@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output (vite renderer bundle + electron-builder artifacts)
+dist/
+release/
+out/
+*.dmg
+*.zip
+*.AppImage
+*.deb
+*.exe
+
+# Vendored package tarballs — installed from npm, not needed in history
+*.tgz
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Local secrets. API keys live in the app's userData settings.json, never here —
+# this is belt-and-braces in case anything is ever written to the project dir.
+.env
+.env.local
+settings.json

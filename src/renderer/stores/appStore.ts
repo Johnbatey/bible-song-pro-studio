@@ -1,0 +1,351 @@
+import { create } from 'zustand';
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
+import type {
+  Scene, Theme, Song, BibleVersion, BibleVerse,
+  DisplayState, AIProvider, TranscriptionState, Alert, LiveScriptureState, AudioInputDevice,
+  OperatingMode
+} from '../types';
+
+/**
+ * Persisted slices live in a JSON file under the app's userData dir (via store:* IPC),
+ * falling back to localStorage when running in a plain browser (`npm run dev`).
+ */
+const bspStorage: StateStorage = {
+  getItem: async (name) => {
+    if (window.BSP?.store) {
+      const result = await window.BSP.store.load().catch(() => null);
+      return result?.state ?? null;
+    }
+    return localStorage.getItem(name);
+  },
+  setItem: async (name, value) => {
+    if (window.BSP?.store) {
+      await window.BSP.store.save(value).catch(() => {});
+      return;
+    }
+    localStorage.setItem(name, value);
+  },
+  removeItem: async (name) => {
+    if (window.BSP?.store) {
+      await window.BSP.store.clear().catch(() => {});
+      return;
+    }
+    localStorage.removeItem(name);
+  },
+};
+
+interface AppState {
+  // App state
+  isLoaded: boolean;
+  platform: string;
+
+  // Display
+  display: DisplayState;
+  setMode: (mode: OperatingMode) => void;
+  /**
+   * The single entry point every panel uses to put something on screen.
+   * Studio routes to preview; basic goes straight to program. `direct` (double-click)
+   * always goes straight to program.
+   */
+  projectScene: (scene: Scene, opts?: { direct?: boolean }) => void;
+  /** Studio: send what's in preview to the audience. */
+  takeToProgram: (transition?: boolean) => void;
+  setOutputMode: (mode: 'fullscreen' | 'lowerThird') => void;
+  setOutputStatus: (status: Partial<DisplayState['outputStatus']>) => void;
+  setCurrentScene: (scene: Scene | null) => void;
+  setPreviewScene: (scene: Scene | null) => void;
+  setIsTransitioning: (v: boolean) => void;
+  setExternalDisplay: (v: boolean) => void;
+  cutToScene: (scene: Scene) => void;
+  transitionToScene: (scene: Scene, transitionType?: string) => void;
+
+  // Scenes
+  scenes: Scene[];
+  addScene: (scene: Scene) => void;
+  removeScene: (id: string) => void;
+  updateScene: (id: string, updates: Partial<Scene>) => void;
+  reorderScenes: (from: number, to: number) => void;
+
+  // Themes
+  themes: Theme[];
+  activeTheme: Theme | null;
+  setActiveTheme: (theme: Theme | null) => void;
+  addTheme: (theme: Theme) => void;
+  updateTheme: (id: string, updates: Partial<Theme>) => void;
+  removeTheme: (id: string) => void;
+
+  // Songs
+  songs: Song[];
+  addSong: (song: Song) => void;
+  removeSong: (id: string) => void;
+  updateSong: (id: string, updates: Partial<Song>) => void;
+  setSongs: (songs: Song[]) => void;
+
+  // Bible
+  bibleVersions: BibleVersion[];
+  currentBibleVersion: BibleVersion | null;
+  verseHistory: BibleVerse[];
+  setBibleVersions: (versions: BibleVersion[]) => void;
+  setCurrentBibleVersion: (version: BibleVersion | null) => void;
+  addVerseToHistory: (verse: BibleVerse) => void;
+
+  // AI / Transcription
+  aiProviders: AIProvider[];
+  transcription: TranscriptionState;
+  liveScripture: LiveScriptureState;
+  audioInputDevices: AudioInputDevice[];
+  setAIProvider: (id: string, updates: Partial<AIProvider>) => void;
+  setTranscription: (state: Partial<TranscriptionState>) => void;
+  setLiveScripture: (state: Partial<LiveScriptureState>) => void;
+  setAudioInputDevices: (devices: AudioInputDevice[]) => void;
+
+  // Alerts
+  alerts: Alert[];
+  activeAlert: Alert | null;
+  triggerAlert: (alert: Alert) => void;
+  dismissAlert: () => void;
+
+  // UI State
+  sidebarOpen: boolean;
+  toggleSidebar: () => void;
+  setSidebarOpen: (v: boolean) => void;
+}
+
+export const useAppStore = create<AppState>()(persist((set, get) => ({
+  isLoaded: false,
+  platform: 'darwin',
+
+  display: {
+    mode: 'studio',
+    outputMode: 'fullscreen',
+    outputStatus: {
+      isOpen: false,
+      url: '',
+      clients: 0,
+      updatedAt: 0,
+    },
+    currentScene: null,
+    previewScene: null,
+    isTransitioning: false,
+    isExternalDisplayActive: false,
+  },
+
+  setMode: (mode) => set((s) => ({ display: { ...s.display, mode } })),
+  setOutputMode: (outputMode) => set((s) => ({ display: { ...s.display, outputMode } })),
+  setOutputStatus: (status) => set((s) => ({ display: { ...s.display, outputStatus: { ...s.display.outputStatus, ...status } } })),
+  setCurrentScene: (scene) => set((s) => ({ display: { ...s.display, currentScene: scene } })),
+  setPreviewScene: (scene) => set((s) => ({ display: { ...s.display, previewScene: scene } })),
+  setIsTransitioning: (v) => set((s) => ({ display: { ...s.display, isTransitioning: v } })),
+  setExternalDisplay: (v) => set((s) => ({ display: { ...s.display, isExternalDisplayActive: v } })),
+
+  cutToScene: (scene) => {
+    set((s) => ({
+      display: {
+        ...s.display,
+        currentScene: scene,
+        previewScene: scene,
+        isTransitioning: false,
+      },
+    }));
+  },
+
+  projectScene: (scene, opts = {}) => {
+    const { display } = get();
+    // Keep it in the scene list so it can be re-fired later
+    if (!get().scenes.some((s) => s.id === scene.id)) get().addScene(scene);
+
+    if (opts.direct || display.mode === 'basic') {
+      // Straight to the audience. Preview follows so the two panes agree.
+      set((s) => ({
+        display: { ...s.display, currentScene: scene, previewScene: scene, isTransitioning: false },
+      }));
+      return;
+    }
+    // Studio: stage it only — nothing changes on the audience display until Take.
+    set((s) => ({ display: { ...s.display, previewScene: scene } }));
+  },
+
+  takeToProgram: (transition = false) => {
+    const { display } = get();
+    const scene = display.previewScene;
+    if (!scene) return;
+    if (transition) get().transitionToScene(scene);
+    else get().cutToScene(scene);
+  },
+
+  transitionToScene: (scene, transitionType = 'fade') => {
+    const state = get();
+    set((s) => ({
+      display: { ...s.display, previewScene: scene, isTransitioning: true },
+    }));
+    setTimeout(() => {
+      set((s) => ({
+        display: {
+          ...s.display,
+          currentScene: scene,
+          isTransitioning: false,
+        },
+      }));
+    }, state.display.mode === 'basic' ? 0 : 400);
+  },
+
+  scenes: [],
+  addScene: (scene) => set((s) => ({ scenes: [...s.scenes, scene] })),
+  removeScene: (id) => set((s) => ({ scenes: s.scenes.filter((sc) => sc.id !== id) })),
+  updateScene: (id, updates) =>
+    set((s) => ({
+      scenes: s.scenes.map((sc) => (sc.id === id ? { ...sc, ...updates } : sc)),
+    })),
+  reorderScenes: (from, to) =>
+    set((s) => {
+      const scenes = [...s.scenes];
+      const [moved] = scenes.splice(from, 1);
+      scenes.splice(to, 0, moved);
+      return { scenes };
+    }),
+
+  themes: [],
+  activeTheme: null,
+  setActiveTheme: (theme) => set({ activeTheme: theme }),
+  addTheme: (theme) => set((s) => ({ themes: [...s.themes, theme] })),
+  updateTheme: (id, updates) =>
+    set((s) => ({
+      themes: s.themes.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    })),
+  removeTheme: (id) => set((s) => ({ themes: s.themes.filter((t) => t.id !== id) })),
+
+  songs: [],
+  addSong: (song) => set((s) => ({ songs: [...s.songs, song] })),
+  removeSong: (id) => set((s) => ({ songs: s.songs.filter((so) => so.id !== id) })),
+  updateSong: (id, updates) =>
+    set((s) => ({
+      songs: s.songs.map((so) => (so.id === id ? { ...so, ...updates } : so)),
+    })),
+  setSongs: (songs) => set({ songs }),
+
+  bibleVersions: [],
+  currentBibleVersion: null,
+  verseHistory: [],
+  setBibleVersions: (versions) => set({ bibleVersions: versions }),
+  setCurrentBibleVersion: (version) => set({ currentBibleVersion: version }),
+  addVerseToHistory: (verse) =>
+    set((s) => ({ verseHistory: [verse, ...s.verseHistory].slice(0, 100) })),
+
+  aiProviders: [
+    { id: 'deepgram', name: 'Deepgram', type: 'deepgram', enabled: false },
+    { id: 'speechmatics', name: 'Speechmatics', type: 'speechmatics', enabled: false },
+    { id: 'local', name: 'Local AI (MLX Whisper)', type: 'local', enabled: true },
+  ],
+  transcription: {
+    isActive: false,
+    provider: null,
+    text: '',
+    confidence: 0,
+  },
+  liveScripture: {
+    isActive: false,
+    detectionMode: 'bible',
+    provider: 'local',
+    selectedInputId: '',
+    transcript: '',
+    bestHit: null,
+    suggestions: [],
+    autoProject: true,
+    autoVersionSwitch: true,
+    autoProjectQuoted: false,
+    requestedVersion: null,
+    meter: {
+      level: 0,
+      peak: 0,
+      isMonitoring: false,
+    },
+  },
+  audioInputDevices: [],
+  setAIProvider: (id, updates) =>
+    set((s) => ({
+      aiProviders: s.aiProviders.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+    })),
+  setTranscription: (state) =>
+    set((s) => ({ transcription: { ...s.transcription, ...state } })),
+  setLiveScripture: (state) =>
+    set((s) => ({ liveScripture: { ...s.liveScripture, ...state } })),
+  setAudioInputDevices: (devices) => set({ audioInputDevices: devices }),
+
+  alerts: [],
+  activeAlert: null,
+  triggerAlert: (alert) => set({ activeAlert: alert }),
+  dismissAlert: () => set({ activeAlert: null }),
+
+  sidebarOpen: true,
+  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+  setSidebarOpen: (v) => set({ sidebarOpen: v }),
+}), {
+  name: 'bsp-app-state',
+  version: 1,
+  storage: createJSONStorage(() => bspStorage),
+
+  // Only library content and user preferences survive a restart. Live display state
+  // (current/preview scene, output status, active alert, meter) is deliberately transient.
+  partialize: (state) => ({
+    scenes: state.scenes,
+    songs: state.songs,
+    themes: state.themes,
+    activeTheme: state.activeTheme,
+    verseHistory: state.verseHistory,
+    currentBibleVersion: state.currentBibleVersion,
+    sidebarOpen: state.sidebarOpen,
+    outputMode: state.display.outputMode,
+    operatingMode: state.display.mode,
+    liveScripturePrefs: {
+      detectionMode: state.liveScripture.detectionMode,
+      provider: state.liveScripture.provider,
+      selectedInputId: state.liveScripture.selectedInputId,
+      autoProject: state.liveScripture.autoProject,
+      autoVersionSwitch: state.liveScripture.autoVersionSwitch,
+      autoProjectQuoted: state.liveScripture.autoProjectQuoted,
+    },
+  }),
+
+  // Custom merge: the persisted shape is flattened (outputMode, liveScripturePrefs), so a
+  // shallow spread would clobber `display` and `liveScripture` with partial objects.
+  merge: (persisted, current) => {
+    const saved = (persisted || {}) as Partial<PersistedState>;
+    return {
+      ...current,
+      scenes: saved.scenes ?? current.scenes,
+      songs: saved.songs ?? current.songs,
+      themes: saved.themes ?? current.themes,
+      activeTheme: saved.activeTheme ?? current.activeTheme,
+      verseHistory: saved.verseHistory ?? current.verseHistory,
+      currentBibleVersion: saved.currentBibleVersion ?? current.currentBibleVersion,
+      sidebarOpen: saved.sidebarOpen ?? current.sidebarOpen,
+      display: {
+        ...current.display,
+        outputMode: saved.outputMode ?? current.display.outputMode,
+        // Older builds stored 'program' | 'preview' | 'simple'. 'simple' was the
+        // program-only workflow, so it maps to basic; everything else to studio.
+        mode: saved.operatingMode === 'basic' || saved.operatingMode === 'simple'
+          ? 'basic'
+          : saved.operatingMode === 'studio' ? 'studio' : current.display.mode,
+      },
+      liveScripture: { ...current.liveScripture, ...(saved.liveScripturePrefs || {}) },
+    };
+  },
+}));
+
+interface PersistedState {
+  scenes: Scene[];
+  songs: Song[];
+  themes: Theme[];
+  activeTheme: Theme | null;
+  verseHistory: BibleVerse[];
+  currentBibleVersion: BibleVersion | null;
+  sidebarOpen: boolean;
+  outputMode: DisplayState['outputMode'];
+  /** 'simple' only appears in state written by pre-studio/basic builds. */
+  operatingMode: OperatingMode | 'simple' | 'program' | 'preview';
+  liveScripturePrefs: Pick<
+    LiveScriptureState,
+    'detectionMode' | 'provider' | 'selectedInputId' | 'autoProject' | 'autoVersionSwitch' | 'autoProjectQuoted'
+  >;
+}

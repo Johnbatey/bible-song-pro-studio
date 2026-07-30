@@ -1,0 +1,555 @@
+export interface Scene {
+  id: string;
+  name: string;
+  type: 'bible' | 'song' | 'media' | 'presentation' | 'custom';
+  content: SceneContent;
+  background?: Background;
+  transition?: Transition;
+}
+
+export interface SceneContent {
+  text?: string;
+  reference?: string;
+  version?: string;
+  html?: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'youtube';
+  slides?: Slide[];
+  slideId?: string;
+  /** Second translation, rendered side by side with the primary text. */
+  secondaryVerse?: SecondaryVerse;
+  /** Shown as a small footer on song scenes — required by most CCLI licences. */
+  songCredit?: SongCredit;
+}
+
+export interface SecondaryVerse {
+  text: string;
+  reference: string;
+  version: string;
+}
+
+export interface SongCredit {
+  title?: string;
+  author?: string;
+  copyright?: string;
+  ccli?: string;
+}
+
+export interface Slide {
+  id: string;
+  text: string;
+  html?: string;
+  notes?: string;
+  title?: string;
+  label?: string;
+  transition?: 'cut' | 'fade' | 'crossfade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'zoom-in' | 'zoom-out';
+  durationMs?: number;
+  hidden?: boolean;
+  buildCount?: number;
+  buildStep?: number;
+  previewDataUrl?: string;
+  thumbDataUrl?: string;
+  thumbText?: string;
+}
+
+export interface PresentationDeck {
+  id: string;
+  title: string;
+  slides: PresentationSlide[];
+  createdAt: number;
+  updatedAt: number;
+  sourceType?: 'internal' | 'pptx' | 'pdf' | 'image' | 'txt' | 'md';
+  sourcePath?: string;
+}
+
+export interface PresentationSlide {
+  id: string;
+  title: string;
+  body: string;
+  label: string;
+  notes: string;
+  transition: 'cut' | 'fade' | 'crossfade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'zoom-in' | 'zoom-out';
+  durationMs: number;
+  hidden: boolean;
+  buildCount: number;
+  buildStep: number;
+  previewDataUrl?: string;
+  thumbDataUrl?: string;
+  thumbText?: string;
+}
+
+export interface Background {
+  type: 'solid' | 'gradient' | 'image' | 'video' | 'transparent';
+  color?: string;
+  gradient?: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
+  fit?: 'cover' | 'contain' | 'fill';
+  loop?: boolean;
+  linkedMode?: boolean;
+  opacity?: number;
+}
+
+export interface Transition {
+  type: 'fade' | 'crossfade' | 'slide' | 'zoom' | 'cut' | 'custom';
+  duration: number;
+  easing?: string;
+}
+
+export interface Theme {
+  id: string;
+  name: string;
+  lowerThird: LowerThirdTheme;
+  fullScreen: FullScreenTheme;
+  slideTheme: SlideTheme;
+  bibleOptions?: BibleDisplayOptions;
+  songOptions?: SongDisplayOptions;
+}
+
+export interface LowerThirdTheme {
+  background: string;
+  backgroundColor: string;
+  backgroundOpacity: number;
+  accentColor: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  fontColor: string;
+  textAlign: 'left' | 'center' | 'right';
+  padding: number;
+  borderRadius: number;
+  animation: string;
+  position: 'bottom-left' | 'bottom-center' | 'bottom-right' | 'top-left' | 'top-center' | 'top-right';
+  width?: number;
+  offsetX?: number;
+  offsetY?: number;
+  scale?: number;
+  anchor?: 'top' | 'bottom';
+}
+
+export interface FullScreenTheme {
+  backgroundColor: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  fontColor: string;
+  textAlign: 'center' | 'left';
+  animation: string;
+  referenceFontSize?: number;
+  lineHeight?: number;
+  verticalAlign?: 'top' | 'middle' | 'bottom';
+  autoResize?: 'none' | 'shrink' | 'grow';
+}
+
+export interface SlideTheme {
+  backgroundColor: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  fontColor: string;
+  accentColor: string;
+  transition: string;
+}
+
+export interface BibleDisplayOptions {
+  showVersion: boolean;
+  shortenVersions: boolean;
+  shortenBooks: boolean;
+  showVerseNumbers: boolean;
+  versionSwitchUpdatesOutput: boolean;
+}
+
+export interface SongDisplayOptions {
+  textTransform: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+  showCategoryName: boolean;
+  displayBySections: boolean;
+}
+
+export interface Song {
+  id: string;
+  title: string;
+  artist?: string;
+  key?: string;
+  tempo?: number;
+  slides: SongSlide[];
+  categories?: string[];
+  /** Licensing metadata — displayed as a credit footer when projecting. */
+  author?: string;
+  copyright?: string;
+  ccli?: string;
+}
+
+export interface SongSlide {
+  id: string;
+  label: string;
+  text: string;
+  order: number;
+}
+
+/** Shape returned by song-import-service.cjs (OpenLyrics / ChordPro / plain text). */
+export interface ImportedSong {
+  title: string;
+  verses: Array<{ name: string; lines: string[] }>;
+  format: 'openlyrics' | 'chordpro' | 'plain';
+  author?: string;
+  copyright?: string;
+  ccli?: string;
+}
+
+export interface SongImportResult {
+  ok: boolean;
+  songs?: ImportedSong[];
+  format?: string;
+  error?: string;
+}
+
+export interface AppSettings {
+  /** Secrets never come back from main — only whether one is stored. */
+  deepgramApiKeySet?: boolean;
+  speechmaticsApiKeySet?: boolean;
+  obsPasswordSet?: boolean;
+  deepgramModel: string;
+  deepgramLanguage: string;
+  sttEngine: 'local' | 'deepgram';
+  obsUrl: string;
+  obsAutoConnect: boolean;
+}
+
+export interface AppSettingsPatch {
+  deepgramApiKey: string;
+  deepgramModel: string;
+  deepgramLanguage: string;
+  sttEngine: 'local' | 'deepgram';
+  obsUrl: string;
+  obsPassword: string;
+  obsAutoConnect: boolean;
+}
+
+export interface ObsStatus {
+  ok: boolean;
+  connected: boolean;
+  identified: boolean;
+  url: string;
+  hasPassword: boolean;
+  currentScene: string;
+  scenes: string[];
+  streaming: boolean;
+  recording: boolean;
+  obsVersion: string;
+  reconnectAttempts: number;
+  lastError: string;
+}
+
+export type SttState = 'idle' | 'connecting' | 'live' | 'reconnecting' | 'stalled' | 'error';
+
+export interface SttStatus {
+  ok: boolean;
+  provider: string;
+  state: SttState;
+  running: boolean;
+  configured: boolean;
+  model: string;
+  language: string;
+  sampleRate: number;
+  bytesSent: number;
+  lastResultAt: number;
+  reconnectAttempts: number;
+  handshakeFailures: number;
+  lastError: string;
+}
+
+export type SttEvent =
+  | { type: 'state'; state: SttState; detail: string; status: SttStatus }
+  | { type: 'transcript'; text: string; isFinal: boolean; speechFinal: boolean; confidence: number }
+  | { type: 'utterance-end' }
+  | { type: 'error'; error: string };
+
+export interface MediaItem {
+  id: string;
+  file: string;
+  name: string;
+  type: 'image' | 'video';
+  size: number;
+  addedAt: number;
+  /** Server-relative path, e.g. /media/<file>. Prefix with the app server origin to use. */
+  url: string;
+}
+
+export interface MediaImportResult {
+  ok: boolean;
+  items: MediaItem[];
+  errors: string[];
+  canceled?: boolean;
+}
+
+export interface BibleVersion {
+  id: string;
+  name: string;
+  abbreviation: string;
+  language: string;
+  books: BibleBook[];
+}
+
+export interface BibleBook {
+  name: string;
+  chapters: number;
+}
+
+export interface BibleVerse {
+  book: string;
+  chapter: number;
+  verse: number;
+  text: string;
+  version: string;
+  reference: string;
+}
+
+export interface BibleSearchResult extends BibleVerse {
+  score?: number;
+}
+
+/**
+ * studio — preview and program side by side; content lands in preview and only reaches
+ *          the audience when you Take it (double-click bypasses straight to program).
+ * basic  — program only; content goes live the moment you send it.
+ */
+export type OperatingMode = 'studio' | 'basic';
+
+export interface DisplayState {
+  mode: OperatingMode;
+  outputMode: 'fullscreen' | 'lowerThird';
+  outputStatus: {
+    isOpen: boolean;
+    url: string;
+    clients: number;
+    updatedAt: number;
+  };
+  currentScene: Scene | null;
+  previewScene: Scene | null;
+  isTransitioning: boolean;
+  isExternalDisplayActive: boolean;
+}
+
+export interface AudioInputDevice {
+  deviceId: string;
+  label: string;
+}
+
+export interface AudioMeterState {
+  level: number;
+  peak: number;
+  isMonitoring: boolean;
+}
+
+export interface LiveScriptureState {
+  isActive: boolean;
+  detectionMode: 'bible' | 'song';
+  provider: 'deepgram' | 'local' | 'mlx-whisper';
+  selectedInputId: string;
+  transcript: string;
+  bestHit: BibleSearchResult | null;
+  suggestions: BibleSearchResult[];
+  autoProject: boolean;
+  autoVersionSwitch: boolean;
+  autoProjectQuoted: boolean;
+  requestedVersion: string | null;
+  meter: AudioMeterState;
+  mlxStatus?: any;
+}
+
+export interface AIProvider {
+  id: string;
+  name: string;
+  type: 'deepgram' | 'speechmatics' | 'local';
+  enabled: boolean;
+  apiKey?: string;
+}
+
+export interface TranscriptionState {
+  isActive: boolean;
+  provider: AIProvider | null;
+  text: string;
+  confidence: number;
+}
+
+export interface Alert {
+  id: string;
+  text: string;
+  type: 'info' | 'warning' | 'announcement' | 'custom';
+  duration: number;
+  animation: string;
+}
+
+declare global {
+  interface Window {
+    BSP: {
+      platform: () => Promise<string>;
+      userDataPath: () => Promise<string>;
+      getDisplayUrl: () => Promise<string>;
+      window: {
+        minimize: () => Promise<void>;
+        maximize: () => Promise<void>;
+        close: () => Promise<void>;
+        isMaximized: () => Promise<boolean>;
+        isFullScreen: () => Promise<boolean>;
+        onFullScreenChange: (cb: (val: boolean) => void) => void;
+      };
+      display: {
+        open: (index?: number) => Promise<boolean>;
+        close: () => Promise<boolean>;
+        getDisplays: () => Promise<Array<{ index: number; name: string; bounds: any; isPrimary: boolean }>>;
+        sendState: (state: any) => Promise<any>;
+        getState: () => Promise<any>;
+        isOpen: () => Promise<boolean>;
+        getStatus: () => Promise<{ isOpen: boolean; url: string; clients: number; updatedAt: number }>;
+      };
+      bible: {
+        getVersions: () => Promise<BibleVersion[]>;
+        getBooks: (versionId: string) => Promise<BibleBook[]>;
+        getChapter: (payload: { versionId: string; book: string; chapter: number }) => Promise<BibleVerse[]>;
+        search: (payload: { versionId: string; query: string; limit?: number }) => Promise<BibleSearchResult[]>;
+      };
+
+      verse: {
+        detect: (payload: { text: string; options?: { versionId?: string; modes?: string[]; limit?: number; minConfidence?: number } }) => Promise<VerseDetectionResult>;
+      };
+      audio: {
+        getInputDevices: () => Promise<AudioInputDevice[]>;
+      };
+      ai: {
+        // Unified API
+        status: () => Promise<TranscriptionStatus>;
+        warmup: (payload?: any) => Promise<any>;
+        transcribe: (payload?: any) => Promise<TranscriptionResult>;
+        dispose: (payload?: any) => Promise<any>;
+        setEngine: (engine: string) => Promise<any>;
+        // Backward-compatible aliases
+        getMlxWhisperStatus: () => Promise<any>;
+        warmupMlxWhisper: (payload?: any) => Promise<any>;
+        transcribeMlxWhisper: (payload?: any) => Promise<any>;
+        disposeMlxWhisper: () => Promise<any>;
+      };
+      ndi: {
+        start: () => Promise<any>;
+        stop: () => Promise<any>;
+        status: () => Promise<any>;
+      };
+      session: {
+        start: (payload?: { name?: string }) => Promise<any>;
+        end: () => Promise<any>;
+        addEntry: (payload: { type: string; reference: string; book?: string; chapter?: number; verse?: number; text: string; version?: string; mode?: string; source?: string; confidence?: number }) => Promise<any>;
+        list: () => Promise<{ ok: boolean; sessions: Array<{ id: string; name: string; startedAt: string; endedAt: string | null; entries: number }> }>;
+        get: (id: string) => Promise<any>;
+        export: (payload: { id: string; format?: 'json' | 'csv' }) => Promise<any>;
+        status: () => Promise<any>;
+      };
+      song: {
+        importFile: (payload: { filePath: string }) => Promise<SongImportResult>;
+        importText: (payload: { text: string }) => Promise<SongImportResult>;
+      };
+      store: {
+        load: () => Promise<{ ok: boolean; state: string | null; error?: string }>;
+        save: (value: string) => Promise<{ ok: boolean }>;
+        clear: () => Promise<{ ok: boolean }>;
+      };
+      settings: {
+        get: () => Promise<{ ok: boolean; settings: AppSettings }>;
+        set: (patch: Partial<AppSettingsPatch>) => Promise<{ ok: boolean; settings: AppSettings }>;
+        clearSecret: (key: string) => Promise<{ ok: boolean; settings?: AppSettings }>;
+      };
+      stt: {
+        start: (payload?: { model?: string; language?: string }) => Promise<{ ok: boolean; error?: string; status: SttStatus }>;
+        stop: () => Promise<{ ok: boolean }>;
+        status: () => Promise<SttStatus>;
+        sendAudio: (chunk: ArrayBuffer) => void;
+        onEvent: (cb: (event: SttEvent) => void) => () => void;
+      };
+      obs: {
+        connect: (payload?: { url?: string; password?: string }) => Promise<{ ok: boolean; error?: string; status: ObsStatus }>;
+        disconnect: () => Promise<{ ok: boolean; status: ObsStatus }>;
+        status: () => Promise<ObsStatus>;
+        setScene: (sceneName: string) => Promise<{ ok: boolean; error?: string }>;
+        toggleStream: () => Promise<{ ok: boolean; active?: boolean; error?: string }>;
+        toggleRecord: () => Promise<{ ok: boolean; active?: boolean; error?: string }>;
+        refresh: () => Promise<unknown>;
+        onEvent: (cb: (event: { type: string; status: ObsStatus }) => void) => () => void;
+      };
+      media: {
+        list: () => Promise<{ ok: boolean; items: MediaItem[] }>;
+        pick: () => Promise<MediaImportResult>;
+        import: (paths: string[]) => Promise<MediaImportResult>;
+        remove: (id: string) => Promise<{ ok: boolean; error?: string }>;
+        rename: (id: string, name: string) => Promise<{ ok: boolean; item?: MediaItem }>;
+        baseUrl: () => Promise<string>;
+        pathForFile: (file: File) => string;
+      };
+      openSlideEditor: () => Promise<boolean>;
+      openStageDisplay: () => Promise<boolean>;
+    };
+  }
+}
+
+export interface TranscriptionStatus {
+  ok: boolean;
+  activeEngine: string;
+  platform: { os: string; arch: string; isAppleSilicon: boolean };
+  engines: {
+    onnx: {
+      ok: boolean;
+      name: string;
+      modelId: string;
+      available: boolean;
+      ready: boolean;
+      warmupState: string;
+      lastError: string;
+    };
+    mlx: {
+      ok: boolean;
+      name: string;
+      available: boolean;
+      ready: boolean;
+      warmupState: string;
+      lastError: string;
+    };
+  };
+}
+
+export interface TranscriptionSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface VerseDetection {
+  mode: 'direct' | 'contextual' | 'verbatim' | 'semantic';
+  book: string;
+  chapter: number;
+  verseStart: number;
+  verseEnd: number | null;
+  displayRef: string;
+  text: string;
+  verses: Array<{ verse: number; text: string }>;
+  confidence: number;
+  hintText?: string;
+  wordOverlap?: number;
+  semanticScore?: number;
+}
+
+export interface VerseDetectionResult {
+  ok: boolean;
+  text: string;
+  detections: VerseDetection[];
+  totalFound: number;
+  modes: string[];
+}
+
+export interface TranscriptionResult {
+  ok: boolean;
+  provider?: string;
+  text: string;
+  segments?: TranscriptionSegment[];
+  confidence: number;
+  isPassthrough?: boolean;
+  activeEngine?: string;
+  error?: string;
+}

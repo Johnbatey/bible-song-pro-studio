@@ -1,0 +1,1653 @@
+/* =========================================================================
+   BSPSlideEditor — stylesheet
+   -------------------------------------------------------------------------
+   Replaces the Tailwind CDN layer. Ships to BSP as css/panel/47-slide-editor.css
+   and is appended to the panel CSS bundle by scripts/build-panel-bundles.js
+   (deferred partition — the editor is not part of first paint).
+
+   RULES THIS FILE FOLLOWS
+   -----------------------
+   1. No reset, ever. Tailwind's preflight would restyle every element in BSP's
+      panel. Nothing here selects a bare tag outside `.slide-editor`.
+   2. Everything is scoped under `.slide-editor`, the editor root. One class on
+      one wrapper keeps the whole subsystem out of BSP's cascade.
+   3. Colors come from BSP's tokens (css/panel/00-tokens.css) — never literals.
+      That is what makes the editor follow BSP's dark/light themes for free:
+      `[data-theme-mode="light"]` re-points the tokens and we inherit it.
+   4. Local tokens below are aliases with fallbacks, so this file also renders
+      standalone in the testbed where BSP's tokens are absent.
+
+   HOST REQUIREMENT: `.slide-editor` is a full-height flex column, so whatever
+   wraps it must have a DEFINITE height — otherwise `height: 100%` resolves to
+   auto, the column grows past the viewport and the floating tool bar lands
+   below the fold. In BSP that height comes from `#page-slide-editor.app-page`;
+   the testbed sets `html, body { height: 100% }` in its own <style> block.
+
+   The palette the prototype encoded as a `tailwind.config` remap (the reference
+   orange primary, calm blue secondary, inverted Apple-neutral surfaces) now
+   lives in --se-accent / --se-accent-2 / the surface ramp. The markup never
+   names a color, so retheming stays a one-block edit.
+   ========================================================================= */
+
+.slide-editor {
+  /* ── Surfaces (BSP token, testbed fallback) ───────────────────────── */
+  --se-bg:            var(--bg-dark, #f5f5f7);
+  --se-surface:       var(--bg-panel, #ffffff);
+  --se-surface-2:     var(--panel-content-bg, #f5f5f7);
+  --se-surface-hover: var(--header-btn-bg, rgba(0, 0, 0, 0.05));
+
+  /* ── Text ─────────────────────────────────────────────────────────── */
+  --se-text:      var(--text, #1c1c1e);
+  --se-text-2:    var(--text-secondary, #6e6e73);
+  --se-text-3:    var(--text-tertiary, #8e8e93);
+
+  /* ── Lines ────────────────────────────────────────────────────────── */
+  --se-border:    var(--border, rgba(0, 0, 0, 0.1));
+  --se-border-2:  var(--border-elevated, rgba(0, 0, 0, 0.16));
+
+  /* ── Accents ──────────────────────────────────────────────────────── */
+  --se-accent:       var(--accent, #f4621f);
+  --se-accent-hover: var(--accent-light, #ff7a45);
+  --se-accent-ink:   #ffffff;
+  --se-accent-2:     #2f80ed;         /* secondary (import / informational) */
+  --se-danger:       var(--danger, #ff453a);
+  --se-success:      var(--success, #30d158);
+
+  /* ── Geometry & motion ────────────────────────────────────────────── */
+  --se-r-sm: var(--radius-sm, 6px);
+  --se-r-md: var(--radius-md, 10px);
+  --se-r-lg: var(--radius-lg, 14px);
+  --se-r-xl: var(--radius-xl, 20px);
+  --se-gap-xs: var(--space-xs, 4px);
+  --se-gap-sm: var(--space-sm, 8px);
+  --se-gap-md: var(--space-md, 12px);
+  --se-gap-lg: var(--space-lg, 16px);
+  --se-ease: var(--ease-out, cubic-bezier(0, 0, 0.2, 1));
+  --se-fast: var(--duration-fast, 150ms);
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: var(--se-text);
+  background: var(--se-bg);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* When the editor root is ALSO one of BSP's pages, page visibility wins.
+   `.app-page` is `display:none` until `.active`, but this stylesheet sorts
+   after 13-app-shell.css, so the `display:flex` above would otherwise leave the
+   editor permanently visible on top of the panel. */
+.app-page.slide-editor:not(.active) {
+  display: none;
+}
+
+/* The editor is a full-workspace tool: it owns everything below BSP's top nav,
+   the same way the Slides page hides #left-workspace. Without this it competes
+   with the persistent dock (Live Scripture, scenes/sources, program display,
+   ~312 px) and is left with roughly half the viewport. The top nav deliberately
+   stays visible so the operator can always navigate away.
+
+   `slide-editor-active` is set on <body> by switchAppPage(), so this only ever
+   applies while the editor is the active page. */
+body.slide-editor-active #app-dock-shell {
+  display: none !important;
+}
+body.slide-editor-active #left-workspace {
+  display: none !important;
+}
+
+/* Scoped box-sizing — deliberately NOT a global `*` rule. */
+.slide-editor *,
+.slide-editor *::before,
+.slide-editor *::after { box-sizing: border-box; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--se-gap-lg);
+  padding: var(--se-gap-md) var(--se-gap-lg);
+  border-bottom: 1px solid var(--se-border);
+  background: var(--se-surface);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+.se-header-group {
+  display: flex;
+  align-items: center;
+  gap: var(--se-gap-md);
+}
+
+.se-wordmark {
+  margin: 0;
+  padding-right: var(--se-gap-xs);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--se-text);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BUTTONS
+   .se-btn is the base; a variant sets its colors; .se-btn-icon is the
+   square icon-only form used for undo/redo and the tool rail.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--se-gap-sm);
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--se-r-lg);
+  background: var(--se-surface-2);
+  color: var(--se-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--se-fast) var(--se-ease),
+              color var(--se-fast) var(--se-ease),
+              border-color var(--se-fast) var(--se-ease);
+}
+
+.se-btn:hover { background: var(--se-surface-hover); }
+
+.se-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  background: var(--se-surface-2);
+}
+
+.se-btn-neutral {
+  background: var(--se-surface-2);
+  border-color: var(--se-border);
+}
+
+.se-btn-primary {
+  background: var(--se-accent);
+  border-color: transparent;
+  color: var(--se-accent-ink);
+  font-weight: 600;
+}
+.se-btn-primary:hover { background: var(--se-accent-hover); }
+
+.se-btn-secondary {
+  background: var(--se-accent-2);
+  border-color: transparent;
+  color: #ffffff;
+  font-weight: 600;
+}
+.se-btn-secondary:hover { filter: brightness(1.08); }
+
+.se-btn-success {
+  background: var(--se-success);
+  border-color: transparent;
+  color: #06240f;
+  font-weight: 600;
+}
+.se-btn-success:hover { filter: brightness(1.08); }
+
+.se-btn-danger {
+  background: color-mix(in srgb, var(--se-danger) 16%, transparent);
+  border-color: color-mix(in srgb, var(--se-danger) 45%, transparent);
+  color: var(--se-danger);
+  font-weight: 600;
+}
+.se-btn-danger:hover {
+  background: color-mix(in srgb, var(--se-danger) 26%, transparent);
+}
+
+/* Square icon button. */
+.se-btn-icon-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--se-r-sm);
+}
+
+.se-btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  gap: 0;
+  border-radius: var(--se-r-md);
+  background: transparent;
+  color: var(--se-text-2);
+}
+.se-btn-icon:hover {
+  background: var(--se-surface-hover);
+  color: var(--se-accent);
+}
+.se-btn-icon:disabled {
+  background: transparent;
+  color: var(--se-text-2);
+}
+.se-btn-icon svg { width: 18px; height: 18px; }
+
+/* Controls the active AI provider cannot serve (see ai/studio.js). */
+.se-btn.is-unavailable,
+.slide-editor .is-unavailable {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SEGMENTED CONTROL  (mode toggle, inspector tabs, left nav)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-segmented {
+  display: flex;
+  gap: var(--se-gap-xs);
+  padding: 4px;
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-xl);
+  background: var(--se-surface-2);
+}
+
+.se-segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--se-gap-sm);
+  flex: 1 1 auto;
+  padding: 7px 16px;
+  border: 0;
+  border-radius: var(--se-r-md);
+  background: transparent;
+  color: var(--se-text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--se-fast) var(--se-ease),
+              color var(--se-fast) var(--se-ease);
+}
+
+.se-segmented-btn:hover { color: var(--se-text); }
+
+.se-segmented-btn.is-active {
+  background: var(--se-accent);
+  color: var(--se-accent-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ICONS
+   Replaces FontAwesome. Icons are inline SVG sized by this class, so the
+   editor carries no icon font and no CDN request.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.se-icon-sm { width: 13px; height: 13px; }
+.se-icon-lg { width: 26px; height: 26px; }
+.se-icon-xl { width: 34px; height: 34px; }
+.se-icon-accent { color: var(--se-accent); }
+.se-icon-secondary { color: var(--se-accent-2); }
+.se-icon-success { color: var(--se-success); }
+.se-icon-danger { color: var(--se-danger); }
+
+.se-spin { animation: se-spin 0.9s linear infinite; }
+@keyframes se-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .se-spin { animation: none; }
+}
+
+.se-audio { width: 100%; height: 32px; }
+
+/* Small count pill (template count, badges in section headers). */
+.se-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--se-surface-2);
+  color: var(--se-text-2);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LAYOUT SHELL
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.se-rail {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 256px;
+  min-height: 0;
+  border-right: 1px solid var(--se-border);
+  background: var(--se-surface);
+}
+
+.se-rail-nav {
+  padding: var(--se-gap-md);
+  border-bottom: 1px solid var(--se-border);
+}
+
+/* A rail page (Slides / Templates). Owns the flex layout so showing and hiding
+   it is a single `.se-hidden` toggle, not the old hidden/flex class pair. */
+.se-rail-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.se-inspector {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 320px;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--se-border);
+  background: var(--se-surface);
+}
+
+.se-workspace {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+  .se-body { flex-direction: column; }
+  .se-rail,
+  .se-inspector {
+    flex: 0 0 auto;
+    border-right: 0;
+    border-left: 0;
+    border-top: 1px solid var(--se-border);
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CANVAS BOARD + FLOATING WORKSPACE CHROME
+   The board itself is positioned by JS (translate + scale); only its
+   appearance lives here.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-board {
+  width: 1280px;
+  height: 720px;
+  overflow: visible;
+  background: #ffffff;
+  border: 1px solid var(--se-border);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.se-layer-fill { width: 100%; height: 100%; position: relative; }
+
+/* Grid + alignment-guide overlays sit above the content, below the chrome. */
+.se-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.se-overlay-grid  { z-index: 30; }
+.se-overlay-guide { z-index: 40; }
+
+/* Floating chrome pinned over the viewport (mode chip, zoom, tool bar). */
+.se-float {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--se-gap-sm);
+  padding: 6px 10px;
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-md);
+  background: color-mix(in srgb, var(--se-surface) 92%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  font-size: 12px;
+}
+
+.se-float-tl { top: var(--se-gap-lg); left: 20px; pointer-events: none; }
+.se-float-tr { top: var(--se-gap-lg); right: 20px; padding: 4px; }
+
+.se-float-toolbar {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  gap: var(--se-gap-xs);
+  padding: 6px;
+  border-radius: var(--se-r-xl);
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+/* Live-mode dot on the workspace indicator. */
+.se-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--se-accent);
+}
+
+.se-zoom-value {
+  width: 48px;
+  padding: 0 var(--se-gap-sm);
+  text-align: center;
+  user-select: none;
+  color: var(--se-text-2);
+}
+
+.se-divider-v {
+  width: 1px;
+  height: 24px;
+  margin: 0 var(--se-gap-xs);
+  align-self: center;
+  background: var(--se-border);
+}
+
+/* A tool-rail button. `.is-active` is the selected tool or an engaged
+   toggle — set by edit/tools.js and edit/snap.js with classList, never by
+   rewriting className. */
+.se-tool {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  gap: 0;
+  border: 1px solid transparent;
+  border-radius: var(--se-r-md);
+  background: var(--se-surface-2);
+  color: var(--se-text);
+}
+.se-tool:hover { background: var(--se-surface-hover); }
+
+.se-tool.is-active {
+  background: color-mix(in srgb, var(--se-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--se-accent) 50%, transparent);
+  color: var(--se-accent);
+}
+
+.se-tool svg { width: 18px; height: 18px; }
+
+.se-tool-danger { color: var(--se-danger); }
+.se-tool-danger:hover {
+  background: color-mix(in srgb, var(--se-danger) 14%, transparent);
+  border-color: color-mix(in srgb, var(--se-danger) 40%, transparent);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PANEL SECTIONS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--se-gap-sm);
+  padding: var(--se-gap-md) var(--se-gap-lg);
+  border-bottom: 1px solid var(--se-border);
+}
+
+.se-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--se-text-3);
+}
+
+/* An inspector page (Design / Layer / AI / PPTX). Like `.se-rail-panel`, it
+   owns its own padding and rhythm so `switchSidebarTab` only toggles
+   `.se-hidden`. */
+.se-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--se-gap-lg);
+  padding: var(--se-gap-lg);
+}
+
+.se-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--se-gap-md);
+}
+
+.se-footnote {
+  padding: var(--se-gap-sm) var(--se-gap-lg);
+  border-top: 1px solid var(--se-border);
+  font-size: 11px;
+  color: var(--se-text-2);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--se-gap-sm);
+}
+
+.se-empty {
+  padding: var(--se-gap-lg);
+  text-align: center;
+  font-size: 11px;
+  color: var(--se-text-3);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FORM CONTROLS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-field { display: flex; flex-direction: column; gap: 6px; }
+
+.se-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--se-text-2);
+}
+
+.se-input,
+.se-select,
+.se-textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-md);
+  background: var(--se-surface-2);
+  color: var(--se-text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.se-input:focus,
+.se-select:focus,
+.se-textarea:focus {
+  outline: none;
+  border-color: var(--se-accent);
+}
+
+.se-textarea { resize: vertical; min-height: 64px; }
+
+.se-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--se-gap-sm);
+}
+
+.se-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--se-gap-xs);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   INSPECTOR CONTENT
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Bordered heading strip at the top of an inspector panel. */
+.se-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--se-gap-sm);
+  padding-bottom: var(--se-gap-md);
+  border-bottom: 1px solid var(--se-border);
+}
+
+.se-title {
+  display: flex;
+  align-items: center;
+  gap: var(--se-gap-sm);
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--se-text);
+}
+
+.se-help {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--se-text-2);
+}
+
+/* A grouped settings block, separated from the one above it. */
+.se-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--se-gap-md);
+  padding-top: var(--se-gap-md);
+  border-top: 1px solid var(--se-border);
+}
+
+/* A filled card (AI studio panels). */
+.se-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--se-gap-md);
+  padding: var(--se-gap-lg);
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-lg);
+  background: var(--se-surface-2);
+}
+
+.se-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--se-accent);
+}
+
+/* Whole block dimmed + inert until something is selected on the canvas. */
+.se-inert {
+  opacity: 0.4;
+  pointer-events: none;
+  transition: opacity var(--se-fast) var(--se-ease);
+}
+.se-inert.is-live { opacity: 1; pointer-events: auto; }
+
+.se-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--se-gap-md);
+  padding: 36px var(--se-gap-lg);
+  border: 1px dashed var(--se-border-2);
+  border-radius: var(--se-r-lg);
+  text-align: center;
+  color: var(--se-text-2);
+}
+.se-empty-state svg { width: 28px; height: 28px; color: var(--se-text-3); }
+
+/* Informational callout (XML preservation notice). */
+.se-note {
+  padding: var(--se-gap-md);
+  border: 1px solid color-mix(in srgb, var(--se-accent) 30%, transparent);
+  border-radius: var(--se-r-md);
+  background: color-mix(in srgb, var(--se-accent) 8%, transparent);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--se-text-2);
+}
+.se-note strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--se-accent);
+}
+
+/* Colour swatch + its hex readout. */
+.se-swatch {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.se-hex {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--se-text-2);
+}
+
+.se-range {
+  width: 100%;
+  height: 4px;
+  border-radius: var(--se-r-sm);
+  background: var(--se-surface-hover);
+  appearance: none;
+  cursor: pointer;
+  accent-color: var(--se-accent);
+}
+
+.se-check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  accent-color: var(--se-accent);
+  cursor: pointer;
+}
+
+/* Label with a control pushed to the far edge. */
+.se-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--se-gap-sm);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--se-text-2);
+  cursor: pointer;
+}
+
+/* Slider caption: name on the left, live value on the right. */
+.se-meter-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--se-text-3);
+}
+
+/* Row of equal-width toggles (bold/italic/underline, text alignment). */
+.se-toggle-row {
+  display: flex;
+  gap: var(--se-gap-xs);
+  padding: 2px;
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-md);
+  background: var(--se-surface-2);
+}
+
+.se-toggle {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 0;
+  border: 0;
+  border-radius: var(--se-r-sm);
+  background: transparent;
+  color: var(--se-text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--se-fast) var(--se-ease),
+              color var(--se-fast) var(--se-ease);
+}
+.se-toggle:hover { background: var(--se-surface-hover); color: var(--se-text); }
+.se-toggle.is-active {
+  background: color-mix(in srgb, var(--se-accent) 16%, transparent);
+  color: var(--se-accent);
+}
+.se-toggle svg { width: 15px; height: 15px; }
+
+/* Text input with buttons docked inside its right edge (background hex). */
+.se-input-affix { position: relative; flex: 1 1 auto; min-width: 0; }
+.se-input-affix .se-input { padding-right: 66px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.se-affix-actions {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-sm);
+  background: var(--se-surface);
+}
+
+/* Imported-deck file chip in the PPTX panel. */
+.se-file-chip {
+  padding: var(--se-gap-md);
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-md);
+  background: var(--se-surface-2);
+}
+
+/* Bounded scroll area (the modifier text-field list). */
+.se-scroll-y {
+  display: flex;
+  flex-direction: column;
+  gap: var(--se-gap-md);
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: var(--se-gap-xs);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DECK NAVIGATOR THUMBNAILS  (render/thumbnails.js)
+   The 16:9 frame and its scaled content layer stay in the host page's own
+   style block; only the chrome around them lives here.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-thumb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--se-gap-sm);
+  cursor: pointer;
+}
+.se-thumb.is-dragging { opacity: 0.4; }
+
+.slide-thumb-preview-wrap.is-active {
+  border-color: var(--se-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--se-accent) 30%, transparent);
+}
+
+.se-thumb-index {
+  position: absolute;
+  left: var(--se-gap-sm);
+  bottom: var(--se-gap-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--se-r-sm);
+  background: color-mix(in srgb, var(--se-surface) 85%, transparent);
+  backdrop-filter: blur(8px);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--se-text-2);
+}
+.slide-thumb-preview-wrap.is-active .se-thumb-index { color: var(--se-accent); }
+
+/* Per-slide actions, revealed on hover over the thumbnail. */
+.se-thumb-actions {
+  position: absolute;
+  top: var(--se-gap-sm);
+  right: var(--se-gap-sm);
+  display: flex;
+  gap: var(--se-gap-xs);
+  opacity: 0;
+  transition: opacity var(--se-fast) var(--se-ease);
+}
+.se-thumb:hover .se-thumb-actions { opacity: 1; }
+.se-thumb-actions .se-btn {
+  background: color-mix(in srgb, var(--se-surface) 88%, transparent);
+  border-color: var(--se-border);
+}
+
+.se-thumb-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--se-gap-sm);
+  padding: 0 var(--se-gap-xs);
+  font-size: 12px;
+}
+
+.se-thumb-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--se-text-2);
+}
+.se-thumb.is-selected .se-thumb-title { color: var(--se-text); }
+
+.se-thumb-num {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--se-text-3);
+  user-select: none;
+}
+
+.se-thumb-loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--se-surface-2);
+  font-size: 11px;
+  color: var(--se-text-3);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SLIDESHOW OVERLAY  (testbed presenter; BSP owns real projection)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-show {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #02050a;
+}
+
+.se-show-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.se-show-canvas {
+  position: absolute;
+  width: 1280px;
+  height: 720px;
+  transform-origin: center;
+  background: #000000;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.se-show-bar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--se-gap-lg);
+  padding: var(--se-gap-sm) var(--se-gap-lg);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--se-r-xl);
+  background: rgba(20, 20, 22, 0.9);
+  backdrop-filter: blur(20px);
+  color: #f5f5f7;
+  font-size: 12px;
+}
+.se-show-bar .se-btn-icon { color: rgba(245, 245, 247, 0.7); }
+.se-show-bar .se-btn-icon:hover { background: rgba(255, 255, 255, 0.12); color: #ffffff; }
+.se-show-bar .se-btn-icon.is-active { color: var(--se-danger); }
+.se-show-bar .se-divider-v { background: rgba(255, 255, 255, 0.16); }
+.se-show-count { user-select: none; font-weight: 600; }
+
+.se-laser {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ef4444;
+  filter: blur(2px);
+  opacity: 0.75;
+  box-shadow: 0 0 10px #ef4444;
+  pointer-events: none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDERED SLIDE CONTENT  (render/slide-renderer.js, edit/tools.js)
+   Everything inside the 1280×720 board. Geometry is set inline by the
+   renderer from the parsed OOXML; only shared behaviour lives here.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-wrap { overflow-wrap: break-word; white-space: pre-wrap; }
+.se-clip { overflow: hidden; }
+.se-noevents { pointer-events: none; }
+.se-fill { width: 100%; height: 100%; }
+.se-img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Full-board empty / loading state (no deck open, slide still parsing). */
+.se-board-state {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--se-gap-sm);
+  padding: 40px;
+  text-align: center;
+  color: var(--se-text-2);
+}
+.se-board-state h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--se-text);
+}
+.se-board-state .se-help { max-width: 24rem; }
+
+/* A builder element wrapper on the canvas. */
+.se-el {
+  position: absolute;
+  user-select: none;
+}
+.se-el:not(.drag-highlight):hover {
+  outline: 1px dashed color-mix(in srgb, var(--se-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.se-text-layer { width: 100%; }
+.se-text-layer-fixed { height: 100%; overflow: hidden; }
+.se-text-layer.is-editing {
+  outline: 2px solid color-mix(in srgb, var(--se-accent-2) 70%, transparent);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--se-accent-2) 6%, transparent);
+  cursor: text;
+  user-select: text;
+}
+
+/* An imported (modifier) shape on the canvas. */
+.se-mod-el { transition: outline-color var(--se-fast) var(--se-ease); }
+.se-mod-el:hover {
+  outline: 1px solid color-mix(in srgb, var(--se-accent-2) 45%, transparent);
+}
+
+/* A single contentEditable text run inside an imported shape. */
+.se-run { transition: background var(--se-fast) var(--se-ease); }
+.se-run:focus {
+  background: color-mix(in srgb, var(--se-accent-2) 20%, transparent);
+  outline: none;
+}
+
+/* Sidebar card for one editable text box of an imported slide. */
+.se-text-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--se-gap-md);
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-md);
+  background: var(--se-surface-2);
+  transition: border-color var(--se-fast) var(--se-ease);
+}
+.se-text-card:hover { border-color: var(--se-border-2); }
+
+.se-text-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--se-text-3);
+}
+
+.se-text-card-field { resize: vertical; line-height: 1.35; }
+
+/* Bezier pen overlay: anchors, control handles, tangent lines. */
+.se-node-anchor,
+.se-node-handle {
+  position: absolute;
+  z-index: 50;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: crosshair;
+  transform: translate(-50%, -50%);
+}
+
+.se-node-anchor {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #d946ef;
+  border-radius: var(--se-r-sm);
+}
+/* Clicking this anchor would close the path. */
+.se-node-anchor.can-close {
+  border-color: var(--se-success);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--se-success) 35%, transparent);
+}
+
+.se-node-handle {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--se-accent-2);
+  border-radius: 50%;
+}
+
+.se-node-tangent {
+  position: absolute;
+  z-index: 40;
+  border-top: 2px dashed var(--se-accent-2);
+  transform-origin: left center;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CONTEXT MENUS + MODAL
+   Shared by edit/context-menu.js (element menu) and app/templates.js
+   (slide menu + save-template dialog).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 176px;
+  padding: var(--se-gap-xs) 0;
+  border: 1px solid var(--se-border-2);
+  border-radius: var(--se-r-md);
+  background: var(--se-surface);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+  font-size: 12px;
+  color: var(--se-text);
+  user-select: none;
+}
+
+.se-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px var(--se-gap-md);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--se-fast) var(--se-ease);
+}
+.se-menu-item:hover { background: var(--se-surface-hover); }
+.se-menu-item.is-danger { color: var(--se-danger); }
+.se-menu-item.is-danger:hover {
+  background: color-mix(in srgb, var(--se-danger) 12%, transparent);
+}
+
+.se-menu-sep {
+  height: 1px;
+  margin: var(--se-gap-xs) 0;
+  background: var(--se-border);
+}
+
+.se-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.se-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--se-gap-md);
+  width: 288px;
+  padding: var(--se-gap-lg);
+  border: 1px solid var(--se-border-2);
+  border-radius: var(--se-r-lg);
+  background: var(--se-surface);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+}
+.se-modal-actions { justify-content: flex-end; }
+
+.se-em { font-weight: 600; color: var(--se-accent); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TOASTS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.se-toasts {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--se-gap-md);
+  max-width: 380px;
+  pointer-events: none;
+}
+
+.se-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--se-gap-md);
+  padding: 12px var(--se-gap-lg);
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-lg);
+  background: var(--se-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  color: var(--se-text);
+  font-size: 12px;
+  font-weight: 500;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity var(--se-fast) var(--se-ease),
+              transform var(--se-fast) var(--se-ease);
+}
+.se-toast.is-shown { opacity: 1; transform: translateY(0); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   UTILITIES  (scoped; a deliberately small set, not a utility framework)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Compatibility alias. ~30 JS call sites across builder/transform/layers/
+   slideshow/thumbnails toggle a plain `hidden` class to show and hide inspector
+   blocks. Renaming all of them is churn with a real failure mode — one missed
+   site silently leaves a panel visible — so `.hidden` is supported here too.
+   It is scoped under `.slide-editor`, so it cannot reach BSP's own markup.
+   `se-hidden` stays the canonical name for new code. */
+.slide-editor .hidden { display: none !important; }
+
+.slide-editor .se-row     { display: flex; align-items: center; gap: var(--se-gap-sm); }
+.slide-editor .se-row-tight { display: flex; align-items: center; gap: var(--se-gap-xs); }
+.slide-editor .se-stack   { display: flex; flex-direction: column; gap: var(--se-gap-sm); }
+.slide-editor .se-spread  { justify-content: space-between; }
+.slide-editor .se-grow    { flex: 1 1 auto; min-width: 0; }
+.slide-editor .se-hidden  { display: none !important; }
+.slide-editor .se-muted   { color: var(--se-text-2); }
+.slide-editor .se-faint   { color: var(--se-text-3); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CANVAS SURFACES, SELECTION HUD, LAYERS, TEMPLATES
+   -------------------------------------------------------------------------
+   Migrated out of index.html's inline <style> block, which hard-coded a
+   `--pb-*` palette of literals. Those are now the shared `--se-*`
+   tokens, so these surfaces follow BSP's theme like everything else.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* --- Infinite board viewport ------------------------------------------ */
+.slide-editor #canvas-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: default;
+  touch-action: none;
+  background-color: var(--se-surface-2);
+  background-image:
+    linear-gradient(rgba(128, 128, 128, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(128, 128, 128, 0.14) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+/* Normal arrow while panning/marquee-selecting — never a grab hand. */
+.slide-editor #canvas-viewport.is-panning { cursor: default; }
+
+/* The board floats freely; JS owns its transform (translate + scale). */
+.slide-editor #slide-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.slide-editor #slide-canvas.canvas-anim {
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* --- Selection HUD (builder + modifier) -------------------------------- */
+.slide-editor .transform-border {
+  position: absolute;
+  z-index: 40;
+  outline: 2px solid var(--se-accent);
+  outline-offset: 8px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.slide-editor .transform-handle {
+  position: absolute;
+  z-index: 50;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background-color: var(--se-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.slide-editor .drag-highlight {
+  outline: 2px dashed var(--se-accent);
+  outline-offset: 4px;
+}
+
+/* Modifier-mode selection box. Positioned in % by modifier-shapes.js; the
+   visible outline comes from the shared `.transform-border`. */
+.slide-editor .bsp-mod-hud { position: absolute; }
+
+.slide-editor .bsp-mod-selected { outline: 2px solid var(--se-accent); outline-offset: 2px; }
+
+/* Marquee rubber-band drawn while dragging on empty canvas. */
+.slide-editor .bsp-mod-marquee {
+  position: absolute;
+  z-index: 45;
+  border: 1px solid var(--se-accent);
+  background: color-mix(in srgb, var(--se-accent) 12%, transparent);
+  pointer-events: none;
+}
+
+/* Floating properties bar above/below the modifier selection. */
+.slide-editor .bsp-mod-toolbar {
+  position: absolute;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--se-gap-xs);
+  padding: 5px 7px;
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-md);
+  background: var(--se-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.slide-editor .bsp-mod-toolbar-label {
+  padding: 0 var(--se-gap-xs);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--se-text-2);
+}
+
+/* Colour chip: a glyph over a swatch bar showing the CURRENT value, with a
+   transparent native picker laid over the top. */
+.slide-editor .bsp-mod-chip {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 30px;
+  height: 30px;
+  padding: 3px 0;
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-sm);
+  background: var(--se-surface-2);
+  color: var(--se-text);
+  cursor: pointer;
+  overflow: hidden;
+}
+.slide-editor .bsp-mod-chip:hover { background: var(--se-surface-hover); }
+.slide-editor .bsp-mod-chip input[type="color"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.slide-editor .chip-glyph { display: flex; line-height: 0; }
+.slide-editor .chip-glyph svg { width: 13px; height: 13px; }
+
+.slide-editor .chip-swatch {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--se-text-3);
+}
+/* Mixed or non-solid (gradient/image) fill — a red slash, not a colour. */
+.slide-editor .chip-swatch-none {
+  background:
+    linear-gradient(to bottom right, transparent 44%, var(--se-danger) 44%,
+                    var(--se-danger) 56%, transparent 56%),
+    var(--se-surface);
+}
+
+/* --- Freeform node editing (edit/node-edit.js) ------------------------- */
+.slide-editor .bsp-node-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+}
+
+.slide-editor .bsp-node-dot {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--se-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: crosshair;
+}
+/* Anchors are solid squares; control points hollow circles — the same
+   vocabulary as a vector pen tool. */
+.slide-editor .bsp-node-dot.anchor { background: var(--se-accent); border-radius: 2px; }
+.slide-editor .bsp-node-dot.ctrl   { background: #ffffff; border-radius: 50%; }
+
+.slide-editor .bsp-node-done {
+  position: absolute;
+  z-index: 60;
+  transform: translateY(-30px);
+  padding: 4px 10px;
+  border: 1px solid var(--se-accent);
+  border-radius: 999px;
+  background: var(--se-surface);
+  color: var(--se-accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+/* --- Layers panel ------------------------------------------------------ */
+.slide-editor .layer-row {
+  display: flex;
+  align-items: center;
+  gap: var(--se-gap-sm);
+  padding: 7px var(--se-gap-sm);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--se-surface);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--se-fast) var(--se-ease),
+              border-color var(--se-fast) var(--se-ease),
+              box-shadow var(--se-fast) var(--se-ease);
+}
+.slide-editor .layer-row:hover {
+  background: var(--se-surface-2);
+  border-color: var(--se-border);
+}
+.slide-editor .layer-row.selected {
+  border-color: var(--se-accent);
+  background: color-mix(in srgb, var(--se-accent) 8%, transparent);
+}
+.slide-editor .layer-row.is-hidden .layer-name,
+.slide-editor .layer-row.is-hidden .layer-type-icon { opacity: 0.4; }
+.slide-editor .layer-row.dragging {
+  opacity: 0.92;
+  border-color: var(--se-border-2);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
+  cursor: grabbing;
+  z-index: 5;
+}
+/* FLIP transition that makes neighbours glide as the order changes. */
+.slide-editor .layer-row.settling { transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Children stay collapsed while a top-level unit is being dragged. */
+.slide-editor .layer-drag-active .layer-child-row { display: none; }
+.slide-editor .layer-child-row { margin-left: 22px; }
+.slide-editor .layer-mod-row { padding-right: var(--se-gap-xs); }
+
+.slide-editor .layer-grip {
+  flex: 0 0 auto;
+  display: flex;
+  color: var(--se-text-2);
+  cursor: grab;
+}
+.slide-editor .layer-grip:active { cursor: grabbing; }
+
+/* Disclosure caret on a group row. */
+.slide-editor .layer-caret {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--se-text-2);
+  transition: transform var(--se-fast) var(--se-ease);
+}
+.slide-editor .layer-caret.open { transform: rotate(90deg); }
+/* Leaf rows keep the caret's width so names stay aligned. */
+.slide-editor .layer-caret-empty { visibility: hidden; }
+
+.slide-editor .layer-type-icon {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--se-surface-2);
+  color: var(--se-text-2);
+}
+.slide-editor .layer-row.selected .layer-type-icon {
+  background: var(--se-surface);
+  color: var(--se-accent);
+}
+
+.slide-editor .layer-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--se-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slide-editor .layer-eye {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--se-text-2);
+  transition: background var(--se-fast) var(--se-ease),
+              color var(--se-fast) var(--se-ease);
+}
+.slide-editor .layer-eye:hover { background: var(--se-surface-2); color: var(--se-text); }
+.slide-editor .layer-row.is-hidden .layer-eye { color: var(--se-text-3); }
+
+/* --- Template tiles ---------------------------------------------------- */
+.slide-editor .tpl-create {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--se-gap-sm);
+  border: 1.5px dashed var(--se-border-2);
+  border-radius: var(--se-r-md);
+  background: var(--se-surface);
+  color: var(--se-text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--se-fast) var(--se-ease),
+              color var(--se-fast) var(--se-ease),
+              background var(--se-fast) var(--se-ease);
+}
+.slide-editor .tpl-create:hover {
+  border-color: var(--se-accent);
+  color: var(--se-accent);
+  background: color-mix(in srgb, var(--se-accent) 8%, transparent);
+}
+
+/* Scaled 1280×720 render inside a template tile. */
+.slide-editor .tpl-scaled { transform-origin: top left; }
+
+/* Loading toast keeps its spinner until a later toast replaces it. */
+.slide-editor .toast-loading { /* marker class — cleared by clearLoadingToasts */ }
+
+/* --- Thumbnail frames (shared by deck navigator + template tiles) ------ */
+.slide-editor .slide-thumb-preview-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--se-border);
+  border-radius: var(--se-r-sm);
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: border-color var(--se-fast) var(--se-ease),
+              box-shadow var(--se-fast) var(--se-ease);
+}
+.slide-editor .slide-thumb-preview-wrap:hover { border-color: var(--se-border-2); }
+
+.slide-editor .slide-thumb-preview-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1280px;
+  height: 720px;
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+/* --- Scrollbars -------------------------------------------------------- */
+.slide-editor ::-webkit-scrollbar { width: 8px; height: 8px; }
+.slide-editor ::-webkit-scrollbar-track { background: transparent; }
+.slide-editor ::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--se-text-3) 45%, transparent);
+}
+.slide-editor ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--se-text-3) 70%, transparent);
+}
+
+/* Head of a text-box card: the shape's reference on the left, its kind (with
+   a colour dot matching the on-canvas highlight) on the right. */
+.slide-editor .se-card-ref {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: var(--se-gap-xs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slide-editor .se-card-kind {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--se-gap-xs);
+  font-weight: 600;
+}
+.slide-editor .se-card-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Destructive action inside the modifier properties bar. */
+.slide-editor .bsp-mod-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--se-r-sm);
+  background: transparent;
+  color: var(--se-text);
+  cursor: pointer;
+  transition: background var(--se-fast) var(--se-ease),
+              color var(--se-fast) var(--se-ease);
+}
+.slide-editor .bsp-mod-toolbar button:hover { background: var(--se-surface-hover); }
+.slide-editor .bsp-mod-toolbar button.danger { color: var(--se-danger); }
+.slide-editor .bsp-mod-toolbar button.danger:hover {
+  background: color-mix(in srgb, var(--se-danger) 14%, transparent);
+}

@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BSP Slide Editor</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #0b0d12;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    :root {
+      --bg-dark: #0b0d12;
+      --bg-panel: #15171d;
+      --panel-content-bg: #1c1e26;
+      --header-btn-bg: rgba(255,255,255,0.06);
+      --text: #f3f5f8;
+      --text-secondary: rgba(255,255,255,0.65);
+      --text-tertiary: rgba(255,255,255,0.42);
+      --border: rgba(255,255,255,0.1);
+      --border-elevated: rgba(255,255,255,0.18);
+      --accent: #f4621f;
+      --accent-light: #ff7a45;
+      --danger: #ff453a;
+      --success: #30d158;
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 16px;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+      --ease-out: cubic-bezier(0, 0, 0.2, 1);
+      --duration-fast: 150ms;
+      --bg-secondary: #1c1e26;
+    }
+  </style>
+  <link rel="stylesheet" href="panel-critical.bundle.css">
+  <link rel="stylesheet" href="47-slide-editor.css">
+  <style>
+    /* Ensure proper sizing */
+    .slide-editor { height: 100%; display: flex; flex-direction: column; }
+    .se-board { width: 1280px; height: 720px; }
+    #canvas-viewport { position: absolute; inset: 0; overflow: hidden; }
+    #slide-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  </style>
+</head>
+<body>
+
+<div id="page-slide-editor" class="app-page slide-editor active">
+
+  <header class="se-header">
+    <div class="se-header-group">
+      <h1 class="se-wordmark">BSP Editor</h1>
+      <div class="se-row-tight">
+        <button id="btn-undo" disabled class="se-btn se-btn-icon" title="Undo (⌘/Ctrl+Z)">
+          <svg viewBox="0 0 24 24" class="se-icon"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a6 6 0 0 1 0 12h-3"/></svg>
+        </button>
+        <button id="btn-redo" disabled class="se-btn se-btn-icon" title="Redo (⌘/Ctrl+Shift+Z)">
+          <svg viewBox="0 0 24 24" class="se-icon"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a6 6 0 0 0 0 12h3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="se-row">
+      <input type="file" id="image-file-input" accept="image/*" class="se-hidden" />
+      <button id="btn-cancel-import" class="se-btn se-btn-danger se-hidden">
+        <svg viewBox="0 0 24 24" class="se-icon"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+        Cancel Import
+      </button>
+      <button data-handler-id="bh2-10" class="se-btn se-btn-neutral" title="Return to the deck without saving">
+        <svg viewBox="0 0 24 24" class="se-icon"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back to Deck
+      </button>
+      <button data-handler-id="bh2-11" class="se-btn se-btn-secondary" title="Save the deck and return to the library">
+        <svg viewBox="0 0 24 24" class="se-icon"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Save to Deck
+      </button>
+      <button data-handler-id="bh2-12" class="se-btn se-btn-success">
+        <svg viewBox="0 0 24 24" class="se-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+        Save / Export
+      </button>
+    </div>
+  </header>
+
+  <main class="se-body">
+
+    <aside class="se-rail">
+      <div class="se-rail-nav">
+        <div class="se-segmented">
+          <button id="lnav-slides-btn" class="se-segmented-btn is-active">
+            <svg viewBox="0 0 24 24" class="se-icon"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M7 21h10M12 17v4"/></svg>
+            Slides
+          </button>
+          <button id="lnav-templates-btn" class="se-segmented-btn">
+            <svg viewBox="0 0 24 24" class="se-icon"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            Templates
+          </button>
+        </div>
+      </div>
+
+      <div id="lnav-slides-panel" class="se-rail-panel">
+        <div class="se-section">
+          <span class="se-section-label">Slides Deck</span>
+          <button id="add-slide-btn" class="se-btn se-btn-icon se-btn-icon-sm se-icon-accent" title="Add New Slide">
+            <svg viewBox="0 0 24 24" class="se-icon se-icon-sm"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <div id="slide-thumbnails-list" class="se-scroll se-stack"></div>
+        <div class="se-footnote">
+          <span>Active Slide: <strong id="lbl-active-slide">1</strong></span>
+          <span id="lbl-total-slides">Total: 0</span>
+        </div>
+      </div>
+
+      <div id="lnav-templates-panel" class="se-rail-panel se-hidden">
+        <div class="se-section">
+          <span class="se-section-label">Slide Templates</span>
+          <div class="se-row-tight">
+            <input type="file" id="template-import-input" accept=".json,application/json" class="se-hidden">
+            <button data-handler-id="bh2-13" class="se-btn se-btn-icon se-btn-icon-sm" title="Import templates (.json)">
+              <svg viewBox="0 0 24 24" class="se-icon"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+            </button>
+            <button data-handler-id="bh2-14" class="se-btn se-btn-icon se-btn-icon-sm" title="Export templates (.json)">
+              <svg viewBox="0 0 24 24" class="se-icon"><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"/></svg>
+            </button>
+            <span id="lbl-template-count" class="se-badge">0</span>
+          </div>
+        </div>
+        <div class="se-scroll se-stack">
+          <button data-handler-id="bh2-15" class="tpl-create" title="Save the current slide as a reusable template">
+            <svg viewBox="0 0 24 24" class="se-icon se-icon-lg"><path d="M12 5v14M5 12h14"/></svg>
+            Create Template
+          </button>
+          <div id="template-tiles-list" class="se-stack"></div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="se-workspace">
+      <div id="canvas-viewport">
+        <div id="slide-canvas" class="se-board">
+          <div id="snap-grid-layer" class="se-overlay se-overlay-grid se-hidden"></div>
+          <div id="slide-content-layer" class="se-layer-fill"></div>
+          <div id="snap-guide-layer" class="se-overlay se-overlay-guide"></div>
+        </div>
+      </div>
+
+      <div class="se-float se-float-tl">
+        <span class="se-dot"></span>
+        <span id="lbl-mode-indicator" class="se-muted">Slide Builder Mode: Creating Custom Slide Canvas</span>
+      </div>
+
+      <div class="se-float se-float-tr">
+        <button data-handler-id="bh2-16" class="se-btn se-btn-icon se-btn-icon-sm" title="Zoom Out">
+          <svg viewBox="0 0 24 24" class="se-icon"><path d="M5 12h14"/></svg>
+        </button>
+        <span id="lbl-scale-percent" class="se-zoom-value">100%</span>
+        <button data-handler-id="bh2-17" class="se-btn se-btn-icon se-btn-icon-sm" title="Zoom In">
+          <svg viewBox="0 0 24 24" class="se-icon"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button data-handler-id="bh2-18" class="se-btn se-btn-icon se-btn-icon-sm" title="Fit to Screen">
+          <svg viewBox="0 0 24 24" class="se-icon"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3"/></svg>
+        </button>
+      </div>
+
+      <div id="builder-quick-toolbar" class="se-float se-float-toolbar">
+        <button id="btn-tool-select" class="se-btn se-tool is-active" title="Selection & Resize Tool">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+        </button>
+        <button id="btn-tool-text" class="se-btn se-tool" title="Add Text">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+        </button>
+        <button id="btn-tool-box" class="se-btn se-tool" title="Add Box">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4" /></svg>
+        </button>
+        <button id="btn-tool-circle" class="se-btn se-tool" title="Add Circle">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /></svg>
+        </button>
+        <button id="btn-tool-image" class="se-btn se-tool" title="Add Local Image">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3.5" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-3.086-3.086a2 2 0 00-2.828 0L6 21" /></svg>
+        </button>
+        <button id="btn-tool-pencil" class="se-btn se-tool" title="Pencil (Freehand Drawing & Fills)">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+        <button id="btn-tool-bezier" class="se-btn se-tool" title="Bezier Pen Tool (Vector Drawing)">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l6.6-2.2L20.2 8.2a2.4 2.4 0 0 0 0-3.4l-1-1a2.4 2.4 0 0 0-3.4 0L5.2 14.4 3 21z"/><path d="M14.5 5.1l4.4 4.4"/><path d="M9.6 18.8 5.2 14.4"/><circle cx="10.2" cy="13.8" r="1.8"/><path d="M10.2 13.8 3 21"/></svg>
+        </button>
+        <button id="btn-tool-eraser" class="se-btn se-tool" title="Eraser Tool (Vector Sweep)">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16c-.5-.5-.5-1.4 0-2l8-8c.5-.5 1.4-.5 2 0l7 7c.5.5.5 1.4 0 2l-2 2"/><path d="M12 11l5 5"/></svg>
+        </button>
+
+        <div class="se-divider-v"></div>
+
+        <button id="btn-snap-toggle" class="se-btn se-tool is-active" title="Smart Snap (snap to center & edges)">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>
+        </button>
+        <button id="btn-grid-toggle" class="se-btn se-tool" title="Snap to Grid">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
+        </button>
+
+        <div class="se-divider-v"></div>
+
+        <button data-handler-id="bh2-19" class="se-btn se-tool" title="Duplicate Slide">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+        </button>
+        <button data-handler-id="bh2-20" class="se-btn se-tool se-tool-danger" title="Delete Active Slide">
+          <svg class="se-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" /></svg>
+        </button>
+      </div>
+    </section>
+
+    <aside id="inspector-panel" class="se-inspector">
+
+      <div class="se-rail-nav">
+        <div class="se-segmented">
+          <button id="tab-design-btn" class="se-segmented-btn is-active">
+            <svg viewBox="0 0 24 24" class="se-icon"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+            Design
+          </button>
+          <button id="tab-layer-btn" class="se-segmented-btn">
+            <svg viewBox="0 0 24 24" class="se-icon"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+            Layer
+          </button>
+          <button id="tab-ai-btn" class="se-segmented-btn">
+            <svg viewBox="0 0 24 24" class="se-icon"><path d="M12 3v3M12 18v3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M3 12h3M18 12h3M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
+            AI
+          </button>
+        </div>
+      </div>
+
+      <div id="inspector-builder-section" class="se-panel">
+        <div class="se-head">
+          <h3 class="se-title">
+            <svg viewBox="0 0 24 24" class="se-icon se-icon-accent"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+            Element Properties
+          </h3>
+          <span id="lbl-selected-element" class="se-badge">None Selected</span>
+        </div>
+
+        <div id="builder-style-controls" class="se-stack se-inert">
+
+          <div class="se-field" id="text-content-inspector-block">
+            <label class="se-label">Text Content</label>
+            <textarea id="inp-element-text" rows="3" class="se-textarea"></textarea>
+          </div>
+
+          <div class="se-grid-2" id="layout-dimensions-inspector-block">
+            <div class="se-field">
+              <label class="se-label">Position X (%)</label>
+              <input type="number" id="inp-element-x" class="se-input" min="0" max="100">
+            </div>
+            <div class="se-field">
+              <label class="se-label">Position Y (%)</label>
+              <input type="number" id="inp-element-y" class="se-input" min="0" max="100">
+            </div>
+            <div class="se-field">
+              <label class="se-label">Width (%)</label>
+              <input type="number" id="inp-element-w" class="se-input" min="1" max="100">
+            </div>
+            <div class="se-field">
+              <label class="se-label">Height (%)</label>
+              <input type="number" id="inp-element-h" class="se-input" min="1" max="100">
+            </div>
+          </div>
+
+          <div id="typography-controls" class="se-group">
+            <label class="se-label">Typography</label>
+            <select id="inp-element-font" class="se-select">
+              <optgroup label="System Fonts">
+                <option value="System Default">System Default</option>
+                <option value="Arial">Arial</option>
+                <option value="Helvetica">Helvetica</option>
+                <option value="Verdana">Verdana</option>
+                <option value="Tahoma">Tahoma</option>
+                <option value="Trebuchet MS">Trebuchet MS</option>
+                <option value="Calibri">Calibri</option>
+                <option value="Segoe UI">Segoe UI</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Garamond">Garamond</option>
+                <option value="Courier New">Courier New</option>
+                <option value="Impact">Impact</option>
+              </optgroup>
+              <optgroup label="Deck Fonts (if installed locally)">
+                <option value="Inter">Inter</option>
+                <option value="Poppins">Poppins</option>
+                <option value="Montserrat">Montserrat</option>
+                <option value="Roboto">Roboto</option>
+                <option value="Open Sans">Open Sans</option>
+                <option value="Lato">Lato</option>
+                <option value="Nunito">Nunito</option>
+                <option value="Oswald">Oswald</option>
+                <option value="Raleway">Raleway</option>
+                <option value="Merriweather">Merriweather</option>
+                <option value="Playfair Display">Playfair Display</option>
+                <option value="Crimson Pro">Crimson Pro</option>
+                <option value="Syne">Syne</option>
+                <option value="Bebas Neue">Bebas Neue</option>
+                <option value="Anton">Anton</option>
+                <option value="Luckiest Guy">Luckiest Guy</option>
+                <option value="Lobster">Lobster</option>
+                <option value="Dancing Script">Dancing Script</option>
+                <option value="Pacifico">Pacifico</option>
+                <option value="DM Mono">DM Mono</option>
+                <option value="Courier Prime">Courier Prime</option>
+              </optgroup>
+            </select>
+            <select id="inp-element-weight" class="se-select">
+              <option value="100">Thin (100)</option>
+              <option value="200">Extra Light (200)</option>
+              <option value="300">Light (300)</option>
+              <option value="400" selected>Regular (400)</option>
+              <option value="500">Medium (500)</option>
+              <option value="600">Semibold (600)</option>
+              <option value="700">Bold (700)</option>
+              <option value="800">Extra Bold (800)</option>
+              <option value="900">Black (900)</option>
+            </select>
+            <div class="se-grid-2">
+              <div class="se-field">
+                <label class="se-label">Size (Pt)</label>
+                <input type="number" id="inp-element-size" class="se-input" min="8" max="120">
+              </div>
+              <div class="se-field">
+                <label class="se-label">Font Color</label>
+                <div class="se-row-tight">
+                  <input type="color" id="inp-element-color" class="se-swatch">
+                  <span id="lbl-font-color-hex" class="se-hex">#FFFFFF</span>
+                </div>
+              </div>
+            </div>
+            <div class="se-toggle-row">
+              <button id="btn-toggle-bold" class="se-toggle" title="Bold"><svg viewBox="0 0 24 24" class="se-icon"><path d="M6 4h7a4 4 0 0 1 0 8H6zM6 12h8a4 4 0 0 1 0 8H6z"/></svg></button>
+              <button id="btn-toggle-italic" class="se-toggle" title="Italic"><svg viewBox="0 0 24 24" class="se-icon"><path d="M19 4h-9M14 20H5M15 4 9 20"/></svg></button>
+              <button id="btn-toggle-underline" class="se-toggle" title="Underline"><svg viewBox="0 0 24 24" class="se-icon"><path d="M6 4v6a6 6 0 0 0 12 0V4M4 21h16"/></svg></button>
+            </div>
+            <div class="se-toggle-row">
+              <button id="btn-align-left" class="se-toggle is-active" title="Align left"><svg viewBox="0 0 24 24" class="se-icon"><path d="M3 6h18M3 12h12M3 18h15"/></svg></button>
+              <button id="btn-align-center" class="se-toggle" title="Align center"><svg viewBox="0 0 24 24" class="se-icon"><path d="M3 6h18M6 12h12M4 18h16"/></svg></button>
+              <button id="btn-align-right" class="se-toggle" title="Align right"><svg viewBox="0 0 24 24" class="se-icon"><path d="M3 6h18M9 12h12M6 18h15"/></svg></button>
+            </div>
+          </div>
+
+          <div id="shape-fill-controls" class="se-group hidden">
+            <label class="se-label" id="lbl-shape-fill-title">Shape Fill Color</label>
+            <div class="se-row">
+              <input type="color" id="inp-shape-fill" class="se-swatch">
+              <span id="lbl-shape-fill-hex" class="se-hex">#22D3EE</span>
+            </div>
+            <div class="se-field">
+              <div class="se-meter-label"><span>Fill Opacity</span><span id="lbl-fill-opacity">100%</span></div>
+              <input type="range" id="inp-fill-opacity" min="0" max="100" value="100" class="se-range">
+            </div>
+          </div>
+
+          <div id="border-radius-controls" class="se-group hidden">
+            <div class="se-row se-spread">
+              <label class="se-label">Border Radius</label>
+              <button id="btn-radius-lock" class="se-btn se-btn-icon se-btn-icon-sm is-active" title="Lock Corners Together">
+                <svg id="svg-radius-lock" viewBox="0 0 24 24" class="se-icon"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </button>
+            </div>
+            <div id="collective-radius-block" class="se-field">
+              <div class="se-meter-label"><span>All Corners</span><span id="lbl-radius-all">8px</span></div>
+              <input type="range" id="inp-radius-all" class="se-range" min="0" max="150" value="8">
+            </div>
+            <div id="individual-radius-block" class="se-grid-2 hidden">
+              <div class="se-field"><label class="se-label">Top Left (px)</label><input type="number" id="inp-radius-tl" class="se-input" min="0" max="200"></div>
+              <div class="se-field"><label class="se-label">Top Right (px)</label><input type="number" id="inp-radius-tr" class="se-input" min="0" max="200"></div>
+              <div class="se-field"><label class="se-label">Bottom Left (px)</label><input type="number" id="inp-radius-bl" class="se-input" min="0" max="200"></div>
+              <div class="se-field"><label class="se-label">Bottom Right (px)</label><input type="number" id="inp-radius-br" class="se-input" min="0" max="200"></div>
+            </div>
+          </div>
+
+          <div id="pen-stroke-controls" class="se-group hidden">
+            <label class="se-label-row"><span>Stroke</span><input type="checkbox" id="inp-stroke-enabled" checked class="se-check"></label>
+            <div class="se-grid-2">
+              <div class="se-field"><label class="se-label">Width (px)</label><input type="number" id="inp-pen-stroke-width" class="se-input" min="1" max="24"></div>
+              <div class="se-field"><label class="se-label">Stroke Color</label>
+                <div class="se-row-tight">
+                  <input type="color" id="inp-pen-stroke-color" class="se-swatch">
+                  <span id="lbl-pen-stroke-hex" class="se-hex">#22D3EE</span>
+                </div>
+              </div>
+            </div>
+            <div id="closed-loop-fill-options">
+              <label class="se-label-row"><span>Enable Fill</span><input type="checkbox" id="inp-pencil-is-filled" class="se-check"></label>
+            </div>
+          </div>
+        </div>
+
+        <div id="builder-style-empty-state" class="se-empty-state">
+          <svg viewBox="0 0 24 24"><path d="M9 11V6a2 2 0 1 1 4 0v5m0-1.5a2 2 0 1 1 4 0V13m0-1.5a2 2 0 1 1 4 0V17a5 5 0 0 1-5 5h-2a7 7 0 0 1-7-7v-3a2 2 0 1 1 4 0"/></svg>
+          <p class="se-help">Click on any text run or element on the visual slide canvas to customize fonts, positions, colors, or drag bounding boxes directly.</p>
+        </div>
+
+        <div class="se-group">
+          <h4 class="se-label">Slide Settings</h4>
+          <label class="se-label">Background Color Palette</label>
+          <div class="se-row">
+            <div class="se-input-affix">
+              <input type="text" id="inp-slide-bg-hex" class="se-input" placeholder="#0B0F19">
+              <div class="se-affix-actions">
+                <button data-handler-id="bh2-21" class="se-btn se-btn-icon se-btn-icon-sm" title="Copy Color Code"><svg viewBox="0 0 24 24" class="se-icon se-icon-sm"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+                <button data-handler-id="bh2-22" class="se-btn se-btn-icon se-btn-icon-sm" title="Paste Color Code"><svg viewBox="0 0 24 24" class="se-icon se-icon-sm"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></button>
+              </div>
+            </div>
+            <div class="se-row-tight">
+              <input type="color" id="inp-slide-bg" class="se-swatch">
+              <button data-handler-id="bh2-23" class="se-btn se-btn-icon se-btn-icon-sm" title="Sample Color from Screen"><svg viewBox="0 0 24 24" class="se-icon"><path d="m2 22 1-1h3l9-9-3-3-9 9v3h1ZM16 11l3-3a3 3 0 0 0-4-4l-3 3 4 4Z"/></svg></button>
+            </div>
+          </div>
+          <label class="se-label-row"><span>Transparent background</span><input type="checkbox" id="chk-slide-transparent" class="se-check"></label>
+        </div>
+      </div>
+
+      <div id="inspector-layer-section" class="se-panel se-hidden">
+        <div class="se-head">
+          <h3 class="se-title">
+            <svg viewBox="0 0 24 24" class="se-icon se-icon-accent"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+            Layers
+          </h3>
+          <span id="lbl-layer-count" class="se-badge">0</span>
+        </div>
+        <p id="layers-help-text" class="se-help">Drag to reorder. Top of the list sits on top of the slide. Use the eye to hide a layer.</p>
+        <div id="layers-list" class="se-stack"></div>
+        <div id="layers-empty-state" class="se-empty-state hidden">
+          <svg viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
+          <p class="se-help">This slide has no elements yet. Add text, shapes, or images to see them stacked here.</p>
+        </div>
+      </div>
+
+      <div id="inspector-ai-section" class="se-panel se-hidden">
+        <div class="se-head">
+          <h3 class="se-title">
+            <svg viewBox="0 0 24 24" class="se-icon se-icon-accent"><path d="m12 3-1.9 5.8L4 10.7l5.8 1.9L11.7 19l1.9-5.8L19 11.3l-5.8-1.9z"/></svg>
+            AI Studio
+          </h3>
+        </div>
+        <p class="se-help">Accelerate design work with the active AI engine. Controls disable themselves when the engine cannot serve them.</p>
+        <div class="se-card">
+          <span class="se-card-label">Generative Slide Maker</span>
+          <p class="se-help">Generate an entire slide structure with visual templates automatically.</p>
+          <textarea id="ai-slide-prompt" rows="2" class="se-textarea" placeholder="e.g. A dark comparison of moon landing theories with visual rectangles..."></textarea>
+          <button id="btn-ai-generate-slide" class="se-btn se-btn-primary"><svg viewBox="0 0 24 24" class="se-icon"><path d="m12 3-1.9 5.8L4 10.7l5.8 1.9L11.7 19l1.9-5.8L19 11.3l-5.8-1.9z"/></svg> Build AI Slide</button>
+        </div>
+        <div class="se-card">
+          <span class="se-card-label">Text Refinement Studio</span>
+          <select id="ai-text-style-preset" class="se-select">
+            <option value="polished and highly professional">Polished &amp; Modern</option>
+            <option value="Classical Biblical prose with majestic verse structure">Biblical Pro/Sermon</option>
+            <option value="Academic summary with short key point bullet lists">Academic Synopsis</option>
+            <option value="translated into Latin ecclesiastical style">Translate: Latin</option>
+            <option value="translated into Ancient Biblical Hebrew representation">Translate: Biblical Hebrew</option>
+            <option value="translated into classical Spanish theology">Translate: Spanish</option>
+          </select>
+          <button id="btn-ai-polish-text" class="se-btn se-btn-neutral"><svg viewBox="0 0 24 24" class="se-icon se-icon-accent"><path d="M15 4V2m0 20v-2M9 6 7.5 4.5M18 18l1.5 1.5M6 12H4m16 0h-2M6.5 17.5 5 19M17.5 6.5 19 5"/><circle cx="12" cy="12" r="3.5"/></svg> Rewrite Content</button>
+        </div>
+        <div class="se-card">
+          <span class="se-card-label">Generative Graphic Studio</span>
+          <p class="se-help">Creates artwork directly onto the slide canvas.</p>
+          <input type="text" id="ai-imagen-prompt" class="se-input" placeholder="e.g. sketch of golden celestial orbits on transparent dark...">
+          <button id="btn-ai-generate-image" class="se-btn se-btn-neutral"><svg viewBox="0 0 24 24" class="se-icon se-icon-secondary"><path d="M12 19c0-3 2-4 4-4h3a2 2 0 0 0 2-2 9 9 0 1 0-9 9 2 2 0 0 0 2-2z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16.5" cy="11.5" r="1"/></svg> Render Image Asset</button>
+        </div>
+        <div class="se-card">
+          <span class="se-card-label">Voice Explainer (TTS)</span>
+          <p class="se-help">Narrate the current slide's text with the active engine's voice.</p>
+          <div class="se-grid-2">
+            <select id="ai-tts-voice" class="se-select">
+              <option value="Kore">Preacher Kore</option>
+              <option value="Fenrir">Dramatic Fenrir</option>
+              <option value="Umbriel">Soft Umbriel</option>
+              <option value="Algieba">Lively Algieba</option>
+            </select>
+            <button id="btn-ai-narrate" class="se-btn se-btn-primary"><svg viewBox="0 0 24 24" class="se-icon"><path d="M11 5 6 9H2v6h4l5 4zM19 5a10 10 0 0 1 0 14M15.5 8.5a5 5 0 0 1 0 7"/></svg> Narrate</button>
+          </div>
+          <div id="tts-audio-player-wrap" class="hidden"><audio id="tts-audio-player" controls class="se-audio"></audio></div>
+        </div>
+      </div>
+
+      <div id="inspector-modifier-section" class="se-panel se-hidden">
+        <div class="se-head">
+          <h3 class="se-title">
+            <svg viewBox="0 0 24 24" class="se-icon se-icon-secondary"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h3a2 2 0 0 1 0 4H9zm0 0v5"/></svg>
+            PPTX Slide Content
+          </h3>
+        </div>
+        <p class="se-help">Directly edit the text structures of your imported slides.</p>
+        <div id="modifier-file-info" class="se-file-chip hidden">
+          <div class="se-row">
+            <svg viewBox="0 0 24 24" class="se-icon se-icon-secondary"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M10 12h1v1h-1zm1 1h1v1h-1zm-1 1h1v1h-1z"/></svg>
+            <span id="lbl-pptx-filename" class="se-grow">presentation.pptx</span>
+          </div>
+          <p id="lbl-pptx-filesize" class="se-help">Size: 0 KB</p>
+        </div>
+        <div class="se-field">
+          <label class="se-label-row"><span>Editable Text Fields</span><span id="lbl-modifier-field-count" class="se-badge">0 Fields</span></label>
+          <div id="modifier-text-fields-list" class="se-scroll-y">
+            <div class="se-empty-state">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>
+              <p class="se-help">Open a PPTX presentation to start modifying slide text.</p>
+            </div>
+          </div>
+        </div>
+        <div class="se-note">
+          <strong>XML Preservation Mode</strong>
+          Document elements retain their original styles, shapes, transitions, and slide master grids. Only raw text runs are updated.
+        </div>
+      </div>
+
+    </aside>
+  </main>
+
+  <div id="toast-wrapper" class="se-toasts"></div>
+</div>
+
+<script>
+// BSP Desktop API stubs for standalone slide editor
+window.BSPDesktop = {
+  presentations: {
+    _decks: JSON.parse(localStorage.getItem('bsp-presentation-decks') || '[]'),
+    _listeners: [],
+    
+    readSource: function({ deckId }) {
+      var deck = this._decks.find(function(d) { return d.id === deckId; });
+      return Promise.resolve(deck ? JSON.parse(JSON.stringify(deck)) : null);
+    },
+    
+    writeSource: function(payload) {
+      var idx = this._decks.findIndex(function(d) { return d.id === payload.id; });
+      if (idx >= 0) {
+        this._decks[idx] = payload;
+      } else {
+        this._decks.push(payload);
+      }
+      localStorage.setItem('bsp-presentation-decks', JSON.stringify(this._decks));
+      this._notify();
+      return Promise.resolve({ ok: true });
+    },
+    
+    open: function({ id }) {
+      return Promise.resolve({ ok: true });
+    },
+
+    _notify: function() {
+      var data = JSON.stringify(this._decks);
+      this._listeners.forEach(function(fn) { fn(data); });
+    },
+    
+    onChange: function(fn) {
+      this._listeners.push(fn);
+    }
+  },
+  ai: {
+    isAvailable: function() { return false; },
+    generateSlide: function() { return Promise.reject(new Error('AI not available')); },
+    polishText: function() { return Promise.reject(new Error('AI not available')); },
+    generateImage: function() { return Promise.reject(new Error('AI not available')); },
+    narrate: function() { return Promise.reject(new Error('AI not available')); }
+  }
+};
+
+window.BSPApplySavedPresentationRecord = function(record) {
+  if (record && record.slides) {
+    localStorage.setItem('bsp-presentation-decks', JSON.stringify(
+      Array.isArray(record) ? record : [record]
+    ));
+  }
+};
+
+// BroadcastChannel for display sync (matches BSP protocol)
+if (typeof BroadcastChannel !== 'undefined') {
+  (function() {
+    var channel = new BroadcastChannel('bsp-display-sync');
+    window.__bspSyncChannel = channel;
+    window.sendToDisplay = function(msg) {
+      channel.postMessage(msg);
+    };
+  })();
+}
+
+console.log('BSP Slide Editor standalone loaded');
+</script>
+
+<script src="slide-editor.bundle.js"></script>
+
+<style>
+  /* Ensure .app-page renders properly in standalone mode */
+  #page-slide-editor.app-page.slide-editor {
+    display: flex;
+    height: 100%;
+  }
+</style>
+
+</body>
+</html>

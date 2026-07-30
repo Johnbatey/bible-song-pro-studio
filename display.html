@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bible Song Pro Max — Display</title>
+<style>
+@font-face{font-family:Poppins;src:url(fonts/Poppins-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:Poppins;src:url(fonts/Poppins-Medium.ttf) format("truetype");font-weight:500}
+@font-face{font-family:Poppins;src:url(fonts/Poppins-Bold.ttf) format("truetype");font-weight:700}
+@font-face{font-family:Inter;src:url(fonts/Inter-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:Inter;src:url(fonts/Inter-Bold.ttf) format("truetype");font-weight:700}
+@font-face{font-family:Montserrat;src:url(fonts/Montserrat-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:Montserrat;src:url(fonts/Montserrat-Bold.ttf) format("truetype");font-weight:700}
+@font-face{font-family:Roboto;src:url(fonts/Roboto-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:Roboto;src:url(fonts/Roboto-Bold.ttf) format("truetype");font-weight:700}
+@font-face{font-family:Oswald;src:url(fonts/Oswald-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:Oswald;src:url(fonts/Oswald-Bold.ttf) format("truetype");font-weight:700}
+@font-face{font-family:Crimson Pro;src:url(fonts/CrimsonPro-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:Crimson Pro;src:url(fonts/CrimsonPro-Bold.ttf) format("truetype");font-weight:700}
+@font-face{font-family:Playfair Display;src:url(fonts/PlayfairDisplay-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:Playfair Display;src:url(fonts/PlayfairDisplay-Bold.ttf) format("truetype");font-weight:700}
+@font-face{font-family:Lora;src:url(fonts/Lora-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:Lora;src:url(fonts/Lora-Bold.ttf) format("truetype");font-weight:700}
+@font-face{font-family:Cinzel;src:url(fonts/Cinzel-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:Cinzel;src:url(fonts/Cinzel-Bold.ttf) format("truetype");font-weight:700}
+@font-face{font-family:Bebas Neue;src:url(fonts/BebasNeue-Regular.ttf) format("truetype");font-weight:400}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { width: 100%; height: 100%; background: #000; overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; background: #000; }
+
+/* ── App Container ── */
+.app-container { height: 100vh; width: 100vw; background: #000; overflow: hidden; }
+.app { width: 100vw; height: 100vh; position: relative; background: #000; background-size: cover; background-position: center; background-repeat: no-repeat; overflow: hidden; }
+.app-bg-layer { position: absolute; inset: 0; pointer-events: none; background-size: cover; background-position: center; background-repeat: no-repeat; transform: translateZ(0); }
+.app-bg-previous { animation: backgroundFadeOut .5s ease forwards; }
+.app-bg-video { width: 100%; height: 100%; object-fit: cover; }
+
+/* ── Verse Display ── */
+.verse-display { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: transparent; padding: 0; box-sizing: border-box; overflow: hidden; }
+.verse-display.hidden { opacity: 0; pointer-events: none; }
+.verse-display.fading-in, .verse-display.visible { opacity: 1; }
+.verse-display.fading-out { opacity: 0; transition: opacity .35s ease; }
+.verse-container { width: 100%; max-width: 100%; background: transparent; padding: 0; box-sizing: border-box; }
+.verse-reference { font-family: inherit; }
+.verse-reference-row { display: flex; align-items: baseline; justify-content: center; gap: .75rem; margin-bottom: 2rem; }
+.verse-reference-translation { font-family: inherit; font-weight: 700; }
+.verse-text { font-family: inherit; white-space: pre-line; }
+
+/* ── Compare / Dual-Translation ── */
+.compare-layout { display: flex; align-items: stretch; justify-content: center; gap: 2.5rem; width: 100%; }
+.compare-pane { flex: 1 1 0; min-width: 0; }
+.compare-divider { width: 1px; background: rgba(255,255,255,.18); }
+
+/* ── Lyrics ── */
+.lyrics-text-block { display: flex; flex-direction: column; gap: 0; }
+.lyrics-line { white-space: pre; }
+
+/* ── Theme Backgrounds ── */
+.theme-none { background: #000; }
+.theme-transparent { background: transparent !important; }
+.theme-green-screen { background: #0f0 !important; }
+.theme-nature { background: linear-gradient(180deg, #1a3a2a, #0d1f14, #050d08); }
+.theme-abstract { background: linear-gradient(135deg, #1a0533, #0d1b3e, #1a0533); }
+.theme-minimal { background: linear-gradient(180deg, #1a1a1e, #0d0d10, #000); }
+.theme-space { background: linear-gradient(180deg, #050a1a, #0a1630, #050a1a); }
+.theme-church { background: linear-gradient(180deg, #1a0f05, #2a1a0a, #1a0f05); }
+.theme-custom-image { background-size: cover; background-position: center; background-repeat: no-repeat; background-color: #000; }
+
+/* ── Song Credit (CCLI) ── */
+/* Kept legible on purpose — a CCLI credit that cannot be read does not satisfy the licence */
+.song-credit { margin-top: 1.75rem; font-size: clamp(11px, 1vw, 17px); opacity: .72; letter-spacing: .02em; text-align: center; line-height: 1.5; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.lower-third .song-credit { margin-top: .5rem; text-align: left; font-size: clamp(9px, .7vw, 13px); }
+
+/* ── Lower Third ── */
+.verse-display.lower-third { align-items: flex-end; background: transparent; }
+.lower-third .verse-container { max-width: 100%; padding: 0; background: transparent; border-radius: 12px; animation: slideUpTauri .6s cubic-bezier(.16,1,.3,1); }
+.lower-third .verse-reference-row { justify-content: flex-start; margin-bottom: .5rem; }
+.lower-third .verse-text { line-height: 1.4; }
+@keyframes slideUpTauri { 0% { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ── LT Broadcast Variant ── */
+.verse-display.lt-broadcast .verse-reference-row { margin-bottom: .6rem; }
+.verse-display.lt-broadcast .verse-reference { display: inline-block; background: #e8541a; color: #fff !important; border-radius: 999px; padding: .28em 1em; text-transform: none !important; text-shadow: none !important; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.verse-display.lt-broadcast .verse-text { background: #fff; color: #141414 !important; border-radius: 16px; padding: .5em .7em; text-shadow: none !important; box-shadow: 0 6px 22px rgba(0,0,0,.28); }
+
+/* ── LT Design Overlay ── */
+.app-lt-design { background-size: 100% auto; background-position: bottom center; }
+
+/* ── Animations ── */
+@keyframes backgroundFadeOut { 0% { opacity: 1; } to { opacity: 0; } }
+@keyframes pulse { 0%, to { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.2); } }
+@keyframes fadeInUp { 0% { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Connection Status ── */
+.connection-status { display: none; position: fixed; top: 20px; right: 20px; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; z-index: 1000; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: all .3s ease; }
+.connection-status.connecting { display: block; background: rgba(255,193,7,.9); color: #000; }
+.connection-status.connected { display: block; background: rgba(76,175,80,.9); color: #fff; }
+.connection-status.error { display: block; background: rgba(244,67,54,.9); color: #fff; }
+
+/* ── Waiting Screen ── */
+.waiting-screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: transparent; color: #fff; z-index: 1; }
+.waiting-content { text-align: center; animation: fadeInUp .6s ease-out; }
+.waiting-content h1 { font-size: 4rem; font-weight: 600; margin-bottom: 1rem; color: #fff; letter-spacing: 2px; text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0px 0px 8px rgba(0,0,0,.8); }
+.waiting-content p { font-size: 1.5rem; color: #fff; margin-bottom: 2rem; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0px 0px 6px rgba(0,0,0,.8); }
+.status-indicator { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 1.2rem; color: #fff; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0px 0px 6px rgba(0,0,0,.8); }
+.pulse-dot { width: 12px; height: 12px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }
+
+/* ── Blackout ── */
+.blackout-screen { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000 !important; z-index: 9999; display: none; }
+.blackout-screen.active { display: block; }
+
+/* ── Fullscreen Button ── */
+.fullscreen-btn { position: fixed; bottom: 16px; right: 16px; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); color: #fff; width: 36px; height: 36px; border-radius: 6px; font-size: 18px; cursor: pointer; opacity: 0; transition: opacity .2s; z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.app:hover .fullscreen-btn { opacity: 1; }
+
+/* ── Responsive ── */
+@media(max-width:1200px){ .verse-text { font-size: 2.5rem; } .verse-reference { font-size: 1.5rem; } .verse-container { padding: 0; } }
+@media(max-width:768px){ .verse-text { font-size: 2rem; } .verse-reference { font-size: 1.2rem; } .verse-container, .verse-display { padding: 0; } }
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="app" id="app">
+    <!-- Background Layer -->
+    <div class="app-bg-layer" id="bgLayer"></div>
+    <div class="app-bg-layer app-bg-previous" id="bgPrevLayer" style="display:none"></div>
+    <!-- Motion Video -->
+    <video class="app-bg-video" id="bgVideo" autoplay muted loop playsinline style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0"></video>
+    <!-- Motion Background Iframe -->
+    <iframe id="motionBg" style="display:none;position:absolute;inset:0;width:100%;height:100%;border:none;z-index:0;pointer-events:none"></iframe>
+    <!-- Waiting Screen -->
+    <div class="waiting-screen" id="waitingScreen">
+      <div class="waiting-content">
+        <h1>Bible Song Pro Max</h1>
+        <p>Waiting for connection…</p>
+        <div class="status-indicator"><div class="pulse-dot"></div><span>Display Standby</span></div>
+      </div>
+    </div>
+    <!-- Verse Display -->
+    <div class="verse-display hidden" id="verseDisplay">
+      <div class="verse-container" id="verseContainer"></div>
+    </div>
+    <!-- Blackout -->
+    <div class="blackout-screen" id="blackoutScreen"></div>
+    <!-- Connection Status -->
+    <div class="connection-status connecting" id="connStatus">Connecting…</div>
+    <!-- Fullscreen Button -->
+    <button class="fullscreen-btn" id="fullscreenBtn" onclick="document.documentElement.requestFullscreen()">⛶</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── Elements ──
+  const app = document.getElementById('app');
+  const bgLayer = document.getElementById('bgLayer');
+  const bgPrevLayer = document.getElementById('bgPrevLayer');
+  const bgVideo = document.getElementById('bgVideo');
+  const waitingScreen = document.getElementById('waitingScreen');
+  const verseDisplay = document.getElementById('verseDisplay');
+  const verseContainer = document.getElementById('verseContainer');
+  const blackoutScreen = document.getElementById('blackoutScreen');
+  const connStatus = document.getElementById('connStatus');
+
+  // ── State ──
+  let currentVerse = null;
+  let currentTheme = null;
+  let config = {
+    fontFamily: 'Poppins',
+    fontSize: 0,
+    fontWeight: 700,
+    fontColor: '#ffffff',
+    textAlign: 'center',
+    referenceColor: '#e8541a',
+    referenceFontSize: 0,
+    animation: 'fade',
+    mode: 'fullscreen',
+    lowerThird: 'standard',
+    translation: 'KJV',
+    bgTheme: 'none',
+    bgCustomImage: null,
+    bgVideo: null,
+    bgFill: null,
+    blackout: false,
+    showTranslation: true,
+    showReference: true,
+  };
+
+  // ── Helpers ──
+  function esc(s) { return String(s || '').replace(/[&<>"']/g, function(c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }
+
+  function setConn(state, msg) {
+    connStatus.className = 'connection-status ' + state;
+    connStatus.textContent = msg || state.charAt(0).toUpperCase() + state.slice(1);
+  }
+
+  // ── Theme Application ──
+  function applyTheme(name) {
+    app.className = app.className.split(/\s+/).filter(function(c) { return !c.startsWith('theme-'); }).join(' ');
+    if (name && name !== 'none') app.classList.add('theme-' + name);
+    if (name === 'custom-image' && config.bgCustomImage) {
+      bgLayer.style.backgroundImage = 'url(' + esc(config.bgCustomImage) + ')';
+    }
+  }
+
+  // ── Render Verse ──
+  function renderVerse(verse) {
+    currentVerse = verse;
+    if (!verse) {
+      verseDisplay.classList.remove('visible', 'fading-in');
+      verseDisplay.classList.add('hidden');
+      return;
+    }
+
+    // Mode classes
+    verseDisplay.classList.remove('lower-third', 'lt-broadcast');
+    if (config.mode === 'lowerThird') {
+      verseDisplay.classList.add('lower-third');
+      if (config.lowerThird === 'broadcast') verseDisplay.classList.add('lt-broadcast');
+    }
+
+    const text = verse.text || verse.displayText || '';
+    const ref = verse.displayReference || verse.reference || '';
+    const trans = verse.songCredit ? (verse.translation || '') : (verse.translation || config.translation || '');
+
+    const bookmark = verse.bookmark || '';
+
+    // Style from config
+    var fs = config.fontSize > 0 ? config.fontSize + 'px' : (config.mode === 'lowerThird' ? 'clamp(16px,2.2vw,44px)' : 'clamp(20px,2.8vw,64px)');
+    var refFs = config.referenceFontSize > 0 ? config.referenceFontSize + 'px' : 'clamp(12px,1.4vw,28px)';
+
+    // Dual-translation check
+    var isCompare = verse.compareLeft && verse.compareRight;
+
+    var html = '';
+    if (isCompare) {
+      html = '<div class="compare-layout">' +
+        '<div class="compare-pane">' +
+          (verse.compareLeft.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-size:' + refFs + '"><span class="verse-reference" style="color:' + esc(config.referenceColor) + ';font-weight:' + config.fontWeight + '">' + esc(verse.compareLeft.ref) + '</span>' +
+          (config.showTranslation && verse.compareLeft.translation ? '<span class="verse-reference-translation" style="opacity:.56;font-size:.85em">' + esc(verse.compareLeft.translation) + '</span>' : '') + '</div>' : '') +
+        '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + '">' + esc(verse.compareLeft.text) + '</div></div>' +
+        '<div class="compare-divider"></div>' +
+        '<div class="compare-pane">' +
+          (verse.compareRight.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-size:' + refFs + '"><span class="verse-reference" style="color:' + esc(config.referenceColor) + ';font-weight:' + config.fontWeight + '">' + esc(verse.compareRight.ref) + '</span>' +
+          (config.showTranslation && verse.compareRight.translation ? '<span class="verse-reference-translation" style="opacity:.56;font-size:.85em">' + esc(verse.compareRight.translation) + '</span>' : '') + '</div>' : '') +
+        '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + '">' + esc(verse.compareRight.text) + '</div></div>' +
+      '</div>';
+    } else {
+      html = '<div class="verse-reference-row" style="font-size:' + refFs + '">' +
+        (config.showReference && ref ? '<span class="verse-reference" style="color:' + esc(config.referenceColor) + ';font-weight:' + config.fontWeight + '">' + esc(ref) + '</span>' : '') +
+        (config.showTranslation && trans ? '<span class="verse-reference-translation" style="opacity:.56;font-size:.85em">' + esc(trans) + '</span>' : '') +
+        (bookmark ? '<span class="verse-reference-translation" style="opacity:.4;font-size:.8em">' + esc(bookmark) + '</span>' : '') +
+      '</div>' +
+      '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + '">' + esc(text) + '</div>';
+    }
+
+    // Song credit footer — small, low-contrast, always last. Most CCLI licences
+    // require title/author/copyright/licence number to be visible while projecting.
+    var credit = verse.songCredit;
+    if (credit) {
+      var creditParts = [];
+      if (credit.title) creditParts.push(esc(credit.title));
+      if (credit.author) creditParts.push(esc(credit.author));
+      if (credit.copyright) creditParts.push(esc(credit.copyright));
+      if (credit.ccli) creditParts.push('CCLI ' + esc(credit.ccli));
+      if (creditParts.length) {
+        html += '<div class="song-credit">' + creditParts.join(' · ') + '</div>';
+      }
+    }
+
+    verseContainer.innerHTML = html;
+    verseDisplay.classList.remove('hidden', 'fading-out');
+    verseDisplay.classList.add('visible');
+    waitingScreen.style.display = 'none';
+  }
+
+  // ── Hide Verse ──
+  function hideVerse() {
+    if (!currentVerse) return;
+    verseDisplay.classList.remove('fading-in', 'visible');
+    verseDisplay.classList.add('fading-out');
+    setTimeout(function() {
+      verseDisplay.classList.add('hidden');
+      verseDisplay.classList.remove('fading-out');
+      currentVerse = null;
+    }, 350);
+  }
+
+  // ── Lyric Display ──
+  function renderLyrics(lyrics) {
+    if (!lyrics || !Array.isArray(lyrics.lines)) return;
+    var html = '<div class="lyrics-text-block">';
+    for (var i = 0; i < lyrics.lines.length; i++) {
+      html += '<div class="lyrics-line" style="font-family:' + config.fontFamily + ';font-size:' + (config.fontSize > 0 ? config.fontSize + 'px' : 'clamp(24px,3.2vw,72px)') + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + '">' + esc(lyrics.lines[i]) + '</div>';
+    }
+    html += '</div>';
+    verseContainer.innerHTML = html;
+    verseDisplay.classList.remove('hidden', 'fading-out');
+    verseDisplay.classList.add('visible');
+    waitingScreen.style.display = 'none';
+  }
+
+  // ── Handle State ──
+  function handleStateUpdate(state) {
+    if (!state) return;
+
+    // Theme
+    if (state.bgTheme) {
+      config.bgTheme = state.bgTheme;
+      applyTheme(state.bgTheme);
+    }
+    // Background video. Reassigning the same src restarts playback mid-service, so
+    // only touch the element when the source actually changes.
+    if (state.bgVideo) {
+      if (config.bgVideo !== state.bgVideo) {
+        config.bgVideo = state.bgVideo;
+        bgVideo.src = state.bgVideo;
+      }
+      bgVideo.loop = state.bgVideoLoop !== false;
+      bgVideo.style.objectFit = state.bgFit || 'cover';
+      bgVideo.style.display = 'block';
+      bgVideo.play().catch(function(){});
+    } else if (state.bgVideo === null || state.bgVideo === '') {
+      config.bgVideo = null;
+      bgVideo.style.display = 'none';
+      bgVideo.removeAttribute('src');
+      bgVideo.load();
+    }
+
+    // Scene background — image or gradient/solid fill. Single writer on purpose: these
+    // share one element, and the `background` shorthand silently wipes background-image,
+    // so only longhands are used here.
+    if ('bgCustomImage' in state || 'bgFill' in state) {
+      var bgImage = state.bgCustomImage || '';
+      var bgFill = state.bgFill || '';
+      config.bgCustomImage = bgImage || null;
+      config.bgFill = bgFill || null;
+
+      if (bgImage) {
+        bgLayer.style.backgroundColor = '#000';
+        bgLayer.style.backgroundImage = 'url("' + String(bgImage).replace(/"/g, '%22') + '")';
+        bgLayer.style.backgroundSize = state.bgFit === 'contain' ? 'contain' : 'cover';
+      } else if (bgFill) {
+        var isGradient = bgFill.indexOf('gradient') !== -1;
+        bgLayer.style.backgroundImage = isGradient ? bgFill : '';
+        bgLayer.style.backgroundColor = isGradient ? '' : bgFill;
+      } else {
+        bgLayer.style.backgroundImage = '';
+        bgLayer.style.backgroundColor = '';
+      }
+      bgLayer.style.opacity = typeof state.bgOpacity === 'number' ? String(state.bgOpacity) : '1';
+    }
+
+    // Motion background (canvas HTML)
+    var motionEl = document.getElementById('motionBg');
+    if (state.bgMotion) {
+      config.bgMotion = state.bgMotion;
+      motionEl.src = state.bgMotion;
+      motionEl.style.display = 'block';
+    } else if (state.bgMotion === null || state.bgMotion === '') {
+      motionEl.style.display = 'none';
+      motionEl.src = '';
+    }
+
+    // Blackout
+    if (typeof state.blackout === 'boolean') {
+      config.blackout = state.blackout;
+      blackoutScreen.classList.toggle('active', state.blackout);
+    }
+
+    // Config
+    if (state.fontFamily) config.fontFamily = state.fontFamily;
+    if (state.fontSize) config.fontSize = state.fontSize;
+    if (state.fontWeight) config.fontWeight = state.fontWeight;
+    if (state.fontColor) config.fontColor = state.fontColor;
+    if (state.textAlign) config.textAlign = state.textAlign;
+    if (state.referenceColor) config.referenceColor = state.referenceColor;
+    if (state.mode) config.mode = state.mode;
+    if (state.lowerThird) config.lowerThird = state.lowerThird;
+    if (state.translation) config.translation = state.translation;
+    if (typeof state.showTranslation === 'boolean') config.showTranslation = state.showTranslation;
+    if (typeof state.showReference === 'boolean') config.showReference = state.showReference;
+
+    // Extract verse from scene.content format (used by session history and REST API)
+    var verseData = state.verse || state.displayVerse || null;
+    if (!verseData && state.scene && state.scene.content) {
+      var sc = state.scene.content;
+      if (sc.text && sc.reference) {
+        // Only Bible content inherits the default translation; a song has none, and
+        // would otherwise be labelled with whatever version was last used.
+        verseData = {
+          text: sc.text,
+          reference: sc.reference,
+          translation: sc.version || (sc.songCredit ? '' : config.translation),
+        };
+        // Dual translation — feeds the existing side-by-side compare layout
+        if (sc.secondaryVerse && sc.secondaryVerse.text) {
+          verseData.compareLeft = { text: sc.text, ref: sc.reference, translation: sc.version || '' };
+          verseData.compareRight = {
+            text: sc.secondaryVerse.text,
+            ref: sc.secondaryVerse.reference || sc.reference,
+            translation: sc.secondaryVerse.version || '',
+          };
+        }
+        if (sc.songCredit) verseData.songCredit = sc.songCredit;
+      }
+    }
+    if (!verseData && state.type === 'verse' && state.scene && state.scene.content) {
+      var sc = state.scene.content;
+      if (sc.text && sc.reference) {
+        verseData = { text: sc.text, reference: sc.reference, translation: sc.version || config.translation };
+      }
+    }
+
+    // Verse rendering
+    if (verseData) {
+      renderVerse(verseData);
+      waitingScreen.style.display = 'none';
+    } else if (state.type === 'hide_verse' || state.type === 'clear') {
+      hideVerse();
+    }
+
+    // Lyrics
+    if (state.lyrics) renderLyrics(state.lyrics);
+
+    // Connection
+    if (state.connStatus) setConn(state.connStatus.state, state.connStatus.message);
+  }
+
+  // ── WebSocket ──
+  function connect() {
+    var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var host = location.host || 'localhost:8942';
+    var ws = new WebSocket(protocol + '//' + host);
+    ws.onopen = function() { setConn('connected', 'Connected'); };
+    ws.onmessage = function(event) {
+      try {
+        var msg = JSON.parse(event.data);
+        if (msg.type === 'display:update') handleStateUpdate(msg.state);
+        else handleStateUpdate(msg);
+      } catch(e) { /* ignore parse errors */ }
+    };
+    ws.onclose = function() {
+      setConn('connecting', 'Reconnecting…');
+      setTimeout(connect, 1000);
+    };
+    ws.onerror = function() { ws.close(); };
+  }
+
+  // ── Init ──
+  applyTheme(config.bgTheme);
+  waitingScreen.style.display = 'flex';
+  connect();
+})();
+</script>
+</body>
+</html>
