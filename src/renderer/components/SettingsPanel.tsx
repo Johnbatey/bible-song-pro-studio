@@ -35,6 +35,7 @@ export function SettingsPanel() {
   const [deepgramKeyDraft, setDeepgramKeyDraft] = useState('');
   const [obsPasswordDraft, setObsPasswordDraft] = useState('');
   const [obsStatus, setObsStatus] = useState<ObsStatus | null>(null);
+  const [localModelAction, setLocalModelAction] = useState<'idle' | 'downloading' | 'ready' | 'error'>('idle');
 
   useEffect(() => {
     window.BSP?.getDisplayUrl?.().then(setDisplayUrl).catch(() => {});
@@ -62,6 +63,15 @@ export function SettingsPanel() {
     const s = await window.BSP?.ai?.status().catch(() => null);
     setAiStatus(s);
     if (s) setLive({ mlxStatus: s.engines?.mlx });
+  }
+
+  async function downloadLocalModel() {
+    const accepted = window.confirm('Download the Local Whisper model now? The first download requires internet access and may take a few minutes.');
+    if (!accepted) return;
+    setLocalModelAction('downloading');
+    const result = await window.BSP?.ai?.warmup({ engine: 'onnx' }).catch((e) => ({ ok: false, error: String(e) }));
+    setAiStatus(result?.status || result);
+    setLocalModelAction(result?.ok ? 'ready' : 'error');
   }
 
   function patchTheme(path: 'fullScreen' | 'lowerThird', updates: any) {
@@ -300,8 +310,15 @@ export function SettingsPanel() {
                   <span style={{ fontSize: 11, color: aiStatus?.engines?.onnx?.ready ? '#4caf50' : 'var(--text-dim)' }}>
                     {aiStatus?.engines?.onnx?.warmupState || 'idle'}
                   </span>
-                  <button className="btn btn-sm" onClick={async () => setAiStatus(await window.BSP?.ai?.warmup({ engine: 'onnx' }).catch((e) => ({ ok: false, error: String(e) })))}>Warm</button>
+                  <button className="btn btn-sm btn-primary" disabled={localModelAction === 'downloading'} onClick={downloadLocalModel}>
+                    {localModelAction === 'downloading' ? 'Downloading…' : aiStatus?.engines?.onnx?.ready ? 'Downloaded' : 'Download model'}
+                  </button>
                   <button className="btn btn-sm" onClick={async () => setAiStatus(await window.BSP?.ai?.dispose({ engine: 'onnx' }).catch((e) => ({ ok: false, error: String(e) })))}>Dispose</button>
+                </div>
+                <div style={{ fontSize: 10, color: localModelAction === 'error' ? '#e74c3c' : 'var(--text-dim)', marginBottom: 8 }}>
+                  {localModelAction === 'error'
+                    ? 'Model download failed. Check your connection and try again.'
+                    : 'Required for offline Live Scripture. It is downloaded once and cached on this computer.'}
                 </div>
 
                 {aiStatus?.platform?.isAppleSilicon && (

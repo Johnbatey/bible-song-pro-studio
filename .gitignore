@@ -28,3 +28,4 @@ npm-debug.log*
 .env
 .env.local
 settings.json
+.opencode

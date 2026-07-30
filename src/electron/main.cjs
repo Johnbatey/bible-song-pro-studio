@@ -235,7 +235,15 @@ function createSplashWindow() {
 }
 
 function createMainWindow() {
-  const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 1100, minHeight: 700, frame: false, titleBarStyle: 'hidden', backgroundColor: '#0c0e14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true } });
+  const isMac = process.platform === 'darwin';
+  // macOS: titleBarStyle 'hidden' keeps the system traffic lights over a frameless
+  // window — the app draws no window buttons of its own there. Setting frame:false as
+  // well would strip them, leaving no way to close the window but Cmd+Q.
+  // Windows/Linux: frameless, with the in-app controls in the title bar.
+  const chrome = isMac
+    ? { titleBarStyle: 'hidden', trafficLightPosition: { x: 16, y: 16 } }
+    : { frame: false };
+  const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 1100, minHeight: 700, ...chrome, backgroundColor: '#0c0e14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true } });
   win.loadURL(isDev ? 'http://localhost:5173' : `file://${path.join(__dirname, '../../dist/index.html')}`);
   if (isDev) win.webContents.openDevTools();
   win.once('ready-to-show', () => { win.show(); win.focus(); });

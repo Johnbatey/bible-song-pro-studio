@@ -158,6 +158,7 @@ function createDeepgramService({ emit }) {
         interim_results: true,
         endpointing: 300,
         vad_events: true,
+        utterance_end_ms: 1000,
       });
 
       connection.on(LiveTranscriptionEvents.Open, () => {

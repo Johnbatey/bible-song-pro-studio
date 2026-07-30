@@ -3,8 +3,10 @@ import { useAppStore } from '../stores/appStore';
 import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHandle } from '../services/audio-capture';
 import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus } from '../types';
 
-/** Seconds of audio buffered before a local Whisper pass. */
-const LOCAL_CHUNK_SECONDS = 5;
+/** Short enough to feel live, while still giving Whisper enough speech context. */
+const LOCAL_CHUNK_SECONDS = 3;
+const DETECT_DEBOUNCE_MS = 90;
+const DETECT_WINDOW_WORDS = 48;
 
 const STATE_LABELS: Record<SttState, { text: string; color: string }> = {
   idle: { text: 'Idle', color: 'var(--text-dim)' },
@@ -34,6 +36,10 @@ export function LiveScripturePanel() {
   const localSamplesRef = useRef(0);
   const localBusyRef = useRef(false);
   const finalTranscriptRef = useRef('');
+  const interimTranscriptRef = useRef('');
+  const detectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const detectSequenceRef = useRef(0);
+  const lastDetectionTextRef = useRef('');
 
   useEffect(() => {
     refreshInputs();
@@ -88,29 +94,48 @@ export function LiveScripturePanel() {
    * appended to the running transcript; interims are shown but not accumulated.
    */
   function handleTranscript(text: string, isFinal: boolean) {
-    const combined = isFinal
-      ? (finalTranscriptRef.current = `${finalTranscriptRef.current} ${text}`.trim())
-      : `${finalTranscriptRef.current} ${text}`.trim();
+    if (isFinal) {
+      finalTranscriptRef.current = `${finalTranscriptRef.current} ${text}`.trim();
+      interimTranscriptRef.current = '';
+    } else {
+      interimTranscriptRef.current = text;
+    }
+    const combined = `${finalTranscriptRef.current} ${interimTranscriptRef.current}`.trim();
     setLive({ transcript: combined });
     setTranscription({ isActive: true, text: combined });
-    if (isFinal) detectFromText(text);
+    scheduleDetection(combined, isFinal);
   }
 
-  async function detectFromText(text: string) {
+  function scheduleDetection(text: string, isFinal: boolean) {
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    const rollingText = words.slice(-DETECT_WINDOW_WORDS).join(' ');
+    if (!rollingText || (!isFinal && rollingText.split(/\s+/).length < 3)) return;
+    detectTimerRef.current = setTimeout(() => detectFromText(rollingText, isFinal), isFinal ? 0 : DETECT_DEBOUNCE_MS);
+  }
+
+  async function detectFromText(text: string, isFinal: boolean) {
     const cleaned = text.trim();
     if (!cleaned) return;
+    if (cleaned === lastDetectionTextRef.current) return;
+    const sequence = ++detectSequenceRef.current;
     const result = await window.BSP?.verse?.detect({
       text: cleaned,
-      options: { versionId: version, modes: ['direct', 'contextual', 'verbatim', 'semantic'], limit: 6, minConfidence: 0.3 },
+      options: { versionId: version, modes: ['direct', 'contextual', 'verbatim', 'semantic'], limit: 6, minConfidence: isFinal ? 0.3 : 0.4 },
     }).catch(() => null);
+    if (sequence !== detectSequenceRef.current) return;
     const detections = result?.detections || [];
     const suggestions = await window.BSP?.bible?.search({ versionId: version, query: cleaned, limit: 6 }).catch(() => []) as BibleSearchResult[];
+    if (sequence !== detectSequenceRef.current) return;
     const bestHit = detections.length > 0
       ? { reference: detections[0].displayRef, text: detections[0].text, book: detections[0].book, chapter: detections[0].chapter, verse: detections[0].verseStart, version } as BibleSearchResult
       : suggestions[0] || null;
+    lastDetectionTextRef.current = cleaned;
     setLive({ bestHit, suggestions });
-    setTranscription({ isActive: true, text: cleaned, confidence: bestHit ? 0.9 : 0.55 });
-    if (bestHit && live.autoProject) sendHit(bestHit);
+    setTranscription({ isActive: true, text: cleaned, confidence: detections[0]?.confidence ?? (bestHit ? 0.65 : 0.45) });
+    // Interim hypotheses revise themselves. Surface their suggestions immediately,
+    // but wait for a final result before changing the live output.
+    if (isFinal && bestHit && useAppStore.getState().liveScripture.autoProject) sendHit(bestHit);
   }
 
   /** Local engine: batch ~5s of audio, then run one Whisper pass over it. */
@@ -150,6 +175,11 @@ export function LiveScripturePanel() {
   async function startLive() {
     setNotice('');
     finalTranscriptRef.current = '';
+    interimTranscriptRef.current = '';
+    lastDetectionTextRef.current = '';
+    detectSequenceRef.current += 1;
+    if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
+    detectTimerRef.current = null;
 
     if (engine === 'deepgram') {
       const started = await window.BSP?.stt?.start({});
@@ -292,7 +322,7 @@ export function LiveScripturePanel() {
             className="input"
             value={live.transcript}
             onChange={(e) => { finalTranscriptRef.current = e.target.value; setLive({ transcript: e.target.value }); }}
-            onBlur={(e) => detectFromText(e.target.value)}
+            onBlur={(e) => detectFromText(e.target.value, true)}
             placeholder="Speech appears here as it is recognised. You can also type or paste sermon text and click away to detect."
             style={styles.transcript}
           />

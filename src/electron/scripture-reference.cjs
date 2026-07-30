@@ -100,6 +100,25 @@ const SPOKEN_REF_PATTERN = new RegExp(
 );
 
 const SPOKEN_ORDINALS = { first: '1', '1st': '1', second: '2', '2nd': '2', third: '3', '3rd': '3' };
+const SPOKEN_NUMBERS = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+  seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
+  sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+};
+
+/** Convert speech-to-text number words near reference markers into digits. */
+function normalizeSpokenReferenceNumbers(text) {
+  return String(text || '').replace(
+    /\b(chapters?|verses?|vs\.?)\s+((?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\s]+(?:one|two|three|four|five|six|seven|eight|nine))?)\b(?:\s+(to|through)\s+((?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\s]+(?:one|two|three|four|five|six|seven|eight|nine))?)\b)?/gi,
+    (_, marker, phrase, rangeWord, endPhrase) => {
+      const toNumber = (value) => String(value).toLowerCase().split(/[-\s]+/)
+        .reduce((sum, part) => sum + (SPOKEN_NUMBERS[part] || 0), 0);
+      const start = toNumber(phrase);
+      return `${marker} ${start}${endPhrase ? ` ${rangeWord} ${toNumber(endPhrase)}` : ''}`;
+    },
+  );
+}
 
 /** "First Corinthians" → "1 Corinthians" so the existing book lookup can resolve it. */
 function normalizeSpokenBook(candidate) {
@@ -110,6 +129,7 @@ function normalizeSpokenBook(candidate) {
 }
 
 function extractReferences(text) {
+  text = normalizeSpokenReferenceNumbers(text);
   const results = [];
   const seen = new Set();
   let match;

@@ -20,14 +20,13 @@ export function TitleBar() {
 
   return (
     <div className="titlebar" style={styles.titlebar}>
-      <div className="titlebar-drag" style={styles.drag}>
-        {platform === 'darwin' && (
-          <div style={styles.traffic}>
-            <span style={styles.dot} onClick={() => window.BSP?.window.close()} />
-            <span style={{ ...styles.dot, background: '#f5bd4f' }} onClick={() => window.BSP?.window.minimize()} />
-            <span style={{ ...styles.dot, background: '#4bc840' }} onClick={() => window.BSP?.window.maximize()} />
-          </div>
-        )}
+      {/* No custom traffic lights on macOS — the window uses titleBarStyle 'hidden', so
+          the system draws its own. Duplicating them just crowded the bar. The padding
+          below reserves the space they occupy so the logo doesn't sit under them. */}
+      <div
+        className="titlebar-drag"
+        style={{ ...styles.drag, paddingLeft: platform === 'darwin' ? 72 : 0 }}
+      >
         <div style={styles.brand}>
           <img src="./bible-song-pro-icon.svg" alt="" style={styles.logo} />
           <span style={styles.title}>Bible Song<span style={styles.pro}>PRO</span> Max</span>
@@ -134,19 +133,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
     flex: 1,
     WebkitAppRegion: 'drag',
-  } as React.CSSProperties & { WebkitAppRegion: string },
-  traffic: {
-    display: 'flex',
-    gap: 7,
-    paddingLeft: 4,
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: '50%',
-    background: '#ff5f57',
-    cursor: 'pointer',
-    WebkitAppRegion: 'no-drag',
   } as React.CSSProperties & { WebkitAppRegion: string },
   brand: {
     display: 'flex',
