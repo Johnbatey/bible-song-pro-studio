@@ -125,6 +125,7 @@ export interface LowerThirdTheme {
   offsetY?: number;
   scale?: number;
   anchor?: 'top' | 'bottom';
+  referenceFontSize?: number;
 }
 
 export interface FullScreenTheme {
@@ -133,12 +134,14 @@ export interface FullScreenTheme {
   fontSize: number;
   fontWeight: number;
   fontColor: string;
-  textAlign: 'center' | 'left';
+  textAlign: 'left' | 'center' | 'right';
   animation: string;
   referenceFontSize?: number;
   lineHeight?: number;
   verticalAlign?: 'top' | 'middle' | 'bottom';
   autoResize?: 'none' | 'shrink' | 'grow';
+  offsetX?: number;
+  offsetY?: number;
 }
 
 export interface SlideTheme {

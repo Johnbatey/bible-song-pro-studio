@@ -238,7 +238,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
         '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + '">' + esc(verse.compareRight.text) + '</div></div>' +
       '</div>';
     } else {
-      html = '<div class="verse-reference-row" style="font-size:' + refFs + '">' +
+      var refJustify = config.textAlign === 'left' ? 'flex-start' : (config.textAlign === 'right' ? 'flex-end' : 'center');
+      html = '<div class="verse-reference-row" style="font-size:' + refFs + '; justify-content:' + refJustify + '; text-align:' + config.textAlign + '">' +
         (config.showReference && ref ? '<span class="verse-reference" style="color:' + esc(config.referenceColor) + ';font-weight:' + config.fontWeight + '">' + esc(ref) + '</span>' : '') +
         (config.showTranslation && trans ? '<span class="verse-reference-translation" style="opacity:.56;font-size:.85em">' + esc(trans) + '</span>' : '') +
         (bookmark ? '<span class="verse-reference-translation" style="opacity:.4;font-size:.8em">' + esc(bookmark) + '</span>' : '') +
@@ -338,7 +339,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
         bgLayer.style.backgroundColor = isGradient ? '' : bgFill;
       } else {
         bgLayer.style.backgroundImage = '';
-        bgLayer.style.backgroundColor = '';
+        bgLayer.style.backgroundColor = config.mode === 'fullscreen' ? '#0c0e14' : '';
       }
       bgLayer.style.opacity = typeof state.bgOpacity === 'number' ? String(state.bgOpacity) : '1';
     }

@@ -65,22 +65,6 @@ export function TitleBar() {
         </div>
         <div style={styles.divider} />
         <div style={styles.outputControls}>
-          <div style={styles.outputModeSwitch}>
-            <button
-              style={{ ...styles.outputModeBtn, ...(outputMode === 'fullscreen' ? styles.outputModeBtnActive : {}) }}
-              onClick={() => setOutputMode('fullscreen')}
-              title="Fullscreen output"
-            >
-              FS
-            </button>
-            <button
-              style={{ ...styles.outputModeBtn, ...(outputMode === 'lowerThird' ? styles.outputModeBtnActive : {}) }}
-              onClick={() => setOutputMode('lowerThird')}
-              title="Lower third output"
-            >
-              LT
-            </button>
-          </div>
           {hasPendingTake && (
             <>
               <button

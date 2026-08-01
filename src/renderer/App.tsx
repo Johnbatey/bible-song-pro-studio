@@ -57,7 +57,7 @@ function displayFieldsFor(theme: Theme | null, outputMode: 'fullscreen' | 'lower
   };
 }
 
-function backgroundFieldsFor(scene: Scene | null) {
+function backgroundFieldsFor(scene: Scene | null, theme: Theme | null, outputMode: 'fullscreen' | 'lowerThird') {
   const bg = scene?.background;
   const fields = {
     bgVideo: '' as string,
@@ -67,13 +67,21 @@ function backgroundFieldsFor(scene: Scene | null) {
     bgOpacity: typeof bg?.opacity === 'number' ? bg.opacity : 1,
     bgVideoLoop: bg?.loop !== false,
   };
-  if (!bg) return fields;
+  if (!bg) {
+    if (outputMode === 'fullscreen') {
+      fields.bgFill = theme?.fullScreen?.backgroundColor || '#0c0e14';
+    }
+    return fields;
+  }
 
   if (bg.type === 'video' && bg.mediaUrl) fields.bgVideo = bg.mediaUrl;
   else if (bg.type === 'image' && bg.mediaUrl) fields.bgCustomImage = bg.mediaUrl;
   else if (bg.type === 'gradient' && bg.gradient) fields.bgFill = bg.gradient;
   else if (bg.type === 'solid' && bg.color) fields.bgFill = bg.color;
   else if (bg.type === 'transparent') fields.bgFill = 'transparent';
+  else if (outputMode === 'fullscreen') {
+    fields.bgFill = theme?.fullScreen?.backgroundColor || '#0c0e14';
+  }
 
   return fields;
 }
@@ -118,7 +126,7 @@ export function App() {
         activeAlert: state.activeAlert,
         transcription: state.transcription.text,
         ...displayFieldsFor(state.activeTheme, state.display.outputMode),
-        ...backgroundFieldsFor(state.display.currentScene),
+        ...backgroundFieldsFor(state.display.currentScene, state.activeTheme, state.display.outputMode),
       }).then((nextState) => {
         useAppStore.getState().setOutputStatus({
           updatedAt: nextState?.updatedAt || Date.now(),

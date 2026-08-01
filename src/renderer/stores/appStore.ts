@@ -215,9 +215,14 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   setActiveTheme: (theme) => set({ activeTheme: theme }),
   addTheme: (theme) => set((s) => ({ themes: [...s.themes, theme] })),
   updateTheme: (id, updates) =>
-    set((s) => ({
-      themes: s.themes.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-    })),
+    set((s) => {
+      const exists = s.themes.some((t) => t.id === id);
+      const updatedThemes = exists
+        ? s.themes.map((t) => (t.id === id ? { ...t, ...updates } : t))
+        : [...s.themes, { id, ...updates } as Theme];
+      const updatedActive = s.activeTheme?.id === id ? { ...s.activeTheme, ...updates } : s.activeTheme;
+      return { themes: updatedThemes, activeTheme: updatedActive };
+    }),
   removeTheme: (id) => set((s) => ({ themes: s.themes.filter((t) => t.id !== id) })),
 
   songs: [],

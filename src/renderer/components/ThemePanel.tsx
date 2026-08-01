@@ -15,6 +15,7 @@ const PRESET_THEMES: Theme[] = [
       accentColor: '#F4E4B0',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 36,
+      referenceFontSize: 24,
       fontWeight: 700,
       fontColor: '#1a1a1a',
       textAlign: 'left',
@@ -22,15 +23,20 @@ const PRESET_THEMES: Theme[] = [
       borderRadius: 8,
       animation: 'slideInLeft',
       position: 'bottom-left',
+      offsetX: 0,
+      offsetY: 0,
     },
     fullScreen: {
       backgroundColor: '#0c0e14',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 48,
+      referenceFontSize: 28,
       fontWeight: 700,
       fontColor: '#F4E4B0',
       textAlign: 'center',
       animation: 'fadeIn',
+      offsetX: 0,
+      offsetY: 0,
     },
     slideTheme: {
       backgroundColor: '#0c0e14',
@@ -52,6 +58,7 @@ const PRESET_THEMES: Theme[] = [
       accentColor: '#3498db',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 32,
+      referenceFontSize: 22,
       fontWeight: 600,
       fontColor: '#ffffff',
       textAlign: 'left',
@@ -59,15 +66,20 @@ const PRESET_THEMES: Theme[] = [
       borderRadius: 10,
       animation: 'slideInUp',
       position: 'bottom-left',
+      offsetX: 0,
+      offsetY: 0,
     },
     fullScreen: {
       backgroundColor: '#0f0c29',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 44,
+      referenceFontSize: 26,
       fontWeight: 600,
       fontColor: '#ffffff',
       textAlign: 'center',
       animation: 'zoomIn',
+      offsetX: 0,
+      offsetY: 0,
     },
     slideTheme: {
       backgroundColor: '#0f0c29',
@@ -89,6 +101,7 @@ const PRESET_THEMES: Theme[] = [
       accentColor: '#2ecc71',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 36,
+      referenceFontSize: 24,
       fontWeight: 700,
       fontColor: '#ffffff',
       textAlign: 'left',
@@ -96,15 +109,20 @@ const PRESET_THEMES: Theme[] = [
       borderRadius: 8,
       animation: 'slideInLeft',
       position: 'bottom-left',
+      offsetX: 0,
+      offsetY: 0,
     },
     fullScreen: {
       backgroundColor: '#001a0a',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 48,
+      referenceFontSize: 28,
       fontWeight: 700,
       fontColor: '#ffffff',
       textAlign: 'center',
       animation: 'fadeIn',
+      offsetX: 0,
+      offsetY: 0,
     },
     slideTheme: {
       backgroundColor: '#001a0a',
@@ -126,6 +144,7 @@ const PRESET_THEMES: Theme[] = [
       accentColor: '#e74c3c',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 34,
+      referenceFontSize: 24,
       fontWeight: 700,
       fontColor: '#ffffff',
       textAlign: 'left',
@@ -133,15 +152,20 @@ const PRESET_THEMES: Theme[] = [
       borderRadius: 8,
       animation: 'slideInLeft',
       position: 'bottom-left',
+      offsetX: 0,
+      offsetY: 0,
     },
     fullScreen: {
       backgroundColor: '#1a0000',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 48,
+      referenceFontSize: 28,
       fontWeight: 700,
       fontColor: '#ffffff',
       textAlign: 'center',
       animation: 'zoomIn',
+      offsetX: 0,
+      offsetY: 0,
     },
     slideTheme: {
       backgroundColor: '#1a0000',
@@ -163,6 +187,7 @@ const PRESET_THEMES: Theme[] = [
       accentColor: '#C9A96E',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 36,
+      referenceFontSize: 24,
       fontWeight: 700,
       fontColor: '#1a1a1a',
       textAlign: 'left',
@@ -170,15 +195,20 @@ const PRESET_THEMES: Theme[] = [
       borderRadius: 10,
       animation: 'slideInUp',
       position: 'bottom-center',
+      offsetX: 0,
+      offsetY: 0,
     },
     fullScreen: {
       backgroundColor: '#ffffff',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 48,
+      referenceFontSize: 28,
       fontWeight: 700,
       fontColor: '#1a1a1a',
       textAlign: 'center',
       animation: 'fadeIn',
+      offsetX: 0,
+      offsetY: 0,
     },
     slideTheme: {
       backgroundColor: '#ffffff',
@@ -187,6 +217,135 @@ const PRESET_THEMES: Theme[] = [
       fontWeight: 500,
       fontColor: '#1a1a1a',
       accentColor: '#C9A96E',
+      transition: 'crossfade',
+    },
+  },
+  {
+    id: 'theme-6',
+    name: 'Royal Purple',
+    lowerThird: {
+      background: 'linear-gradient(135deg, rgba(74,20,140,0.95), rgba(123,31,162,0.95))',
+      backgroundColor: '#4a148c',
+      backgroundOpacity: 0.95,
+      accentColor: '#e1bee7',
+      fontFamily: 'Inter, sans-serif',
+      fontSize: 34,
+      referenceFontSize: 22,
+      fontWeight: 700,
+      fontColor: '#ffffff',
+      textAlign: 'left',
+      padding: 18,
+      borderRadius: 8,
+      animation: 'slideInLeft',
+      position: 'bottom-left',
+      offsetX: 0,
+      offsetY: 0,
+    },
+    fullScreen: {
+      backgroundColor: '#1a0033',
+      fontFamily: 'Inter, sans-serif',
+      fontSize: 46,
+      referenceFontSize: 26,
+      fontWeight: 700,
+      fontColor: '#ffffff',
+      textAlign: 'center',
+      animation: 'fadeIn',
+      offsetX: 0,
+      offsetY: 0,
+    },
+    slideTheme: {
+      backgroundColor: '#1a0033',
+      fontFamily: 'Inter, sans-serif',
+      fontSize: 34,
+      fontWeight: 500,
+      fontColor: '#f3e5f5',
+      accentColor: '#ab47bc',
+      transition: 'crossfade',
+    },
+  },
+  {
+    id: 'theme-7',
+    name: 'Ocean Breeze',
+    lowerThird: {
+      background: 'linear-gradient(135deg, rgba(2,119,189,0.95), rgba(0,172,193,0.95))',
+      backgroundColor: '#0277bd',
+      backgroundOpacity: 0.95,
+      accentColor: '#80deea',
+      fontFamily: 'Montserrat, sans-serif',
+      fontSize: 34,
+      referenceFontSize: 22,
+      fontWeight: 600,
+      fontColor: '#ffffff',
+      textAlign: 'left',
+      padding: 18,
+      borderRadius: 10,
+      animation: 'slideInUp',
+      position: 'bottom-left',
+      offsetX: 0,
+      offsetY: 0,
+    },
+    fullScreen: {
+      backgroundColor: '#002171',
+      fontFamily: 'Montserrat, sans-serif',
+      fontSize: 46,
+      referenceFontSize: 26,
+      fontWeight: 700,
+      fontColor: '#ffffff',
+      textAlign: 'center',
+      animation: 'zoomIn',
+      offsetX: 0,
+      offsetY: 0,
+    },
+    slideTheme: {
+      backgroundColor: '#002171',
+      fontFamily: 'Montserrat, sans-serif',
+      fontSize: 34,
+      fontWeight: 500,
+      fontColor: '#e0f7fa',
+      accentColor: '#26c6da',
+      transition: 'slide',
+    },
+  },
+  {
+    id: 'theme-8',
+    name: 'Sunset Warmth',
+    lowerThird: {
+      background: 'linear-gradient(135deg, rgba(230,81,0,0.95), rgba(245,124,0,0.95))',
+      backgroundColor: '#e65100',
+      backgroundOpacity: 0.95,
+      accentColor: '#ffe0b2',
+      fontFamily: 'Inter, sans-serif',
+      fontSize: 34,
+      referenceFontSize: 22,
+      fontWeight: 700,
+      fontColor: '#ffffff',
+      textAlign: 'left',
+      padding: 18,
+      borderRadius: 8,
+      animation: 'slideInLeft',
+      position: 'bottom-left',
+      offsetX: 0,
+      offsetY: 0,
+    },
+    fullScreen: {
+      backgroundColor: '#1b0000',
+      fontFamily: 'Inter, sans-serif',
+      fontSize: 48,
+      referenceFontSize: 28,
+      fontWeight: 700,
+      fontColor: '#ffcc80',
+      textAlign: 'center',
+      animation: 'fadeIn',
+      offsetX: 0,
+      offsetY: 0,
+    },
+    slideTheme: {
+      backgroundColor: '#1b0000',
+      fontFamily: 'Inter, sans-serif',
+      fontSize: 36,
+      fontWeight: 500,
+      fontColor: '#fff3e0',
+      accentColor: '#ff9800',
       transition: 'crossfade',
     },
   },
@@ -201,24 +360,29 @@ export function ThemePanel() {
   const setActiveTheme = useAppStore((s) => s.setActiveTheme);
   const [editTheme, setEditTheme] = useState<Theme | null>(null);
 
-  const customPresetNames = new Set(themes.map((theme) => theme.name.replace(/\s+Copy$/, '')));
-  const visiblePresets = PRESET_THEMES.filter((theme) => !customPresetNames.has(theme.name));
-  const allThemes = [...themes, ...visiblePresets];
+  // Combine default preset themes with custom user created/modified themes smoothly
+  const themeMap = new Map<string, Theme>();
+  PRESET_THEMES.forEach((preset) => themeMap.set(preset.id, preset));
+  themes.forEach((theme) => {
+    const existing = themeMap.get(theme.id);
+    themeMap.set(theme.id, existing ? { ...existing, ...theme } : theme);
+  });
+  const allThemes = Array.from(themeMap.values());
 
   const renameTheme = (theme: Theme, name: string) => {
     const updated = { ...theme, name };
     setEditTheme(updated);
-    if (activeTheme?.id === theme.id) setActiveTheme(updated);
-    if (name.trim()) updateTheme(theme.id, { name });
+    setActiveTheme(updated);
+    if (name.trim()) updateTheme(theme.id, updated);
   };
 
   const commitThemeName = (theme: Theme) => {
     const nextName = theme.name.trim();
-    const fallback = themes.find((item) => item.id === theme.id)?.name || 'Untitled Theme';
+    const fallback = theme.name || 'Untitled Theme';
     const updated = { ...theme, name: nextName || fallback };
     setEditTheme(updated);
-    if (activeTheme?.id === theme.id) setActiveTheme(updated);
-    updateTheme(theme.id, { name: updated.name });
+    setActiveTheme(updated);
+    updateTheme(theme.id, updated);
   };
 
   const deleteTheme = (theme: Theme) => {
@@ -343,10 +507,8 @@ export function ThemePanel() {
                   style={{ flex: 1 }}
                   onClick={(event) => {
                     event.stopPropagation();
-                    const existing = themes.find((t) => t.id === theme.id);
-                    const editable = existing || { ...theme, id: `theme-${Date.now()}`, name: `${theme.name} Copy` };
-                    if (!existing) addTheme(editable);
-                    setEditTheme(editable);
+                    setActiveTheme(theme);
+                    setEditTheme(theme);
                   }}
                 >
                   Edit Design
@@ -398,8 +560,8 @@ export function ThemePanel() {
                   onChange={(updates) => {
                     const updated = { ...editTheme, lowerThird: { ...editTheme.lowerThird, ...updates } };
                     setEditTheme(updated);
-                    if (activeTheme?.id === editTheme.id) setActiveTheme(updated);
-                    useAppStore.getState().updateTheme(editTheme.id, updated);
+                    setActiveTheme(updated);
+                    updateTheme(editTheme.id, updated);
                   }}
                 />
               </div>
@@ -410,8 +572,8 @@ export function ThemePanel() {
                   onChange={(updates) => {
                     const updated = { ...editTheme, fullScreen: { ...editTheme.fullScreen, ...updates } };
                     setEditTheme(updated);
-                    if (activeTheme?.id === editTheme.id) setActiveTheme(updated);
-                    useAppStore.getState().updateTheme(editTheme.id, updated);
+                    setActiveTheme(updated);
+                    updateTheme(editTheme.id, updated);
                   }}
                 />
               </div>
@@ -424,6 +586,11 @@ export function ThemePanel() {
 }
 
 function ThemeFormSection({ values, onChange }: { values: any; onChange: (updates: any) => void }) {
+  const safeInt = (val: string, fallback = 0) => {
+    const parsed = parseInt(val, 10);
+    return isNaN(parsed) ? fallback : parsed;
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div>
@@ -446,8 +613,8 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
           <input
             className="input"
             type="number"
-            value={values.fontSize || 32}
-            onChange={(e) => onChange({ fontSize: parseInt(e.target.value) })}
+            value={values.fontSize ?? 32}
+            onChange={(e) => onChange({ fontSize: safeInt(e.target.value, 32) })}
           />
         </div>
         <div style={{ flex: 1 }}>
@@ -455,7 +622,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
           <select
             className="input"
             value={values.fontWeight || 400}
-            onChange={(e) => onChange({ fontWeight: parseInt(e.target.value) })}
+            onChange={(e) => onChange({ fontWeight: safeInt(e.target.value, 400) })}
           >
             <option value="300">Light (300)</option>
             <option value="400">Regular (400)</option>
@@ -499,6 +666,29 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <div style={{ flex: 1 }}>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Ref Font Size</label>
+          <input
+            className="input"
+            type="number"
+            value={values.referenceFontSize ?? 26}
+            onChange={(e) => onChange({ referenceFontSize: safeInt(e.target.value, 26) })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Text Alignment</label>
+          <select
+            className="input"
+            value={values.textAlign || 'center'}
+            onChange={(e) => onChange({ textAlign: e.target.value })}
+          >
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+          </select>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ flex: 1 }}>
           <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Background</label>
           <input
             className="input"
@@ -514,7 +704,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
             className="input"
             type="number"
             value={values.borderRadius ?? 0}
-            onChange={(e) => onChange({ borderRadius: parseInt(e.target.value) || 0 })}
+            onChange={(e) => onChange({ borderRadius: safeInt(e.target.value, 0) })}
           />
         </div>
       </div>
@@ -527,16 +717,25 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
             min="40"
             max="100"
             value={values.width ?? 92}
-            onChange={(e) => onChange({ width: parseInt(e.target.value) || 92 })}
+            onChange={(e) => onChange({ width: safeInt(e.target.value, 92) })}
           />
         </div>
         <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Offset Y</label>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Position X (px)</label>
+          <input
+            className="input"
+            type="number"
+            value={values.offsetX ?? 0}
+            onChange={(e) => onChange({ offsetX: safeInt(e.target.value, 0) })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Position Y (px)</label>
           <input
             className="input"
             type="number"
             value={values.offsetY ?? 0}
-            onChange={(e) => onChange({ offsetY: parseInt(e.target.value) || 0 })}
+            onChange={(e) => onChange({ offsetY: safeInt(e.target.value, 0) })}
           />
         </div>
       </div>

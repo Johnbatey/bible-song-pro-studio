@@ -22,6 +22,7 @@ export function PreviewProgramView() {
   const isTransitioning = useAppStore((s) => s.display.isTransitioning);
   const mode = useAppStore((s) => s.display.mode);
   const outputMode = useAppStore((s) => s.display.outputMode);
+  const setOutputMode = useAppStore((s) => s.setOutputMode);
   const activeTheme = useAppStore((s) => s.activeTheme);
   const activeAlert = useAppStore((s) => s.activeAlert);
   const transcription = useAppStore((s) => s.transcription.text);
@@ -244,7 +245,47 @@ export function PreviewProgramView() {
         </div>
         <div style={styles.zoomControls}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-            {/* Extended chrome bar base for additional tools */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.04em' }}>OUTPUT:</span>
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 5, padding: 2, gap: 2, border: '1px solid var(--border-primary)' }}>
+                <button
+                  style={{
+                    height: 22,
+                    padding: '0 10px',
+                    border: 'none',
+                    borderRadius: 4,
+                    background: outputMode === 'fullscreen' ? 'var(--accent)' : 'transparent',
+                    color: outputMode === 'fullscreen' ? '#ffffff' : 'var(--text-secondary)',
+                    fontWeight: outputMode === 'fullscreen' ? 700 : 500,
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onClick={() => setOutputMode('fullscreen')}
+                  title="Fullscreen Output Mode (FS)"
+                >
+                  FS
+                </button>
+                <button
+                  style={{
+                    height: 22,
+                    padding: '0 10px',
+                    border: 'none',
+                    borderRadius: 4,
+                    background: outputMode === 'lowerThird' ? 'var(--accent)' : 'transparent',
+                    color: outputMode === 'lowerThird' ? '#ffffff' : 'var(--text-secondary)',
+                    fontWeight: outputMode === 'lowerThird' ? 700 : 500,
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onClick={() => setOutputMode('lowerThird')}
+                  title="Lower Third Output Mode (LT)"
+                >
+                  LT
+                </button>
+              </div>
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom - ZOOM_STEP)} title="Zoom out">-</button>

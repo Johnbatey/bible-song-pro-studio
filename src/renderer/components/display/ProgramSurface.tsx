@@ -150,20 +150,36 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
     textAlign,
     lineHeight: mode === 'fullscreen' ? state.theme?.fullScreen?.lineHeight : undefined,
   };
+  const themeRefFontSize = mode === 'lowerThird' ? state.theme?.lowerThird?.referenceFontSize : state.theme?.fullScreen?.referenceFontSize;
   const refStyle: React.CSSProperties = {
-    fontSize: referenceFontSize({ ...state, referenceFontSize: state.referenceFontSize ?? state.theme?.fullScreen?.referenceFontSize ?? 0 }, preview),
+    fontSize: referenceFontSize({ ...state, referenceFontSize: state.referenceFontSize ?? themeRefFontSize ?? 0 }, preview),
     color: referenceColor,
     fontWeight,
   };
+  const fsOffsetX = state.theme?.fullScreen?.offsetX || 0;
+  const fsOffsetY = state.theme?.fullScreen?.offsetY || 0;
   const fullscreenStyle: React.CSSProperties = {
     justifyContent: fullscreenJustify(state.theme?.fullScreen?.verticalAlign),
     textAlign,
+    transform: [
+      fsOffsetX ? `translateX(${fsOffsetX}px)` : '',
+      fsOffsetY ? `translateY(${fsOffsetY}px)` : '',
+    ].filter(Boolean).join(' ') || undefined,
   };
   const refRowStyle: React.CSSProperties = {
     justifyContent: alignmentJustify(textAlign),
     textAlign,
     width: '100%',
   };
+
+  const ltOffsetX = state.theme?.lowerThird?.offsetX || 0;
+  const ltOffsetY = state.theme?.lowerThird?.offsetY || 0;
+  const ltWidth = state.theme?.lowerThird?.width;
+  const ltTransform = [
+    ltWidth ? 'translateX(-50%)' : '',
+    ltOffsetX ? `translateX(${ltOffsetX}px)` : '',
+    ltOffsetY ? `translateY(${ltOffsetY}px)` : '',
+  ].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className={`program-surface ${mode === 'lowerThird' ? 'program-surface-lt' : 'program-surface-full'} ${className}`}>
@@ -193,15 +209,20 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
           style={{
             background: state.theme?.lowerThird?.background || undefined,
             borderRadius: state.theme?.lowerThird?.borderRadius,
-            width: state.theme?.lowerThird?.width ? `${state.theme.lowerThird.width}%` : undefined,
-            left: state.theme?.lowerThird?.width ? '50%' : undefined,
-            right: state.theme?.lowerThird?.width ? 'auto' : undefined,
-            transform: state.theme?.lowerThird?.width ? 'translateX(-50%)' : undefined,
+            width: ltWidth ? `${ltWidth}%` : undefined,
+            left: ltWidth ? '50%' : undefined,
+            right: ltWidth ? 'auto' : undefined,
+            transform: ltTransform,
+            textAlign,
           }}
         >
           <div className="program-lt-text" style={textStyle}>{content?.text || ''}</div>
-          {showReference && content?.reference && <div className="program-lt-ref" style={{ color: referenceColor }}>{content.reference}</div>}
-          {songCredit(scene) && <div className="program-song-credit">{songCredit(scene)}</div>}
+          {showReference && content?.reference && (
+            <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign }}>
+              {content.reference}
+            </div>
+          )}
+          {songCredit(scene) && <div className="program-song-credit" style={{ textAlign }}>{songCredit(scene)}</div>}
         </div>
       )}
 
