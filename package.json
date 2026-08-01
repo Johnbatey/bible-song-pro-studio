@@ -1,7 +1,7 @@
 {
-  "name": "bible-song-pro-max",
+  "name": "bible-song-pro",
   "version": "1.0.0",
-  "description": "Bible Song Pro Max - Professional Church Presentation & Streaming Software",
+  "description": "Bible Song Pro - Professional Church Presentation & Streaming Software",
   "main": "src/electron/main.cjs",
   "author": "Bible Song Pro Team",
   "license": "UNLICENSED",
@@ -38,8 +38,8 @@
     "verify:all": "npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all"
   },
   "build": {
-    "appId": "com.biblesongpro.max",
-    "productName": "Bible Song Pro Max",
+    "appId": "com.biblesongpro.app",
+    "productName": "Bible Song Pro",
     "directories": {
       "buildResources": "assets",
       "output": "dist"
@@ -60,10 +60,10 @@
       "hardenedRuntime": true,
       "entitlements": "assets/entitlements.mac.plist",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Bible Song Pro Max needs microphone access for live transcription.",
-        "NSCameraUsageDescription": "Bible Song Pro Max needs camera access for video input.",
-        "NSScreenCaptureUsageDescription": "Bible Song Pro Max needs screen access for output display.",
-        "NSLocalNetworkUsageDescription": "Bible Song Pro Max uses the local network to publish NDI video sources and serve the display and mobile remote pages.",
+        "NSMicrophoneUsageDescription": "Bible Song Pro needs microphone access for live transcription.",
+        "NSCameraUsageDescription": "Bible Song Pro needs camera access for video input.",
+        "NSScreenCaptureUsageDescription": "Bible Song Pro needs screen access for output display.",
+        "NSLocalNetworkUsageDescription": "Bible Song Pro uses the local network to publish NDI video sources and serve the display and mobile remote pages.",
         "NSBonjourServices": [
           "_ndi._tcp",
           "_ndi._udp"

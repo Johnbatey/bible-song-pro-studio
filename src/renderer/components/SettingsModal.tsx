@@ -497,20 +497,20 @@ export function SettingsModal() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center', ...type.secondary, fontWeight: fontWeight.semibold }}>
                       <span className="badge badge-active">NDI LIVE</span>
-                      <span>Bible Song Pro Max Output</span>
+                      <span>Bible Song Pro Output</span>
                     </div>
                     <span style={{ ...type.caption, color: 'var(--text-dim)' }}>1920×1080 @ 60fps</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       className="btn btn-sm btn-secondary"
-                      onClick={() => navigator.clipboard.writeText('OBS NDI Source: Bible Song Pro Max')}
+                      onClick={() => navigator.clipboard.writeText('OBS NDI Source: Bible Song Pro')}
                     >
                       Copy OBS Setup
                     </button>
                     <button
                       className="btn btn-sm btn-secondary"
-                      onClick={() => navigator.clipboard.writeText('vMix NDI Input: Bible Song Pro Max')}
+                      onClick={() => navigator.clipboard.writeText('vMix NDI Input: Bible Song Pro')}
                     >
                       Copy vMix Setup
                     </button>
@@ -977,8 +977,8 @@ export function SettingsModal() {
                 <div className="sm-content-sub">System runtime diagnostics and software details.</div>
 
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div><strong>Application:</strong> Bible Song Pro Max</div>
-                  <div><strong>Version:</strong> v1.0.0 (Pro Max Edition)</div>
+                  <div><strong>Application:</strong> Bible Song Pro</div>
+                  <div><strong>Version:</strong> v1.0.0 (Pro Edition)</div>
                   <div><strong>Graphics Backend:</strong> macOS Metal Hardware Acceleration</div>
                   <div><strong>Server Port:</strong> 8942</div>
                 </div>

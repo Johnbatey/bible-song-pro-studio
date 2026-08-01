@@ -182,7 +182,7 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
 
       {!scene && (
         <div className="program-surface-standby">
-          <div className="program-surface-standby-title">Bible Song Pro Max</div>
+          <div className="program-surface-standby-title">Bible Song Pro</div>
           <div className="program-surface-standby-sub">Waiting for signal...</div>
         </div>
       )}

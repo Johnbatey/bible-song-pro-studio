@@ -58,7 +58,7 @@ export function StatusBar() {
         </span>
         <span style={styles.separator} />
         <span style={{ ...styles.item, color: 'var(--accent)' }}>
-          Bible Song Pro Max
+          Bible Song Pro
         </span>
       </div>
     </div>

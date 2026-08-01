@@ -45,7 +45,7 @@ function createNdiService() {
   let lib = null;
   let api = null;
   let sendInstance = null;
-  let sourceName = 'Bible Song Pro Max';
+  let sourceName = 'Bible Song Pro';
   let isRunning = false;
   let captureTimer = null;
   let displayWindow = null;

@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
 /**
- * Bible Song Pro Max — operator UI type system.
+ * Bible Song Pro — operator UI type system.
  *
  * Six sizes, four weights, three tracking values. Hierarchy comes from weight
  * and color, not size: at 11–15px a 2px step is nearly invisible, a 400→600

@@ -158,7 +158,7 @@ const apiHandlers = {
   'GET /api/session/list': () => ({ ok: true, sessions: sessionHistory?.listSessions() || [] }),
   'GET /api/session/export': ({ query }) => sessionHistory?.exportSession(query?.id, query?.format || 'json'),
   'POST /api/ndi/start': () => {
-    const result = ndiService?.start('Bible Song Pro Max');
+    const result = ndiService?.start('Bible Song Pro');
     if (result?.ok && displayWindow && !displayWindow.isDestroyed()) {
       ndiService.setDisplayWindow(displayWindow);
       ndiService.startCapture(15, { width: 1280, height: 720 });
@@ -391,7 +391,7 @@ app.whenReady().then(async () => {
   // ── Keyboard Shortcuts ──
   globalShortcut.register('CommandOrControl+Shift+F', () => { mainWindow?.webContents.send('shortcut:fullscreen'); });
   globalShortcut.register('CommandOrControl+Shift+B', () => { setDisplayState({ blackout: !displayState.blackout }); });
-  globalShortcut.register('CommandOrControl+Shift+N', () => { ndiService?.start('Bible Song Pro Max'); });
+  globalShortcut.register('CommandOrControl+Shift+N', () => { ndiService?.start('Bible Song Pro'); });
   globalShortcut.register('CommandOrControl+Shift+E', () => sessionHistory?.endSession());
   globalShortcut.register('CommandOrControl+Shift+P', () => { sessionHistory?.startSession('Session ' + new Date().toLocaleString()); });
   globalShortcut.register('F5', () => { if (displayWindow && !displayWindow.isDestroyed()) displayWindow.reload(); });
@@ -452,7 +452,7 @@ app.whenReady().then(async () => {
 
   // NDI IPC
   ipcMain.handle('ndi:start', async (_, p) => {
-    const r = ndiService?.start(p?.name || 'Bible Song Pro Max');
+    const r = ndiService?.start(p?.name || 'Bible Song Pro');
     if (r?.ok) {
       // Capture the display output if it's open; otherwise the source is created and
       // starts publishing as soon as one is.

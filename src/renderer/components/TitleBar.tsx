@@ -33,7 +33,7 @@ export function TitleBar() {
       >
         <div style={styles.brand}>
           <img src="./bible-song-pro-icon.svg" alt="" style={styles.logo} />
-          <span style={styles.title}>Bible Song<span style={styles.pro}>PRO</span> Max</span>
+          <span style={styles.title}>Bible Song Pro</span>
         </div>
       </div>
       <div style={styles.controls}>
