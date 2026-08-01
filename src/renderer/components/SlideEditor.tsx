@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { useAppStore } from '../stores/appStore';
 import type { PresentationDeck, PresentationSlide, Scene } from '../types';
 import { parsePptxFile, parsePdfFile } from '../utils/parsers';
+import { type, fontWeight, numeric } from '../styles/type';
 
 type SlideTransition = PresentationSlide['transition'];
 
@@ -360,8 +361,8 @@ export function SlideEditor({ onClose }: { onClose: () => void }) {
               </>
             ) : (
               <div style={css.noDeck}>
-                <h3 style={{ margin: 0, fontSize: 16, color: 'rgba(255,255,255,0.5)' }}>No deck selected</h3>
-                <p style={{ margin: '8px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>Select a deck from the library or import a new presentation.</p>
+                <h3 style={{ margin: 0, ...type.title, color: 'rgba(255,255,255,0.5)' }}>No deck selected</h3>
+                <p style={{ margin: '8px 0 0', ...type.body, color: 'rgba(255,255,255,0.3)' }}>Select a deck from the library or import a new presentation.</p>
               </div>
             )}
           </main>
@@ -371,8 +372,8 @@ export function SlideEditor({ onClose }: { onClose: () => void }) {
       {showCreateDialog && (
         <div style={css.dlgBackdrop} onClick={() => setShowCreateDialog(false)}>
           <div style={css.dlg} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: 0, fontSize: 17, color: '#f3f5f8' }}>Create Slide Project</h3>
-            <label style={{ display: 'block', marginBottom: 7, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Project Name</label>
+            <h3 style={{ margin: 0, ...type.title, color: '#f3f5f8' }}>Create Slide Project</h3>
+            <label style={{ display: 'block', marginBottom: 7, ...type.secondary, color: 'rgba(255,255,255,0.5)' }}>Project Name</label>
             <input style={css.dlgInput} type="text" value={newDeckTitle} onChange={(e) => setNewDeckTitle(e.target.value)} placeholder="My Presentation" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleCreateDeck(); }} />
             <div style={css.dlgActions}>
               <button style={css.actionChip} onClick={() => setShowCreateDialog(false)}>Cancel</button>
@@ -386,72 +387,73 @@ export function SlideEditor({ onClose }: { onClose: () => void }) {
 }
 
 const css: Record<string, React.CSSProperties> = {
-  parsingBar: { height: 32, flex: '0 0 32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(74,134,255,0.15)', borderBottom: '1px solid rgba(74,134,255,0.25)', fontSize: 12, fontWeight: 600, color: '#8ab4ff', letterSpacing: '0.04em' },
+  parsingBar: { height: 32, flex: '0 0 32px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(74,134,255,0.15)', borderBottom: '1px solid rgba(74,134,255,0.25)', ...type.secondary, fontWeight: fontWeight.semibold, color: '#8ab4ff' },
   overlay: { position: 'fixed', inset: 0, zIndex: 1000, background: '#0b0d12', display: 'flex', flexDirection: 'column', color: '#f3f5f8', fontFamily: 'Inter, system-ui, -apple-system, sans-serif' },
   editor: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 },
   topbar: { height: 48, flex: '0 0 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(15,21,31,0.94)', backdropFilter: 'blur(14px)' },
   topbarLeft: { display: 'flex', alignItems: 'center', gap: 12 },
-  backBtn: { padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  topbarTitle: { fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.8)' },
-  topbarStatus: { fontSize: 11, color: 'rgba(255,255,255,0.46)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 },
+  backBtn: { padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', ...type.secondary, fontWeight: fontWeight.semibold, cursor: 'pointer' },
+  topbarTitle: { ...type.heading, color: 'rgba(255,255,255,0.8)' },
+  topbarStatus: { ...type.label, color: 'rgba(255,255,255,0.46)' },
   topbarRight: { display: 'flex', alignItems: 'center', gap: 10 },
-  presenterBtn: { padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(74,134,255,0.85)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-  closeBtn: { padding: '4px 10px', borderRadius: 6, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 16, cursor: 'pointer' },
+  presenterBtn: { padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(74,134,255,0.85)', color: '#fff', ...type.secondary, fontWeight: fontWeight.semibold, cursor: 'pointer' },
+  closeBtn: { padding: '4px 10px', borderRadius: 6, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', ...type.title, cursor: 'pointer' },
   body: { flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' },
   rail: { width: 220, flex: '0 0 220px', display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(255,255,255,0.08)', background: '#0f1117' },
   railActions: { display: 'flex', flexDirection: 'column', gap: 6, padding: 12, borderBottom: '1px solid rgba(255,255,255,0.08)' },
-  actionChip: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#f3f5f8', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  actionChip: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#f3f5f8', ...type.secondary, fontWeight: fontWeight.semibold, cursor: 'pointer' },
   acPrimary: { background: 'rgba(74,134,255,0.94)', borderColor: 'rgba(120,167,255,0.42)', color: '#fff' },
   acDanger: { color: '#ff6b6b', borderColor: 'rgba(255,107,107,0.3)' },
-  searchInput: { margin: '8px 12px', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', fontSize: 12, outline: 'none' },
+  searchInput: { margin: '8px 12px', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', ...type.secondary, outline: 'none' },
   railScroll: { flex: 1, overflowY: 'auto', padding: '4px 8px' },
   deckItem: { position: 'relative', padding: '8px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 2 },
   deckItemActive: { background: 'rgba(74,134,255,0.15)' },
-  deckItemTitle: { fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  deckItemMeta: { fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
-  deckDeleteBtn: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: 10, cursor: 'pointer', borderRadius: 4, display: 'none' },
-  emptyText: { padding: 20, textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.35)' },
+  deckItemTitle: { ...type.secondary, fontWeight: fontWeight.semibold, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  deckItemMeta: { ...type.caption, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+  deckDeleteBtn: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.3)', ...type.caption, cursor: 'pointer', borderRadius: 4, display: 'none' },
+  emptyText: { padding: 20, textAlign: 'center', ...type.caption, color: 'rgba(255,255,255,0.35)' },
   railFooter: { padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.08)' },
-  filterSelect: { width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', fontSize: 11, outline: 'none' },
+  filterSelect: { width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', ...type.caption, outline: 'none' },
   main: { flex: 1, display: 'flex', minWidth: 0, overflow: 'hidden', gap: 0 },
   canvasArea: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 16, gap: 12, overflow: 'hidden' },
   canvasOuter: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, overflow: 'hidden' },
   canvas: { width: '100%', maxWidth: '100%', height: '100%', maxHeight: '100%', aspectRatio: '16/9', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'linear-gradient(135deg, #0c0e14, #1a1a2e)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
   canvasContent: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6%', textAlign: 'center', position: 'relative' },
+  // Slide canvas renders the output, not chrome — deliberately outside the UI type scale.
   canvasBody: { fontSize: 'clamp(14px, 2.5vw, 38px)', fontWeight: 600, color: '#f0ece4', lineHeight: 1.35, maxWidth: '88%', textShadow: '0 2px 10px rgba(0,0,0,0.3)' },
   canvasPlaceholder: { fontSize: 'clamp(18px, 3vw, 44px)', fontWeight: 700, color: 'rgba(240,236,228,0.7)' },
   canvasTitle: {},
-  canvasFooter: { position: 'absolute', bottom: 8, left: 12, right: 12, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em' },
-  canvasEmpty: { color: 'rgba(255,255,255,0.3)', fontSize: 14 },
+  canvasFooter: { position: 'absolute', bottom: 8, left: 12, right: 12, display: 'flex', justifyContent: 'space-between', ...type.label, fontWeight: fontWeight.regular, color: 'rgba(255,255,255,0.25)' },
+  canvasEmpty: { color: 'rgba(255,255,255,0.3)', ...type.body },
   thumbStrip: { display: 'flex', gap: 8, overflowX: 'auto', padding: '4px 0', flex: '0 0 auto', minHeight: 60 },
   thumbItem: { flex: '0 0 100px', padding: 6, borderRadius: 8, cursor: 'pointer', border: '2px solid transparent', background: 'rgba(255,255,255,0.03)', transition: 'border-color 0.15s', overflow: 'hidden' },
   thumbItemActive: { borderColor: 'rgba(74,134,255,0.6)', background: 'rgba(74,134,255,0.1)' },
   thumbItemHidden: { opacity: 0.5 },
-  thumbNum: { fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 4 },
-  thumbPreview: { fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as any },
+  thumbNum: { ...type.caption, ...numeric, fontWeight: fontWeight.bold, color: 'rgba(255,255,255,0.4)', marginBottom: 4 },
+  thumbPreview: { ...type.caption, color: 'rgba(255,255,255,0.5)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as any },
   inspector: { width: 310, flex: '0 0 310px', display: 'flex', flexDirection: 'column', borderLeft: '1px solid rgba(255,255,255,0.08)', background: '#0f1117', overflowY: 'auto' },
   inspectorInfo: { display: 'flex', padding: 16, gap: 16 },
   insStat: { flex: 1, textAlign: 'center' },
-  insStatVal: { fontSize: 24, fontWeight: 800, color: '#f3f5f8', letterSpacing: '-0.04em' },
-  insStatLabel: { fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2 },
+  insStatVal: { ...type.display, ...numeric, color: '#f3f5f8' },
+  insStatLabel: { ...type.label, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
   insMeta: { padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 8 },
-  insMetaItem: { display: 'flex', justifyContent: 'space-between', fontSize: 12 },
-  insMetaLabel: { color: 'rgba(255,255,255,0.4)', fontWeight: 500 },
-  insMetaValue: { color: 'rgba(255,255,255,0.8)', fontWeight: 600 },
+  insMetaItem: { display: 'flex', justifyContent: 'space-between', ...type.secondary },
+  insMetaLabel: { color: 'rgba(255,255,255,0.4)', fontWeight: fontWeight.medium },
+  insMetaValue: { color: 'rgba(255,255,255,0.8)', fontWeight: fontWeight.semibold },
   insCard: { padding: 16, borderTop: '1px solid rgba(255,255,255,0.08)' },
-  sectionTitle: { margin: '0 0 12px', fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.48)' },
+  sectionTitle: { margin: '0 0 12px', ...type.label, color: 'rgba(255,255,255,0.48)' },
   edForm: { display: 'flex', flexDirection: 'column', gap: 10 },
   edField: { display: 'flex', flexDirection: 'column', gap: 4 },
-  edLabel: { fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)' },
-  edInput: { padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', fontSize: 12, outline: 'none' },
-  edSelect: { padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', fontSize: 12, outline: 'none', cursor: 'pointer' },
-  edTextarea: { padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', fontSize: 12, outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.45 },
+  edLabel: { ...type.caption, fontWeight: fontWeight.semibold, color: 'rgba(255,255,255,0.5)' },
+  edInput: { padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', ...type.secondary, outline: 'none' },
+  edSelect: { padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', ...type.secondary, outline: 'none', cursor: 'pointer' },
+  edTextarea: { padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', ...type.secondary, outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.45 },
   edGrid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
-  edCheck: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', paddingTop: 22 },
+  edCheck: { display: 'flex', alignItems: 'center', gap: 6, ...type.secondary, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', paddingTop: 22 },
   edActions: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   noDeck: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 },
   dlgBackdrop: { position: 'fixed', inset: 0, zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(4px)' },
   dlg: { width: 360, padding: 20, borderRadius: 14, border: '1px solid rgba(255,255,255,0.14)', background: '#1a1d24', boxShadow: '0 24px 70px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: 12 },
-  dlgInput: { padding: '10px 11px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', fontSize: 13, outline: 'none' },
+  dlgInput: { padding: '10px 11px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(0,0,0,0.2)', color: '#f3f5f8', ...type.body, outline: 'none' },
   dlgActions: { display: 'flex', justifyContent: 'flex-end', gap: 8 },
 };

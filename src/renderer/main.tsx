@@ -1,38 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { useAppStore } from './stores/appStore';
 import './styles/global.css';
+
+/**
+ * Test seam for the scripts/verify-*.cjs harnesses, which drive the real built
+ * app in Electron and otherwise have no way to seed operator state. Read/write
+ * access to the store only — no behaviour of its own.
+ */
+declare global {
+  interface Window { __BSP_TEST__?: { store: typeof useAppStore } }
+}
+window.__BSP_TEST__ = { store: useAppStore };
 
 function SplashOverlay() {
   useEffect(() => {
     const splashEl = document.getElementById('splash-screen');
-    if (splashEl) {
-      splashEl.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:center;height:100%;background:#030308;">
-          <div style="text-align:center;">
-            <div style="width:40px;height:40px;border:2px solid rgba(201,169,110,0.3);border-top-color:#C9A96E;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto;"></div>
-            <div style="margin-top:16px;font-family:-apple-system,sans-serif;font-size:12px;letter-spacing:0.15em;color:rgba(255,255,255,0.3);text-transform:uppercase;">Loading Sanctuary</div>
-          </div>
-          <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-        </div>
-      `;
-    }
+    if (!splashEl) return;
 
-    const hideSplash = () => {
-      splashEl?.remove();
-    };
+    // Smoothly fade out inline loading screen once React has mounted App
+    const timer = setTimeout(() => {
+      splashEl.style.opacity = '0';
+      splashEl.style.pointerEvents = 'none';
+      setTimeout(() => {
+        splashEl.remove();
+      }, 400);
+    }, 200);
 
-    // Listen for splash complete from splash.html
-    const handleSplash = () => hideSplash();
-    document.addEventListener('splash-complete', handleSplash);
-
-    // Fallback in case no splash-complete event is emitted.
-    const timer = setTimeout(hideSplash, 4000);
-
-    return () => {
-      document.removeEventListener('splash-complete', handleSplash);
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, []);
 
   return null;
@@ -43,7 +39,6 @@ function Root() {
 
   useEffect(() => {
     setReady(true);
-    document.dispatchEvent(new Event('splash-complete'));
   }, []);
 
   return (

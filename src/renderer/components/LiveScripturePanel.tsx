@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHandle } from '../services/audio-capture';
-import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus } from '../types';
+import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection } from '../types';
+import { type, fontWeight, numeric } from '../styles/type';
 
 /** Short enough to feel live, while still giving Whisper enough speech context. */
 const LOCAL_CHUNK_SECONDS = 3;
@@ -30,6 +31,9 @@ export function LiveScripturePanel() {
   const [sttStatus, setSttStatus] = useState<SttStatus | null>(null);
   const [keyConfigured, setKeyConfigured] = useState(false);
   const [notice, setNotice] = useState('');
+  const [rankedDetections, setRankedDetections] = useState<VerseDetection[]>([]);
+  const [detectionIsFinal, setDetectionIsFinal] = useState(false);
+  const [detectionLatencyMs, setDetectionLatencyMs] = useState(0);
 
   const captureRef = useRef<AudioCaptureHandle | null>(null);
   const localBufferRef = useRef<Float32Array[]>([]);
@@ -40,6 +44,7 @@ export function LiveScripturePanel() {
   const detectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const detectSequenceRef = useRef(0);
   const lastDetectionTextRef = useRef('');
+  const lastProjectedRef = useRef({ key: '', at: 0 });
 
   useEffect(() => {
     refreshInputs();
@@ -66,9 +71,20 @@ export function LiveScripturePanel() {
       }
     });
 
+    const startFromTranscriptPanel = () => {
+      if (!useAppStore.getState().liveScripture.isActive) startLive();
+    };
+    const stopFromTranscriptPanel = () => {
+      stopLive();
+      setTranscription({ isActive: false, text: '' });
+    };
+    window.addEventListener('bsp:live-transcription-start', startFromTranscriptPanel);
+    window.addEventListener('bsp:live-transcription-stop', stopFromTranscriptPanel);
+
     return () => {
       off?.();
-      stopLive();
+      window.removeEventListener('bsp:live-transcription-start', startFromTranscriptPanel);
+      window.removeEventListener('bsp:live-transcription-stop', stopFromTranscriptPanel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -117,25 +133,62 @@ export function LiveScripturePanel() {
   async function detectFromText(text: string, isFinal: boolean) {
     const cleaned = text.trim();
     if (!cleaned) return;
-    if (cleaned === lastDetectionTextRef.current) return;
+    const transcriptKey = `${isFinal ? 'final' : 'interim'}|${cleaned}`;
+    if (transcriptKey === lastDetectionTextRef.current) return;
     const sequence = ++detectSequenceRef.current;
+    const detectionStartedAt = performance.now();
+    const prefsBeforeDetection = useAppStore.getState().liveScripture;
+    const versionRequest = isFinal ? detectVersionRequest(cleaned, versions) : null;
+    let detectionVersion = version;
+    if (versionRequest) {
+      if (prefsBeforeDetection.autoVersionSwitch) {
+        detectionVersion = versionRequest.versionId;
+        if (detectionVersion !== version) setVersion(detectionVersion);
+        setLive({ requestedVersion: null });
+        setNotice(`Bible version switched to ${versionRequest.label}.`);
+      } else {
+        setLive({ requestedVersion: versionRequest.versionId });
+        setNotice(`${versionRequest.label} was requested. Enable Auto version switch or select it manually.`);
+      }
+    }
     const result = await window.BSP?.verse?.detect({
       text: cleaned,
-      options: { versionId: version, modes: ['direct', 'contextual', 'verbatim', 'semantic'], limit: 6, minConfidence: isFinal ? 0.3 : 0.4 },
+      options: { versionId: detectionVersion, modes: ['direct', 'contextual', 'verbatim', 'semantic'], limit: 6, minConfidence: isFinal ? 0.3 : 0.4, isFinal },
     }).catch(() => null);
     if (sequence !== detectSequenceRef.current) return;
     const detections = result?.detections || [];
-    const suggestions = await window.BSP?.bible?.search({ versionId: version, query: cleaned, limit: 6 }).catch(() => []) as BibleSearchResult[];
+    const fallbackSuggestions = detections.length
+      ? []
+      : await window.BSP?.bible?.search({ versionId: detectionVersion, query: cleaned, limit: 6 }).catch(() => []) as BibleSearchResult[];
     if (sequence !== detectSequenceRef.current) return;
-    const bestHit = detections.length > 0
-      ? { reference: detections[0].displayRef, text: detections[0].text, book: detections[0].book, chapter: detections[0].chapter, verse: detections[0].verseStart, version } as BibleSearchResult
-      : suggestions[0] || null;
-    lastDetectionTextRef.current = cleaned;
+    const parserSuggestions = detections.map((d) => ({
+      reference: d.displayRef, text: d.text, book: d.book, chapter: d.chapter,
+      verse: d.verseStart, version: detectionVersion,
+    } as BibleSearchResult));
+    const suggestions = parserSuggestions.length ? parserSuggestions : fallbackSuggestions;
+    const bestHit = suggestions[0] || null;
+    lastDetectionTextRef.current = transcriptKey;
+    setRankedDetections(detections);
+    setDetectionIsFinal(isFinal);
+    setDetectionLatencyMs(Math.max(0, Math.round(performance.now() - detectionStartedAt)));
     setLive({ bestHit, suggestions });
     setTranscription({ isActive: true, text: cleaned, confidence: detections[0]?.confidence ?? (bestHit ? 0.65 : 0.45) });
-    // Interim hypotheses revise themselves. Surface their suggestions immediately,
-    // but wait for a final result before changing the live output.
-    if (isFinal && bestHit && useAppStore.getState().liveScripture.autoProject) sendHit(bestHit);
+    // Keep Program accuracy tied to Deepgram's final transcript. Fast endpointing
+    // makes this final arrive promptly without projecting a revisable hypothesis.
+    if (isFinal && bestHit && detections[0]) {
+      const mode = String(detections[0]?.mode || '');
+      const prefs = useAppStore.getState().liveScripture;
+      const matchClass = classifyProjectionMode(mode);
+      const shouldProject = matchClass === 'quoted'
+        ? prefs.autoProjectQuoted
+        : matchClass === 'direct' && prefs.autoProject;
+      const key = `${detectionVersion}|${bestHit.reference}`;
+      const now = Date.now();
+      if (shouldProject && (lastProjectedRef.current.key !== key || now - lastProjectedRef.current.at > 4000)) {
+        lastProjectedRef.current = { key, at: now };
+        sendHit(bestHit, { goLive: true, confidence: detections[0].confidence, sourceMode: mode });
+      }
+    }
   }
 
   /** Local engine: batch ~5s of audio, then run one Whisper pass over it. */
@@ -213,6 +266,9 @@ export function LiveScripturePanel() {
         onError: (err) => setNotice(err.message),
       });
       setLive({ isActive: true, provider: engine === 'deepgram' ? 'deepgram' : 'local' });
+      const providerType = engine === 'deepgram' ? 'deepgram' : 'local';
+      const provider = useAppStore.getState().aiProviders.find((entry) => entry.type === providerType) || null;
+      setTranscription({ isActive: true, provider });
     } catch (err) {
       setNotice(err instanceof Error ? err.message : 'Could not open the microphone');
       if (engine === 'deepgram') window.BSP?.stt?.stop();
@@ -228,7 +284,7 @@ export function LiveScripturePanel() {
     setTranscription({ isActive: false });
   }
 
-  function sendHit(hit: BibleSearchResult) {
+  function sendHit(hit: BibleSearchResult, options: { goLive?: boolean; confidence?: number; sourceMode?: string } = {}) {
     const scene: Scene = {
       id: `live-${Date.now()}`,
       name: `Live ${hit.reference}`,
@@ -239,21 +295,49 @@ export function LiveScripturePanel() {
         version: hit.version,
       },
       background: { type: 'gradient', gradient: 'linear-gradient(135deg,#0f172a,#1e1b4b,#312e81)' },
-      transition: { type: 'fade', duration: 0.4 },
+      transition: { type: 'fade', duration: 0.15 },
     };
-    projectScene(scene);
+    // Auto-project means Program/Audience, including in Studio mode. Without `direct`
+    // the shared projector intentionally stages the scene in Preview only.
+    projectScene(scene, { direct: options.goLive === true });
     window.BSP?.session?.addEntry({
       type: 'verse', reference: hit.reference, book: hit.book, chapter: hit.chapter, verse: hit.verse,
-      text: hit.text, version: hit.version, mode: live.detectionMode, source: 'detection',
-      confidence: live.bestHit === hit ? 0.9 : 0.6,
+      text: hit.text, version: hit.version, mode: options.sourceMode || live.detectionMode, source: 'detection',
+      confidence: options.confidence ?? (live.bestHit === hit ? 0.9 : 0.6),
     }).catch(() => {});
+  }
+
+  function setDirectAutoProject(enabled: boolean) {
+    setLive({ autoProject: enabled });
+    const detection = rankedDetections[0];
+    if (enabled && live.bestHit && detection && classifyProjectionMode(detection.mode) === 'direct') {
+      sendHit(live.bestHit, { goLive: true, confidence: detection.confidence, sourceMode: detection.mode });
+    }
+  }
+
+  function setQuotedAutoProject(enabled: boolean) {
+    setLive({ autoProjectQuoted: enabled });
+    const detection = rankedDetections[0];
+    if (enabled && live.bestHit && detection && classifyProjectionMode(detection.mode) === 'quoted') {
+      sendHit(live.bestHit, { goLive: true, confidence: detection.confidence, sourceMode: detection.mode });
+    }
+  }
+
+  function setAutoVersionSwitch(enabled: boolean) {
+    setLive({ autoVersionSwitch: enabled });
+    if (!enabled || !live.requestedVersion) return;
+    const requested = versions.find((entry) => entry.id === live.requestedVersion);
+    if (!requested) return;
+    setVersion(requested.id);
+    setLive({ requestedVersion: null });
+    setNotice(`Bible version switched to ${requested.abbreviation}.`);
   }
 
   const statusInfo = STATE_LABELS[sttStatus?.state || 'idle'];
   const deepgramUnavailable = engine === 'deepgram' && !keyConfigured;
 
   return (
-    <div>
+    <div style={styles.root}>
       <div style={styles.header}>
         <h2 style={styles.h2}>Live Scripture</h2>
         <div style={styles.actions}>
@@ -297,7 +381,7 @@ export function LiveScripturePanel() {
           <div style={{ ...styles.meterFill, width: `${Math.round(live.meter.level * 100)}%` }} />
           <div style={{ ...styles.meterPeak, left: `${Math.round(live.meter.peak * 100)}%` }} />
         </div>
-        <span style={{ fontSize: 11, color: statusInfo.color, fontWeight: 600, whiteSpace: 'nowrap' }}>
+        <span style={{ ...type.caption, color: statusInfo.color, fontWeight: fontWeight.semibold, whiteSpace: 'nowrap' }}>
           ● {engine === 'deepgram' ? statusInfo.text : live.isActive ? 'Listening' : 'Idle'}
         </span>
       </div>
@@ -310,71 +394,196 @@ export function LiveScripturePanel() {
       {notice && <div style={styles.warn}>{notice}</div>}
 
       <div style={styles.options}>
-        <label style={styles.check}><input type="checkbox" checked={live.autoProject} onChange={(e) => setLive({ autoProject: e.target.checked })} /> Auto project direct references</label>
-        <label style={styles.check}><input type="checkbox" checked={live.autoVersionSwitch} onChange={(e) => setLive({ autoVersionSwitch: e.target.checked })} /> Auto version switch</label>
-        <label style={styles.check}><input type="checkbox" checked={live.autoProjectQuoted} onChange={(e) => setLive({ autoProjectQuoted: e.target.checked })} /> Project quoted matches</label>
+        <label style={styles.check}><input type="checkbox" checked={live.autoProject} onChange={(e) => setDirectAutoProject(e.target.checked)} /> Auto project direct references</label>
+        <label style={styles.check}><input type="checkbox" checked={live.autoVersionSwitch} onChange={(e) => setAutoVersionSwitch(e.target.checked)} /> Auto version switch</label>
+        <label style={styles.check}><input type="checkbox" checked={live.autoProjectQuoted} onChange={(e) => setQuotedAutoProject(e.target.checked)} /> Project quoted matches</label>
       </div>
 
-      <div style={styles.split}>
-        <div className="card" style={styles.panel}>
-          <div className="section-title">Live Transcript</div>
-          <textarea
-            className="input"
-            value={live.transcript}
-            onChange={(e) => { finalTranscriptRef.current = e.target.value; setLive({ transcript: e.target.value }); }}
-            onBlur={(e) => detectFromText(e.target.value, true)}
-            placeholder="Speech appears here as it is recognised. You can also type or paste sermon text and click away to detect."
-            style={styles.transcript}
-          />
-        </div>
-        <div className="card" style={styles.panel}>
-          <div className="section-title">Detected Verses</div>
+      <div style={styles.matchDashboard}>
+        <div className="card" style={styles.primaryColumn}>
+          <div style={styles.columnHeader}>
+            <div>
+              <div className="section-title" style={{ marginBottom: 2 }}>Best Match</div>
+              <div style={styles.columnSubtitle}>Current highest-ranked scripture</div>
+            </div>
+            <span style={detectionIsFinal ? styles.finalBadge : styles.trackingBadge}>
+              {detectionIsFinal ? 'Final' : 'Tracking'}
+            </span>
+          </div>
           {live.bestHit ? (
-            <button style={styles.hit} onClick={() => sendHit(live.bestHit!)}>
-              <strong>{live.bestHit.reference}</strong>
-              <span>{live.bestHit.text}</span>
+            <button style={styles.hit} onClick={() => sendHit(live.bestHit!, { goLive: true, confidence: rankedDetections[0]?.confidence, sourceMode: rankedDetections[0]?.mode })}>
+              <div style={styles.primaryReferenceRow}>
+                <strong style={styles.primaryReference}>{live.bestHit.reference}</strong>
+                <span style={styles.versionBadge}>{live.bestHit.version || version}</span>
+              </div>
+              <span style={styles.primaryText}>{live.bestHit.text}</span>
             </button>
           ) : <div style={styles.placeholder}>Top detected verse will appear here.</div>}
-          <div style={styles.suggestions}>
-            {live.suggestions.slice(1).map((hit) => (
-              <button key={hit.reference} className="btn btn-sm btn-secondary" onClick={() => sendHit(hit)}>{hit.reference}</button>
-            ))}
+          {rankedDetections[0] && (
+            <div style={styles.primaryMetrics}>
+              <Metric label="Confidence" value={`${confidencePercent(rankedDetections[0].confidence)}%`} />
+              <Metric label="Match tier" value={formatMatchMode(rankedDetections[0].mode)} />
+              <Metric label="Words matched" value={rankedDetections[0].wordOverlap != null ? `${Math.round(rankedDetections[0].wordOverlap * 100)}%` : 'Direct'} />
+              <Metric label="Search time" value={`${detectionLatencyMs} ms`} />
+            </div>
+          )}
+        </div>
+
+        <div className="card" style={styles.indexColumn}>
+          <div style={styles.columnHeader}>
+            <div>
+              <div className="section-title" style={{ marginBottom: 2 }}>Candidate Index</div>
+              <div style={styles.columnSubtitle}>Ranked alternatives updating with the speaker</div>
+            </div>
+            <span style={styles.countBadge}>{Math.max(0, live.suggestions.length - 1)} matches</span>
           </div>
+          {live.suggestions.length > 1 ? (
+            <div style={styles.suggestions}>
+              {live.suggestions.slice(1).map((hit, index) => {
+                const detection = rankedDetections[index + 1];
+                const confidence = detection?.confidence;
+                return (
+                  <button key={`${hit.reference}-${index}`} style={styles.suggestionCard} onClick={() => sendHit(hit, { goLive: true, confidence: detection?.confidence, sourceMode: detection?.mode })}>
+                    <div style={styles.candidateTopRow}>
+                      <span style={styles.rankBadge}>#{index + 2}</span>
+                      <strong style={styles.suggestionReference}>{hit.reference}</strong>
+                      <span style={styles.candidateConfidence}>{confidence != null ? `${confidencePercent(confidence)}%` : 'Candidate'}</span>
+                    </div>
+                    <span style={styles.suggestionText}>
+                      {hit.text || detection?.text || 'Verse content is unavailable for this Bible version.'}
+                    </span>
+                    <div style={styles.candidateFooter}>
+                      <span>{formatMatchMode(detection?.mode || 'search')}</span>
+                      <span>{hit.version || version}</span>
+                    </div>
+                    {confidence != null && (
+                      <span style={styles.confidenceTrack}>
+                        <span style={{ ...styles.confidenceFill, width: `${Math.max(4, Math.min(100, confidence * 100))}%` }} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={styles.placeholder}>Close matches will be indexed here as words arrive.</div>
+          )}
         </div>
       </div>
 
-      {sttStatus && engine === 'deepgram' && (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div className="section-title">Deepgram Status</div>
-          <div style={styles.statusGrid}>
-            <span>State</span><span style={{ color: statusInfo.color }}>{statusInfo.text}</span>
-            <span>Model</span><span>{sttStatus.model} · {sttStatus.language}</span>
-            <span>Audio sent</span><span>{(sttStatus.bytesSent / 1024 / 1024).toFixed(2)} MB @ {sttStatus.sampleRate / 1000} kHz</span>
-            <span>Reconnects</span><span>{sttStatus.reconnectAttempts}</span>
-            {sttStatus.lastError ? (<><span>Last error</span><span style={{ color: 'var(--red, #e74c3c)' }}>{sttStatus.lastError}</span></>) : null}
-          </div>
-        </div>
-      )}
+    </div>
+  );
+}
+
+function formatMatchMode(mode: string) {
+  const labels: Record<string, string> = {
+    direct: 'Direct reference',
+    'direct-reference': 'Direct reference',
+    'spoken-reference': 'Spoken reference',
+    'phonetic-reference': 'Phonetic reference',
+    'context-verse-reference': 'Chapter context',
+    contextual: 'Context match',
+    verbatim: 'Verbatim quote',
+    'quoted-verse-exact': 'Exact quotation',
+    'quoted-verse-interim': 'Prefix quotation',
+    'quoted-verse-bm25': 'Word index',
+    semantic: 'Semantic match',
+    search: 'Text search',
+  };
+  return labels[mode] || mode.replace(/-/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function classifyProjectionMode(mode: string): 'direct' | 'quoted' | 'none' {
+  const normalized = String(mode || '').toLowerCase();
+  if (normalized.includes('quoted') || normalized === 'verbatim' || normalized === 'semantic') return 'quoted';
+  if (
+    normalized === 'direct' ||
+    normalized === 'direct-reference' ||
+    normalized === 'spoken-reference' ||
+    normalized === 'phonetic-reference' ||
+    normalized === 'context-verse-reference'
+  ) return 'direct';
+  return 'none';
+}
+
+function detectVersionRequest(
+  transcript: string,
+  availableVersions: Array<{ id: string; abbreviation: string; name: string }>,
+) {
+  const normalized = transcript.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const hasIntent = /\b(switch|change|set|use|show|give|read from|turn to)\b/.test(normalized);
+  const hasContext = /\b(version|translation|bible)\b/.test(normalized);
+  if (!hasIntent && !hasContext) return null;
+  const builtInAliases: Record<string, string[]> = {
+    KJV: ['kjv', 'king james', 'king james version'],
+    NKJV: ['nkjv', 'new king james', 'new king james version'],
+    NASB: ['nasb', 'new american standard', 'new american standard bible'],
+    NLT: ['nlt', 'new living translation'],
+  };
+  const candidates = availableVersions.flatMap((entry) => {
+    const aliases = new Set([
+      entry.id.toLowerCase(),
+      entry.abbreviation.toLowerCase(),
+      entry.name.toLowerCase().replace(/\([^)]*\)/g, '').trim(),
+      ...(builtInAliases[entry.id] || []),
+    ]);
+    return [...aliases].map((alias) => ({ entry, alias }));
+  }).sort((a, b) => b.alias.length - a.alias.length);
+  const match = candidates.find(({ alias }) => new RegExp(`(^|\\s)${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(normalized));
+  return match ? { versionId: match.entry.id, label: match.entry.abbreviation } : null;
+}
+
+function confidencePercent(confidence: number) {
+  return Math.max(0, Math.min(100, Math.round(Number(confidence || 0) * 100)));
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={styles.metric}>
+      <span style={styles.metricLabel}>{label}</span>
+      <strong style={styles.metricValue}>{value}</strong>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  h2: { fontSize: 16, fontWeight: 600 },
+  root: { height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  header: { flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  h2: { ...type.title },
   actions: { display: 'flex', gap: 6, flexWrap: 'wrap' },
-  controlCard: { display: 'flex', gap: 8, alignItems: 'center', padding: 12, borderRadius: 'var(--radius-md)' },
+  controlCard: { flex: '0 0 auto', display: 'flex', gap: 8, alignItems: 'center', padding: 12, borderRadius: 'var(--radius-md)' },
   meter: { position: 'relative', flex: 1, height: 12, minWidth: 100, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' },
   meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)', borderRadius: 999 },
   meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: '#fff' },
-  options: { display: 'flex', gap: 14, flexWrap: 'wrap', margin: '10px 0', fontSize: 11, color: 'var(--text-secondary)' },
+  options: { flex: '0 0 auto', display: 'flex', gap: 14, flexWrap: 'wrap', margin: '10px 0', ...type.caption, color: 'var(--text-secondary)' },
   check: { display: 'flex', alignItems: 'center', gap: 6 },
-  split: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 12 },
-  panel: { minHeight: 270 },
-  transcript: { minHeight: 210, resize: 'vertical', lineHeight: 1.5 },
-  hit: { width: '100%', border: '1px solid var(--border-accent)', background: 'var(--accent-dim)', color: 'var(--text-primary)', borderRadius: 8, padding: 12, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer', fontFamily: 'var(--font-sans)' },
-  placeholder: { color: 'var(--text-dim)', fontSize: 12, padding: 18, textAlign: 'center' },
-  suggestions: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 },
-  warn: { fontSize: 11, color: 'var(--amber, #f1c40f)', background: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.25)', borderRadius: 8, padding: '8px 10px', margin: '10px 0' },
-  statusGrid: { display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: 11, color: 'var(--text-secondary)' },
+  matchDashboard: { flex: '1 1 auto', minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: 'minmax(300px, 0.82fr) minmax(500px, 1.55fr)', gap: 12, alignItems: 'stretch' },
+  primaryColumn: { minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  indexColumn: { minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  columnHeader: { flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  columnSubtitle: { ...type.caption, color: 'var(--text-dim)' },
+  finalBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(46,204,113,.25)', ...type.label, fontWeight: fontWeight.bold },
+  trackingBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--blue-dim)', color: 'var(--blue)', border: '1px solid rgba(52,152,219,.25)', ...type.label, fontWeight: fontWeight.bold },
+  countBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', ...type.caption, ...numeric, whiteSpace: 'nowrap' },
+  hit: { width: '100%', border: '1px solid var(--border-accent)', background: 'var(--accent-dim)', color: 'var(--text-primary)', borderRadius: 10, padding: 14, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 9, cursor: 'pointer', fontFamily: 'var(--font-ui)' },
+  primaryReferenceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  primaryReference: { color: 'var(--accent-light)', ...type.title },
+  versionBadge: { ...type.caption, color: 'var(--text-secondary)', background: 'rgba(0,0,0,.18)', borderRadius: 4, padding: '2px 5px' },
+  primaryText: { ...type.body },
+  primaryMetrics: { marginTop: 'auto', paddingTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 },
+  metric: { background: 'var(--bg-elevated)', border: '1px solid var(--border-primary)', borderRadius: 7, padding: '8px 9px', display: 'flex', flexDirection: 'column', gap: 2 },
+  metricLabel: { color: 'var(--text-dim)', ...type.label, fontWeight: fontWeight.regular },
+  metricValue: { color: 'var(--text-primary)', ...type.caption, ...numeric, fontWeight: fontWeight.semibold },
+  placeholder: { color: 'var(--text-dim)', ...type.secondary, padding: 18, textAlign: 'center' },
+  suggestions: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', scrollbarGutter: 'stable', paddingRight: 4, alignContent: 'start', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
+  suggestionCard: { minWidth: 0, border: '1px solid var(--border-primary)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', borderRadius: 8, padding: '10px 11px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 7, cursor: 'pointer', fontFamily: 'var(--font-ui)', overflow: 'hidden' },
+  candidateTopRow: { display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr) auto', alignItems: 'center', gap: 6 },
+  rankBadge: { ...type.caption, ...numeric, color: 'var(--text-dim)' },
+  suggestionReference: { ...type.secondary, fontWeight: fontWeight.semibold, color: 'var(--accent)' },
+  suggestionText: { ...type.secondary, color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+  candidateConfidence: { color: 'var(--green)', ...type.caption, ...numeric, fontWeight: fontWeight.bold },
+  candidateFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, color: 'var(--text-dim)', ...type.label, fontWeight: fontWeight.regular },
+  confidenceTrack: { display: 'block', height: 3, borderRadius: 999, background: 'rgba(255,255,255,.06)', overflow: 'hidden' },
+  confidenceFill: { display: 'block', height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,var(--blue),var(--green))' },
+  warn: { ...type.caption, color: 'var(--amber, #f1c40f)', background: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.25)', borderRadius: 8, padding: '8px 10px', margin: '10px 0' },
 };

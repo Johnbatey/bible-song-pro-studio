@@ -22,7 +22,20 @@
     "dist:linux": "vite build && electron-builder --linux --publish always",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:live-scripture": "node scripts/test-live-scripture-parser.cjs",
+    "verify:display-architecture": "node scripts/verify-display-architecture.cjs",
+    "verify:window-resizing": "node scripts/verify-window-resizing.cjs",
+    "verify:remote-architecture": "node scripts/verify-remote-architecture.cjs",
+    "verify:program-surface": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-program-surface.cjs",
+    "verify:audience-display": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-audience-display.cjs",
+    "verify:display-parity": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-display-parity.cjs",
+    "verify:operator-layout": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-operator-layout.cjs",
+    "verify:mode-switch": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-mode-switch.cjs",
+    "verify:display-stack": "node scripts/verify-display-stack.cjs",
+    "verify:dist-audience-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-dist-audience-display.cjs",
+    "verify:display-all": "npm run typecheck && npm run verify:display-architecture && npm run verify:window-resizing && npm run verify:display-stack && npm run verify:dist-audience-display",
+    "verify:all": "npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all"
   },
   "build": {
     "appId": "com.biblesongpro.max",

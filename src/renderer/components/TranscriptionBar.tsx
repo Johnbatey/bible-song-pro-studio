@@ -1,4 +1,5 @@
 import { useAppStore } from '../stores/appStore';
+import { type, numeric } from '../styles/type';
 
 export function TranscriptionBar() {
   const transcription = useAppStore((s) => s.transcription);
@@ -34,7 +35,7 @@ export function TranscriptionBar() {
           Start Transcription
         </button>
         {!enabledProvider && (
-          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+          <span style={{ ...type.caption, color: 'var(--text-dim)' }}>
             Enable an AI provider in Settings
           </span>
         )}
@@ -64,10 +65,10 @@ export function TranscriptionBar() {
           animation: transcription.isActive ? 'pulse 1.5s ease-in-out infinite' : 'none',
         }}
       />
-      <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span style={{ ...type.secondary, color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {transcription.text || 'Listening...'}
       </span>
-      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+      <span style={{ ...type.caption, ...numeric, color: 'var(--text-dim)' }}>
         {(transcription.confidence * 100).toFixed(0)}%
       </span>
       <button

@@ -1,4 +1,20 @@
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { ProgramSurface } from './display/ProgramSurface';
+import { type, fontWeight } from '../styles/type';
+
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 2;
+const ZOOM_STEP = 0.05;
+const STAGE_GAP = 12;
+const STAGE_LABEL_HEIGHT = 20;
+const STAGE_SAFE_PAD = 76;
+const STAGE_ASPECT = 16 / 9;
+
+function clampZoom(value: number) {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
+}
 
 export function PreviewProgramView() {
   const currentScene = useAppStore((s) => s.display.currentScene);
@@ -6,167 +22,249 @@ export function PreviewProgramView() {
   const isTransitioning = useAppStore((s) => s.display.isTransitioning);
   const mode = useAppStore((s) => s.display.mode);
   const outputMode = useAppStore((s) => s.display.outputMode);
-  const setOutputMode = useAppStore((s) => s.setOutputMode);
-  const takeToProgram = useAppStore((s) => s.takeToProgram);
   const activeTheme = useAppStore((s) => s.activeTheme);
+  const activeAlert = useAppStore((s) => s.activeAlert);
+  const transcription = useAppStore((s) => s.transcription.text);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; x: number; y: number } | null>(null);
+  const zoomRef = useRef(1);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [stageSize, setStageSize] = useState({ width: 960, height: 560, itemWidth: 474 });
 
   const isStudio = mode === 'studio';
   // Something is staged that the audience isn't seeing yet
   const hasPendingTake = isStudio && Boolean(previewScene) && currentScene?.id !== previewScene?.id;
+  const zoomLabel = `${Math.round(zoom * 100)}%`;
+  const outputScale = stageSize.itemWidth / 1920;
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <span style={styles.headerLabel}>{isStudio ? 'Preview / Program' : 'Program'}</span>
-        <div style={styles.actions}>
-          <div style={styles.modeSwitch}>
-            <button
-              style={{ ...styles.modeBtn, ...(outputMode === 'fullscreen' ? styles.modeBtnActive : {}) }}
-              onClick={() => setOutputMode('fullscreen')}
-              title="Fullscreen output"
-            >
-              FS
-            </button>
-            <button
-              style={{ ...styles.modeBtn, ...(outputMode === 'lowerThird' ? styles.modeBtnActive : {}) }}
-              onClick={() => setOutputMode('lowerThird')}
-              title="Lower third output"
-            >
-              LT
-            </button>
-          </div>
-          {hasPendingTake && (
-            <>
-              <button
-                className="btn btn-sm btn-secondary"
-                onClick={() => takeToProgram(false)}
-                title="Cut to program (no transition)"
-              >
-                Cut
-              </button>
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => takeToProgram(true)}
-                title="Take to program with a transition"
-              >
-                Take
-              </button>
-            </>
-          )}
-          {!isStudio && (
-            <span style={styles.liveBadge} title="Basic mode — everything you send goes live immediately">
-              ● LIVE
-            </span>
-          )}
-        </div>
-      </div>
-      <div style={styles.canvasWrapper}>
-        {/* Preview exists only in studio mode */}
-        {isStudio && (
-          <div style={styles.previewCol}>
-            <div style={styles.label}>
-              <span style={{ ...styles.dot, background: hasPendingTake ? '#f1c40f' : '#2ecc71' }} />
-              Preview{hasPendingTake ? ' · ready to take' : ''}
-            </div>
-            <div style={{ ...styles.displayBox, borderColor: hasPendingTake ? '#f1c40f' : undefined }}>
-              <DisplayContent scene={previewScene} outputMode={outputMode} theme={activeTheme} />
-            </div>
-          </div>
-        )}
-        {/* Program */}
-        <div style={isStudio ? styles.previewCol : styles.programColSolo}>
-          <div style={styles.label}>
-            <span style={{ ...styles.dot, background: '#e74c3c' }} />
-            Program{!isStudio ? ' · live' : ''}
-          </div>
-          <div style={{ ...styles.displayBox, borderColor: 'var(--border-accent)' }}>
-            {isTransitioning && (
-              <div style={styles.transitionOverlay}>
-                <div style={styles.transitionSpinner} />
-              </div>
-            )}
-            <DisplayContent scene={currentScene} outputMode={outputMode} theme={activeTheme} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+  const updateZoom = useCallback((next: number) => {
+    const nextZoom = clampZoom(next);
+    zoomRef.current = nextZoom;
+    setZoom((current) => Math.abs(current - nextZoom) < 0.001 ? current : nextZoom);
+  }, []);
 
-function DisplayContent({ scene, outputMode, theme }: { scene: any; outputMode: 'fullscreen' | 'lowerThird'; theme: any }) {
-  if (!scene) {
-    return (
-      <div style={styles.emptyState}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5">
-          <rect x="2" y="3" width="20" height="14" rx="2" />
-          <line x1="8" y1="21" x2="16" y2="21" />
-          <line x1="12" y1="17" x2="12" y2="21" />
-        </svg>
-        <span style={{ marginTop: 8, fontSize: 12, color: 'var(--text-dim)' }}>
-          No scene selected
-        </span>
-      </div>
+  const measureStage = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const viewportRect = viewport.getBoundingClientRect();
+    const columns = isStudio ? 2 : 1;
+    const totalGap = isStudio ? STAGE_GAP : 0;
+    const availableWidth = Math.max(240, viewportRect.width - STAGE_SAFE_PAD);
+    const availableHeight = Math.max(160, viewportRect.height - STAGE_SAFE_PAD - STAGE_LABEL_HEIGHT);
+    const itemHeight = Math.max(
+      120,
+      Math.min(availableHeight, (availableWidth - totalGap) / columns / STAGE_ASPECT),
     );
+    const itemWidth = Math.round(itemHeight * STAGE_ASPECT);
+    const next = {
+      itemWidth,
+      width: itemWidth * columns + totalGap,
+      height: Math.round(STAGE_LABEL_HEIGHT + itemHeight),
+    };
+
+    setStageSize((current) => {
+      if (
+        Math.abs(current.width - next.width) < 1 &&
+        Math.abs(current.height - next.height) < 1 &&
+        Math.abs(current.itemWidth - next.itemWidth) < 1
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [isStudio]);
+
+  const fitStage = useCallback(() => {
+    measureStage();
+    updateZoom(1);
+    setPan((current) => current.x === 0 && current.y === 0 ? current : { x: 0, y: 0 });
+  }, [measureStage, updateZoom]);
+
+  useLayoutEffect(() => {
+    let frame = 0;
+    const scheduleMeasure = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(measureStage);
+    };
+    scheduleMeasure();
+    const viewport = viewportRef.current;
+    const observer = viewport && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(scheduleMeasure)
+      : null;
+    if (viewport && observer) observer.observe(viewport);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
+  }, [isStudio, measureStage]);
+
+  useLayoutEffect(() => {
+    updateZoom(1);
+    setPan({ x: 0, y: 0 });
+    measureStage();
+  }, [isStudio, measureStage, updateZoom]);
+
+  const setZoomAround = useCallback((next: number, clientX?: number, clientY?: number) => {
+    const viewport = viewportRef.current;
+    const nextZoom = clampZoom(next);
+    if (!viewport || clientX === undefined || clientY === undefined) {
+      updateZoom(nextZoom);
+      return;
+    }
+    const rect = viewport.getBoundingClientRect();
+    const focusX = clientX - rect.left - rect.width / 2 - pan.x;
+    const focusY = clientY - rect.top - rect.height / 2 - pan.y;
+    const currentZoom = zoomRef.current || zoom;
+    const ratio = nextZoom / currentZoom;
+    setPan({
+      x: pan.x + focusX * (1 - ratio),
+      y: pan.y + focusY * (1 - ratio),
+    });
+    updateZoom(nextZoom);
+  }, [pan, updateZoom, zoom]);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const onNativeWheel = (event: WheelEvent) => {
+      if ((event.target as HTMLElement | null)?.closest('button,input')) return;
+      event.preventDefault();
+
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        const delta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+        setZoomAround(zoomRef.current + delta, event.clientX, event.clientY);
+        return;
+      }
+
+      setPan((current) => ({
+        x: current.x - event.deltaX,
+        y: current.y - event.deltaY,
+      }));
+    };
+
+    viewport.addEventListener('wheel', onNativeWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', onNativeWheel);
+  }, [setZoomAround]);
+
+  function onWheel(event: React.WheelEvent<HTMLDivElement>) {
+    if (event.defaultPrevented) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      const delta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+      setZoomAround(zoom + delta, event.clientX, event.clientY);
+      return;
+    }
+    setPan((current) => ({
+      x: current.x - event.deltaX,
+      y: current.y - event.deltaY,
+    }));
   }
 
-  const bg = scene.background || {};
-  const bgStyle: React.CSSProperties = {};
-  if (bg.type === 'gradient') {
-    bgStyle.background = bg.gradient || 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)';
-  } else if (bg.type === 'solid') {
-    bgStyle.background = bg.color || '#000';
-  } else if (bg.type === 'transparent') {
-    bgStyle.background = 'transparent';
-  } else {
-    bgStyle.background = 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)';
+  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('button,input')) return;
+    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: pan.x, y: pan.y };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsPanning(true);
+  }
+
+  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    setPan({
+      x: drag.x + event.clientX - drag.startX,
+      y: drag.y + event.clientY - drag.startY,
+    });
+  }
+
+  function finishPan(event: React.PointerEvent<HTMLDivElement>) {
+    if (dragRef.current?.pointerId === event.pointerId) {
+      dragRef.current = null;
+      setIsPanning(false);
+    }
   }
 
   return (
-    <div style={{ ...styles.displayInner, ...bgStyle }}>
-      {outputMode === 'lowerThird' ? (
+    <div className="pv-dock" style={styles.container}>
+      <div
+        ref={viewportRef}
+        style={{ ...styles.viewport, cursor: isPanning ? 'grabbing' : 'grab' }}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={finishPan}
+        onPointerCancel={finishPan}
+      >
         <div
+          ref={stageRef}
           style={{
-            ...styles.lowerThird,
-            background: theme?.lowerThird?.background || 'linear-gradient(135deg, rgba(10,18,32,0.94), rgba(37,52,78,0.94))',
-            color: theme?.lowerThird?.fontColor || '#fff',
-            borderRadius: `${theme?.lowerThird?.borderRadius ?? 8}px`,
-            width: `${theme?.lowerThird?.width ?? 92}%`,
-            fontFamily: theme?.lowerThird?.fontFamily || 'inherit',
+            ...styles.stage,
+            width: stageSize.width,
+            height: stageSize.height,
+            transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`,
           }}
         >
-          <div style={{ ...styles.ltText, fontSize: theme?.lowerThird?.fontSize ? Math.max(10, theme.lowerThird.fontSize / 3) : undefined }}>
-            {scene.content?.text || ''}
+          {isStudio && (
+            <div style={{ ...styles.previewCol, width: stageSize.itemWidth }}>
+              <div style={styles.label}>
+                <span style={{ ...styles.dot, background: hasPendingTake ? '#f1c40f' : '#2ecc71' }} />
+                Preview{hasPendingTake ? ' · ready to take' : ''}
+              </div>
+              <div style={{ ...styles.displayBox, borderColor: hasPendingTake ? '#f1c40f' : undefined }}>
+                <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
+                  <ProgramSurface
+                    preview
+                    state={{ scene: previewScene, outputMode, theme: activeTheme }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <div style={{ ...(isStudio ? styles.previewCol : styles.programColSolo), width: stageSize.itemWidth }}>
+            <div style={styles.label}>
+              <span style={{ ...styles.dot, background: '#e74c3c' }} />
+              Program{!isStudio ? ' · live' : ''}
+            </div>
+            <div style={{ ...styles.displayBox, borderColor: 'var(--border-accent)' }}>
+              {isTransitioning && (
+                <div style={styles.transitionOverlay}>
+                  <div style={styles.transitionSpinner} />
+                </div>
+              )}
+              <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
+                <ProgramSurface
+                  preview
+                  state={{ scene: currentScene, outputMode, theme: activeTheme, activeAlert, transcription }}
+                />
+              </div>
+            </div>
           </div>
-          {scene.content?.reference && <div style={styles.ltRef}>{scene.content.reference}</div>}
         </div>
-      ) : (
-        <>
-          {scene.content?.html ? (
-            <div style={styles.slidePreview} dangerouslySetInnerHTML={{ __html: scene.content.html }} />
-          ) : scene.content?.text && (
-            <div
-              style={{
-                ...styles.displayText,
-                color: theme?.fullScreen?.fontColor || '#fff',
-                fontFamily: theme?.fullScreen?.fontFamily || 'inherit',
-                textAlign: theme?.fullScreen?.textAlign || 'center',
-              }}
-            >
-              {scene.content.text}
-            </div>
-          )}
-          {scene.content?.reference && (
-            <div style={styles.displayRef}>
-              {scene.content.reference}
-            </div>
-          )}
-          {scene.content?.version && (
-            <div style={styles.displayVersion}>
-              {scene.content.version}
-            </div>
-          )}
-        </>
-      )}
+        <div style={styles.zoomControls}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+            {/* Extended chrome bar base for additional tools */}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom - ZOOM_STEP)} title="Zoom out">-</button>
+            <span style={styles.zoomValue}>{zoomLabel}</span>
+            <input
+              style={styles.zoomSlider}
+              type="range"
+              min={ZOOM_MIN}
+              max={ZOOM_MAX}
+              step={0.01}
+              value={zoom}
+              onChange={(event) => setZoomAround(Number(event.currentTarget.value))}
+              title="Preview/program scale"
+            />
+            <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom + ZOOM_STEP)} title="Zoom in">+</button>
+            <button style={styles.zoomBtnWide} onClick={fitStage} title="Fit preview/program to view">FIT</button>
+            <button style={styles.zoomBtnWide} onClick={() => { updateZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset scale and pan">1:1</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -174,83 +272,56 @@ function DisplayContent({ scene, outputMode, theme }: { scene: any; outputMode: 
 const styles: Record<string, React.CSSProperties> = {
   container: {
     flexShrink: 0,
-    padding: '12px 16px 14px',
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    minHeight: 0,
+    padding: '10px 12px 12px',
     background: 'var(--bg-secondary)',
     borderBottom: '1px solid var(--border-primary)',
   },
-  header: {
+  viewport: {
+    position: 'relative',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+    background: 'linear-gradient(135deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01))',
+    touchAction: 'none',
+  },
+  stage: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  headerLabel: {
-    fontSize: 11,
-    fontWeight: 600,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    color: 'var(--text-dim)',
-  },
-  actions: {
-    display: 'flex',
-    gap: 6,
-    alignItems: 'center',
-  },
-  modeSwitch: {
-    display: 'flex',
-    border: '1px solid var(--border-primary)',
-    borderRadius: 6,
-    padding: 2,
-    background: 'rgba(255,255,255,0.04)',
-  },
-  modeBtn: {
-    border: 'none',
-    background: 'transparent',
-    color: 'var(--text-secondary)',
-    borderRadius: 4,
-    padding: '4px 9px',
-    fontSize: 10,
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  modeBtnActive: {
-    background: 'var(--accent)',
-    color: '#17120a',
-  },
-  canvasWrapper: {
-    display: 'flex',
+    flexDirection: 'row',
     gap: 12,
+    alignItems: 'stretch',
+    transformOrigin: 'center center',
+    willChange: 'transform',
   },
   previewCol: {
-    flex: 1,
+    flex: '0 0 auto',
     minWidth: 0,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
   },
-  // Basic mode: one pane, but capped so it doesn't dominate the window
   programColSolo: {
-    flex: 1,
+    flex: '0 0 auto',
     minWidth: 0,
-    maxWidth: '52%',
-  },
-  liveBadge: {
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    color: '#e74c3c',
-    padding: '3px 8px',
-    borderRadius: 999,
-    background: 'rgba(231,76,60,0.12)',
-    border: '1px solid rgba(231,76,60,0.3)',
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
   },
   label: {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    fontSize: 11,
-    fontWeight: 500,
+    ...type.label,
     color: 'var(--text-secondary)',
     marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
   },
   dot: {
     width: 6,
@@ -261,74 +332,18 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative',
     width: '100%',
     aspectRatio: '16/9',
-    borderRadius: 'var(--radius-md)',
+    borderRadius: 0,
     overflow: 'hidden',
     background: '#000',
     border: '1px solid var(--border-primary)',
   },
-  displayInner: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    textAlign: 'center',
-  },
-  lowerThird: {
-    alignSelf: 'center',
-    marginTop: 'auto',
-    marginBottom: 12,
-    padding: '10px 14px',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-    textAlign: 'left',
-  },
-  ltText: {
-    fontSize: 13,
-    fontWeight: 700,
-    lineHeight: 1.25,
-    whiteSpace: 'pre-line',
-  },
-  ltRef: {
-    marginTop: 4,
-    fontSize: 9,
-    opacity: 0.68,
-    fontWeight: 600,
-    textTransform: 'uppercase',
-  },
-  slidePreview: {
-    color: '#fff',
-    fontSize: 'clamp(12px, 1.6vw, 22px)',
-    lineHeight: 1.35,
-    maxWidth: '88%',
-  },
-  displayText: {
-    fontSize: 'clamp(14px, 1.8vw, 24px)',
-    fontWeight: 600,
-    color: '#fff',
-    lineHeight: 1.4,
-    textShadow: '0 2px 10px rgba(0,0,0,0.3)',
-  },
-  displayRef: {
-    fontSize: 'clamp(10px, 0.9vw, 13px)',
-    fontWeight: 500,
-    color: 'rgba(255,255,255,0.5)',
-    marginTop: 8,
-  },
-  displayVersion: {
-    fontSize: 'clamp(8px, 0.7vw, 10px)',
-    fontWeight: 400,
-    color: 'rgba(255,255,255,0.2)',
-    marginTop: 4,
-  },
-  emptyState: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
+  outputFrame: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 1920,
+    height: 1080,
+    transformOrigin: 'top left',
   },
   transitionOverlay: {
     position: 'absolute',
@@ -346,5 +361,55 @@ const styles: Record<string, React.CSSProperties> = {
     borderTopColor: 'var(--accent)',
     borderRadius: '50%',
     animation: 'spin 0.6s linear infinite',
+  },
+  zoomControls: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '6px 12px',
+    borderRadius: 0,
+    borderTop: '1px solid var(--border-primary)',
+    background: 'rgba(12, 14, 20, 0.94)',
+    backdropFilter: 'blur(14px)',
+    boxShadow: '0 -2px 10px rgba(0,0,0,0.2)',
+    cursor: 'default',
+  },
+  zoomBtn: {
+    width: 24,
+    height: 24,
+    border: '1px solid var(--border-primary)',
+    borderRadius: 5,
+    background: 'rgba(255,255,255,0.06)',
+    color: 'var(--text-primary)',
+    cursor: 'pointer',
+    fontWeight: fontWeight.semibold,
+  },
+  zoomBtnWide: {
+    height: 24,
+    padding: '0 8px',
+    border: '1px solid var(--border-primary)',
+    borderRadius: 5,
+    background: 'rgba(255,255,255,0.06)',
+    color: 'var(--text-primary)',
+    cursor: 'pointer',
+    ...type.label,
+    fontWeight: fontWeight.bold,
+  },
+  zoomValue: {
+    width: 38,
+    textAlign: 'center',
+    color: 'var(--text-secondary)',
+    ...type.label,
+    fontWeight: fontWeight.bold,
+  },
+  zoomSlider: {
+    width: 92,
+    accentColor: 'var(--accent)',
   },
 };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import type { MediaItem, Scene } from '../types';
+import { type, fontWeight } from '../styles/type';
 
 const GRADIENT_PRESETS = [
   { name: 'Purple Haze', value: 'linear-gradient(135deg, #667eea, #764ba2)' },
@@ -126,7 +127,7 @@ export function MediaPanel() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600 }}>Media</h2>
+        <h2 style={{ ...type.title }}>Media</h2>
         <button className="btn btn-sm btn-primary" onClick={handlePick} disabled={busy}>
           {busy ? 'Importing…' : 'Import Media'}
         </button>
@@ -157,7 +158,7 @@ export function MediaPanel() {
               title={`Preview ${preset.name}`}
             >
               <div style={{ width: '100%', height: '100%', background: preset.value, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>{preset.name}</span>
+                <span style={{ ...type.caption, color: 'rgba(255,255,255,0.75)' }}>{preset.name}</span>
               </div>
             </button>
           ))}
@@ -190,10 +191,10 @@ export function MediaPanel() {
           <polyline points="17 8 12 3 7 8" />
           <line x1="12" y1="3" x2="12" y2="15" />
         </svg>
-        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+        <div style={{ ...type.secondary, color: 'var(--text-dim)' }}>
           Drop images or videos here, or click to browse
         </div>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, opacity: 0.7 }}>
+        <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 4, opacity: 0.7 }}>
           JPG · PNG · WEBP · GIF · SVG · MP4 · MOV · WEBM
         </div>
       </div>
@@ -201,7 +202,7 @@ export function MediaPanel() {
       {/* Library */}
       <div className="section-title" style={{ marginBottom: 8 }}>Media Library ({items.length})</div>
       {items.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>
+        <div style={{ ...type.secondary, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>
           Nothing imported yet. Files you add are copied into the app's media folder.
         </div>
       ) : (
@@ -244,10 +245,10 @@ export function MediaPanel() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ ...type.secondary, fontWeight: fontWeight.medium, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {item.name}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                  <div style={{ ...type.caption, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                     {item.type} · {formatSize(item.size)}
                   </div>
                 </div>

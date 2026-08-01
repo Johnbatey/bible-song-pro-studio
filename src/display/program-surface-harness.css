@@ -1,0 +1,6 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { min-height: 100%; margin: 0; background: #0c0e14; color: #f0ece4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.surface-harness { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 18px; padding: 18px; }
+.surface-case { min-width: 0; }
+.surface-case-title { margin-bottom: 8px; font-size: 12px; font-weight: 700; color: rgba(240, 236, 228, .64); text-transform: uppercase; letter-spacing: .06em; }
+.surface-frame { aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid rgba(255, 255, 255, .1); border-radius: 6px; background: #000; }

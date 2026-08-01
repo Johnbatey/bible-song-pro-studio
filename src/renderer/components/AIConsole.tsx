@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import type { Scene } from '../types';
+import { type, fontWeight, iconSize } from '../styles/type';
 
 export function AIConsole({ onClose }: { onClose: () => void }) {
   const scenes = useAppStore((s) => s.scenes);
@@ -136,7 +137,7 @@ export function AIConsole({ onClose }: { onClose: () => void }) {
             <path d="M12 16v-4" />
             <path d="M12 8h.01" />
           </svg>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>AI Console</span>
+          <span style={{ ...type.heading }}>AI Console</span>
         </div>
         <button className="btn btn-sm btn-ghost" onClick={onClose}>✕</button>
       </div>
@@ -169,7 +170,7 @@ export function AIConsole({ onClose }: { onClose: () => void }) {
               animation: 'spin 0.8s linear infinite',
               margin: '0 auto 12px',
             }} />
-            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>AI processing...</div>
+            <div style={{ ...type.secondary, color: 'var(--text-dim)' }}>AI processing...</div>
           </div>
         ) : (
           aiActions.map((item) => (
@@ -180,10 +181,10 @@ export function AIConsole({ onClose }: { onClose: () => void }) {
               onClick={item.action}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>{item.icon}</span>
+                <span style={{ fontSize: iconSize.md }}>{item.icon}</span>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 500 }}>{item.label}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 1 }}>{item.desc}</div>
+                  <div style={{ ...type.secondary, fontWeight: fontWeight.medium }}>{item.label}</div>
+                  <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 1 }}>{item.desc}</div>
                 </div>
               </div>
             </div>

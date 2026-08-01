@@ -1,3 +1,6 @@
+import { useAppStore } from '../stores/appStore';
+import { type, fontWeight, iconSize } from '../styles/type';
+
 type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'presentation' | 'songlibrary' | 'settings' | 'history';
 
 interface SidebarProps {
@@ -13,18 +16,22 @@ const panels: Array<{ id: PanelView; label: string; icon: string }> = [
   { id: 'live', label: 'Live Scripture', icon: '🎙️' },
   { id: 'presentation', label: 'Slides', icon: '📽️' },
   { id: 'media', label: 'Media', icon: '🖼️' },
-  { id: 'themes', label: 'Themes', icon: '🎨' },
+  { id: 'themes', label: 'Design', icon: '🎨' },
   { id: 'songlibrary', label: 'Song Library', icon: '📚' },
   { id: 'history', label: 'History', icon: '📋' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps) {
+  const openSettings = useAppStore((s) => s.openSettings);
+
   return (
     <nav
       style={{
         width: collapsed ? 56 : 200,
         minWidth: collapsed ? 56 : 200,
+        height: '100%',
+        minHeight: 0,
         background: 'var(--bg-secondary)',
         borderRight: '1px solid var(--border-primary)',
         display: 'flex',
@@ -32,13 +39,20 @@ export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps)
         padding: '8px 0',
         gap: 2,
         transition: 'width 0.25s ease, min-width 0.25s ease',
-        overflow: 'hidden',
+        overflowY: 'auto',
+        overflowX: 'hidden',
       }}
     >
       {panels.map((panel) => (
         <button
           key={panel.id}
-          onClick={() => onPanelChange(panel.id)}
+          onClick={() => {
+            if (panel.id === 'settings') {
+              openSettings('output');
+            } else {
+              onPanelChange(panel.id);
+            }
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -47,12 +61,12 @@ export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps)
             border: 'none',
             background: activePanel === panel.id ? 'var(--accent-dim)' : 'transparent',
             color: activePanel === panel.id ? 'var(--accent)' : 'var(--text-secondary)',
-            fontSize: 13,
-            fontWeight: activePanel === panel.id ? 600 : 400,
+            ...type.body,
+            fontWeight: activePanel === panel.id ? fontWeight.semibold : fontWeight.regular,
             cursor: 'pointer',
             transition: 'all 0.15s',
             borderRadius: 0,
-            fontFamily: 'var(--font-sans)',
+            fontFamily: 'var(--font-ui)',
             whiteSpace: 'nowrap',
             justifyContent: collapsed ? 'center' : 'flex-start',
             paddingLeft: collapsed ? 0 : 16,
@@ -70,7 +84,7 @@ export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps)
             }
           }}
         >
-          <span style={{ fontSize: 18, lineHeight: 1 }}>{panel.icon}</span>
+          <span style={{ fontSize: iconSize.md, lineHeight: 1 }}>{panel.icon}</span>
           {!collapsed && <span>{panel.label}</span>}
         </button>
       ))}

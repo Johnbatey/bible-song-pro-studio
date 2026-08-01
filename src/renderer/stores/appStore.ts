@@ -76,10 +76,12 @@ interface AppState {
 
   // Songs
   songs: Song[];
+  showSongCredits: boolean;
   addSong: (song: Song) => void;
   removeSong: (id: string) => void;
   updateSong: (id: string, updates: Partial<Song>) => void;
   setSongs: (songs: Song[]) => void;
+  setShowSongCredits: (show: boolean) => void;
 
   // Bible
   bibleVersions: BibleVersion[];
@@ -109,6 +111,10 @@ interface AppState {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   setSidebarOpen: (v: boolean) => void;
+  isSettingsOpen: boolean;
+  activeSettingsCategory: string;
+  openSettings: (category?: string) => void;
+  closeSettings: () => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -215,6 +221,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   removeTheme: (id) => set((s) => ({ themes: s.themes.filter((t) => t.id !== id) })),
 
   songs: [],
+  showSongCredits: false,
   addSong: (song) => set((s) => ({ songs: [...s.songs, song] })),
   removeSong: (id) => set((s) => ({ songs: s.songs.filter((so) => so.id !== id) })),
   updateSong: (id, updates) =>
@@ -222,6 +229,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       songs: s.songs.map((so) => (so.id === id ? { ...so, ...updates } : so)),
     })),
   setSongs: (songs) => set({ songs }),
+  setShowSongCredits: (showSongCredits) => set({ showSongCredits }),
 
   bibleVersions: [],
   currentBibleVersion: null,
@@ -279,6 +287,11 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   sidebarOpen: true,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSidebarOpen: (v) => set({ sidebarOpen: v }),
+
+  isSettingsOpen: false,
+  activeSettingsCategory: 'output',
+  openSettings: (category) => set((s) => ({ isSettingsOpen: true, activeSettingsCategory: category || s.activeSettingsCategory || 'output' })),
+  closeSettings: () => set({ isSettingsOpen: false }),
 }), {
   name: 'bsp-app-state',
   version: 1,

@@ -264,6 +264,19 @@ export type SttEvent =
   | { type: 'utterance-end' }
   | { type: 'error'; error: string };
 
+/** A monitor the output window can be sent to. */
+export interface DisplayTarget {
+  id: string;
+  index: number;
+  name: string;
+  label: string;
+  isPrimary: boolean;
+  isInternal: boolean;
+  bounds: { x: number; y: number; width: number; height: number };
+  resolution: string;
+  scaleFactor: number;
+}
+
 export interface MediaItem {
   id: string;
   file: string;
@@ -321,6 +334,8 @@ export interface DisplayState {
   outputStatus: {
     isOpen: boolean;
     url: string;
+    browserUrl?: string;
+    remoteUrl?: string;
     clients: number;
     updatedAt: number;
   };
@@ -395,23 +410,26 @@ declare global {
         onFullScreenChange: (cb: (val: boolean) => void) => void;
       };
       display: {
-        open: (index?: number) => Promise<boolean>;
-        close: () => Promise<boolean>;
-        getDisplays: () => Promise<Array<{ index: number; name: string; bounds: any; isPrimary: boolean }>>;
+        open: (target?: { displayId?: string } | string | number) => Promise<{ ok: boolean; displayId?: string; label?: string; error?: string }>;
+        close: () => Promise<{ ok: boolean }>;
+        getDisplays: () => Promise<DisplayTarget[]>;
+        getActive: () => Promise<{ ok: boolean; displayId: string | null; isOpen: boolean }>;
+        onListChanged: (cb: (displays: DisplayTarget[]) => void) => () => void;
         sendState: (state: any) => Promise<any>;
         getState: () => Promise<any>;
         isOpen: () => Promise<boolean>;
-        getStatus: () => Promise<{ isOpen: boolean; url: string; clients: number; updatedAt: number }>;
+        getStatus: () => Promise<{ isOpen: boolean; url: string; browserUrl?: string; remoteUrl?: string; clients: number; updatedAt: number }>;
+        onMessage: (cb: (message: any) => void) => () => void;
       };
       bible: {
         getVersions: () => Promise<BibleVersion[]>;
         getBooks: (versionId: string) => Promise<BibleBook[]>;
         getChapter: (payload: { versionId: string; book: string; chapter: number }) => Promise<BibleVerse[]>;
-        search: (payload: { versionId: string; query: string; limit?: number }) => Promise<BibleSearchResult[]>;
+        search: (payload: { versionId: string; query: string; limit?: number; book?: string }) => Promise<BibleSearchResult[]>;
       };
 
       verse: {
-        detect: (payload: { text: string; options?: { versionId?: string; modes?: string[]; limit?: number; minConfidence?: number } }) => Promise<VerseDetectionResult>;
+        detect: (payload: { text: string; options?: { versionId?: string; modes?: string[]; limit?: number; minConfidence?: number; isFinal?: boolean } }) => Promise<VerseDetectionResult>;
       };
       audio: {
         getInputDevices: () => Promise<AudioInputDevice[]>;
@@ -521,7 +539,7 @@ export interface TranscriptionSegment {
 }
 
 export interface VerseDetection {
-  mode: 'direct' | 'contextual' | 'verbatim' | 'semantic';
+  mode: string;
   book: string;
   chapter: number;
   verseStart: number;

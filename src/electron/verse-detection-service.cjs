@@ -1,9 +1,11 @@
 const bibleService = require('./bible-service.cjs');
 const refParser = require('./scripture-reference.cjs');
 const { createVerseIndexService } = require('./verse-index-service.cjs');
+const { createLiveScriptureParser } = require('./live-scripture-parser.cjs');
 
 function createVerseDetectionService() {
   const verseIndex = createVerseIndexService();
+  const liveParser = createLiveScriptureParser({ verseIndex });
 
   function detect(text, options = {}) {
     const versionId = options.versionId || 'KJV';
@@ -21,7 +23,27 @@ function createVerseDetectionService() {
 
     // Mode 1: Direct scripture references
     if (modes.includes('direct')) {
-      const refs = refParser.extractReferences(text);
+      const parsed = liveParser.parseDirect(text, versionId);
+      if (parsed && !parsed.contextOnly) {
+        const chapter = bibleData[parsed.book]?.[String(parsed.chapter)] || {};
+        const verses = [];
+        for (let v = parsed.verseStart; v <= parsed.verseEnd; v++) {
+          if (chapter[String(v)]) verses.push({ verse: v, text: chapter[String(v)] });
+        }
+        if (verses.length) {
+          const key = `${parsed.book}|${parsed.chapter}|${parsed.verseStart}`;
+          seen.add(key);
+          detections.push({
+            mode: parsed.reason || 'direct', book: parsed.book, chapter: parsed.chapter,
+            verseStart: parsed.verseStart, verseEnd: parsed.verseEnd,
+            displayRef: `${parsed.book} ${parsed.chapter}:${parsed.verseStart}${parsed.verseEnd > parsed.verseStart ? `-${parsed.verseEnd}` : ''}`,
+            text: verses.map((verse) => verse.text).join(' '), verses, confidence: parsed.confidence || 0.95,
+          });
+        }
+      }
+      // A book/chapter-only phrase establishes context for a following "verse …".
+      // Do not turn it into verse 1 as the legacy stateless parser did.
+      const refs = parsed?.contextOnly ? [] : refParser.extractReferences(text);
       refs.forEach((ref) => {
         const chapter = bibleData[ref.book]?.[String(ref.chapter)];
         if (!chapter) return;
@@ -82,6 +104,17 @@ function createVerseDetectionService() {
     // Mode 3: Verbatim quote matching, scored over BM25 candidates rather than the
     // whole corpus — same answers, ~100x less work per call.
     if (modes.includes('verbatim') && detections.length < limit) {
+      liveParser.quoteCandidates(text, versionId, { interim: options.isFinal === false, limit }).forEach((v) => {
+        const key = `vb|${v.book}|${v.chapter}|${v.verseStart}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        detections.push({
+          mode: v.reason, book: v.book, chapter: v.chapter, verseStart: v.verseStart,
+          verseEnd: v.verseEnd, displayRef: `${v.book} ${v.chapter}:${v.verseStart}`,
+          text: v.excerpt, verses: [{ verse: v.verseStart, text: v.excerpt }],
+          confidence: v.confidence, wordOverlap: v.score,
+        });
+      });
       const candidates = verseIndex.search(text, { versionId, limit: 60 }).map((hit) => {
         const cleaned = hit.text.replace(/[^\w\s']/g, '').toLowerCase();
         const words = cleaned.split(/\s+/);
@@ -141,7 +174,32 @@ function createVerseDetectionService() {
 
     // Sort by confidence descending, limit
     detections.sort((a, b) => b.confidence - a.confidence);
-    const filtered = detections.filter((d) => d.confidence >= minConfidence).slice(0, limit);
+    const uniqueDetections = [];
+    const uniqueKeys = new Set();
+    detections.forEach((d) => {
+      const key = `${d.book}|${d.chapter}|${d.verseStart}|${d.verseEnd || d.verseStart}`;
+      if (uniqueKeys.has(key)) return;
+      uniqueKeys.add(key);
+      uniqueDetections.push(d);
+    });
+    const filtered = uniqueDetections
+      .filter((d) => d.confidence >= minConfidence)
+      .slice(0, limit)
+      .map((detection) => {
+        if (String(detection.text || '').trim()) return detection;
+        const chapter = bibleData[detection.book]?.[String(detection.chapter)] || {};
+        const end = detection.verseEnd || detection.verseStart;
+        const verses = [];
+        for (let verse = detection.verseStart; verse <= end; verse++) {
+          const verseText = chapter[String(verse)];
+          if (verseText) verses.push({ verse, text: verseText });
+        }
+        return {
+          ...detection,
+          text: verses.map((verse) => verse.text).join(' '),
+          verses: verses.length ? verses : detection.verses,
+        };
+      });
 
     return {
       ok: true,

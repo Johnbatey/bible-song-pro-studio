@@ -5,6 +5,7 @@ node_modules/
 dist/
 release/
 out/
+artifacts/
 *.dmg
 *.zip
 *.AppImage

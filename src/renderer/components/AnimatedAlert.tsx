@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Alert } from '../types';
+import { type, fontWeight } from '../styles/type';
 
 interface AnimatedAlertProps {
   alert: Alert;
@@ -74,17 +75,15 @@ export function AnimatedAlert({ alert, onDismiss }: AnimatedAlertProps) {
       <div style={{ flex: 1 }}>
         <div
           style={{
-            fontSize: 10,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
+            ...type.label,
+            fontWeight: fontWeight.bold,
             opacity: 0.7,
             marginBottom: 2,
           }}
         >
           {alert.type}
         </div>
-        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.3 }}>
+        <div style={{ ...type.body, fontWeight: fontWeight.medium }}>
           {alert.text}
         </div>
       </div>
@@ -101,7 +100,7 @@ export function AnimatedAlert({ alert, onDismiss }: AnimatedAlertProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 11,
+          ...type.caption,
           flexShrink: 0,
           transition: 'background 0.2s',
         }}

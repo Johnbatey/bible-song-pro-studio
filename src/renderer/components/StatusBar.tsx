@@ -1,4 +1,5 @@
 import { useAppStore } from '../stores/appStore';
+import { type } from '../styles/type';
 
 export function StatusBar() {
   const platform = useAppStore((s) => s.platform);
@@ -74,7 +75,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--bg-secondary)',
     borderTop: '1px solid var(--border-primary)',
     flexShrink: 0,
-    fontSize: 11,
+    ...type.caption,
     color: 'var(--text-dim)',
   },
   left: {

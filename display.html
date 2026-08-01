@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://localhost:8942 http://127.0.0.1:8942; media-src 'self' blob: http://localhost:8942 http://127.0.0.1:8942; connect-src 'self' ws://localhost:8942 ws://127.0.0.1:8942 http://localhost:8942 http://127.0.0.1:8942; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-src 'self' http://localhost:8942 http://127.0.0.1:8942;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bible Song Pro Max — Display</title>
 <style>
@@ -94,10 +95,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ── Connection Status ── */
-.connection-status { display: none; position: fixed; top: 20px; right: 20px; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; z-index: 1000; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: all .3s ease; }
-.connection-status.connecting { display: block; background: rgba(255,193,7,.9); color: #000; }
-.connection-status.connected { display: block; background: rgba(76,175,80,.9); color: #fff; }
-.connection-status.error { display: block; background: rgba(244,67,54,.9); color: #fff; }
 
 /* ── Waiting Screen ── */
 .waiting-screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: transparent; color: #fff; z-index: 1; }
@@ -112,8 +109,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 .blackout-screen.active { display: block; }
 
 /* ── Fullscreen Button ── */
-.fullscreen-btn { position: fixed; bottom: 16px; right: 16px; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); color: #fff; width: 36px; height: 36px; border-radius: 6px; font-size: 18px; cursor: pointer; opacity: 0; transition: opacity .2s; z-index: 9999; display: flex; align-items: center; justify-content: center; }
-.app:hover .fullscreen-btn { opacity: 1; }
 
 /* ── Responsive ── */
 @media(max-width:1200px){ .verse-text { font-size: 2.5rem; } .verse-reference { font-size: 1.5rem; } .verse-container { padding: 0; } }
@@ -144,10 +139,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
     </div>
     <!-- Blackout -->
     <div class="blackout-screen" id="blackoutScreen"></div>
-    <!-- Connection Status -->
-    <div class="connection-status connecting" id="connStatus">Connecting…</div>
-    <!-- Fullscreen Button -->
-    <button class="fullscreen-btn" id="fullscreenBtn" onclick="document.documentElement.requestFullscreen()">⛶</button>
+    <!-- No connection badge or fullscreen button: this surface is the audience output,
+         and operator chrome must never be projected. Connection state is reported in
+         the app's own status bar instead. -->
   </div>
 </div>
 
@@ -164,7 +158,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
   const verseDisplay = document.getElementById('verseDisplay');
   const verseContainer = document.getElementById('verseContainer');
   const blackoutScreen = document.getElementById('blackoutScreen');
-  const connStatus = document.getElementById('connStatus');
 
   // ── State ──
   let currentVerse = null;
@@ -192,11 +185,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 
   // ── Helpers ──
   function esc(s) { return String(s || '').replace(/[&<>"']/g, function(c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }
-
-  function setConn(state, msg) {
-    connStatus.className = 'connection-status ' + state;
-    connStatus.textContent = msg || state.charAt(0).toUpperCase() + state.slice(1);
-  }
 
   // ── Theme Application ──
   function applyTheme(name) {
@@ -428,7 +416,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
     if (state.lyrics) renderLyrics(state.lyrics);
 
     // Connection
-    if (state.connStatus) setConn(state.connStatus.state, state.connStatus.message);
   }
 
   // ── WebSocket ──
@@ -436,7 +423,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
     var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     var host = location.host || 'localhost:8942';
     var ws = new WebSocket(protocol + '//' + host);
-    ws.onopen = function() { setConn('connected', 'Connected'); };
+    ws.onopen = function() { /* connected — no on-screen indicator on the audience output */ };
     ws.onmessage = function(event) {
       try {
         var msg = JSON.parse(event.data);
@@ -445,7 +432,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
       } catch(e) { /* ignore parse errors */ }
     };
     ws.onclose = function() {
-      setConn('connecting', 'Reconnecting…');
       setTimeout(connect, 1000);
     };
     ws.onerror = function() { ws.close(); };

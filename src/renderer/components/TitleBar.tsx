@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { type, fontWeight, iconSize } from '../styles/type';
 
 export function TitleBar() {
-  const platform = useAppStore((s) => s.platform);
   const mode = useAppStore((s) => s.display.mode);
   const setMode = useAppStore((s) => s.setMode);
+  const currentScene = useAppStore((s) => s.display.currentScene);
+  const previewScene = useAppStore((s) => s.display.previewScene);
+  const outputMode = useAppStore((s) => s.display.outputMode);
+  const setOutputMode = useAppStore((s) => s.setOutputMode);
+  const takeToProgram = useAppStore((s) => s.takeToProgram);
   const setExternalDisplay = useAppStore((s) => s.setExternalDisplay);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const isStudio = mode === 'studio';
+  const hasPendingTake = isStudio && Boolean(previewScene) && currentScene?.id !== previewScene?.id;
 
   useEffect(() => {
     if (window.BSP) {
@@ -20,12 +27,9 @@ export function TitleBar() {
 
   return (
     <div className="titlebar" style={styles.titlebar}>
-      {/* No custom traffic lights on macOS — the window uses titleBarStyle 'hidden', so
-          the system draws its own. Duplicating them just crowded the bar. The padding
-          below reserves the space they occupy so the logo doesn't sit under them. */}
       <div
         className="titlebar-drag"
-        style={{ ...styles.drag, paddingLeft: platform === 'darwin' ? 72 : 0 }}
+        style={styles.drag}
       >
         <div style={styles.brand}>
           <img src="./bible-song-pro-icon.svg" alt="" style={styles.logo} />
@@ -60,6 +64,50 @@ export function TitleBar() {
           </button>
         </div>
         <div style={styles.divider} />
+        <div style={styles.outputControls}>
+          <div style={styles.outputModeSwitch}>
+            <button
+              style={{ ...styles.outputModeBtn, ...(outputMode === 'fullscreen' ? styles.outputModeBtnActive : {}) }}
+              onClick={() => setOutputMode('fullscreen')}
+              title="Fullscreen output"
+            >
+              FS
+            </button>
+            <button
+              style={{ ...styles.outputModeBtn, ...(outputMode === 'lowerThird' ? styles.outputModeBtnActive : {}) }}
+              onClick={() => setOutputMode('lowerThird')}
+              title="Lower third output"
+            >
+              LT
+            </button>
+          </div>
+          {hasPendingTake && (
+            <>
+              <button
+                className="btn btn-sm btn-secondary"
+                style={styles.takeBtn}
+                onClick={() => takeToProgram(false)}
+                title="Cut to program"
+              >
+                Cut
+              </button>
+              <button
+                className="btn btn-sm btn-primary"
+                style={styles.takeBtn}
+                onClick={() => takeToProgram(true)}
+                title="Take to program"
+              >
+                Take
+              </button>
+            </>
+          )}
+          {!isStudio && (
+            <span style={styles.liveBadge} title="Basic mode sends directly to Program">
+              ● LIVE
+            </span>
+          )}
+        </div>
+        <div style={styles.divider} />
         <button
           style={styles.iconBtn}
           onClick={async () => {
@@ -88,7 +136,7 @@ export function TitleBar() {
               setExternalDisplay(true);
             }
           }}
-          title="External Display"
+          title="External Display Window"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -96,19 +144,55 @@ export function TitleBar() {
             <line x1="12" y1="17" x2="12" y2="21" />
           </svg>
         </button>
-        {platform !== 'darwin' && (
-          <div style={styles.winControls}>
-            <button style={styles.iconBtn} onClick={() => window.BSP?.window.minimize()}>
-              <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" strokeWidth="1.5"/></svg>
-            </button>
-            <button style={styles.iconBtn} onClick={() => window.BSP?.window.maximize()}>
-              <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg>
-            </button>
-            <button style={{ ...styles.iconBtn, color: '#e74c3c' }} onClick={() => window.BSP?.window.close()}>
-              <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" strokeWidth="1.5"/><line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" strokeWidth="1.5"/></svg>
-            </button>
-          </div>
-        )}
+        <button
+          style={styles.iconBtn}
+          onClick={() => useAppStore.getState().openSettings('output')}
+          title="General Settings"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+        <div style={styles.divider} />
+        <div style={styles.winControls}>
+          <button
+            style={styles.iconBtn}
+            onClick={() => window.BSP?.window.minimize()}
+            title="Minimize Window"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+          <button
+            style={styles.iconBtn}
+            onClick={async () => {
+              await window.BSP?.window.maximize();
+              const maxed = await window.BSP?.window.isMaximized();
+              setIsMaximized(!!maxed);
+            }}
+            title={isMaximized ? "Restore Window" : "Maximize Window"}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {isMaximized ? (
+                <rect x="5" y="5" width="14" height="14" rx="1" />
+              ) : (
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              )}
+            </svg>
+          </button>
+          <button
+            style={{ ...styles.iconBtn, color: 'var(--red)' }}
+            onClick={() => window.BSP?.window.close()}
+            title="Close Window"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -132,28 +216,24 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 12,
     flex: 1,
-    WebkitAppRegion: 'drag',
-  } as React.CSSProperties & { WebkitAppRegion: string },
+  },
   brand: {
     display: 'flex',
     alignItems: 'center',
-    fontSize: 13,
-    fontWeight: 600,
-    letterSpacing: '0.02em',
+    ...type.title,
     color: 'var(--text-primary)',
   },
   logo: {
-    width: 22,
-    height: 22,
+    width: iconSize.lg,
+    height: iconSize.lg,
     marginRight: 8,
     borderRadius: 6,
   },
   title: {
-    WebkitAppRegion: 'no-drag',
-  } as React.CSSProperties & { WebkitAppRegion: string },
+  },
   pro: {
     color: 'var(--accent)',
-    fontWeight: 800,
+    fontWeight: fontWeight.semibold,
     marginLeft: 3,
     marginRight: 3,
   },
@@ -176,11 +256,11 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '4px 10px',
     border: 'none',
     borderRadius: 4,
-    fontSize: 11,
-    fontWeight: 500,
+    ...type.secondary,
+    fontWeight: fontWeight.medium,
     cursor: 'pointer',
     transition: 'all 0.2s',
-    fontFamily: 'var(--font-sans)',
+    fontFamily: 'var(--font-ui)',
   },
   modeDotProgram: {
     width: 6,
@@ -199,6 +279,44 @@ const styles: Record<string, React.CSSProperties> = {
     height: 6,
     borderRadius: '50%',
     background: '#3498db',
+  },
+  outputControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  outputModeSwitch: {
+    display: 'flex',
+    border: '1px solid var(--border-primary)',
+    borderRadius: 6,
+    padding: 2,
+    background: 'rgba(255,255,255,0.04)',
+  },
+  outputModeBtn: {
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--text-secondary)',
+    borderRadius: 4,
+    padding: '4px 9px',
+    ...type.label,
+    cursor: 'pointer',
+  },
+  outputModeBtnActive: {
+    background: 'var(--accent)',
+    color: '#17120a',
+  },
+  takeBtn: {
+    height: 26,
+    padding: '0 12px',
+  },
+  liveBadge: {
+    ...type.label,
+    fontWeight: fontWeight.bold,
+    color: '#e74c3c',
+    padding: '4px 8px',
+    borderRadius: 999,
+    background: 'rgba(231,76,60,0.12)',
+    border: '1px solid rgba(231,76,60,0.3)',
   },
   divider: {
     width: 1,

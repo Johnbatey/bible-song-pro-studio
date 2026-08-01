@@ -2,17 +2,79 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://localhost:8942 http://127.0.0.1:8942; media-src 'self' blob: http://localhost:8942 http://127.0.0.1:8942; connect-src 'self' ws://localhost:8942 ws://127.0.0.1:8942 http://localhost:8942 http://127.0.0.1:8942; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-src 'self' http://localhost:8942 http://127.0.0.1:8942;" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bible Song Pro Max</title>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <style>
-      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #03040a; }
-      #splash-screen { position: fixed; inset: 0; z-index: 99999; }
+      @font-face {
+        font-family: 'Inter';
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url('./fonts/InterVariable.woff2') format('woff2');
+      }
+
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #060810; }
+      #splash-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        background: #060810;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        transition: opacity 0.4s ease, visibility 0.4s ease;
+      }
+      .sanctuary-loader {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      .loader-logo {
+        width: 56px;
+        height: 56px;
+        filter: drop-shadow(0 6px 18px rgba(30, 58, 110, 0.6));
+      }
+      .loader-spinner {
+        width: 28px;
+        height: 28px;
+        border: 2px solid rgba(96, 165, 250, 0.2);
+        border-top-color: #60a5fa;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      .loader-title {
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        color: #f8fafc;
+      }
+      .loader-title .pro { color: #60a5fa; }
+      .loader-title .max { color: #f59e0b; }
+      .loader-sub {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        color: rgba(255, 255, 255, 0.45);
+        text-transform: uppercase;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
       #root { width: 100%; height: 100%; }
     </style>
   </head>
   <body>
-    <div id="splash-screen"></div>
+    <div id="splash-screen">
+      <div class="sanctuary-loader">
+        <img src="./bible-song-pro-icon.svg" class="loader-logo" alt="Bible Song Pro Max Logo" />
+        <div class="loader-spinner"></div>
+        <div class="loader-title">Bible Song <span class="pro">PRO</span> <span class="max">Max</span></div>
+        <div class="loader-sub">Loading Sanctuary...</div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/renderer/main.tsx"></script>
   </body>

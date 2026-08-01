@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import type { Theme } from '../types';
 import { v4 as uuid } from 'uuid';
+import { type, fontWeight } from '../styles/type';
 
 const PRESET_THEMES: Theme[] = [
   {
@@ -194,16 +195,46 @@ const PRESET_THEMES: Theme[] = [
 export function ThemePanel() {
   const themes = useAppStore((s) => s.themes);
   const addTheme = useAppStore((s) => s.addTheme);
+  const updateTheme = useAppStore((s) => s.updateTheme);
+  const removeTheme = useAppStore((s) => s.removeTheme);
   const activeTheme = useAppStore((s) => s.activeTheme);
   const setActiveTheme = useAppStore((s) => s.setActiveTheme);
   const [editTheme, setEditTheme] = useState<Theme | null>(null);
 
-  const allThemes = themes.length > 0 ? themes : PRESET_THEMES;
+  const customPresetNames = new Set(themes.map((theme) => theme.name.replace(/\s+Copy$/, '')));
+  const visiblePresets = PRESET_THEMES.filter((theme) => !customPresetNames.has(theme.name));
+  const allThemes = [...themes, ...visiblePresets];
+
+  const renameTheme = (theme: Theme, name: string) => {
+    const updated = { ...theme, name };
+    setEditTheme(updated);
+    if (activeTheme?.id === theme.id) setActiveTheme(updated);
+    if (name.trim()) updateTheme(theme.id, { name });
+  };
+
+  const commitThemeName = (theme: Theme) => {
+    const nextName = theme.name.trim();
+    const fallback = themes.find((item) => item.id === theme.id)?.name || 'Untitled Theme';
+    const updated = { ...theme, name: nextName || fallback };
+    setEditTheme(updated);
+    if (activeTheme?.id === theme.id) setActiveTheme(updated);
+    updateTheme(theme.id, { name: updated.name });
+  };
+
+  const deleteTheme = (theme: Theme) => {
+    const existing = themes.find((item) => item.id === theme.id);
+    if (!existing) return;
+    const confirmed = window.confirm(`Delete "${theme.name}"? This cannot be undone.`);
+    if (!confirmed) return;
+    removeTheme(theme.id);
+    if (activeTheme?.id === theme.id) setActiveTheme(null);
+    if (editTheme?.id === theme.id) setEditTheme(null);
+  };
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600 }}>Themes</h2>
+    <div style={styles.panel}>
+      <div style={styles.header}>
+        <h2 style={{ ...type.title }}>Design</h2>
         <div style={{ display: 'flex', gap: 6 }}>
           {activeTheme && (
             <button className="btn btn-sm btn-secondary" onClick={() => setEditTheme(activeTheme)}>
@@ -215,7 +246,7 @@ export function ThemePanel() {
             onClick={() => {
             const t: Theme = {
               id: `theme-${Date.now()}`,
-              name: `Custom Theme ${themes.length + 1}`,
+              name: `Custom Design ${themes.length + 1}`,
               lowerThird: {
                 background: 'rgba(0,0,0,0.8)',
                 backgroundColor: '#000',
@@ -255,106 +286,139 @@ export function ThemePanel() {
             setEditTheme(t);
           }}
           >
-            + Custom Theme
+            + Custom Design
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-        {allThemes.map((theme) => (
-          <div
-            key={theme.id}
-            className={`card card-hover ${activeTheme?.id === theme.id ? 'glass-accent' : ''}`}
-            style={{ cursor: 'pointer' }}
-            onClick={() => setActiveTheme(theme)}
-          >
-            {/* Preview bar */}
+      <div style={styles.body}>
+        <div style={styles.themeGrid}>
+          {allThemes.map((theme) => (
             <div
-              style={{
-                height: 60,
-                borderRadius: 'var(--radius-sm)',
-                marginBottom: 10,
-                background: theme.lowerThird.background || theme.lowerThird.backgroundColor,
-                display: 'flex',
-                alignItems: 'flex-end',
-                padding: 8,
-              }}
+              key={theme.id}
+              className={`card card-hover ${activeTheme?.id === theme.id ? 'glass-accent' : ''}`}
+              style={{ cursor: 'pointer' }}
+              onClick={() => setActiveTheme(theme)}
             >
+              {/* Preview bar */}
               <div
                 style={{
-                  width: '60%',
-                  height: 6,
-                  borderRadius: 3,
-                  background: theme.lowerThird.fontColor,
-                  opacity: 0.8,
+                  height: 60,
+                  borderRadius: 'var(--radius-sm)',
+                  marginBottom: 10,
+                  background: theme.lowerThird.background || theme.lowerThird.backgroundColor,
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  padding: 8,
                 }}
-              />
+              >
+                <div
+                  style={{
+                    width: '60%',
+                    height: 6,
+                    borderRadius: 3,
+                    background: theme.lowerThird.fontColor,
+                    opacity: 0.8,
+                  }}
+                />
+              </div>
+              <div style={{ ...type.heading, fontWeight: fontWeight.medium }}>{theme.name}</div>
+              <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                <span className="badge" style={{ background: 'var(--blue-dim)', color: 'var(--blue)' }}>
+                  LT
+                </span>
+                <span className="badge" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>
+                  Full
+                </span>
+                <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                  Slides
+                </span>
+              </div>
+              <div style={{ marginTop: 8, ...type.caption, color: 'var(--text-dim)' }}>
+                Anim: {theme.lowerThird.animation}
+              </div>
+              <div style={styles.cardActions}>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    const existing = themes.find((t) => t.id === theme.id);
+                    const editable = existing || { ...theme, id: `theme-${Date.now()}`, name: `${theme.name} Copy` };
+                    if (!existing) addTheme(editable);
+                    setEditTheme(editable);
+                  }}
+                >
+                  Edit Design
+                </button>
+                {themes.some((item) => item.id === theme.id) && (
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    style={styles.deleteButton}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      deleteTheme(theme);
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 500 }}>{theme.name}</div>
-            <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-              <span className="badge" style={{ background: 'var(--blue-dim)', color: 'var(--blue)' }}>
-                LT
-              </span>
-              <span className="badge" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>
-                Full
-              </span>
-              <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                Slides
-              </span>
-            </div>
-            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-dim)' }}>
-              Anim: {theme.lowerThird.animation}
-            </div>
-            <button
-              className="btn btn-sm btn-secondary"
-              style={{ width: '100%', marginTop: 10 }}
-              onClick={(event) => {
-                event.stopPropagation();
-                const existing = themes.find((t) => t.id === theme.id);
-                const editable = existing || { ...theme, id: `theme-${Date.now()}`, name: `${theme.name} Copy` };
-                if (!existing) addTheme(editable);
-                setActiveTheme(editable);
-                setEditTheme(editable);
-              }}
-            >
-              Edit Theme
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* Theme editor */}
-      {editTheme && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Editing: {editTheme.name}</div>
-          <div style={{ display: 'flex', gap: 16 }}>
-            <div style={{ flex: 1 }}>
-              <div className="section-title">Lower Third</div>
-              <ThemeFormSection
-                values={editTheme.lowerThird}
-                onChange={(updates) => {
-                  const updated = { ...editTheme, lowerThird: { ...editTheme.lowerThird, ...updates } };
-                  setEditTheme(updated);
-                  setActiveTheme(updated);
-                  useAppStore.getState().updateTheme(editTheme.id, updated);
-                }}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div className="section-title">Full Screen</div>
-              <ThemeFormSection
-                values={editTheme.fullScreen}
-                onChange={(updates) => {
-                  const updated = { ...editTheme, fullScreen: { ...editTheme.fullScreen, ...updates } };
-                  setEditTheme(updated);
-                  setActiveTheme(updated);
-                  useAppStore.getState().updateTheme(editTheme.id, updated);
-                }}
-              />
-            </div>
-          </div>
+          ))}
         </div>
-      )}
+
+        {/* Theme editor */}
+        {editTheme && (
+          <div className="card" style={styles.editorCard}>
+            <div style={styles.editorHeader}>
+              <label style={styles.nameField}>
+                <span style={styles.nameLabel}>Design Preset Name</span>
+                <input
+                  className="input"
+                  value={editTheme.name}
+                  onChange={(event) => renameTheme(editTheme, event.target.value)}
+                  onBlur={() => commitThemeName(editTheme)}
+                />
+              </label>
+              {themes.some((theme) => theme.id === editTheme.id) && (
+                <button className="btn btn-sm btn-secondary" style={styles.deleteButton} onClick={() => deleteTheme(editTheme)}>
+                  Delete Design
+                </button>
+              )}
+              <button className="btn btn-sm btn-secondary" onClick={() => setEditTheme(null)}>
+                Back to Design
+              </button>
+            </div>
+            <div style={styles.editorBody}>
+              <div style={styles.editorColumn}>
+                <div className="section-title">Lower Third</div>
+                <ThemeFormSection
+                  values={editTheme.lowerThird}
+                  onChange={(updates) => {
+                    const updated = { ...editTheme, lowerThird: { ...editTheme.lowerThird, ...updates } };
+                    setEditTheme(updated);
+                    if (activeTheme?.id === editTheme.id) setActiveTheme(updated);
+                    useAppStore.getState().updateTheme(editTheme.id, updated);
+                  }}
+                />
+              </div>
+              <div style={styles.editorColumn}>
+                <div className="section-title">Full Screen</div>
+                <ThemeFormSection
+                  values={editTheme.fullScreen}
+                  onChange={(updates) => {
+                    const updated = { ...editTheme, fullScreen: { ...editTheme.fullScreen, ...updates } };
+                    setEditTheme(updated);
+                    if (activeTheme?.id === editTheme.id) setActiveTheme(updated);
+                    useAppStore.getState().updateTheme(editTheme.id, updated);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -363,7 +427,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div>
-        <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Family</label>
+        <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Family</label>
         <select
           className="input"
           value={values.fontFamily || ''}
@@ -378,7 +442,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Size</label>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Size</label>
           <input
             className="input"
             type="number"
@@ -387,7 +451,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
           />
         </div>
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Weight</label>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Weight</label>
           <select
             className="input"
             value={values.fontWeight || 400}
@@ -404,7 +468,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Color</label>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Color</label>
           <input
             className="input"
             type="color"
@@ -414,7 +478,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
           />
         </div>
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Animation</label>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Animation</label>
           <select
             className="input"
             value={values.animation || 'fadeIn'}
@@ -435,7 +499,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Background</label>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Background</label>
           <input
             className="input"
             type="color"
@@ -445,7 +509,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
           />
         </div>
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Radius</label>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Radius</label>
           <input
             className="input"
             type="number"
@@ -456,7 +520,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Width %</label>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Width %</label>
           <input
             className="input"
             type="number"
@@ -467,7 +531,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
           />
         </div>
         <div style={{ flex: 1 }}>
-          <label style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Offset Y</label>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Offset Y</label>
           <input
             className="input"
             type="number"
@@ -479,3 +543,80 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
     </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  panel: {
+    height: '100%',
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    overflowY: 'auto',
+    paddingRight: 4,
+  },
+  header: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
+  },
+  body: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  themeGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: 12,
+  },
+  cardActions: {
+    display: 'flex',
+    gap: 6,
+    marginTop: 10,
+  },
+  deleteButton: {
+    color: 'var(--red)',
+    borderColor: 'rgba(231, 76, 60, 0.24)',
+  },
+  editorCard: {
+    flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+    maxHeight: 'min(520px, 70vh)',
+  },
+  editorHeader: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+  },
+  nameField: {
+    flex: '1 1 260px',
+    minWidth: 180,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  nameLabel: {
+    ...type.label,
+    color: 'var(--text-dim)',
+  },
+  editorBody: {
+    minHeight: 0,
+    overflowY: 'auto',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: 16,
+    paddingRight: 4,
+  },
+  editorColumn: {
+    minWidth: 0,
+  },
+};

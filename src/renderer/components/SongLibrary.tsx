@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import type { Song } from '../types';
 import { v4 as uuid } from 'uuid';
+import { type, fontWeight } from '../styles/type';
 
 // CCLI-like song database
 const SONG_PACKS = [
@@ -93,7 +94,7 @@ export function SongLibrary() {
 
   return (
     <div style={{ padding: 16 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Song Library</h2>
+      <h2 style={{ ...type.title, marginBottom: 16 }}>Song Library</h2>
 
       {/* Library filter. Online catalogue search (CCLI SongSelect etc.) is not built yet. */}
       <div className="glass" style={{ padding: 12, borderRadius: 'var(--radius-md)', marginBottom: 16 }}>
@@ -106,7 +107,7 @@ export function SongLibrary() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>
+        <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 6 }}>
           Online catalogue search is not available yet — use <strong>Songs → Import Songs</strong> for
           OpenLyrics and ChordPro files.
         </div>
@@ -121,14 +122,14 @@ export function SongLibrary() {
             <div key={pack.id} className="card card-hover">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{pack.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                  <div style={{ ...type.title }}>{pack.name}</div>
+                  <div style={{ ...type.secondary, color: 'var(--text-dim)', marginTop: 2 }}>
                     {pack.songs.length} songs
                   </div>
                   <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                     {pack.songs.map((s) => (
                       <span key={s.title} style={{
-                        fontSize: 10,
+                        ...type.caption,
                         padding: '1px 6px',
                         borderRadius: 4,
                         background: 'var(--bg-elevated)',
@@ -159,19 +160,19 @@ export function SongLibrary() {
           <div key={song.id} className="card card-hover" style={{ padding: '10px 14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{song.title}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                <div style={{ ...type.heading, fontWeight: fontWeight.medium }}>{song.title}</div>
+                <div style={{ ...type.caption, color: 'var(--text-dim)' }}>
                   {song.artist} {song.key ? `· ${song.key}` : ''} · {song.slides.length} slides
                 </div>
               </div>
-              <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'var(--green-dim)', color: 'var(--green)' }}>
+              <span style={{ ...type.caption, padding: '2px 6px', borderRadius: 4, background: 'var(--green-dim)', color: 'var(--green)' }}>
                 Ready
               </span>
             </div>
           </div>
         ))}
         {filteredSongs.length === 0 && (
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>
+          <div style={{ ...type.body, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>
             {songs.length === 0
               ? 'No songs yet. Install a song pack above, or import your own from the Songs panel.'
               : `No songs match "${search}".`}

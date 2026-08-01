@@ -156,7 +156,9 @@ function createDeepgramService({ emit }) {
         punctuate: true,
         smart_format: true,
         interim_results: true,
-        endpointing: 300,
+        // Ask Deepgram to close a speech segment quickly. Projection still waits for
+        // `is_final`, but no longer pays the previous 300 ms endpointing delay.
+        endpointing: 50,
         vad_events: true,
         utterance_end_ms: 1000,
       });

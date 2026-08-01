@@ -20,6 +20,7 @@ let mainWindow = null;
 let displayWindow = null;
 let wss = null;
 let displayPort = 8942;
+let activeDisplayId = null;
 let ndiService = null;
 let sessionHistory = null;
 let songImportService = null;
@@ -56,7 +57,7 @@ function serveStatic(dirName) {
       : ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
       : ext === '.mp4' ? 'video/mp4' : ext === '.html' ? 'text/html' : ext === '.css' ? 'text/css' : ext === '.js' ? 'application/javascript'
       : 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'public, max-age=31536000' });
+    res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'public, max-age=31536000', 'Access-Control-Allow-Origin': '*' });
     fs.createReadStream(fp).pipe(res);
   };
 }
@@ -119,7 +120,7 @@ function serveMedia(req, res, fileName) {
 // ── API Handlers for REST / Mobile Remote ──
 const apiHandlers = {
   'POST /api/verse/search': ({ body }) => {
-    const results = bibleService.search(body?.versionId || 'KJV', body?.query || '', body?.limit || 20);
+    const results = bibleService.search(body?.versionId || 'KJV', body?.query || '', body?.limit || 20, { book: body?.book || '' });
     return { ok: true, results };
   },
   'POST /api/verse/chapter': ({ body }) => {
@@ -228,47 +229,112 @@ function startHttpServer() {
 }
 
 function createSplashWindow() {
-  const s = new BrowserWindow({ width: 560, height: 420, frame: false, transparent: true, resizable: false, alwaysOnTop: true, backgroundColor: '#03040a', webPreferences: { nodeIntegration: false, contextIsolation: true } });
+  const s = new BrowserWindow({ width: 700, height: 500, frame: false, transparent: true, resizable: false, alwaysOnTop: true, backgroundColor: '#03040a', webPreferences: { nodeIntegration: false, contextIsolation: true } });
   s.loadURL(isDev ? 'http://localhost:5173/splash.html' : `file://${path.join(__dirname, '../../dist/splash.html')}`);
   s.center();
   return s;
 }
 
 function createMainWindow() {
-  const isMac = process.platform === 'darwin';
-  // macOS: titleBarStyle 'hidden' keeps the system traffic lights over a frameless
-  // window — the app draws no window buttons of its own there. Setting frame:false as
-  // well would strip them, leaving no way to close the window but Cmd+Q.
-  // Windows/Linux: frameless, with the in-app controls in the title bar.
-  const chrome = isMac
-    ? { titleBarStyle: 'hidden', trafficLightPosition: { x: 16, y: 16 } }
-    : { frame: false };
-  const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 1100, minHeight: 700, ...chrome, backgroundColor: '#0c0e14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true } });
+  const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 640, minHeight: 480, frame: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0c0e14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true } });
+  win.setResizable(true);
+  win.setMinimumSize(640, 480);
   win.loadURL(isDev ? 'http://localhost:5173' : `file://${path.join(__dirname, '../../dist/index.html')}`);
   if (isDev) win.webContents.openDevTools();
   win.once('ready-to-show', () => { win.show(); win.focus(); });
   return win;
 }
 
+/**
+ * Monitor list for the output picker. Uses the OS-reported label ("DELL U2720Q") when
+ * there is one, since "Display 2" tells an operator nothing about which screen is the
+ * projector.
+ */
+function getDisplayPayload() {
+  const primary = screen.getPrimaryDisplay();
+  return screen.getAllDisplays().map((display, index) => {
+    const isPrimary = display.id === primary.id;
+    const isInternal = Boolean(display.internal);
+    const fallback = isInternal
+      ? (isPrimary ? 'Built-in Display' : `Internal Display ${index + 1}`)
+      : `External Display ${index + 1}`;
+    return {
+      id: String(display.id),
+      index,
+      name: display.label || fallback,
+      label: display.label || fallback,
+      isPrimary,
+      isInternal,
+      bounds: display.bounds,
+      resolution: `${Math.round(display.bounds.width * display.scaleFactor)}×${Math.round(display.bounds.height * display.scaleFactor)}`,
+      scaleFactor: display.scaleFactor,
+    };
+  });
+}
+
+/**
+ * 'auto' prefers a real external monitor — the projector — over the operator's own
+ * screen, which is almost always what's wanted.
+ */
+function chooseDisplay(displayId) {
+  const displays = screen.getAllDisplays();
+  if (displays.length === 0) return null;
+  const primary = screen.getPrimaryDisplay();
+
+  if (displayId !== undefined && displayId !== null && displayId !== 'auto') {
+    const exact = displays.find((d) => String(d.id) === String(displayId));
+    if (exact) return exact;
+    // Legacy callers passed an index
+    if (typeof displayId === 'number' && displays[displayId]) return displays[displayId];
+  }
+
+  return displays.find((d) => !d.internal && d.id !== primary.id)
+    || displays.find((d) => !d.internal)
+    || displays.find((d) => d.id !== primary.id)
+    || primary
+    || displays[0];
+}
+
+function broadcastDisplayList() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('display:listChanged', getDisplayPayload());
+  }
+}
+
+function resizableOutputBounds(bounds) {
+  const margin = 48;
+  const width = Math.max(640, Math.min(1280, bounds.width - margin * 2));
+  const height = Math.max(360, Math.round(width * 9 / 16));
+  const fittedHeight = Math.min(height, Math.max(360, bounds.height - margin * 2));
+  return {
+    x: Math.round(bounds.x + (bounds.width - width) / 2),
+    y: Math.round(bounds.y + (bounds.height - fittedHeight) / 2),
+    width: Math.round(width),
+    height: Math.round(fittedHeight),
+  };
+}
+
 function createDisplayWindow(bounds) {
   if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
-  const d = bounds || screen.getPrimaryDisplay().bounds;
-  displayWindow = new BrowserWindow({ x: d.x, y: d.y, width: d.width, height: d.height, fullscreen: true, frame: false, alwaysOnTop: true, backgroundColor: '#000000', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true } });
-  displayWindow.loadURL(`http://localhost:${displayPort}/display.html`);
+  const d = resizableOutputBounds(bounds || screen.getPrimaryDisplay().workArea || screen.getPrimaryDisplay().bounds);
+  displayWindow = new BrowserWindow({ x: d.x, y: d.y, width: d.width, height: d.height, minWidth: 640, minHeight: 360, frame: true, autoHideMenuBar: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#000000', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, backgroundThrottling: false } });
+  displayWindow.setResizable(true);
+  displayWindow.setMinimumSize(640, 360);
+  displayWindow.loadURL(isDev ? 'http://localhost:5173/audience-display.html' : `file://${path.join(__dirname, '../../dist/audience-display.html')}`);
   displayWindow.setMenuBarVisibility(false);
   displayWindow.webContents.once('did-finish-load', () => broadcastDisplayState());
   return displayWindow;
 }
 
 function createStageDisplayWindow() {
-  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 1200, minHeight: 800, backgroundColor: '#000000', title: 'BSP Stage Display', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
+  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#000000', title: 'BSP Stage Display', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
   win.loadURL(isDev ? 'http://localhost:5173/stage-display/index.html' : `file://${path.join(__dirname, '../../dist/stage-display/index.html')}`);
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
   return win;
 }
 
 function createSlideEditorWindow() {
-  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 1200, minHeight: 800, backgroundColor: '#0b0d12', title: 'BSP Slide Editor', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
+  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0b0d12', title: 'BSP Slide Editor', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
   win.loadURL(isDev ? 'http://localhost:5173/slide-editor/index.html' : `file://${path.join(__dirname, '../../dist/slide-editor/index.html')}`);
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
   return win;
@@ -337,13 +403,29 @@ app.whenReady().then(async () => {
   ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized());
   ipcMain.handle('window:isFullScreen', () => mainWindow?.isFullScreen());
 
-  ipcMain.handle('display:open', (_, i) => { const displays = screen.getAllDisplays(); createDisplayWindow((displays[i] || displays[0] || screen.getPrimaryDisplay()).bounds); return true; });
-  ipcMain.handle('display:close', () => { if (displayWindow && !displayWindow.isDestroyed()) { displayWindow.close(); displayWindow = null; } return true; });
-  ipcMain.handle('display:getDisplays', () => screen.getAllDisplays().map((d, i) => ({ index: i, name: 'Display ' + (i + 1), bounds: d.bounds, isPrimary: d.id === screen.getPrimaryDisplay().id })));
+  ipcMain.handle('display:open', (_, arg) => {
+    // Accepts { displayId } | 'auto' | legacy index
+    const displayId = (arg && typeof arg === 'object') ? arg.displayId : arg;
+    const target = chooseDisplay(displayId);
+    if (!target) return { ok: false, error: 'No displays available' };
+    createDisplayWindow(target.bounds);
+    activeDisplayId = String(target.id);
+    return { ok: true, displayId: activeDisplayId, label: getDisplayPayload().find((d) => d.id === activeDisplayId)?.label || '' };
+  });
+  ipcMain.handle('display:close', () => { if (displayWindow && !displayWindow.isDestroyed()) { displayWindow.close(); displayWindow = null; } activeDisplayId = null; return { ok: true }; });
+  ipcMain.handle('display:getDisplays', () => getDisplayPayload());
+  ipcMain.handle('display:getActive', () => ({ ok: true, displayId: activeDisplayId, isOpen: !!(displayWindow && !displayWindow.isDestroyed()) }));
   ipcMain.handle('display:sendState', (_, s) => setDisplayState(s));
   ipcMain.handle('display:getState', () => displayState);
   ipcMain.handle('display:isOpen', () => !!(displayWindow && !displayWindow.isDestroyed()));
-  ipcMain.handle('display:getStatus', () => ({ isOpen: !!(displayWindow && !displayWindow.isDestroyed()), url: `http://localhost:${displayPort}/display.html`, clients: wss ? wss.clients.size : 0, updatedAt: displayState.updatedAt || 0, remoteUrl: `http://localhost:${displayPort}/remote.html` }));
+  ipcMain.handle('display:getStatus', () => ({
+    isOpen: !!(displayWindow && !displayWindow.isDestroyed()),
+    url: 'Electron IPC display',
+    browserUrl: `http://localhost:${displayPort}/display.html`,
+    clients: wss ? wss.clients.size : 0,
+    updatedAt: displayState.updatedAt || 0,
+    remoteUrl: `http://localhost:${displayPort}/remote.html`,
+  }));
   ipcMain.on('display:message', (_, msg) => { if (msg && msg.type === 'display:update') setDisplayState(msg.state || msg); });
 
   ipcMain.handle('slide-editor:open', () => { createSlideEditorWindow(); return true; });
@@ -356,7 +438,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('bible:getVersions', () => bibleService.getVersions());
   ipcMain.handle('bible:getBooks', (_, v) => bibleService.getBooks(v));
   ipcMain.handle('bible:getChapter', (_, p) => bibleService.getChapter(p?.versionId, p?.book, p?.chapter));
-  ipcMain.handle('bible:search', (_, p) => bibleService.search(p?.versionId, p?.query, p?.limit));
+  ipcMain.handle('bible:search', (_, p) => bibleService.search(p?.versionId, p?.query, p?.limit, { book: p?.book || '' }));
 
   ipcMain.handle('verse:detect', (_, p) => verseDetectionService.detect(p?.text, p?.options || {}));
   ipcMain.handle('verse:warmIndex', (_, p) => verseDetectionService.warmIndex(p?.versionId || 'KJV'));
@@ -468,6 +550,21 @@ app.whenReady().then(async () => {
 
   // Audio
   ipcMain.handle('audio:getInputDevices', () => []);
+
+  // Keep the monitor picker in step with the hardware — projectors get plugged in
+  // mid-service, and a stale list is worse than none.
+  screen.on('display-added', () => broadcastDisplayList());
+  screen.on('display-removed', (_e, removed) => {
+    // If the output screen was unplugged, tear the window down rather than leaving it
+    // stranded on coordinates that no longer exist.
+    if (activeDisplayId && String(removed?.id) === activeDisplayId) {
+      if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
+      displayWindow = null;
+      activeDisplayId = null;
+    }
+    broadcastDisplayList();
+  });
+  screen.on('display-metrics-changed', () => broadcastDisplayList());
 
   // Fullscreen events
   mainWindow.on('enter-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', true));

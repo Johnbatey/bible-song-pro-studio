@@ -3,6 +3,7 @@ import { useAppStore } from './stores/appStore';
 import { TitleBar } from './components/TitleBar';
 import { Sidebar } from './components/Sidebar';
 import { PreviewProgramView } from './components/PreviewProgramView';
+import { TranscriptPanel } from './components/TranscriptPanel';
 import { ScenePanel } from './components/ScenePanel';
 import { BiblePanel } from './components/BiblePanel';
 import { SongsPanel } from './components/SongsPanel';
@@ -11,23 +12,51 @@ import { MediaPanel } from './components/MediaPanel';
 import { PresentationPanel } from './components/PresentationPanel';
 import { SongLibrary } from './components/SongLibrary';
 import { SettingsPanel } from './components/SettingsPanel';
+import { SettingsModal } from './components/SettingsModal';
 import { AnimatedAlert } from './components/AnimatedAlert';
 import { AIConsole } from './components/AIConsole';
-import { TranscriptionBar } from './components/TranscriptionBar';
 import { StatusBar } from './components/StatusBar';
 import { LiveScripturePanel } from './components/LiveScripturePanel';
 import { SessionHistoryPanel } from './components/SessionHistoryPanel';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useBroadcastSync } from './hooks/useBroadcastSync';
-import type { Scene } from './types';
+import type { Scene, Theme } from './types';
 
 type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'presentation' | 'songlibrary' | 'settings' | 'history';
 
 /**
- * display.html consumes flat background fields (bgVideo / bgCustomImage / bgFill), not
- * the Scene.background object. Translate here so imported media and gradients actually
- * reach the output. Every field is sent on each update — an explicit empty string is
- * what clears a previous background.
+ * The audience display renderer consumes flat background fields
+ * (bgVideo / bgCustomImage / bgFill), not the Scene.background object. Translate here
+ * so imported media and gradients actually reach the output. Every field is sent on
+ * each update — an explicit empty string is what clears a previous background.
  */
+/**
+ * The audience display keeps a flat config (fontFamily, fontSize, mode, …) — it has no
+ * concept of our nested Theme object. Two mismatches meant the external output ignored both:
+ *   - the theme was sent as `theme: {...}`, so every font/colour field was dropped
+ *   - the output mode was sent as `outputMode`, but the page reads `mode`
+ * so FS/LT switching and the whole Theme designer only ever affected the Program pane.
+ */
+function displayFieldsFor(theme: Theme | null, outputMode: 'fullscreen' | 'lowerThird') {
+  const section = outputMode === 'lowerThird' ? theme?.lowerThird : theme?.fullScreen;
+  const bible = theme?.bibleOptions;
+
+  return {
+    // The display renderer calls this `mode`
+    mode: outputMode,
+    fontFamily: section?.fontFamily || 'Poppins',
+    fontSize: section?.fontSize ?? 0,
+    fontWeight: section?.fontWeight ?? 700,
+    fontColor: section?.fontColor || '#ffffff',
+    textAlign: section?.textAlign || 'center',
+    referenceColor: theme?.lowerThird?.accentColor || '#e8541a',
+    referenceFontSize: theme?.fullScreen?.referenceFontSize ?? 0,
+    // No theme control hides the reference today, so it always shows.
+    showReference: true,
+    showTranslation: bible?.showVersion ?? true,
+  };
+}
+
 function backgroundFieldsFor(scene: Scene | null) {
   const bg = scene?.background;
   const fields = {
@@ -88,6 +117,7 @@ export function App() {
         theme: state.activeTheme,
         activeAlert: state.activeAlert,
         transcription: state.transcription.text,
+        ...displayFieldsFor(state.activeTheme, state.display.outputMode),
         ...backgroundFieldsFor(state.display.currentScene),
       }).then((nextState) => {
         useAppStore.getState().setOutputStatus({
@@ -110,39 +140,160 @@ export function App() {
     return unsubscribe;
   }, []);
 
-  const panelViews: Record<PanelView, React.ReactNode> = {
-    scenes: <ScenePanel />,
-    bible: <BiblePanel />,
-    songs: <SongsPanel />,
-    live: <LiveScripturePanel />,
-    media: <MediaPanel />,
-    themes: <ThemePanel />,
-    presentation: <PresentationPanel />,
-    songlibrary: <SongLibrary />,
-    settings: <SettingsPanel />,
-    history: <SessionHistoryPanel />,
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('bsp_sidebarWidth');
+    return saved ? parseInt(saved, 10) : 280;
+  });
+
+  const [transcriptHeight, setTranscriptHeight] = useState<number>(() => {
+    const saved = localStorage.getItem('bsp_transcriptHeight');
+    return saved ? parseInt(saved, 10) : 360;
+  });
+
+  const [activeDrag, setActiveDrag] = useState<'sidebar' | 'transcript' | null>(null);
+
+  const startResizing = (type: 'sidebar' | 'transcript', e: React.PointerEvent) => {
+    e.preventDefault();
+    setActiveDrag(type);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialSidebarW = sidebarWidth;
+    const initialTranscriptH = transcriptHeight;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      if (type === 'sidebar') {
+        const deltaX = moveEvent.clientX - startX;
+        const nextW = Math.min(500, Math.max(160, initialSidebarW + deltaX));
+        setSidebarWidth(nextW);
+        localStorage.setItem('bsp_sidebarWidth', String(nextW));
+      } else if (type === 'transcript') {
+        const deltaY = moveEvent.clientY - startY;
+        const nextH = Math.min(700, Math.max(180, initialTranscriptH + deltaY));
+        setTranscriptHeight(nextH);
+        localStorage.setItem('bsp_transcriptHeight', String(nextH));
+      }
+    };
+
+    const onPointerUp = () => {
+      setActiveDrag(null);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
   };
+
+  const [visitedPanels, setVisitedPanels] = useState<Set<string>>(() => new Set([activePanel]));
+
+  useEffect(() => {
+    setVisitedPanels((prev) => {
+      if (prev.has(activePanel)) return prev;
+      const next = new Set(prev);
+      next.add(activePanel);
+      return next;
+    });
+  }, [activePanel]);
+
+  const workspaceStyle = {
+    '--sidebar-width': `${sidebarWidth}px`,
+    '--transcript-height': `${transcriptHeight}px`,
+  } as React.CSSProperties;
 
   return (
     <div className="app-shell">
       <TitleBar />
       <div className="app-body">
-        <Sidebar
-          activePanel={activePanel as PanelView}
-          onPanelChange={(p) => setActivePanel(p)}
-          collapsed={!sidebarOpen}
-        />
         <div className="app-main">
-          <PreviewProgramView />
-          <div className="app-content">
-            <div className="app-content-inner">
-              {panelViews[activePanel as PanelView] || <ScenePanel />}
+          <div className="operator-workspace" style={workspaceStyle}>
+            <div className="transcript-region">
+              <TranscriptPanel onOpenLiveScripture={() => setActivePanel('live')} />
             </div>
+
+            {/* Vertical resizer between Transcript and Sidebar */}
+            <div
+              className={`resizer-handle resizer-handle-v ${activeDrag === 'transcript' ? 'is-dragging' : ''}`}
+              onPointerDown={(e) => startResizing('transcript', e)}
+              title="Drag to resize top area height"
+            >
+              <div className="resizer-grip-v" />
+            </div>
+
+            <div className="sidebar-region">
+              <Sidebar
+                activePanel={activePanel as PanelView}
+                onPanelChange={(p) => setActivePanel(p)}
+                collapsed={!sidebarOpen}
+              />
+            </div>
+
+            {/* Horizontal resizer between Sidebar and Left Workspace */}
+            <div
+              className={`resizer-handle resizer-handle-h sidebar-resizer ${activeDrag === 'sidebar' ? 'is-dragging' : ''}`}
+              onPointerDown={(e) => startResizing('sidebar', e)}
+              title="Drag to resize Sidebar width"
+            >
+              <div className="resizer-grip-h" />
+            </div>
+
+            <main className="left-workspace">
+              <div className="app-content">
+                <div className="app-content-inner">
+                  <ErrorBoundary label="Panel">
+                  <div style={{ display: activePanel === 'scenes' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('scenes') && <ScenePanel />}
+                  </div>
+                  <div style={{ display: activePanel === 'bible' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('bible') && <BiblePanel />}
+                  </div>
+                  <div style={{ display: activePanel === 'songs' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('songs') && <SongsPanel />}
+                  </div>
+                  <div style={{ display: activePanel === 'live' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('live') && <LiveScripturePanel />}
+                  </div>
+                  <div style={{ display: activePanel === 'media' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('media') && <MediaPanel />}
+                  </div>
+                  <div style={{ display: activePanel === 'themes' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('themes') && <ThemePanel />}
+                  </div>
+                  <div style={{ display: activePanel === 'presentation' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('presentation') && <PresentationPanel />}
+                  </div>
+                  <div style={{ display: activePanel === 'songlibrary' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('songlibrary') && <SongLibrary />}
+                  </div>
+                  <div style={{ display: activePanel === 'settings' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('settings') && <SettingsPanel />}
+                  </div>
+                  <div style={{ display: activePanel === 'history' ? 'block' : 'none', height: '100%' }}>
+                    {visitedPanels.has('history') && <SessionHistoryPanel />}
+                  </div>
+                  </ErrorBoundary>
+                </div>
+              </div>
+            </main>
+
+            <section className="program-dock">
+              <ErrorBoundary label="Preview / Program">
+                <PreviewProgramView />
+              </ErrorBoundary>
+            </section>
           </div>
         </div>
       </div>
+      {activeDrag && (
+        <div
+          className="resize-drag-overlay"
+          style={{
+            cursor: activeDrag === 'transcript' ? 'ns-resize' : 'ew-resize',
+          }}
+        />
+      )}
       <StatusBar />
-      <TranscriptionBar />
       <div style={{ position: 'fixed', bottom: 60, right: 20, zIndex: 50, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button
           className="btn btn-primary btn-sm"
@@ -190,6 +341,7 @@ export function App() {
         </button>
       </div>
       {showAIConsole && <AIConsole onClose={() => setShowAIConsole(false)} />}
+      <SettingsModal />
       {activeAlert && (
         <AnimatedAlert
           alert={activeAlert}

@@ -1,3 +1,5 @@
+import { type, fontWeight } from '../styles/type';
+
 export function PresentationPanel() {
   const handleOpen = () => {
     window.BSP.openSlideEditor();
@@ -63,8 +65,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--border-primary)',
   },
   title: {
-    fontSize: 16,
-    fontWeight: 600,
+    ...type.title,
     margin: 0,
     color: 'var(--text-primary)',
   },
@@ -74,8 +75,8 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--border-accent)',
     background: 'var(--accent)',
     color: '#fff',
-    fontSize: 12,
-    fontWeight: 600,
+    ...type.secondary,
+    fontWeight: fontWeight.semibold,
     cursor: 'pointer',
   },
   content: {
@@ -98,14 +99,14 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
   infoText: {
-    fontSize: 13,
+    ...type.body,
     color: 'var(--text-secondary)',
     lineHeight: 1.5,
     margin: 0,
   },
   featureList: {
     textAlign: 'left',
-    fontSize: 11,
+    ...type.caption,
     color: 'var(--text-dim)',
     lineHeight: 1.8,
     margin: 0,

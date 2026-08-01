@@ -14,13 +14,24 @@ contextBridge.exposeInMainWorld('BSP', {
   },
 
   display: {
-    open: (index) => ipcRenderer.invoke('display:open', index),
+    open: (target) => ipcRenderer.invoke('display:open', target),
+    getActive: () => ipcRenderer.invoke('display:getActive'),
+    onListChanged: (cb) => {
+      const handler = (_, displays) => cb(displays);
+      ipcRenderer.on('display:listChanged', handler);
+      return () => ipcRenderer.removeListener('display:listChanged', handler);
+    },
     close: () => ipcRenderer.invoke('display:close'),
     getDisplays: () => ipcRenderer.invoke('display:getDisplays'),
     sendState: (state) => ipcRenderer.invoke('display:sendState', state),
     getState: () => ipcRenderer.invoke('display:getState'),
     isOpen: () => ipcRenderer.invoke('display:isOpen'),
     getStatus: () => ipcRenderer.invoke('display:getStatus'),
+    onMessage: (cb) => {
+      const handler = (_, msg) => cb(msg);
+      ipcRenderer.on('display:message', handler);
+      return () => ipcRenderer.removeListener('display:message', handler);
+    },
   },
 
   bible: {
@@ -127,6 +138,10 @@ contextBridge.exposeInMainWorld('BSP', {
   openSlideEditor: () => ipcRenderer.invoke('slide-editor:open'),
   openStageDisplay: () => ipcRenderer.invoke('stage-display:open'),
   getDisplayUrl: () => ipcRenderer.invoke('get:displayUrl'),
-  onDisplayMessage: (cb) => { ipcRenderer.on('display:message', (_, msg) => cb(msg)); },
+  onDisplayMessage: (cb) => {
+    const handler = (_, msg) => cb(msg);
+    ipcRenderer.on('display:message', handler);
+    return () => ipcRenderer.removeListener('display:message', handler);
+  },
   sendDisplayMessage: (msg) => { ipcRenderer.send('display:message', msg); },
 });

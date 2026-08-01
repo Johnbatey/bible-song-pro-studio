@@ -41,7 +41,7 @@ export default defineConfig({
           cpSync(biblesSrc, biblesDest, { recursive: true });
           console.log('Copied assets/bibles/ to dist/');
         }
-        ['fonts', 'themes', 'lowerthirds'].forEach((dir) => {
+        ['fonts', 'themes', 'lowerthirds', 'fixtures'].forEach((dir) => {
           const src = path.resolve(__dirname, 'public', dir);
           const dest = path.join(distDir, dir);
           if (existsSync(src)) {
@@ -67,7 +67,10 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         splash: path.resolve(__dirname, 'splash.html'),
-        display: path.resolve(__dirname, 'display.html'),
+        audienceDisplay: path.resolve(__dirname, 'audience-display.html'),
+        audienceDisplayFixture: path.resolve(__dirname, 'audience-display-fixture.html'),
+        programSurfaceHarness: path.resolve(__dirname, 'program-surface-harness.html'),
+        programSurfaceSingle: path.resolve(__dirname, 'program-surface-single.html'),
       },
     },
   },

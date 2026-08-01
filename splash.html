@@ -2,146 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bible Song Pro Max</title>
-<script>
-// anime.js v3.2.1 - inlined for offline splash support
-(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i])...}
 <style>
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/InterVariable.woff2') format('woff2');
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  background: #030308;
-  font-family: -apple-system, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif;
+  background: #060810;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   user-select: none;
-}
-
-canvas#gear-canvas {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-}
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-}
-
-.cross-container {
-  position: relative;
-  width: 120px;
-  height: 180px;
-  margin-bottom: 20px;
-}
-
-.cross-beam {
-  position: absolute;
-  background: linear-gradient(135deg, #C9A96E, #F4E4B0, #C9A96E);
-  border-radius: 2px;
-  box-shadow: 0 0 40px rgba(201, 169, 110, 0.3), 0 0 80px rgba(201, 169, 110, 0.1);
-}
-
-.cross-beam.vertical {
-  width: 6px;
-  height: 100%;
-  left: 50%;
-  transform: translateX(-50%) scaleY(0);
-  transform-origin: top center;
-}
-
-.cross-beam.horizontal {
-  height: 6px;
-  width: 100%;
-  top: 35%;
-  transform: scaleX(0);
-  transform-origin: center center;
-}
-
-.cross-glow {
-  position: absolute;
-  width: 200px;
-  height: 200px;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(201,169,110,0.15) 0%, transparent 70%);
-  opacity: 0;
-}
-
-.light-ray {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 2px;
-  height: 300px;
-  background: linear-gradient(to top, rgba(248, 224, 140, 0.6), transparent);
-  transform-origin: bottom center;
-  opacity: 0;
-}
-
-.text-layer {
-  position: relative;
-  z-index: 2;
-  text-align: center;
-}
-
-.gospel-word {
-  display: inline-block;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: rgba(248, 224, 140, 0.7);
-  margin-bottom: 16px;
-  opacity: 0;
-}
-
-.main-title-line {
-  font-size: clamp(28px, 5vw, 52px);
-  font-weight: 700;
-  color: #f0ece4;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
-  opacity: 0;
-  transform: translateY(30px);
-}
-
-.main-title-line .highlight {
-  background: linear-gradient(135deg, #C9A96E, #F4E4B0);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.sub-title-line {
-  font-size: clamp(12px, 1.5vw, 18px);
-  font-weight: 400;
-  color: rgba(240, 236, 228, 0.5);
-  letter-spacing: 0.15em;
-  margin-top: 12px;
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-.scripture-text {
-  font-size: clamp(11px, 1.2vw, 15px);
-  font-weight: 300;
-  font-style: italic;
-  color: rgba(240, 236, 228, 0.35);
-  letter-spacing: 0.05em;
-  margin-top: 24px;
-  max-width: 420px;
-  line-height: 1.6;
-  opacity: 0;
 }
 
 .particles-canvas {
@@ -151,84 +32,199 @@ canvas#gear-canvas {
   pointer-events: none;
 }
 
-.loading-bar {
+.splash-card {
   position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 160px;
-  height: 2px;
-  border-radius: 1px;
-  background: rgba(255,255,255,0.06);
-  z-index: 3;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  z-index: 1;
+  text-align: center;
+}
+
+.logo-wrapper {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin-bottom: 20px;
+  animation: logoFloat 3.5s ease-in-out infinite alternate;
+}
+
+.logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 24px rgba(30, 58, 110, 0.65)) drop-shadow(0 0 16px rgba(245, 158, 11, 0.25));
+  animation: logoPop 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.logo-glow {
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.2) 0%, rgba(245, 158, 11, 0.1) 45%, transparent 70%);
+  border-radius: 50%;
+  animation: pulseGlow 3s ease-in-out infinite alternate;
+  z-index: -1;
+}
+
+.app-title {
+  font-size: 32px;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  opacity: 0;
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+}
+
+.app-title .pro {
+  color: #60a5fa;
+  font-weight: 800;
+}
+
+.app-title .max {
+  color: #f59e0b;
+  font-weight: 800;
+}
+
+.app-subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 8px;
+  opacity: 0;
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+}
+
+.scripture-box {
+  margin-top: 24px;
+  padding: 16px 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(12px);
+  max-width: 520px;
+  opacity: 0;
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
+}
+
+.scripture-quote {
+  font-size: 13px;
+  font-weight: 300;
+  font-style: italic;
+  color: rgba(248, 250, 252, 0.75);
+  line-height: 1.6;
+}
+
+.scripture-ref {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  color: #f59e0b;
+  opacity: 0.85;
+}
+
+.loading-footer {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 220px;
+  opacity: 0;
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+}
+
+.loading-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
-.loading-bar-fill {
+.loading-fill {
   height: 100%;
   width: 0%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #C9A96E, #F4E4B0);
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #f59e0b);
+  animation: fillProgress 3.2s cubic-bezier(0.1, 0.7, 0.1, 1) 0.3s forwards;
 }
 
-.loading-text {
-  position: fixed;
-  bottom: 56px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.12em;
-  color: rgba(255,255,255,0.25);
-  z-index: 3;
+.loading-status {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+}
+
+@keyframes logoPop {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes logoFloat {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-8px); }
 }
 
 @keyframes pulseGlow {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.8; }
+  0% { opacity: 0.4; transform: scale(0.95); }
+  100% { opacity: 0.8; transform: scale(1.1); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fillProgress {
+  to { width: 100%; }
 }
 </style>
 </head>
 <body>
-<canvas id="gear-canvas"></canvas>
 <canvas id="particles-canvas" class="particles-canvas"></canvas>
 
-<div class="overlay">
-  <div class="cross-container" id="cross-container">
-    <div class="cross-glow" id="cross-glow"></div>
-    <div class="cross-beam vertical" id="cross-vertical"></div>
-    <div class="cross-beam horizontal" id="cross-horizontal"></div>
+<div class="splash-card">
+  <div class="logo-wrapper">
+    <div class="logo-glow"></div>
+    <img src="./bible-song-pro-icon.svg" class="logo-img" alt="Bible Song Pro Max Logo" />
   </div>
-  <div class="text-layer">
-    <div class="gospel-word" id="gospel-word">✝ The Gospel According</div>
-    <div class="main-title-line" id="title-line-1">
-      For God So Loved<br>
-      <span class="highlight">The World</span>
+
+  <div class="app-title">Bible Song <span class="pro">PRO</span> <span class="max">Max</span></div>
+  <div class="app-subtitle">Presentation & Media Sanctuary</div>
+
+  <div class="scripture-box">
+    <div class="scripture-quote">
+      "He was wounded for our transgressions, He was bruised for our iniquities; the chastisement of our peace was upon Him, and by His stripes we are healed."
     </div>
-    <div class="sub-title-line" id="sub-title">He gave His only begotten Son</div>
-    <div class="scripture-text" id="scripture">
-      "He was wounded for our transgressions,<br>
-      He was bruised for our iniquities;<br>
-      The chastisement of our peace was upon Him,<br>
-      And by His stripes we are healed."
-      <div style="margin-top: 6px; opacity: 0.6;">— Isaiah 53:5</div>
-    </div>
+    <div class="scripture-ref">— Isaiah 53:5</div>
+  </div>
+
+  <div class="loading-footer">
+    <div class="loading-bar"><div class="loading-fill"></div></div>
+    <div class="loading-status" id="loading-status">PREPARING THE SANCTUARY</div>
   </div>
 </div>
 
-<div class="loading-bar"><div class="loading-bar-fill" id="loading-fill"></div></div>
-<div class="loading-text" id="loading-text">PREPARING THE SANCTUARY</div>
-
 <script>
-// Particle system
+// Floating dust particles
 const pCanvas = document.getElementById('particles-canvas');
 const pCtx = pCanvas.getContext('2d');
 pCanvas.width = window.innerWidth;
 pCanvas.height = window.innerHeight;
 
 const particles = [];
-for (let i = 0; i < 120; i++) {
+for (let i = 0; i < 70; i++) {
   particles.push({
     x: Math.random() * pCanvas.width,
     y: Math.random() * pCanvas.height,
@@ -250,305 +246,22 @@ function drawParticles() {
     if (p.y > pCanvas.height) p.y = 0;
     pCtx.beginPath();
     pCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    pCtx.fillStyle = `rgba(201, 169, 110, ${p.opacity})`;
+    pCtx.fillStyle = `rgba(96, 165, 250, ${p.opacity})`;
     pCtx.fill();
   });
   requestAnimationFrame(drawParticles);
 }
 drawParticles();
 
-// Gear canvas - animated gear split like animejs.com
-const canvas = document.getElementById('gear-canvas');
-const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-let gearRotation = 0;
-let gearSplit = 0;
-let gearOpacity = 0;
-let targetSplit = 0;
-
-function drawGear(cx, cy, radius, teeth, rotation, split, opacity) {
-  ctx.save();
-  ctx.globalAlpha = opacity;
-  ctx.translate(cx, cy);
-  ctx.rotate(rotation);
-
-  // Draw gear teeth
-  const innerR = radius * 0.75;
-  const toothH = radius * 0.2;
-  const toothW = (Math.PI * 2 * radius) / teeth * 0.5;
-
-  // Split gear into left and right halves
-  const splitX = split;
-
-  // Left half
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(-radius, -radius - 10, radius + splitX, radius * 2 + 20);
-  ctx.clip();
-
-  ctx.beginPath();
-  for (let i = 0; i < teeth; i++) {
-    const angle = (i / teeth) * Math.PI * 2 - Math.PI / 2;
-    const nextAngle = ((i + 0.5) / teeth) * Math.PI * 2 - Math.PI / 2;
-
-    ctx.moveTo(Math.cos(angle) * innerR, Math.sin(angle) * innerR);
-    ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-    ctx.lineTo(Math.cos(angle + 0.15 / teeth) * (radius + toothH), Math.sin(angle + 0.15 / teeth) * (radius + toothH));
-    ctx.lineTo(Math.cos(nextAngle - 0.15 / teeth) * (radius + toothH), Math.sin(nextAngle - 0.15 / teeth) * (radius + toothH));
-    ctx.lineTo(Math.cos(nextAngle) * radius, Math.sin(nextAngle) * radius);
-    ctx.lineTo(Math.cos(nextAngle) * innerR, Math.sin(nextAngle) * innerR);
-  }
-  ctx.closePath();
-
-  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-  gradient.addColorStop(0, '#F4E4B0');
-  gradient.addColorStop(0.5, '#C9A96E');
-  gradient.addColorStop(1, '#8B7335');
-  ctx.fillStyle = gradient;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.restore();
-
-  // Right half
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(-radius + splitX, -radius - 10, radius * 2, radius * 2 + 20);
-  ctx.clip();
-
-  ctx.beginPath();
-  for (let i = 0; i < teeth; i++) {
-    const angle = (i / teeth) * Math.PI * 2 - Math.PI / 2;
-    const nextAngle = ((i + 0.5) / teeth) * Math.PI * 2 - Math.PI / 2;
-
-    ctx.moveTo(Math.cos(angle) * innerR, Math.sin(angle) * innerR);
-    ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-    ctx.lineTo(Math.cos(angle + 0.15 / teeth) * (radius + toothH), Math.sin(angle + 0.15 / teeth) * (radius + toothH));
-    ctx.lineTo(Math.cos(nextAngle - 0.15 / teeth) * (radius + toothH), Math.sin(nextAngle - 0.15 / teeth) * (radius + toothH));
-    ctx.lineTo(Math.cos(nextAngle) * radius, Math.sin(nextAngle) * radius);
-    ctx.lineTo(Math.cos(nextAngle) * innerR, Math.sin(nextAngle) * innerR);
-  }
-  ctx.closePath();
-  ctx.fillStyle = gradient;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.restore();
-
-  // Inner circle
-  ctx.beginPath();
-  ctx.arc(0, 0, innerR * 0.4, 0, Math.PI * 2);
-  ctx.fillStyle = '#1a1a2e';
-  ctx.fill();
-
-  // Cross in center
-  const crossSize = innerR * 0.2;
-  ctx.strokeStyle = '#C9A96E';
-  ctx.lineWidth = 2;
-  ctx.shadowColor = 'rgba(201, 169, 110, 0.5)';
-  ctx.shadowBlur = 10;
-  ctx.beginPath();
-  ctx.moveTo(0, -crossSize);
-  ctx.lineTo(0, crossSize);
-  ctx.moveTo(-crossSize, 0);
-  ctx.lineTo(crossSize, 0);
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // Glow ring
-  ctx.beginPath();
-  ctx.arc(0, 0, innerR * 0.6, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(201, 169, 110, ${0.1 + Math.sin(Date.now() / 2000) * 0.05})`;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-function animate() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const radius = Math.min(canvas.width, canvas.height) * 0.12;
-
-  // Apply anime.js-driven values
-  gearRotation += 0.002;
-  drawGear(cx, cy, radius, 24, gearRotation, gearSplit, gearOpacity);
-
-  requestAnimationFrame(animate);
-}
-
-// Start gear animation
 window.addEventListener('resize', () => {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
   pCanvas.width = window.innerWidth;
   pCanvas.height = window.innerHeight;
 });
 
-animate();
-
-// anime.js timeline - breathtaking sequence
-const tl = anime.timeline({
-  easing: 'spring(1, 80, 10, 0)',
-});
-
-// Phase 1: Cross emerges from darkness
-tl.add({
-  targets: '#cross-vertical',
-  scaleY: [0, 1],
-  duration: 1200,
-  easing: 'spring(1, 60, 12, 0)',
-}, 0)
-.add({
-  targets: '#cross-horizontal',
-  scaleX: [0, 1],
-  duration: 800,
-  easing: 'spring(1, 60, 12, 0)',
-}, 300)
-.add({
-  targets: '#cross-glow',
-  opacity: [0, 1],
-  scale: [0.5, 1],
-  duration: 1000,
-  easing: 'spring(1, 40, 8, 0)',
-}, 200);
-
-// Phase 2: Gospel word fades in
-tl.add({
-  targets: '#gospel-word',
-  opacity: [0, 1],
-  translateY: [20, 0],
-  duration: 800,
-  easing: 'spring(1, 60, 10, 0)',
-}, 800);
-
-// Phase 3: Gear split animation
-tl.add({
-  targets: this,
-  targetSplit: 120,
-  duration: 1500,
-  easing: 'spring(1, 50, 8, 0)',
-  update: (a) => { gearSplit = a.progress * 0.012 * 120; },
-}, 1000);
-
 setTimeout(() => {
-  anime({
-    targets: this,
-    gearOpacity: 1,
-    duration: 800,
-    easing: 'spring(1, 60, 10, 0)',
-    update: (a) => { gearOpacity = a.progress; },
-  });
-}, 200);
-
-// Phase 4: Main title with spring bounce
-tl.add({
-  targets: '#title-line-1',
-  opacity: [0, 1],
-  translateY: [40, 0],
-  duration: 1000,
-  easing: 'spring(1, 80, 12, 0)',
-}, 1400);
-
-// Phase 5: Subtitle
-tl.add({
-  targets: '#sub-title',
-  opacity: [0, 1],
-  translateY: [25, 0],
-  duration: 800,
-  easing: 'spring(1, 60, 10, 0)',
-}, 2000);
-
-// Phase 6: Scripture
-tl.add({
-  targets: '#scripture',
-  opacity: [0, 1],
-  translateY: [20, 0],
-  duration: 1000,
-  easing: 'spring(1, 50, 8, 0)',
-}, 2500);
-
-// Phase 7: Loading bar
-tl.add({
-  targets: '#loading-fill',
-  width: ['0%', '85%'],
-  duration: 2500,
-  easing: 'spring(1, 40, 6, 0)',
-}, 500);
-
-// Loading text animation
-anime({
-  targets: '#loading-text',
-  opacity: [0, 1],
-  translateY: [10, 0],
-  duration: 800,
-  easing: 'spring(1, 60, 10, 0)',
-  delay: 600,
-});
-
-// Subtle float on cross
-anime({
-  targets: '#cross-container',
-  translateY: [0, -6],
-  duration: 2500,
-  direction: 'alternate',
-  loop: true,
-  easing: 'easeInOutSine',
-});
-
-// Pulsing glow on cross
-anime({
-  targets: '#cross-glow',
-  opacity: [0.3, 0.8],
-  scale: [1, 1.1],
-  duration: 2000,
-  direction: 'alternate',
-  loop: true,
-  easing: 'easeInOutSine',
-});
-
-// Light rays animation
-function createLightRays() {
-  const container = document.getElementById('cross-container');
-  for (let i = 0; i < 12; i++) {
-    const ray = document.createElement('div');
-    ray.className = 'light-ray';
-    const angle = (i / 12) * 360;
-    ray.style.transform = `rotate(${angle}deg)`;
-    ray.style.transformOrigin = 'bottom center';
-    ray.style.top = '50%';
-    ray.style.left = '50%';
-    container.appendChild(ray);
-
-    anime({
-      targets: ray,
-      opacity: [0, 0.4, 0],
-      height: [0, 400],
-      duration: 2000 + Math.random() * 1000,
-      delay: i * 200 + Math.random() * 500,
-      loop: true,
-      easing: 'easeOutQuad',
-    });
-  }
-}
-setTimeout(createLightRays, 1000);
-
-// Signal ready for app
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    document.getElementById('loading-fill').style.width = '100%';
-    setTimeout(() => {
-      document.getElementById('loading-text').textContent = 'ENTER THE SANCTUARY';
-      document.dispatchEvent(new CustomEvent('splash-complete'));
-    }, 400);
-  }, 3800);
-});
+  const text = document.getElementById('loading-status');
+  if (text) text.textContent = 'ENTER THE SANCTUARY';
+}, 2800);
 </script>
 </body>
 </html>

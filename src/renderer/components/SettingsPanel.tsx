@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
-import type { AppSettings, AppSettingsPatch, ObsStatus } from '../types';
+import type { AppSettings, AppSettingsPatch, ObsStatus, DisplayTarget } from '../types';
+import { ensureTheme } from '../utils/defaultTheme';
+import { type, fontWeight } from '../styles/type';
 
-type Tab = 'output' | 'fullscreen' | 'lowerthird' | 'bible' | 'background' | 'fx' | 'audio' | 'ai' | 'streaming';
+type Tab = 'output' | 'fullscreen' | 'lowerthird' | 'songs' | 'bible' | 'background' | 'fx' | 'audio' | 'ai' | 'streaming';
 
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'output', label: 'Output' },
   { id: 'fullscreen', label: 'Fullscreen' },
   { id: 'lowerthird', label: 'LT Mode' },
+  { id: 'songs', label: 'Songs' },
   { id: 'bible', label: 'Bible' },
   { id: 'background', label: 'Background' },
   { id: 'fx', label: 'Text FX' },
@@ -17,6 +20,8 @@ const tabs: Array<{ id: Tab; label: string }> = [
 ];
 
 export function SettingsPanel() {
+  const showSongCredits = useAppStore((s) => s.showSongCredits);
+  const setShowSongCredits = useAppStore((s) => s.setShowSongCredits);
   const aiProviders = useAppStore((s) => s.aiProviders);
   const setAIProvider = useAppStore((s) => s.setAIProvider);
   const display = useAppStore((s) => s.display);
@@ -25,6 +30,8 @@ export function SettingsPanel() {
   const setOutputStatus = useAppStore((s) => s.setOutputStatus);
   const activeTheme = useAppStore((s) => s.activeTheme);
   const setActiveTheme = useAppStore((s) => s.setActiveTheme);
+  const updateTheme = useAppStore((s) => s.updateTheme);
+  const themes = useAppStore((s) => s.themes);
   const live = useAppStore((s) => s.liveScripture);
   const setLive = useAppStore((s) => s.setLiveScripture);
 
@@ -36,6 +43,39 @@ export function SettingsPanel() {
   const [obsPasswordDraft, setObsPasswordDraft] = useState('');
   const [obsStatus, setObsStatus] = useState<ObsStatus | null>(null);
   const [localModelAction, setLocalModelAction] = useState<'idle' | 'downloading' | 'ready' | 'error'>('idle');
+  const [displays, setDisplays] = useState<DisplayTarget[]>([]);
+  const [selectedDisplayId, setSelectedDisplayId] = useState<string>('auto');
+  const [activeDisplayId, setActiveDisplayId] = useState<string | null>(null);
+  const [displayNotice, setDisplayNotice] = useState('');
+
+  async function refreshDisplays() {
+    const list = await window.BSP?.display?.getDisplays().catch(() => []);
+    if (list) setDisplays(list);
+    const active = await window.BSP?.display?.getActive().catch(() => null);
+    if (active?.ok) setActiveDisplayId(active.displayId);
+  }
+
+  async function openDisplay(target: string) {
+    const result = await window.BSP?.display?.open({ displayId: target }).catch(() => null);
+    if (result?.ok) {
+      setActiveDisplayId(result.displayId || null);
+      setDisplayNotice(`Output sent to ${result.label || 'display'}.`);
+    } else {
+      setDisplayNotice(result?.error || 'Could not open the output display.');
+    }
+    refreshStatus();
+    refreshDisplays();
+  }
+
+  useEffect(() => {
+    refreshDisplays();
+    // Monitors get plugged in mid-service; keep the list live rather than stale
+    const off = window.BSP?.display?.onListChanged((list) => {
+      setDisplays(list);
+      window.BSP?.display?.getActive().then((a) => a?.ok && setActiveDisplayId(a.displayId)).catch(() => {});
+    });
+    return () => off?.();
+  }, []);
 
   useEffect(() => {
     window.BSP?.getDisplayUrl?.().then(setDisplayUrl).catch(() => {});
@@ -75,53 +115,10 @@ export function SettingsPanel() {
   }
 
   function patchTheme(path: 'fullScreen' | 'lowerThird', updates: any) {
-    const base = activeTheme || {
-      id: 'settings-live-theme',
-      name: 'Live Settings Theme',
-      lowerThird: {
-        background: 'linear-gradient(135deg, rgba(10,18,32,0.94), rgba(37,52,78,0.94))',
-        backgroundColor: '#0f172a',
-        backgroundOpacity: 0.94,
-        accentColor: '#C9A96E',
-        fontFamily: '-apple-system, SF Pro Display, sans-serif',
-        fontSize: 36,
-        fontWeight: 700,
-        fontColor: '#ffffff',
-        textAlign: 'left',
-        padding: 20,
-        borderRadius: 18,
-        animation: 'slideInUp',
-        position: 'bottom-center',
-        width: 92,
-        offsetX: 0,
-        offsetY: 0,
-        scale: 100,
-        anchor: 'bottom',
-      },
-      fullScreen: {
-        backgroundColor: '#0f172a',
-        fontFamily: '-apple-system, SF Pro Display, sans-serif',
-        fontSize: 56,
-        fontWeight: 700,
-        fontColor: '#ffffff',
-        textAlign: 'center',
-        animation: 'fade',
-        referenceFontSize: 26,
-        lineHeight: 1.25,
-        verticalAlign: 'middle',
-        autoResize: 'shrink',
-      },
-      slideTheme: {
-        backgroundColor: '#0f172a',
-        fontFamily: '-apple-system, SF Pro Display, sans-serif',
-        fontSize: 40,
-        fontWeight: 600,
-        fontColor: '#ffffff',
-        accentColor: '#C9A96E',
-        transition: 'fade',
-      },
-    };
-    setActiveTheme({ ...base, [path]: { ...(base as any)[path], ...updates } } as any);
+    const base = ensureTheme(activeTheme);
+    const next = { ...base, [path]: { ...base[path], ...updates } };
+    setActiveTheme(next);
+    if (themes.some((theme) => theme.id === next.id)) updateTheme(next.id, next);
   }
 
   return (
@@ -143,13 +140,72 @@ export function SettingsPanel() {
         <div style={styles.body}>
           {activeTab === 'output' && (
             <Section title="Standalone Output">
-              <div style={styles.row}>
-                <button className="btn btn-secondary" onClick={() => window.BSP?.display.open(1).then(refreshStatus)}>Open External Display</button>
-                <button className="btn btn-secondary" onClick={() => window.BSP?.display.close().then(refreshStatus)}>Close Display</button>
-                <button className="btn btn-secondary" onClick={() => navigator.clipboard?.writeText(displayUrl)}>Copy Browser URL</button>
+              {/* Monitor picker. The old button opened display index 1 unconditionally,
+                  which was wrong whenever the projector wasn't the second screen. */}
+              <div className="section-title" style={{ marginBottom: 6 }}>
+                Output Monitor ({displays.length} detected)
               </div>
-              <input className="input" value={displayUrl || display.outputStatus.url || 'http://localhost:8942/display.html'} readOnly onClick={(e) => (e.target as HTMLInputElement).select()} />
-              <div style={styles.statusLine}>Open: {String(display.outputStatus.isOpen)} · Browser clients: {display.outputStatus.clients}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                <button
+                  className={`card card-hover ${selectedDisplayId === 'auto' ? 'glass-accent' : ''}`}
+                  onClick={() => setSelectedDisplayId('auto')}
+                  style={{
+                    textAlign: 'left', cursor: 'pointer',
+                    borderColor: selectedDisplayId === 'auto' ? 'var(--border-accent)' : undefined,
+                  }}
+                >
+                  <div style={{ ...type.heading }}>Automatic</div>
+                  <div style={{ ...type.caption, color: 'var(--text-dim)' }}>
+                    Use the first external monitor that isn't this screen
+                  </div>
+                </button>
+
+                {displays.map((d) => {
+                  const isLive = activeDisplayId === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      className={`card card-hover ${selectedDisplayId === d.id ? 'glass-accent' : ''}`}
+                      onClick={() => setSelectedDisplayId(d.id)}
+                      onDoubleClick={() => openDisplay(d.id)}
+                      style={{
+                        textAlign: 'left', cursor: 'pointer',
+                        borderColor: selectedDisplayId === d.id ? 'var(--border-accent)' : undefined,
+                      }}
+                      title="Double-click to send the output here"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ ...type.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {d.label}
+                          </div>
+                          <div style={{ ...type.caption, color: 'var(--text-dim)' }}>
+                            {d.resolution}{d.scaleFactor !== 1 ? ` @${d.scaleFactor}x` : ''} · {d.bounds.x},{d.bounds.y}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          {isLive && <span style={styles.badgeLive}>● OUTPUT</span>}
+                          {d.isPrimary && <span style={styles.badge}>Primary</span>}
+                          <span style={styles.badge}>{d.isInternal ? 'Built-in' : 'External'}</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={styles.row}>
+                <button className="btn btn-primary" onClick={() => openDisplay(selectedDisplayId)}>
+                  {display.outputStatus.isOpen ? 'Move Output Here' : 'Open External Display'}
+                </button>
+                <button className="btn btn-secondary" onClick={() => window.BSP?.display.close().then(() => { setActiveDisplayId(null); refreshStatus(); })}>Close Display</button>
+                <button className="btn btn-secondary" onClick={() => navigator.clipboard?.writeText(displayUrl || display.outputStatus.browserUrl || '')}>Copy Browser URL</button>
+              </div>
+              {displayNotice && (
+                <div style={{ ...type.caption, color: 'var(--text-dim)', margin: '6px 0' }}>{displayNotice}</div>
+              )}
+              <input className="input" value={displayUrl || display.outputStatus.browserUrl || 'http://localhost:8942/display.html'} readOnly onClick={(e) => (e.target as HTMLInputElement).select()} />
+              <div style={styles.statusLine}>Internal output: {display.outputStatus.url || 'Electron IPC display'} · Open: {String(display.outputStatus.isOpen)} · Browser clients: {display.outputStatus.clients}</div>
               <div style={styles.row}>
                 <button
                   className={`btn btn-sm ${display.mode === 'studio' ? 'btn-primary' : 'btn-secondary'}`}
@@ -199,6 +255,22 @@ export function SettingsPanel() {
             </Section>
           )}
 
+          {activeTab === 'songs' && (
+            <Section title="Song Options">
+              <label style={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={showSongCredits}
+                  onChange={(e) => setShowSongCredits(e.target.checked)}
+                />
+                Show Song Credits on Display Output (Author, CCLI, Copyright)
+              </label>
+              <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 4, marginLeft: 24 }}>
+                Disabled by default. When enabled, credits will only show at the bottom of output when Auto (Section) mode is active.
+              </div>
+            </Section>
+          )}
+
           {activeTab === 'bible' && (
             <Section title="Bible Options">
               {['Show Bible Version', 'Shorten Bible Versions', 'Shorten Book Names', 'Show Verse Numbers', 'Version Switch Updates Output'].map((label, i) => (
@@ -239,10 +311,10 @@ export function SettingsPanel() {
           {activeTab === 'ai' && (
             <Section title="AI Settings">
               <div style={{ paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Transcription</div>
+                <div style={{ ...type.heading, marginBottom: 8 }}>Transcription</div>
 
                 <div style={styles.row}>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Engine</span>
+                  <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>Engine</span>
                   <select
                     className="input"
                     style={{ width: 180 }}
@@ -255,7 +327,7 @@ export function SettingsPanel() {
                 </div>
 
                 <div style={styles.row}>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Deepgram API Key</span>
+                  <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>Deepgram API Key</span>
                   <input
                     className="input"
                     type="password"
@@ -275,12 +347,12 @@ export function SettingsPanel() {
                     <button className="btn btn-sm btn-ghost" onClick={clearDeepgramKey}>Remove</button>
                   )}
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
+                <div style={{ ...type.caption, color: 'var(--text-dim)', marginBottom: 8 }}>
                   Stored in the app's settings file with owner-only permissions, never in the project or the UI state.
                 </div>
 
                 <div style={styles.row}>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Model</span>
+                  <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>Model</span>
                   <select
                     className="input"
                     style={{ width: 140 }}
@@ -292,7 +364,7 @@ export function SettingsPanel() {
                     <option value="enhanced">enhanced</option>
                     <option value="base">base</option>
                   </select>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Language</span>
+                  <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>Language</span>
                   <input
                     className="input"
                     style={{ width: 90 }}
@@ -303,11 +375,11 @@ export function SettingsPanel() {
               </div>
 
               <div style={{ padding: '12px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Local Engines</div>
+                <div style={{ ...type.heading, marginBottom: 8 }}>Local Engines</div>
 
                 <div style={styles.row}>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>ONNX Whisper</span>
-                  <span style={{ fontSize: 11, color: aiStatus?.engines?.onnx?.ready ? '#4caf50' : 'var(--text-dim)' }}>
+                  <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>ONNX Whisper</span>
+                  <span style={{ ...type.caption, color: aiStatus?.engines?.onnx?.ready ? '#4caf50' : 'var(--text-dim)' }}>
                     {aiStatus?.engines?.onnx?.warmupState || 'idle'}
                   </span>
                   <button className="btn btn-sm btn-primary" disabled={localModelAction === 'downloading'} onClick={downloadLocalModel}>
@@ -315,7 +387,7 @@ export function SettingsPanel() {
                   </button>
                   <button className="btn btn-sm" onClick={async () => setAiStatus(await window.BSP?.ai?.dispose({ engine: 'onnx' }).catch((e) => ({ ok: false, error: String(e) })))}>Dispose</button>
                 </div>
-                <div style={{ fontSize: 10, color: localModelAction === 'error' ? '#e74c3c' : 'var(--text-dim)', marginBottom: 8 }}>
+                <div style={{ ...type.caption, color: localModelAction === 'error' ? '#e74c3c' : 'var(--text-dim)', marginBottom: 8 }}>
                   {localModelAction === 'error'
                     ? 'Model download failed. Check your connection and try again.'
                     : 'Required for offline Live Scripture. It is downloaded once and cached on this computer.'}
@@ -323,8 +395,8 @@ export function SettingsPanel() {
 
                 {aiStatus?.platform?.isAppleSilicon && (
                   <div style={styles.row}>
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>MLX Whisper (Apple Silicon)</span>
-                    <span style={{ fontSize: 11, color: aiStatus?.engines?.mlx?.ready ? '#4caf50' : 'var(--text-dim)' }}>
+                    <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>MLX Whisper (Apple Silicon)</span>
+                    <span style={{ ...type.caption, color: aiStatus?.engines?.mlx?.ready ? '#4caf50' : 'var(--text-dim)' }}>
                       {aiStatus?.engines?.mlx?.warmupState || 'unavailable'}
                     </span>
                     {aiStatus?.engines?.mlx?.available && (
@@ -337,7 +409,7 @@ export function SettingsPanel() {
                 )}
 
                 <div style={styles.row}>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Active Engine</span>
+                  <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>Active Engine</span>
                   <select className="input" style={{ width: 140 }} value={aiStatus?.activeEngine || 'onnx'} onChange={(e) => window.BSP?.ai?.setEngine(e.target.value).then(refreshStatus)}>
                     <option value="onnx">ONNX (cross-platform)</option>
                     {aiStatus?.platform?.isAppleSilicon && <option value="mlx">MLX (Apple Silicon)</option>}
@@ -351,12 +423,12 @@ export function SettingsPanel() {
 
           {activeTab === 'streaming' && (
             <Section title="OBS Studio">
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
+              <div style={{ ...type.caption, color: 'var(--text-dim)', marginBottom: 10 }}>
                 Enable <strong>Tools → WebSocket Server Settings</strong> in OBS, then connect here.
               </div>
 
               <div style={styles.row}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Server</span>
+                <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>Server</span>
                 <input
                   className="input"
                   style={{ flex: 1 }}
@@ -367,7 +439,7 @@ export function SettingsPanel() {
               </div>
 
               <div style={styles.row}>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Password</span>
+                <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>Password</span>
                 <input
                   className="input"
                   type="password"
@@ -397,7 +469,7 @@ export function SettingsPanel() {
                 >
                   {obsStatus?.connected ? 'Disconnect' : 'Connect'}
                 </button>
-                <span style={{ fontSize: 11, color: obsStatus?.identified ? '#4caf50' : 'var(--text-dim)' }}>
+                <span style={{ ...type.caption, color: obsStatus?.identified ? '#4caf50' : 'var(--text-dim)' }}>
                   {obsStatus?.identified
                     ? `Connected${obsStatus.obsVersion ? ' · OBS ' + obsStatus.obsVersion : ''}`
                     : obsStatus?.connected ? 'Authenticating…' : 'Not connected'}
@@ -405,13 +477,13 @@ export function SettingsPanel() {
               </div>
 
               {obsStatus?.lastError && (
-                <div style={{ fontSize: 11, color: '#e74c3c', margin: '6px 0' }}>{obsStatus.lastError}</div>
+                <div style={{ ...type.caption, color: '#e74c3c', margin: '6px 0' }}>{obsStatus.lastError}</div>
               )}
 
               {obsStatus?.identified && (
                 <>
                   <div style={{ padding: '10px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Scenes</div>
+                    <div style={{ ...type.heading, marginBottom: 8 }}>Scenes</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {obsStatus.scenes.map((scene) => (
                         <button
@@ -423,7 +495,7 @@ export function SettingsPanel() {
                         </button>
                       ))}
                       {obsStatus.scenes.length === 0 && (
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>No scenes reported</span>
+                        <span style={{ ...type.caption, color: 'var(--text-dim)' }}>No scenes reported</span>
                       )}
                     </div>
                   </div>
@@ -441,7 +513,7 @@ export function SettingsPanel() {
                     >
                       {obsStatus.recording ? 'Stop Recording' : 'Start Recording'}
                     </button>
-                    <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                    <span style={{ ...type.caption, color: 'var(--text-dim)' }}>
                       {obsStatus.streaming ? '● Live' : ''} {obsStatus.recording ? '● Rec' : ''}
                     </span>
                   </div>
@@ -476,20 +548,30 @@ function SelectField({ label, value, options, onChange }: { label: string; value
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  badge: {
+    ...type.label, padding: '2px 6px', borderRadius: 4,
+    background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+    whiteSpace: 'nowrap',
+  },
+  badgeLive: {
+    ...type.label, fontWeight: fontWeight.bold, padding: '2px 6px', borderRadius: 4,
+    background: 'rgba(231,76,60,0.15)', color: '#e74c3c',
+    border: '1px solid rgba(231,76,60,0.35)', whiteSpace: 'nowrap',
+  },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  h2: { fontSize: 16, fontWeight: 600 },
+  h2: { ...type.title },
   layout: { display: 'grid', gridTemplateColumns: '170px minmax(0,1fr)', gap: 14 },
   tabRail: { display: 'flex', flexDirection: 'column', gap: 6 },
   tabBtn: { justifyContent: 'flex-start' },
   body: { minWidth: 0 },
   row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
-  statusLine: { fontSize: 12, color: 'var(--text-secondary)' },
+  statusLine: { ...type.secondary, color: 'var(--text-secondary)' },
   controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 },
-  field: { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, color: 'var(--text-dim)' },
-  check: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-secondary)' },
+  field: { display: 'flex', flexDirection: 'column', gap: 4, ...type.caption, color: 'var(--text-dim)' },
+  check: { display: 'flex', alignItems: 'center', gap: 8, ...type.body, color: 'var(--text-secondary)' },
   meter: { height: 12, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
   meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)' },
   providerRow: { display: 'grid', gridTemplateColumns: '220px minmax(0,1fr)', gap: 10, alignItems: 'center' },
-  providerLabel: { display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 13 },
-  pre: { margin: 0, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', fontSize: 11, maxHeight: 180, overflow: 'auto' },
+  providerLabel: { display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', ...type.body },
+  pre: { margin: 0, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', ...type.caption, fontFamily: 'var(--font-mono)', maxHeight: 180, overflow: 'auto' },
 };

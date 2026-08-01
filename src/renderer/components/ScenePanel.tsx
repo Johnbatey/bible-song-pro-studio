@@ -1,5 +1,6 @@
 import { useAppStore } from '../stores/appStore';
 import type { Scene } from '../types';
+import { type, fontWeight } from '../styles/type';
 
 export function ScenePanel() {
   const scenes = useAppStore((s) => s.scenes);
@@ -28,7 +29,7 @@ export function ScenePanel() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600 }}>Scenes</h2>
+        <h2 style={{ ...type.title }}>Scenes</h2>
         <button className="btn btn-primary btn-sm" onClick={handleAddScene}>
           + New Scene
         </button>
@@ -52,8 +53,8 @@ export function ScenePanel() {
                   ? 'Click to stage in Preview · double-click to go straight to Program'
                   : 'Click to go live'}
               >
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{scene.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2, textTransform: 'capitalize' }}>
+                <div style={{ ...type.heading, fontWeight: fontWeight.medium }}>{scene.name}</div>
+                <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 2, textTransform: 'capitalize' }}>
                   {scene.type}
                 </div>
               </div>
@@ -93,7 +94,7 @@ export function ScenePanel() {
           </div>
         ))}
         {scenes.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-dim)', ...type.body }}>
             No scenes yet. Create your first scene to get started.
           </div>
         )}
