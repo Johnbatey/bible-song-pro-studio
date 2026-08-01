@@ -321,15 +321,23 @@ export function BiblePanel() {
       }
       return;
     }
+    const primaryVer = verse.version || selectedVersion;
+    const secondaryVer = secondaryVerse?.version || secondaryVersion;
     const scene: Scene = {
       id: sceneId,
       name: verse.reference,
       type: 'bible',
       content: {
         text: verse.text,
-        reference: `${verse.reference} (${secondaryVerse ? `${verse.version} / ${secondaryVersion}` : verse.version})`,
-        version: dualVersion ? `${verse.version}/${secondaryVersion}` : verse.version,
-        secondaryVerse,
+        reference: secondaryVerse ? `${verse.reference} (${primaryVer})` : verse.reference,
+        version: primaryVer,
+        secondaryVerse: secondaryVerse
+          ? {
+              ...secondaryVerse,
+              reference: `${secondaryVerse.reference || verse.reference} (${secondaryVer})`,
+              version: secondaryVer,
+            }
+          : undefined,
       },
       background: {
         type: 'gradient',
@@ -434,16 +442,10 @@ export function BiblePanel() {
 
   return (
     <div ref={containerRef} style={styles.panel}>
-      <div style={styles.header}>
-        <h2 style={styles.h2}>Bible</h2>
-        <div style={styles.segmented}>
-          <button className={`btn btn-sm ${mode === 'text' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('text')}>Text</button>
-          <button className={`btn btn-sm ${mode === 'buttons' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('buttons')}>Buttons</button>
-        </div>
-      </div>
-
       <div className="glass" style={styles.searchShell}>
         <div style={styles.controlsRow}>
+          <h2 style={{ ...styles.h2, margin: 0, paddingRight: 6, flexShrink: 0 }}>Bible</h2>
+
           <input
             className="input"
             value={query}
@@ -451,7 +453,7 @@ export function BiblePanel() {
             onKeyDown={handleSearchKeyDown}
             onBlur={() => setQuery((current) => normalizeReferenceQuery(current))}
             placeholder="Search reference or words, e.g. John 3:16"
-            style={{ flex: 1, minWidth: 180 }}
+            style={{ flex: '1 1 160px', minWidth: 120, maxWidth: 220 }}
           />
           <button className="btn btn-secondary btn-sm" onClick={pinCurrent}>Pin</button>
 
@@ -465,11 +467,12 @@ export function BiblePanel() {
               setResults([]);
               setHighlightedVerse(null);
             }}
-            style={{ width: 140 }}
+            style={{ width: 130 }}
           >
             <option value="">Select Book</option>
             {bookOptions.map((book) => <option key={book.name} value={book.name}>{book.name}</option>)}
           </select>
+
           <select
             className="input"
             value={chapter || ''}
@@ -479,7 +482,7 @@ export function BiblePanel() {
               setHighlightedVerse(null);
             }}
             disabled={!selectedBook}
-            style={{ width: 72 }}
+            style={{ width: 68 }}
           >
             <option value="">Ch</option>
             {Array.from({ length: selectedChapterCount }, (_, i) => i + 1).map((num) => <option key={num} value={num}>Ch {num}</option>)}
@@ -487,6 +490,11 @@ export function BiblePanel() {
 
           <button className="btn btn-secondary btn-sm" disabled={!visibleVerses.length} onClick={() => sendAdjacentVerse(-1)}>Prev</button>
           <button className="btn btn-secondary btn-sm" disabled={!visibleVerses.length} onClick={() => sendAdjacentVerse(1)}>Next</button>
+
+          <div style={{ ...styles.segmented, marginLeft: 'auto' }}>
+            <button className={`btn btn-sm ${mode === 'text' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('text')}>Text</button>
+            <button className={`btn btn-sm ${mode === 'buttons' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('buttons')}>Buttons</button>
+          </div>
         </div>
 
         <div style={styles.versionBar}>

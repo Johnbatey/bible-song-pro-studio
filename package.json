@@ -12,9 +12,9 @@
     "dev": "vite",
     "dev:electron": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE; electron .",
     "build:renderer": "vite build",
-    "build:mac": "vite build && electron-builder --mac --arm64",
-    "build:mac:intel": "vite build && electron-builder --mac --x64",
-    "build:mac:universal": "vite build && electron-builder --mac --universal",
+    "build:mac": "vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --arm64",
+    "build:mac:intel": "vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --x64",
+    "build:mac:universal": "vite build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal",
     "build:win": "vite build && electron-builder --win",
     "build:linux": "vite build && electron-builder --linux",
     "dist:mac": "vite build && electron-builder --mac --arm64 --publish always",
@@ -42,7 +42,7 @@
     "productName": "Bible Song Pro",
     "directories": {
       "buildResources": "assets",
-      "output": "dist"
+      "output": "release"
     },
     "files": [
       "dist/**/*",

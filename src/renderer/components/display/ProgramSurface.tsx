@@ -133,6 +133,17 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
   const content = contentFromScene(scene);
   const secondaryVerse = content?.secondaryVerse;
   const isCompare = Boolean(secondaryVerse?.text);
+  const baseRef = (content?.reference || '').replace(/\s*\([^)]*\/[^)]*\)\s*$/, '').trim();
+  const primaryVersionTag = content?.version ? content.version.split('/')[0] : '';
+  const secondaryVersionTag = secondaryVerse?.version || (content?.version ? content.version.split('/')[1] : '');
+
+  const primaryRef = isCompare && primaryVersionTag && !content?.reference?.includes(`(${primaryVersionTag})`)
+    ? `${baseRef} (${primaryVersionTag})`
+    : content?.reference;
+
+  const secondaryRef = isCompare && secondaryVersionTag && !secondaryVerse?.reference?.includes(`(${secondaryVersionTag})`)
+    ? `${(secondaryVerse?.reference || baseRef).replace(/\s*\([^)]*\/[^)]*\)\s*$/, '').trim()} (${secondaryVersionTag})`
+    : secondaryVerse?.reference;
   const video = videoSource(state, assetBaseUrl);
   const fontFamily = state.fontFamily || themeSection?.fontFamily || defaultTheme.fontFamily;
   const fontWeight = state.fontWeight || themeSection?.fontWeight || defaultTheme.fontWeight;
@@ -234,14 +245,14 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
             <div className="program-compare">
               <div className="program-compare-pane">
                 <div className="program-ref-row" style={refRowStyle}>
-                  {showReference && content?.reference && <span style={refStyle}>{content.reference}</span>}
+                  {showReference && primaryRef && <span style={refStyle}>{primaryRef}</span>}
                 </div>
                 <div className="program-main-text" style={textStyle}>{content?.text || ''}</div>
               </div>
               <div className="program-compare-divider" />
               <div className="program-compare-pane">
                 <div className="program-ref-row" style={refRowStyle}>
-                  {showReference && secondaryVerse?.reference && <span style={refStyle}>{secondaryVerse.reference}</span>}
+                  {showReference && secondaryRef && <span style={refStyle}>{secondaryRef}</span>}
                 </div>
                 <div className="program-main-text" style={textStyle}>{secondaryVerse?.text || ''}</div>
               </div>

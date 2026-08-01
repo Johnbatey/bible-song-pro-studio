@@ -386,13 +386,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
           reference: sc.reference,
           translation: sc.version || (sc.songCredit ? '' : config.translation),
         };
-        // Dual translation — feeds the existing side-by-side compare layout
         if (sc.secondaryVerse && sc.secondaryVerse.text) {
-          verseData.compareLeft = { text: sc.text, ref: sc.reference, translation: sc.version || '' };
+          var baseRef = (sc.reference || '').replace(/\s*\([^)]*\/[^)]*\)\s*$/, '').trim();
+          var pVer = sc.version ? sc.version.split('/')[0] : '';
+          var sVer = sc.secondaryVerse.version || (sc.version ? sc.version.split('/')[1] : '');
+
+          var lRef = pVer && !sc.reference.includes('(' + pVer + ')') ? (baseRef.split(' (')[0] + ' (' + pVer + ')') : sc.reference;
+          var rRef = sVer && !(sc.secondaryVerse.reference || '').includes('(' + sVer + ')') ? ((sc.secondaryVerse.reference || baseRef).split(' (')[0] + ' (' + sVer + ')') : (sc.secondaryVerse.reference || sc.reference);
+
+          verseData.compareLeft = { text: sc.text, ref: lRef, translation: '' };
           verseData.compareRight = {
             text: sc.secondaryVerse.text,
-            ref: sc.secondaryVerse.reference || sc.reference,
-            translation: sc.secondaryVerse.version || '',
+            ref: rRef,
+            translation: '',
           };
         }
         if (sc.songCredit) verseData.songCredit = sc.songCredit;
