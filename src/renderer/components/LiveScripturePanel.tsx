@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHandle } from '../services/audio-capture';
 import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection } from '../types';
 import { type, fontWeight, numeric } from '../styles/type';
+import { Block, BlockButton, BlockDivider, BlockSegment } from './Block';
 
 /** Short enough to feel live, while still giving Whisper enough speech context. */
 const LOCAL_CHUNK_SECONDS = 3;
@@ -337,26 +338,28 @@ export function LiveScripturePanel() {
   const deepgramUnavailable = engine === 'deepgram' && !keyConfigured;
 
   return (
-    <div style={styles.root}>
-      <div style={styles.header}>
-        <h2 style={styles.h2}>Live Scripture</h2>
-        <div style={styles.actions}>
-          <button className={`btn btn-sm ${live.detectionMode === 'bible' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setLive({ detectionMode: 'bible' })}>Bible</button>
-          <button className={`btn btn-sm ${live.detectionMode === 'song' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setLive({ detectionMode: 'song' })}>Song</button>
-          <button className="btn btn-sm btn-secondary" onClick={refreshInputs}>Refresh Inputs</button>
-          <button
-            className={`btn btn-sm ${live.isActive ? 'btn-secondary' : 'btn-primary'}`}
-            onClick={live.isActive ? stopLive : startLive}
-            disabled={deepgramUnavailable}
-            title={deepgramUnavailable ? 'Add a Deepgram API key in Settings first' : undefined}
-          >
-            {live.isActive ? 'Stop' : 'Start'}
-          </button>
-        </div>
-      </div>
-
-      <div className="glass" style={styles.controlCard}>
-        <select className="input" value={live.selectedInputId} onChange={(e) => setLive({ selectedInputId: e.target.value })} disabled={live.isActive}>
+    <div className="blk-col" style={styles.root}>
+      <div className="blk blk--bar" style={styles.controlBar}>
+        <BlockSegment>
+          <BlockButton active={live.detectionMode === 'bible'} onClick={() => setLive({ detectionMode: 'bible' })}>Bible</BlockButton>
+          <BlockButton active={live.detectionMode === 'song'} onClick={() => setLive({ detectionMode: 'song' })}>Song</BlockButton>
+        </BlockSegment>
+        <BlockButton onClick={refreshInputs} title="Re-scan audio inputs">Refresh Inputs</BlockButton>
+        <BlockButton
+          active={!live.isActive}
+          onClick={live.isActive ? stopLive : startLive}
+          disabled={deepgramUnavailable}
+          title={deepgramUnavailable ? 'Add a Deepgram API key in Settings first' : undefined}
+        >
+          {live.isActive ? 'Stop' : 'Start'}
+        </BlockButton>
+        <select
+          className="input"
+          value={live.selectedInputId}
+          onChange={(e) => setLive({ selectedInputId: e.target.value })}
+          disabled={live.isActive}
+          style={{ maxWidth: 220 }}
+        >
           {devices.length === 0 && <option value="">No microphone available</option>}
           {devices.map((device) => <option key={device.deviceId} value={device.deviceId}>{device.label}</option>)}
         </select>
@@ -393,23 +396,24 @@ export function LiveScripturePanel() {
       )}
       {notice && <div style={styles.warn}>{notice}</div>}
 
-      <div style={styles.options}>
+      <div className="blk blk--bar" style={styles.controlBar}>
         <label style={styles.check}><input type="checkbox" checked={live.autoProject} onChange={(e) => setDirectAutoProject(e.target.checked)} /> Auto project direct references</label>
         <label style={styles.check}><input type="checkbox" checked={live.autoVersionSwitch} onChange={(e) => setAutoVersionSwitch(e.target.checked)} /> Auto version switch</label>
         <label style={styles.check}><input type="checkbox" checked={live.autoProjectQuoted} onChange={(e) => setQuotedAutoProject(e.target.checked)} /> Project quoted matches</label>
       </div>
 
-      <div style={styles.matchDashboard}>
-        <div className="card" style={styles.primaryColumn}>
-          <div style={styles.columnHeader}>
-            <div>
-              <div className="section-title" style={{ marginBottom: 2 }}>Best Match</div>
-              <div style={styles.columnSubtitle}>Current highest-ranked scripture</div>
-            </div>
+      <div className="blk-row" style={styles.matchDashboard}>
+        <Block
+          title="Best Match"
+          subtitle="Current highest-ranked scripture"
+          style={styles.primaryColumn}
+          tools={(
             <span style={detectionIsFinal ? styles.finalBadge : styles.trackingBadge}>
               {detectionIsFinal ? 'Final' : 'Tracking'}
             </span>
-          </div>
+          )}
+          bodyStyle={{ display: 'flex', flexDirection: 'column' }}
+        >
           {live.bestHit ? (
             <button style={styles.hit} onClick={() => sendHit(live.bestHit!, { goLive: true, confidence: rankedDetections[0]?.confidence, sourceMode: rankedDetections[0]?.mode })}>
               <div style={styles.primaryReferenceRow}>
@@ -427,16 +431,17 @@ export function LiveScripturePanel() {
               <Metric label="Search time" value={`${detectionLatencyMs} ms`} />
             </div>
           )}
-        </div>
+        </Block>
 
-        <div className="card" style={styles.indexColumn}>
-          <div style={styles.columnHeader}>
-            <div>
-              <div className="section-title" style={{ marginBottom: 2 }}>Candidate Index</div>
-              <div style={styles.columnSubtitle}>Ranked alternatives updating with the speaker</div>
-            </div>
-            <span style={styles.countBadge}>{Math.max(0, live.suggestions.length - 1)} matches</span>
-          </div>
+        <BlockDivider />
+
+        <Block
+          title="Candidate Index"
+          subtitle="Ranked alternatives updating with the speaker"
+          style={styles.indexColumn}
+          tools={<span style={styles.countBadge}>{Math.max(0, live.suggestions.length - 1)} matches</span>}
+          bodyStyle={{ display: 'flex', flexDirection: 'column' }}
+        >
           {live.suggestions.length > 1 ? (
             <div style={styles.suggestions}>
               {live.suggestions.slice(1).map((hit, index) => {
@@ -468,9 +473,8 @@ export function LiveScripturePanel() {
           ) : (
             <div style={styles.placeholder}>Close matches will be indexed here as words arrive.</div>
           )}
-        </div>
+        </Block>
       </div>
-
     </div>
   );
 }
@@ -547,21 +551,15 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  root: { height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: { flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  h2: { ...type.title },
-  actions: { display: 'flex', gap: 6, flexWrap: 'wrap' },
-  controlCard: { flex: '0 0 auto', display: 'flex', gap: 8, alignItems: 'center', padding: 12, borderRadius: 'var(--radius-md)' },
+  root: { height: '100%', minHeight: 0, overflow: 'hidden' },
+  controlBar: { flexWrap: 'wrap' },
   meter: { position: 'relative', flex: 1, height: 12, minWidth: 100, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' },
   meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)', borderRadius: 999 },
   meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: '#fff' },
-  options: { flex: '0 0 auto', display: 'flex', gap: 14, flexWrap: 'wrap', margin: '10px 0', ...type.caption, color: 'var(--text-secondary)' },
-  check: { display: 'flex', alignItems: 'center', gap: 6 },
-  matchDashboard: { flex: '1 1 auto', minHeight: 0, overflow: 'hidden', display: 'grid', gridTemplateColumns: 'minmax(300px, 0.82fr) minmax(500px, 1.55fr)', gap: 12, alignItems: 'stretch' },
-  primaryColumn: { minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-  indexColumn: { minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-  columnHeader: { flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
-  columnSubtitle: { ...type.caption, color: 'var(--text-dim)' },
+  check: { display: 'flex', alignItems: 'center', gap: 6, ...type.caption, color: 'var(--text-secondary)' },
+  matchDashboard: { flex: '1 1 auto', minHeight: 0, overflow: 'hidden' },
+  primaryColumn: { flex: '0.82 1 300px', minWidth: 260 },
+  indexColumn: { flex: '1.55 1 500px', minWidth: 300 },
   finalBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(46,204,113,.25)', ...type.label, fontWeight: fontWeight.bold },
   trackingBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--blue-dim)', color: 'var(--blue)', border: '1px solid rgba(52,152,219,.25)', ...type.label, fontWeight: fontWeight.bold },
   countBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', ...type.caption, ...numeric, whiteSpace: 'nowrap' },
@@ -585,5 +583,5 @@ const styles: Record<string, React.CSSProperties> = {
   candidateFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, color: 'var(--text-dim)', ...type.label, fontWeight: fontWeight.regular },
   confidenceTrack: { display: 'block', height: 3, borderRadius: 999, background: 'rgba(255,255,255,.06)', overflow: 'hidden' },
   confidenceFill: { display: 'block', height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,var(--blue),var(--green))' },
-  warn: { ...type.caption, color: 'var(--amber, #f1c40f)', background: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.25)', borderRadius: 8, padding: '8px 10px', margin: '10px 0' },
+  warn: { flex: '0 0 auto', ...type.caption, color: 'var(--amber, #f1c40f)', background: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.25)', borderRadius: 'var(--block-radius)', padding: '8px 10px' },
 };

@@ -1,7 +1,7 @@
 :root {
   --bg-primary: #0c0c0e;
   --bg-secondary: #161414;
-  --bg-surface: #18181b;
+  --bg-surface: #161414;
   --bg-elevated: #232221;
   --bg-hover: #232221;
   --border-primary: #262628;
@@ -59,6 +59,18 @@
   --icon-sm: 14px;
   --icon-md: 18px;
   --icon-lg: 22px;
+
+  /* ── Window blocks ─────────────────────────────────────────────────────
+     Every window in the app is one block: a chrome bar carrying the block's
+     label and its tools, a 1px rule, then the body. Blocks sit next to each
+     other with --block-gap between them and a divider line in that gap. */
+  --block-bg: #161414;        /* Matt Black — block surface */
+  --block-line: #262628;      /* Black Beauty — block border + chrome rule */
+  --block-active: #232221;    /* Black Chestnut Oak — chrome switch highlight */
+  --block-radius: 6px;
+  --block-gap: 9px;           /* space between two blocks (divider sits in it) */
+  --block-chrome-h: 40px;
+  --block-pad: 12px;
 }
 
 * {
@@ -125,10 +137,11 @@ html, body, #root {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--sidebar-width, 280px) 1px minmax(0, 1fr);
-  grid-template-rows: var(--transcript-height, 360px) 1px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 280px) var(--block-gap) minmax(0, 1fr);
+  grid-template-rows: var(--transcript-height, 360px) var(--block-gap) minmax(0, 1fr);
   overflow: hidden;
   background: var(--bg-primary);
+  padding: var(--block-gap);
   position: relative;
 }
 
@@ -138,7 +151,7 @@ html, body, #root {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: transparent;
   padding: 0;
 }
 
@@ -148,15 +161,220 @@ html, body, #root {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--bg-secondary);
+  background: transparent;
 }
 
-.sidebar-region > nav {
+.sidebar-region nav {
   width: 100% !important;
   min-width: 0 !important;
   height: 100%;
   min-height: 0 !important;
   overflow-y: auto !important;
+}
+
+/* ── Window block ──────────────────────────────────────────────────────
+   .blk           the window itself — matt black, hairline border
+   .blk__chrome   top bar: label on the left, tools on the right
+   .blk__body     content below the rule
+   .blk__footer   optional bottom bar (nav, status) */
+.blk {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--block-bg);
+  border: 1px solid var(--block-line);
+  border-radius: var(--block-radius);
+  overflow: hidden;
+}
+
+.blk--fill {
+  flex: 1 1 auto;
+  height: 100%;
+}
+
+/* A block that is nothing but a chrome bar — a standalone toolbar window.
+   Overflow stays visible so dropdown popups can escape it. */
+.blk--bar {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--block-chrome-h);
+  padding: 6px var(--block-pad);
+  overflow: visible;
+}
+
+.blk__chrome {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: var(--block-chrome-h);
+  padding: 0 var(--block-pad);
+  border-bottom: 1px solid var(--block-line);
+}
+
+/* A chrome bar that is nothing but tools (no label) still keeps the rule. */
+.blk__chrome--tools {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  padding: 6px var(--block-pad);
+}
+
+.blk__title {
+  font-size: var(--fs-heading);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.blk__subtitle {
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-regular);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.blk__titlegroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.blk__tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.blk__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--block-pad);
+}
+
+.blk__body--flush {
+  padding: 0;
+}
+
+.blk__body--center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.blk__footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: var(--block-chrome-h);
+  padding: 6px var(--block-pad);
+  border-top: 1px solid var(--block-line);
+}
+
+/* ── Chrome controls ──
+   Tool buttons and switchers live in the chrome bar; the highlight that
+   rides over them is Black Chestnut Oak. */
+.blk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-secondary);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-tight);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.blk-btn:hover:not(:disabled) {
+  background: var(--block-active);
+  color: var(--text-primary);
+}
+
+.blk-btn.is-active {
+  background: var(--block-active);
+  border-color: var(--block-line);
+  color: var(--text-primary);
+}
+
+.blk-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.blk-btn--icon {
+  width: 28px;
+  padding: 0;
+}
+
+.blk-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--block-line);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+.blk-seg .blk-btn {
+  height: 24px;
+}
+
+/* ── Divider that sits in the gap between two blocks ── */
+.blk-divider {
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: var(--block-line);
+}
+
+.blk-divider--h {
+  flex: 0 0 1px;
+  width: 100%;
+  height: 1px;
+  align-self: auto;
+}
+
+/* Rows / columns of blocks: gap on both sides of the divider. */
+.blk-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--block-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+.blk-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--block-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+.blk-fill {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
 .left-workspace {
@@ -177,43 +395,47 @@ html, body, #root {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg-secondary);
+  background: transparent;
   overflow: hidden;
 }
 
-/* ── Resizer Handles & Overlay matching the reference design ── */
+/* ── Resizers ──
+   The resizer is the divider that sits in the gap between two blocks: a
+   hairline in Black Beauty, centred in the gap, with the whole gap as the
+   grab target. */
 .resizer-handle {
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
   position: relative;
   z-index: 10;
-  transition: background 0.15s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.resizer-handle:hover,
-.resizer-handle.is-dragging {
-  background: #FF5500;
+.resizer-handle::after {
+  content: '';
+  position: absolute;
+  background: var(--block-line);
+  transition: background 0.15s ease;
+}
+
+.resizer-handle:hover::after,
+.resizer-handle.is-dragging::after {
+  background: var(--accent);
 }
 
 .resizer-handle-h {
   grid-row: 1 / -1;
   cursor: ew-resize;
-  width: 1px;
+  width: var(--block-gap);
 }
 
-.resizer-handle-h::before {
-  content: '';
-  position: absolute;
+.resizer-handle-h::after {
   top: 0;
   bottom: 0;
-  left: -4px;
-  right: -4px;
-  cursor: ew-resize;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
 }
 
 .resizer-handle-h.sidebar-resizer {
@@ -224,30 +446,15 @@ html, body, #root {
   grid-column: 1 / -1;
   grid-row: 2;
   cursor: ns-resize;
-  height: 1px;
+  height: var(--block-gap);
 }
 
-.resizer-handle-v::before {
-  content: '';
-  position: absolute;
+.resizer-handle-v::after {
   left: 0;
   right: 0;
-  top: -4px;
-  bottom: -4px;
-  cursor: ns-resize;
-}
-
-.resizer-grip-v,
-.resizer-grip-h {
-  border-radius: 1px;
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.resizer-handle:hover .resizer-grip-v,
-.resizer-handle:hover .resizer-grip-h,
-.resizer-handle.is-dragging .resizer-grip-v,
-.resizer-handle.is-dragging .resizer-grip-h {
-  background: #17120a;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
 }
 
 .resize-drag-overlay {
@@ -262,7 +469,7 @@ html, body, #root {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding: 16px;
+  padding: 0;
   display: flex;
   flex-direction: column;
 }
@@ -272,31 +479,6 @@ html, body, #root {
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.transcript-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 14px 16px;
-  background: #161618;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-}
-
-.transcript-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.transcript-panel__label {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: var(--lh-tight);
-  color: #ffffff;
 }
 
 .transcript-panel__status {
@@ -328,16 +510,6 @@ html, body, #root {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-.transcript-panel__body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow-y: auto;
-  padding: 12px 4px;
-}
-
 .transcript-panel__text {
   max-width: 100%;
   color: var(--text-primary);
@@ -360,16 +532,6 @@ html, body, #root {
   overflow-wrap: anywhere;
 }
 
-.transcript-panel__footer {
-  min-height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-primary);
-}
-
 .transcript-panel__confidence,
 .transcript-panel__hint {
   font-size: var(--fs-caption);
@@ -380,16 +542,6 @@ html, body, #root {
 
 .transcript-panel__confidence {
   font-variant-numeric: tabular-nums;
-}
-
-.pv-dock {
-  height: 100%;
-  border-bottom: 0 !important;
-}
-
-.pv-dock > div:last-child {
-  flex-direction: row;
-  min-height: 0;
 }
 
 @media (max-width: 1180px) {
@@ -429,10 +581,13 @@ html, body, #root {
   .sidebar-region {
     grid-row: 3;
     max-height: 56px;
-    border-bottom: 8px solid #05070b;
   }
 
-  .sidebar-region > nav {
+  .sidebar-region .blk__chrome {
+    display: none;
+  }
+
+  .sidebar-region nav {
     flex-direction: row !important;
     overflow-x: auto !important;
   }
@@ -511,10 +666,8 @@ html, body, #root {
 
 /* Utility classes */
 .glass {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--border-primary);
+  background: var(--block-bg);
+  border: 1px solid var(--block-line);
 }
 
 .glass-accent {
@@ -641,15 +794,15 @@ html, body, #root {
 }
 
 .card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-primary);
+  background: var(--block-bg);
+  border: 1px solid var(--block-line);
   border-radius: var(--radius-md);
   padding: 16px;
 }
 
 .card-hover:hover {
   border-color: var(--border-accent);
-  background: var(--bg-elevated);
+  background: var(--block-active);
 }
 
 /* ── Settings Modal Pop-Up (Two-Pane Dialog) ── */
@@ -667,8 +820,8 @@ html, body, #root {
   max-width: calc(100vw - 32px);
   height: 560px;
   max-height: calc(100vh - 48px);
-  background: #141416;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--block-bg);
+  border: 1px solid var(--block-line);
   border-radius: 12px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
   display: flex;
@@ -693,8 +846,8 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: #141416;
+  border-bottom: 1px solid var(--block-line);
+  background: var(--block-bg);
   flex-shrink: 0;
   cursor: move;
   user-select: none;
@@ -737,7 +890,7 @@ html, body, #root {
 }
 
 .sm-close-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--block-active);
   color: #ffffff;
 }
 
@@ -751,8 +904,8 @@ html, body, #root {
 .sm-sidebar {
   width: 220px;
   min-width: 220px;
-  background: #141416;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--block-bg);
+  border-right: 1px solid var(--block-line);
   display: flex;
   flex-direction: column;
   padding: 16px 0;
@@ -777,7 +930,7 @@ html, body, #root {
 
 .sm-sidebar-item:hover {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--block-active);
 }
 
 .sm-sidebar-item.active {
@@ -803,7 +956,7 @@ html, body, #root {
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px;
-  background: #161618;
+  background: var(--block-bg);
 }
 
 .sm-content-title {
@@ -827,7 +980,7 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   gap: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--block-line);
 }
 
 .sm-form-row {
@@ -837,7 +990,7 @@ html, body, #root {
   padding: 14px 0;
   background: transparent;
   border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--block-line);
   border-radius: 0;
   gap: 16px;
 }

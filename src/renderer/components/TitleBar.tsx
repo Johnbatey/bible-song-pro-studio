@@ -129,7 +129,7 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
         <button
           style={{
             ...styles.blackBtn,
-            background: isBlackout ? '#ef4444' : 'rgba(255, 255, 255, 0.06)',
+            background: isBlackout ? '#ef4444' : 'var(--block-active)',
             color: isBlackout ? '#ffffff' : 'var(--text-secondary)',
           }}
           onClick={toggleBlackout}
@@ -188,7 +188,6 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
             style={{
               ...styles.toolbarBtn,
               color: isStudio || activePanel === 'scenes' ? 'var(--accent)' : 'var(--text-secondary)',
-              background: isStudio || activePanel === 'scenes' ? 'var(--accent-dim)' : 'transparent',
             }}
             onClick={() => {
               if (isStudio) {
@@ -301,7 +300,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: 56,
     padding: '0 14px',
     background: '#0c0c0e',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    borderBottom: '1px solid var(--block-line)',
     flexShrink: 0,
     zIndex: 100,
     userSelect: 'none',
@@ -325,11 +324,11 @@ const styles: Record<string, React.CSSProperties> = {
   pillContainer: {
     display: 'flex',
     alignItems: 'center',
-    background: '#1a1a1e',
+    background: 'var(--block-bg)',
     borderRadius: 8,
     padding: 3,
     gap: 2,
-    border: '1px solid rgba(255, 255, 255, 0.06)',
+    border: '1px solid var(--block-line)',
   },
   pillBtn: {
     padding: '5px 14px',
@@ -364,8 +363,8 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ffffff',
     padding: '4px 10px',
     borderRadius: 6,
-    background: '#1c1c1f',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'var(--block-active)',
+    border: '1px solid var(--block-line)',
     letterSpacing: '0.04em',
   },
   liveDot: {
@@ -377,7 +376,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   blackBtn: {
     padding: '4px 10px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    border: '1px solid var(--block-line)',
     borderRadius: 6,
     fontSize: 11,
     fontWeight: 700,
@@ -397,8 +396,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: 2,
     padding: '4px 10px',
-    border: 'none',
-    background: 'transparent',
+    border: '1px solid var(--block-line)',
+    background: 'var(--block-active)',
     borderRadius: 6,
     cursor: 'pointer',
     fontSize: 11,
@@ -410,7 +409,7 @@ const styles: Record<string, React.CSSProperties> = {
   divider: {
     width: 1,
     height: 22,
-    background: 'rgba(255, 255, 255, 0.08)',
+    background: 'var(--block-line)',
   },
   winControls: {
     display: 'flex',

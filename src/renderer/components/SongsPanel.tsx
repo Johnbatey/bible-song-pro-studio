@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { importSongFiles, SONG_FILE_ACCEPT } from '../utils/song-import';
 import type { Scene, Song } from '../types';
 import { type, fontWeight } from '../styles/type';
+import { Block, BlockButton, BlockDivider, BlockSegment } from './Block';
 
 const DEMO_SONGS: Song[] = [
   {
@@ -210,26 +211,7 @@ export function SongsPanel() {
   }, [selectedSong, linesPerSlide, currentScene, previewScene, operatingMode]);
 
   return (
-    <div ref={containerRef} style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      {/* Top Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexShrink: 0 }}>
-        <h2 style={{ ...type.title }}>Songs</h2>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {songs.length === 0 && (
-            <button className="btn btn-sm btn-secondary" onClick={handleAddDemoSongs}>
-              Load Demo Songs
-            </button>
-          )}
-          <button
-            className="btn btn-sm btn-primary"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-          >
-            {importing ? 'Importing…' : 'Import Songs'}
-          </button>
-        </div>
-      </div>
-
+    <div ref={containerRef} className="blk-row" style={{ height: '100%', minHeight: 0 }}>
       <input
         ref={fileInputRef}
         type="file"
@@ -242,19 +224,33 @@ export function SongsPanel() {
         }}
       />
 
-      {/* Main Two-Column View */}
-      <div style={{ display: 'flex', gap: 14, flex: 1, minHeight: 0 }}>
-        {/* Left Column: Search & Songs List */}
-        <div style={{ flex: '0 0 280px', minWidth: 220, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
-          <input
-            className="input"
-            placeholder="Search songs..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Left block: search & song list */}
+      <Block
+        title="Songs"
+        subtitle={`${songs.length}`}
+        style={{ flex: '0 0 300px', minWidth: 220 }}
+        tools={(
+          <>
+            {songs.length === 0 && (
+              <BlockButton onClick={handleAddDemoSongs}>Demo</BlockButton>
+            )}
+            <BlockButton onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              {importing ? 'Importing…' : 'Import'}
+            </BlockButton>
+          </>
+        )}
+        bodyStyle={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+      >
+        <input
+          className="input"
+          placeholder="Search songs..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ flexShrink: 0 }}
+        />
 
-          {/* Dropzone */}
-          <div
+        {/* Dropzone */}
+        <div
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={(e) => {
@@ -274,11 +270,11 @@ export function SongsPanel() {
               flexShrink: 0,
             }}
           >
-            Drop OpenLyrics (.xml), ChordPro (.pro) or .txt files
-          </div>
+          Drop OpenLyrics (.xml), ChordPro (.pro) or .txt files
+        </div>
 
-          {/* Scrollable Song List */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 2 }}>
+        {/* Scrollable Song List */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 2 }}>
             {filteredSongs.map((song) => {
               const isSelected = selectedSong?.id === song.id;
               return (
@@ -305,66 +301,67 @@ export function SongsPanel() {
                 </div>
               );
             })}
-            {filteredSongs.length === 0 && (
-              <div style={{ ...type.secondary, color: 'var(--text-dim)', textAlign: 'center', padding: 24 }}>
-                {songs.length === 0
-                  ? 'No songs yet. Import a file or load demo songs.'
-                  : `No songs match "${search}".`}
-              </div>
-            )}
-          </div>
+          {filteredSongs.length === 0 && (
+            <div style={{ ...type.secondary, color: 'var(--text-dim)', textAlign: 'center', padding: 24 }}>
+              {songs.length === 0
+                ? 'No songs yet. Import a file or load demo songs.'
+                : `No songs match "${search}".`}
+            </div>
+          )}
         </div>
+      </Block>
 
-        {/* Right Column: Song Details & Lyrics Button Mode Grid */}
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', paddingRight: 4 }}>
-          {selectedSong ? (
-            <>
-              {/* Header & Controls Bar */}
-              <div className="glass" style={{ padding: 12, borderRadius: 'var(--radius-md)', marginBottom: 10, flexShrink: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-                  <div>
-                    <h3 style={{ ...type.title, fontWeight: fontWeight.bold, margin: 0, color: 'var(--text-primary)' }}>{selectedSong.title}</h3>
-                    <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 2 }}>
-                      {selectedSong.artist || 'Unknown Artist'} {selectedSong.key ? `· Key: ${selectedSong.key}` : ''}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <button className="btn btn-secondary btn-sm" disabled={!formattedSlides.length} onClick={() => sendAdjacentSlide(-1)}>Prev</button>
-                    <button className="btn btn-secondary btn-sm" disabled={!formattedSlides.length} onClick={() => sendAdjacentSlide(1)}>Next</button>
-                  </div>
-                </div>
+      <BlockDivider />
 
-                {/* Line Selection Option Bar */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px solid var(--border-primary)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ ...type.caption, color: 'var(--text-secondary)', fontWeight: fontWeight.medium }}>Lines per slide:</span>
-                    {(['auto', 1, 2, 4, 6] as const).map((val) => (
-                      <button
-                        key={String(val)}
-                        className={`btn btn-sm ${linesPerSlide === val ? 'btn-primary' : 'btn-secondary'}`}
-                        style={{ padding: '2px 8px', ...type.caption }}
-                        onClick={() => setLinesPerSlide(val)}
-                      >
-                        {val === 'auto' ? 'Auto (Section)' : `${val} ${val === 1 ? 'line' : 'lines'}`}
-                      </button>
-                    ))}
-                  </div>
+      {/* Right block: song details & lyric slides */}
+      <Block
+        className="blk-fill"
+        title={selectedSong ? selectedSong.title : 'Lyrics'}
+        subtitle={selectedSong
+          ? `${selectedSong.artist || 'Unknown Artist'}${selectedSong.key ? ` · Key: ${selectedSong.key}` : ''}`
+          : undefined}
+        tools={selectedSong ? (
+          <>
+            <BlockButton disabled={!formattedSlides.length} onClick={() => sendAdjacentSlide(-1)}>Prev</BlockButton>
+            <BlockButton disabled={!formattedSlides.length} onClick={() => sendAdjacentSlide(1)}>Next</BlockButton>
+          </>
+        ) : undefined}
+        footer={selectedSong ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ ...type.caption, color: 'var(--text-dim)' }}>Lines per slide</span>
+              <BlockSegment>
+                {(['auto', 1, 2, 4, 6] as const).map((val) => (
+                  <BlockButton
+                    key={String(val)}
+                    active={linesPerSlide === val}
+                    onClick={() => setLinesPerSlide(val)}
+                  >
+                    {val === 'auto' ? 'Auto' : String(val)}
+                  </BlockButton>
+                ))}
+              </BlockSegment>
+            </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', ...type.caption, color: 'var(--text-secondary)' }} title="Show song title, author, and copyright credits at the bottom of output (only when Auto (Section) mode is active)">
-                    <input
-                      type="checkbox"
-                      checked={showSongCredits}
-                      onChange={(e) => setShowSongCredits(e.target.checked)}
-                      style={{ accentColor: 'var(--accent)' }}
-                    />
-                    Display Credits (Disabled by default)
-                  </label>
-                </div>
-              </div>
-
-
-              {/* Clickable Lyric Buttons Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', ...type.caption, color: 'var(--text-secondary)' }}
+              title="Show song title, author, and copyright credits at the bottom of output (only when Auto (Section) mode is active)"
+            >
+              <input
+                type="checkbox"
+                checked={showSongCredits}
+                onChange={(e) => setShowSongCredits(e.target.checked)}
+                style={{ accentColor: 'var(--accent)' }}
+              />
+              Display credits
+            </label>
+          </>
+        ) : undefined}
+      >
+        {selectedSong ? (
+          <>
+            {/* Clickable Lyric Buttons Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
                 {formattedSlides.map((slide) => {
                   const sceneId = songSceneId(selectedSong, slide);
                   const isLive = currentScene?.type === 'song' && currentScene.id === sceneId;
@@ -417,17 +414,16 @@ export function SongsPanel() {
                         {slide.text}
                       </span>
                     </button>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)', ...type.body }}>
-              Select a song from the left list to view lyrics & button mode controls.
+                );
+              })}
             </div>
-          )}
-        </div>
-      </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)', ...type.body }}>
+            Select a song from the left list to view lyrics & button mode controls.
+          </div>
+        )}
+      </Block>
     </div>
   );
 }

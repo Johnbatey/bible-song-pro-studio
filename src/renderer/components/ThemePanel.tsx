@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import type { Theme } from '../types';
 import { v4 as uuid } from 'uuid';
 import { type, fontWeight } from '../styles/type';
+import { Block, BlockButton } from './Block';
 
 const PRESET_THEMES: Theme[] = [
   {
@@ -408,17 +409,17 @@ export function ThemePanel() {
     <div style={styles.panel}>
       {!editTheme ? (
         /* PAGE 1: PRESET GRID VIEW */
-        <>
-          <div style={styles.header}>
-            <h2 style={{ ...type.title }}>Design Presets</h2>
-            <div style={{ display: 'flex', gap: 6 }}>
+        <Block
+          title="Design Presets"
+          subtitle={`${allThemes.length}`}
+          tools={(
+            <>
               {activeTheme && (
-                <button className="btn btn-sm btn-secondary" onClick={() => setEditTheme(activeTheme)}>
+                <BlockButton onClick={() => setEditTheme(activeTheme)}>
                   Customize Active
-                </button>
+                </BlockButton>
               )}
-              <button
-                className="btn btn-sm btn-primary"
+              <BlockButton
                 onClick={() => {
                   const t: Theme = {
                     id: `theme-${Date.now()}`,
@@ -464,12 +465,11 @@ export function ThemePanel() {
                 }}
               >
                 + Custom Design
-              </button>
-            </div>
-          </div>
-
-          <div style={styles.body}>
-            <div style={styles.themeGrid}>
+              </BlockButton>
+            </>
+          )}
+        >
+          <div style={styles.themeGrid}>
               {allThemes.map((theme) => (
                 <div
                   key={theme.id}
@@ -526,35 +526,25 @@ export function ThemePanel() {
                   </div>
                 </div>
               ))}
-            </div>
           </div>
-        </>
+        </Block>
       ) : (
         /* PAGE 2: PRESET EDITOR VIEW */
-        <>
-          <div style={styles.header}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button className="btn btn-sm btn-secondary" onClick={() => setEditTheme(null)}>
-                ← Back to Design Presets
-              </button>
-              <h2 style={{ ...type.title, fontSize: 18 }}>
-                Edit Design: <span style={{ color: 'var(--accent)' }}>{editTheme.name}</span>
-              </h2>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+        <Block
+          title={<>Edit Design: <span style={{ color: 'var(--accent)' }}>{editTheme.name}</span></>}
+          tools={(
+            <>
+              <BlockButton onClick={() => setEditTheme(null)}>← Presets</BlockButton>
               {themes.some((theme) => theme.id === editTheme.id) && (
-                <button className="btn btn-sm btn-secondary" style={styles.deleteButton} onClick={() => deleteTheme(editTheme)}>
+                <BlockButton style={styles.deleteButton} onClick={() => deleteTheme(editTheme)}>
                   Delete Design
-                </button>
+                </BlockButton>
               )}
-              <button className="btn btn-sm btn-primary" onClick={() => setEditTheme(null)}>
-                Done
-              </button>
-            </div>
-          </div>
-
-          <div style={styles.body}>
-            <div className="card" style={{ ...styles.editorCard, height: '100%' }}>
+              <BlockButton active onClick={() => setEditTheme(null)}>Done</BlockButton>
+            </>
+          )}
+        >
+            <div style={styles.editorCard}>
               <div style={styles.editorHeader}>
                 <label style={styles.nameField}>
                   <span style={styles.nameLabel}>Design Preset Name</span>
@@ -600,8 +590,7 @@ export function ThemePanel() {
                 </div>
               </div>
             </div>
-          </div>
-        </>
+        </Block>
       )}
     </div>
   );
@@ -1197,23 +1186,6 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
-    overflowY: 'auto',
-    paddingRight: 4,
-  },
-  header: {
-    flexShrink: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 16,
-  },
-  body: {
-    flex: 1,
-    minHeight: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
   },
   themeGrid: {
     display: 'grid',
@@ -1230,11 +1202,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderColor: 'rgba(231, 76, 60, 0.24)',
   },
   editorCard: {
-    flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
-    maxHeight: 'min(520px, 70vh)',
   },
   editorHeader: {
     flexShrink: 0,

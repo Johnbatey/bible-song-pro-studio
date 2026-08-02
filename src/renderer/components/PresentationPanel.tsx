@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { CustomDropdown } from './CustomDropdown';
+import { Block } from './Block';
 
 interface SlideItem {
   id: string;
@@ -38,9 +39,9 @@ export function PresentationPanel() {
   }
 
   return (
-    <div style={styles.container}>
-      {/* Top Controls Bar */}
-      <div style={styles.topBar}>
+    <div className="blk-col" style={styles.container}>
+      {/* Toolbar block */}
+      <div className="blk blk--bar">
         <CustomDropdown
           value="create"
           options={[
@@ -63,11 +64,11 @@ export function PresentationPanel() {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div className="blk-seg">
           <button style={styles.gridToggleBtn} title="List View">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           </button>
-          <button style={{ ...styles.gridToggleBtn, background: 'rgba(255, 255, 255, 0.08)' }} title="2 Column Grid View">
+          <button style={{ ...styles.gridToggleBtn, background: 'var(--block-active)' }} title="2 Column Grid View">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           </button>
           <button style={styles.gridToggleBtn} title="3 Column Grid View">
@@ -77,7 +78,7 @@ export function PresentationPanel() {
       </div>
 
       {/* Slide Cards Grid */}
-      <div style={styles.gridContainer}>
+      <Block className="blk-fill" title="Slides" subtitle={`${presentations.length}`} bodyStyle={styles.gridContainer}>
         {presentations
           .filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()))
           .map((item) => (
@@ -109,7 +110,7 @@ export function PresentationPanel() {
               </div>
             </div>
           ))}
-      </div>
+      </Block>
     </div>
   );
 }
@@ -117,16 +118,8 @@ export function PresentationPanel() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
+    minHeight: 0,
     fontFamily: 'var(--font-ui)',
-  },
-  topBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 14,
-    flexShrink: 0,
   },
   searchBox: {
     flex: 1,
@@ -135,8 +128,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     height: 34,
     padding: '0 12px',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'var(--block-active)',
+    border: '1px solid var(--block-line)',
     borderRadius: 6,
   },
   searchInput: {
@@ -148,28 +141,26 @@ const styles: Record<string, React.CSSProperties> = {
     outline: 'none',
   },
   gridToggleBtn: {
-    width: 34,
-    height: 34,
+    width: 28,
+    height: 28,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    borderRadius: 6,
+    background: 'transparent',
+    border: 'none',
+    borderRadius: 4,
     color: '#ffffff',
     cursor: 'pointer',
   },
   gridContainer: {
-    flex: 1,
-    overflowY: 'auto',
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
     gap: 14,
     alignContent: 'start',
   },
   card: {
-    background: '#141416',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'var(--block-bg)',
+    border: '1px solid var(--block-line)',
     borderRadius: 6,
     overflow: 'hidden',
     cursor: 'pointer',
@@ -194,7 +185,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    background: '#141416',
+    background: 'var(--block-bg)',
+    borderTop: '1px solid var(--block-line)',
   },
   cardTitle: {
     fontSize: 12,

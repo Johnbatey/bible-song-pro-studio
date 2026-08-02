@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import type { Song } from '../types';
 import { v4 as uuid } from 'uuid';
 import { type, fontWeight } from '../styles/type';
+import { Block } from './Block';
 
 // CCLI-like song database
 const SONG_PACKS = [
@@ -93,26 +94,25 @@ export function SongLibrary() {
   };
 
   return (
-    <div style={{ padding: 16, height: '100%', minHeight: 0, overflowY: 'auto', boxSizing: 'border-box' }}>
-      <h2 style={{ ...type.title, marginBottom: 16 }}>Song Library</h2>
-
-      {/* Library filter. Online catalogue search (CCLI SongSelect etc.) is not built yet. */}
-      <div className="glass" style={{ padding: 12, borderRadius: 'var(--radius-md)', marginBottom: 16 }}>
-        <div className="section-title">Filter Library</div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-          <input
-            className="input"
-            placeholder="Filter songs in your library..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 6 }}>
+    <Block
+      title="Song Library"
+      subtitle={`${filteredSongs.length}/${songs.length}`}
+      tools={(
+        <input
+          className="input"
+          placeholder="Filter songs..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: 220, height: 28, padding: '0 10px', background: 'var(--block-active)', borderColor: 'var(--block-line)' }}
+        />
+      )}
+      footer={(
+        <span style={{ ...type.caption, color: 'var(--text-dim)' }}>
           Online catalogue search is not available yet — use <strong>Songs → Import Songs</strong> for
           OpenLyrics and ChordPro files.
-        </div>
-      </div>
-
+        </span>
+      )}
+    >
       {/* Song Packs */}
       <div className="section-title" style={{ marginBottom: 8 }}>Song Packs</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
@@ -179,6 +179,6 @@ export function SongLibrary() {
           </div>
         )}
       </div>
-    </div>
+    </Block>
   );
 }

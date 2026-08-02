@@ -1,0 +1,113 @@
+import type { CSSProperties, ReactNode } from 'react';
+
+/**
+ * The window block — the one shape every panel in the app is built from.
+ *
+ *   ┌──────────────────────────────┐
+ *   │ Title                 tools  │  chrome bar
+ *   ├──────────────────────────────┤  1px Black Beauty rule
+ *   │ body                         │
+ *   └──────────────────────────────┘  1px Black Beauty border, matt black fill
+ *
+ * Blocks sit beside one another with --block-gap between them and a
+ * <BlockDivider /> in that gap.
+ */
+interface BlockProps {
+  /** Label shown at the left of the chrome bar. Omit for a tools-only chrome. */
+  title?: ReactNode;
+  /** Muted text next to the title. */
+  subtitle?: ReactNode;
+  /** Controls at the right of the chrome bar. */
+  tools?: ReactNode;
+  /** Replaces title/tools entirely — for chrome bars that are one long toolbar. */
+  chrome?: ReactNode;
+  /** Bottom bar below the body, separated by its own rule. */
+  footer?: ReactNode;
+  /** Drop the body's default padding (lists that draw their own). */
+  flush?: boolean;
+  /** Centre the body's content both ways. */
+  centered?: boolean;
+  className?: string;
+  style?: CSSProperties;
+  bodyClassName?: string;
+  bodyStyle?: CSSProperties;
+  children?: ReactNode;
+}
+
+export function Block({
+  title,
+  subtitle,
+  tools,
+  chrome,
+  footer,
+  flush,
+  centered,
+  className = '',
+  style,
+  bodyClassName = '',
+  bodyStyle,
+  children,
+}: BlockProps) {
+  const hasChrome = Boolean(chrome || title || tools);
+
+  return (
+    <section className={`blk blk--fill ${className}`.trim()} style={style}>
+      {hasChrome && (
+        chrome ? (
+          <div className="blk__chrome blk__chrome--tools">{chrome}</div>
+        ) : (
+          <div className="blk__chrome">
+            <div className="blk__titlegroup">
+              {title && <span className="blk__title">{title}</span>}
+              {subtitle && <span className="blk__subtitle">{subtitle}</span>}
+            </div>
+            {tools && <div className="blk__tools">{tools}</div>}
+          </div>
+        )
+      )}
+      <div
+        className={[
+          'blk__body',
+          flush ? 'blk__body--flush' : '',
+          centered ? 'blk__body--center' : '',
+          bodyClassName,
+        ].filter(Boolean).join(' ')}
+        style={bodyStyle}
+      >
+        {children}
+      </div>
+      {footer && <div className="blk__footer">{footer}</div>}
+    </section>
+  );
+}
+
+/** The hairline that sits in the gap between two blocks. */
+export function BlockDivider({ orientation = 'vertical' }: { orientation?: 'vertical' | 'horizontal' }) {
+  return <div className={orientation === 'horizontal' ? 'blk-divider blk-divider--h' : 'blk-divider'} />;
+}
+
+interface BlockButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  active?: boolean;
+  icon?: boolean;
+}
+
+/** A chrome-bar control. Active/hover states use Black Chestnut Oak. */
+export function BlockButton({ active, icon, className = '', ...rest }: BlockButtonProps) {
+  return (
+    <button
+      type="button"
+      {...rest}
+      className={[
+        'blk-btn',
+        icon ? 'blk-btn--icon' : '',
+        active ? 'is-active' : '',
+        className,
+      ].filter(Boolean).join(' ')}
+    />
+  );
+}
+
+/** Wrapper for a group of mutually exclusive chrome buttons. */
+export function BlockSegment({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div className={`blk-seg ${className}`.trim()}>{children}</div>;
+}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from './stores/appStore';
 import { TitleBar } from './components/TitleBar';
 import { Sidebar } from './components/Sidebar';
+import { Block } from './components/Block';
 import { PreviewProgramView } from './components/PreviewProgramView';
 import { TranscriptPanel } from './components/TranscriptPanel';
 import { ScenePanel } from './components/ScenePanel';
@@ -227,16 +228,16 @@ export function App() {
               className={`resizer-handle resizer-handle-v ${activeDrag === 'transcript' ? 'is-dragging' : ''}`}
               onPointerDown={(e) => startResizing('transcript', e)}
               title="Drag to resize top area height"
-            >
-              <div className="resizer-grip-v" />
-            </div>
+            />
 
             <div className="sidebar-region">
-              <Sidebar
-                activePanel={activePanel as PanelView}
-                onPanelChange={(p) => setActivePanel(p)}
-                collapsed={!sidebarOpen}
-              />
+              <Block title="Workspace" flush>
+                <Sidebar
+                  activePanel={activePanel as PanelView}
+                  onPanelChange={(p) => setActivePanel(p)}
+                  collapsed={!sidebarOpen}
+                />
+              </Block>
             </div>
 
             {/* Horizontal resizer between Sidebar and Left Workspace */}
@@ -244,9 +245,7 @@ export function App() {
               className={`resizer-handle resizer-handle-h sidebar-resizer ${activeDrag === 'sidebar' ? 'is-dragging' : ''}`}
               onPointerDown={(e) => startResizing('sidebar', e)}
               title="Drag to resize Sidebar width"
-            >
-              <div className="resizer-grip-h" />
-            </div>
+            />
 
             <main className="left-workspace">
               <div className="app-content">

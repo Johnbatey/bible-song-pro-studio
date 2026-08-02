@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import type { MediaItem, Scene } from '../types';
 import { type, fontWeight } from '../styles/type';
+import { Block, BlockButton } from './Block';
 
 const GRADIENT_PRESETS = [
   { name: 'Purple Haze', value: 'linear-gradient(135deg, #667eea, #764ba2)' },
@@ -125,17 +126,16 @@ export function MediaPanel() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Fixed Chrome Header */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ ...type.title }}>Media</h2>
-        <button className="btn btn-sm btn-primary" onClick={handlePick} disabled={busy}>
+    <Block
+      title="Media"
+      subtitle={`${items.length} in library`}
+      tools={(
+        <BlockButton onClick={handlePick} disabled={busy}>
           {busy ? 'Importing…' : 'Import Media'}
-        </button>
-      </div>
-
-      {/* Scrollable Body */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: 6 }}>
+        </BlockButton>
+      )}
+    >
+      <>
         {/* Colour / gradient backgrounds */}
         <div className="glass" style={{ padding: 12, borderRadius: 'var(--radius-md)', marginBottom: 12 }}>
           <div className="section-title">Backgrounds</div>
@@ -268,7 +268,7 @@ export function MediaPanel() {
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </>
+    </Block>
   );
 }

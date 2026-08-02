@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { ProgramSurface } from './display/ProgramSurface';
+import { Block, BlockButton, BlockSegment } from './Block';
 import { type, fontWeight } from '../styles/type';
 
 const ZOOM_MIN = 0.5;
@@ -188,7 +189,53 @@ export function PreviewProgramView() {
   }
 
   return (
-    <div className="pv-dock" style={styles.container}>
+    <Block
+      className="pv-dock"
+      title="Output"
+      subtitle={isStudio ? 'Preview · Program' : 'Program'}
+      tools={(
+        <BlockSegment>
+          <BlockButton
+            active={outputMode === 'fullscreen'}
+            onClick={() => setOutputMode('fullscreen')}
+            title="Fullscreen Output Mode (FS)"
+          >
+            FS
+          </BlockButton>
+          <BlockButton
+            active={outputMode === 'lowerThird'}
+            onClick={() => setOutputMode('lowerThird')}
+            title="Lower Third Output Mode (LT)"
+          >
+            LT
+          </BlockButton>
+        </BlockSegment>
+      )}
+      flush
+      bodyStyle={{ display: 'flex', overflow: 'hidden' }}
+      footer={(
+        <>
+          <span style={styles.footerLabel}>SCALE</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom - ZOOM_STEP)} title="Zoom out">-</button>
+            <span style={styles.zoomValue}>{zoomLabel}</span>
+            <input
+              style={styles.zoomSlider}
+              type="range"
+              min={ZOOM_MIN}
+              max={ZOOM_MAX}
+              step={0.01}
+              value={zoom}
+              onChange={(event) => setZoomAround(Number(event.currentTarget.value))}
+              title="Preview/program scale"
+            />
+            <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom + ZOOM_STEP)} title="Zoom in">+</button>
+            <button style={styles.zoomBtnWide} onClick={fitStage} title="Fit preview/program to view">FIT</button>
+            <button style={styles.zoomBtnWide} onClick={() => { updateZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset scale and pan">1:1</button>
+          </div>
+        </>
+      )}
+    >
       <div
         ref={viewportRef}
         style={{ ...styles.viewport, cursor: isPanning ? 'grabbing' : 'grab' }}
@@ -243,93 +290,19 @@ export function PreviewProgramView() {
             </div>
           </div>
         </div>
-        <div style={styles.zoomControls}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.04em' }}>OUTPUT:</span>
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 5, padding: 2, gap: 2, border: '1px solid var(--border-primary)' }}>
-                <button
-                  style={{
-                    height: 22,
-                    padding: '0 10px',
-                    border: 'none',
-                    borderRadius: 4,
-                    background: outputMode === 'fullscreen' ? 'var(--accent)' : 'transparent',
-                    color: outputMode === 'fullscreen' ? '#ffffff' : 'var(--text-secondary)',
-                    fontWeight: outputMode === 'fullscreen' ? 700 : 500,
-                    fontSize: 11,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onClick={() => setOutputMode('fullscreen')}
-                  title="Fullscreen Output Mode (FS)"
-                >
-                  FS
-                </button>
-                <button
-                  style={{
-                    height: 22,
-                    padding: '0 10px',
-                    border: 'none',
-                    borderRadius: 4,
-                    background: outputMode === 'lowerThird' ? 'var(--accent)' : 'transparent',
-                    color: outputMode === 'lowerThird' ? '#ffffff' : 'var(--text-secondary)',
-                    fontWeight: outputMode === 'lowerThird' ? 700 : 500,
-                    fontSize: 11,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onClick={() => setOutputMode('lowerThird')}
-                  title="Lower Third Output Mode (LT)"
-                >
-                  LT
-                </button>
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom - ZOOM_STEP)} title="Zoom out">-</button>
-            <span style={styles.zoomValue}>{zoomLabel}</span>
-            <input
-              style={styles.zoomSlider}
-              type="range"
-              min={ZOOM_MIN}
-              max={ZOOM_MAX}
-              step={0.01}
-              value={zoom}
-              onChange={(event) => setZoomAround(Number(event.currentTarget.value))}
-              title="Preview/program scale"
-            />
-            <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom + ZOOM_STEP)} title="Zoom in">+</button>
-            <button style={styles.zoomBtnWide} onClick={fitStage} title="Fit preview/program to view">FIT</button>
-            <button style={styles.zoomBtnWide} onClick={() => { updateZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset scale and pan">1:1</button>
-          </div>
-        </div>
       </div>
-    </div>
+    </Block>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    flexShrink: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    minHeight: 0,
-    padding: 0,
-    background: '#161414',
-    border: '1px solid #262628',
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
   viewport: {
     position: 'relative',
     flex: 1,
+    minWidth: 0,
     minHeight: 0,
     overflow: 'hidden',
-    background: '#0c0c0e',
-    borderRadius: 0,
+    background: 'var(--bg-primary)',
     touchAction: 'none',
   },
   stage: {
@@ -407,30 +380,16 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
     animation: 'spin 0.6s linear infinite',
   },
-  zoomControls: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 20,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    padding: '6px 12px',
-    borderRadius: 0,
-    borderTop: '1px solid var(--border-primary)',
-    background: 'rgba(12, 14, 20, 0.94)',
-    backdropFilter: 'blur(14px)',
-    boxShadow: '0 -2px 10px rgba(0,0,0,0.2)',
-    cursor: 'default',
+  footerLabel: {
+    ...type.label,
+    color: 'var(--text-dim)',
   },
   zoomBtn: {
     width: 24,
     height: 24,
-    border: '1px solid var(--border-primary)',
+    border: '1px solid var(--block-line)',
     borderRadius: 5,
-    background: 'rgba(255,255,255,0.06)',
+    background: 'var(--block-active)',
     color: 'var(--text-primary)',
     cursor: 'pointer',
     fontWeight: fontWeight.semibold,
@@ -438,9 +397,9 @@ const styles: Record<string, React.CSSProperties> = {
   zoomBtnWide: {
     height: 24,
     padding: '0 8px',
-    border: '1px solid var(--border-primary)',
+    border: '1px solid var(--block-line)',
     borderRadius: 5,
-    background: 'rgba(255,255,255,0.06)',
+    background: 'var(--block-active)',
     color: 'var(--text-primary)',
     cursor: 'pointer',
     ...type.label,

@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import type { BibleBook, BibleSearchResult, BibleVerse, BibleVersion, Scene } from '../types';
 import { type, fontWeight, numeric } from '../styles/type';
 import { CustomDropdown } from './CustomDropdown';
+import { Block } from './Block';
 
 const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', 'Revelation'];
 
@@ -435,9 +436,15 @@ export function BiblePanel() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [visibleVerses, currentScene, previewScene, dualVersion, secondaryVersion, selectedVersion, outputMode, operatingMode]);
 
+  const chapterLabel = results.length
+    ? `Search results · ${results.length}`
+    : selectedBook
+    ? `${selectedBook} ${chapter}`
+    : 'Scripture';
+
   return (
-    <div ref={containerRef} style={styles.panel}>
-      <div style={styles.searchShell}>
+    <div ref={containerRef} className="blk-col" style={styles.panel}>
+      <div className="blk blk--bar">
         <div style={styles.controlsRow}>
           {/* Custom Dark Version Dropdown Popup matching the reference design */}
           <CustomDropdown
@@ -452,7 +459,7 @@ export function BiblePanel() {
             <button
               style={{
                 ...styles.pillBtn,
-                background: !dualVersion ? '#FF5500' : 'transparent',
+                background: !dualVersion ? 'var(--block-active)' : 'transparent',
                 color: !dualVersion ? '#ffffff' : '#a1a1aa',
               }}
               onClick={() => setDualVersion(false)}
@@ -466,7 +473,7 @@ export function BiblePanel() {
             <button
               style={{
                 ...styles.pillBtn,
-                background: dualVersion ? '#FF5500' : 'transparent',
+                background: dualVersion ? 'var(--block-active)' : 'transparent',
                 color: dualVersion ? '#ffffff' : '#a1a1aa',
               }}
               onClick={() => setDualVersion(true)}
@@ -521,7 +528,11 @@ export function BiblePanel() {
         </div>
       </div>
 
-      <div style={styles.resultsPane}>
+      <Block
+        className="blk-fill"
+        title={chapterLabel}
+        tools={<span style={styles.footerNote}>{currentVersion?.name || selectedVersion}</span>}
+      >
         {pinned.length > 0 && (
           <div style={styles.chips}>
             {pinned.map((verse) => (
@@ -623,20 +634,19 @@ export function BiblePanel() {
         )}
 
         <div style={styles.footerNote}>
-          Active version: {currentVersion?.name || selectedVersion}. Click a verse card to load it into Preview.
+          Click a verse card to load it into Preview.
         </div>
-      </div>
+      </Block>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  panel: { height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' },
+  panel: { height: '100%', minHeight: 0 },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   h2: { ...type.title },
   segmented: { display: 'flex', gap: 6 },
-  searchShell: { padding: '8px 10px', borderRadius: 6, marginBottom: 10, flexShrink: 0, background: '#161414', border: '1px solid #262628' },
-  controlsRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap' },
+  controlsRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap', width: '100%' },
   versionSelect: {
     padding: '5px 10px',
     background: '#232221',
@@ -703,7 +713,6 @@ const styles: Record<string, React.CSSProperties> = {
   versionBar: { display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 },
   inlineToggle: { display: 'flex', alignItems: 'center', gap: 5, marginLeft: 6, ...type.caption, color: 'var(--text-secondary)' },
   secondarySelect: { width: 84, height: 28, padding: '2px 8px', ...type.secondary },
-  resultsPane: { flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 2 },
   chips: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 },
   grid: { display: 'flex', flexDirection: 'column', gap: 6 },
   verseButton: {

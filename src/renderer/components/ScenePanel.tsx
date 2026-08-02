@@ -1,6 +1,7 @@
 import { useAppStore } from '../stores/appStore';
 import type { Scene } from '../types';
 import { type, fontWeight } from '../styles/type';
+import { Block, BlockButton } from './Block';
 
 export function ScenePanel() {
   const scenes = useAppStore((s) => s.scenes);
@@ -27,13 +28,13 @@ export function ScenePanel() {
   };
 
   return (
-    <div style={{ height: '100%', minHeight: 0, overflowY: 'auto', paddingRight: 4, boxSizing: 'border-box' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ ...type.title }}>Scenes</h2>
-        <button className="btn btn-primary btn-sm" onClick={handleAddScene}>
-          + New Scene
-        </button>
-      </div>
+    <Block
+      title="Scenes"
+      subtitle={`${scenes.length}`}
+      tools={(
+        <BlockButton onClick={handleAddScene} title="Create a new scene">+ New Scene</BlockButton>
+      )}
+    >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {scenes.map((scene) => (
           <div
@@ -99,6 +100,6 @@ export function ScenePanel() {
           </div>
         )}
       </div>
-    </div>
+    </Block>
   );
 }

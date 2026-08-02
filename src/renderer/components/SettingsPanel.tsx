@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import type { AppSettings, AppSettingsPatch, ObsStatus, DisplayTarget } from '../types';
 import { ensureTheme } from '../utils/defaultTheme';
 import { type, fontWeight } from '../styles/type';
+import { Block, BlockButton, BlockSegment } from './Block';
 
 type Tab = 'output' | 'fullscreen' | 'lowerthird' | 'songs' | 'bible' | 'background' | 'fx' | 'audio' | 'ai' | 'streaming';
 
@@ -122,22 +123,22 @@ export function SettingsPanel() {
   }
 
   return (
-    <div>
-      <div style={styles.header}>
-        <h2 style={styles.h2}>Settings</h2>
-        <button className="btn btn-sm btn-secondary" onClick={refreshStatus}>Refresh Status</button>
-      </div>
-
-      <div style={styles.layout}>
-        <div style={styles.tabRail}>
-          {tabs.map((tab) => (
-            <button key={tab.id} className={`btn btn-sm ${activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab(tab.id)} style={styles.tabBtn}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div style={styles.body}>
+    <Block
+      title="Settings"
+      tools={(
+        <>
+          <BlockSegment>
+            {tabs.map((tab) => (
+              <BlockButton key={tab.id} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)}>
+                {tab.label}
+              </BlockButton>
+            ))}
+          </BlockSegment>
+          <BlockButton onClick={refreshStatus} title="Refresh status">Refresh</BlockButton>
+        </>
+      )}
+    >
+      <div style={styles.body}>
           {activeTab === 'output' && (
             <Section title="Standalone Output">
               {/* Monitor picker. The old button opened display index 1 unconditionally,
@@ -521,9 +522,8 @@ export function SettingsPanel() {
               )}
             </Section>
           )}
-        </div>
       </div>
-    </div>
+    </Block>
   );
 }
 
@@ -558,12 +558,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(231,76,60,0.15)', color: '#e74c3c',
     border: '1px solid rgba(231,76,60,0.35)', whiteSpace: 'nowrap',
   },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  h2: { ...type.title },
-  layout: { display: 'grid', gridTemplateColumns: '170px minmax(0,1fr)', gap: 14 },
-  tabRail: { display: 'flex', flexDirection: 'column', gap: 6 },
-  tabBtn: { justifyContent: 'flex-start' },
-  body: { minWidth: 0 },
+  body: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 },
   row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
   statusLine: { ...type.secondary, color: 'var(--text-secondary)' },
   controlGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 },
