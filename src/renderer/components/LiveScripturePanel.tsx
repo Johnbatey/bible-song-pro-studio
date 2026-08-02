@@ -3,7 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHandle } from '../services/audio-capture';
 import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection } from '../types';
 import { type, fontWeight, numeric } from '../styles/type';
-import { Block, BlockButton, BlockDivider, BlockSegment } from './Block';
+import { Block, BlockButton, BlockSegment } from './Block';
 
 /** Short enough to feel live, while still giving Whisper enough speech context. */
 const LOCAL_CHUNK_SECONDS = 3;
@@ -432,8 +432,6 @@ export function LiveScripturePanel() {
             </div>
           )}
         </Block>
-
-        <BlockDivider />
 
         <Block
           title="Candidate Index"

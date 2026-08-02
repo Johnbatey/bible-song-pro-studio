@@ -9,8 +9,8 @@ import type { CSSProperties, ReactNode } from 'react';
  *   │ body                         │
  *   └──────────────────────────────┘  1px Black Beauty border, matt black fill
  *
- * Blocks sit beside one another with --block-gap between them and a
- * <BlockDivider /> in that gap.
+ * Blocks sit beside one another with --block-gap between them. The gap stays
+ * empty — each block draws its own border, so no rule is needed between them.
  */
 interface BlockProps {
   /** Label shown at the left of the chrome bar. Omit for a tools-only chrome. */
@@ -79,11 +79,6 @@ export function Block({
       {footer && <div className="blk__footer">{footer}</div>}
     </section>
   );
-}
-
-/** The hairline that sits in the gap between two blocks. */
-export function BlockDivider({ orientation = 'vertical' }: { orientation?: 'vertical' | 'horizontal' }) {
-  return <div className={orientation === 'horizontal' ? 'blk-divider blk-divider--h' : 'blk-divider'} />;
 }
 
 interface BlockButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

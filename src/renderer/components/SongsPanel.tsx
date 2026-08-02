@@ -3,7 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { importSongFiles, SONG_FILE_ACCEPT } from '../utils/song-import';
 import type { Scene, Song } from '../types';
 import { type, fontWeight } from '../styles/type';
-import { Block, BlockButton, BlockDivider, BlockSegment } from './Block';
+import { Block, BlockButton, BlockSegment } from './Block';
 
 const DEMO_SONGS: Song[] = [
   {
@@ -310,8 +310,6 @@ export function SongsPanel() {
           )}
         </div>
       </Block>
-
-      <BlockDivider />
 
       {/* Right block: song details & lyric slides */}
       <Block

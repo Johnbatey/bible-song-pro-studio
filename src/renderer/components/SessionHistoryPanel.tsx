@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type, fontWeight } from '../styles/type';
-import { Block, BlockButton, BlockDivider } from './Block';
+import { Block, BlockButton } from './Block';
 
 export function SessionHistoryPanel() {
   const [sessions, setSessions] = useState<Array<any>>([]);
@@ -72,8 +72,6 @@ export function SessionHistoryPanel() {
           </button>
         ))}
       </Block>
-
-      <BlockDivider />
 
       <Block
         className="blk-fill"

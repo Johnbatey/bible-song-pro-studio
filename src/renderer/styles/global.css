@@ -339,21 +339,7 @@ html, body, #root {
   height: 24px;
 }
 
-/* ── Divider that sits in the gap between two blocks ── */
-.blk-divider {
-  flex: 0 0 1px;
-  align-self: stretch;
-  background: var(--block-line);
-}
-
-.blk-divider--h {
-  flex: 0 0 1px;
-  width: 100%;
-  height: 1px;
-  align-self: auto;
-}
-
-/* Rows / columns of blocks: gap on both sides of the divider. */
+/* Rows / columns of blocks: the gap between them stays empty. */
 .blk-row {
   display: flex;
   flex-direction: row;
@@ -412,10 +398,13 @@ html, body, #root {
   z-index: 10;
 }
 
+/* The hairline stays invisible — each block already draws its own border, so
+   a third line in the gap only adds noise. It lights up on hover/drag to show
+   the gap is grabbable. */
 .resizer-handle::after {
   content: '';
   position: absolute;
-  background: var(--block-line);
+  background: transparent;
   transition: background 0.15s ease;
 }
 
