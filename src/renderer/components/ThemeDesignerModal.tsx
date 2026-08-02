@@ -620,7 +620,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
   },
   presetCard: {
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: 'hidden',
     cursor: 'pointer',
     background: '#18181b',

@@ -1,10 +1,10 @@
 :root {
   --bg-primary: #0c0c0e;
-  --bg-secondary: #141416;
+  --bg-secondary: #161414;
   --bg-surface: #18181b;
-  --bg-elevated: #202024;
-  --bg-hover: #26262a;
-  --border-primary: rgba(255, 255, 255, 0.08);
+  --bg-elevated: #232221;
+  --bg-hover: #232221;
+  --border-primary: #262628;
   --border-accent: rgba(255, 85, 0, 0.4);
   --text-primary: #ffffff;
   --text-secondary: #a1a1aa;
@@ -19,10 +19,10 @@
   --red-dim: rgba(239, 68, 68, 0.15);
   --blue: #3b82f6;
   --blue-dim: rgba(59, 130, 246, 0.15);
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-xl: 6px;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
@@ -125,8 +125,8 @@ html, body, #root {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--sidebar-width, 280px) 8px minmax(0, 1fr);
-  grid-template-rows: var(--transcript-height, 360px) 6px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 280px) 1px minmax(0, 1fr);
+  grid-template-rows: var(--transcript-height, 360px) 1px minmax(0, 1fr);
   overflow: hidden;
   background: var(--bg-primary);
   position: relative;
@@ -139,7 +139,7 @@ html, body, #root {
   min-height: 0;
   overflow: hidden;
   background: var(--bg-primary);
-  padding: 8px;
+  padding: 0;
 }
 
 .sidebar-region {
@@ -181,12 +181,12 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* ── Resizer Handles & Overlay ── */
+/* ── Resizer Handles & Overlay matching the reference design ── */
 .resizer-handle {
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
-  background: #05070b;
+  background: rgba(255, 255, 255, 0.08);
   position: relative;
   z-index: 10;
   transition: background 0.15s ease;
@@ -197,13 +197,23 @@ html, body, #root {
 
 .resizer-handle:hover,
 .resizer-handle.is-dragging {
-  background: var(--accent);
+  background: #FF5500;
 }
 
 .resizer-handle-h {
   grid-row: 1 / -1;
   cursor: ew-resize;
-  width: 8px;
+  width: 1px;
+}
+
+.resizer-handle-h::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+  cursor: ew-resize;
 }
 
 .resizer-handle-h.sidebar-resizer {
@@ -214,19 +224,21 @@ html, body, #root {
   grid-column: 1 / -1;
   grid-row: 2;
   cursor: ns-resize;
-  height: 6px;
+  height: 1px;
 }
 
-.resizer-grip-v {
-  width: 24px;
-  height: 2px;
-  border-radius: 1px;
-  background: rgba(255, 255, 255, 0.25);
+.resizer-handle-v::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -4px;
+  cursor: ns-resize;
 }
 
+.resizer-grip-v,
 .resizer-grip-h {
-  width: 2px;
-  height: 24px;
   border-radius: 1px;
   background: rgba(255, 255, 255, 0.25);
 }

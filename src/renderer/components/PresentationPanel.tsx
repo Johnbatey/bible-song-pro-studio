@@ -170,7 +170,7 @@ const styles: Record<string, React.CSSProperties> = {
   card: {
     background: '#141416',
     border: '1px solid rgba(255, 255, 255, 0.08)',
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: 'hidden',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
