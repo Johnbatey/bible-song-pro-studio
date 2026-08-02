@@ -157,7 +157,18 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
   const fontWeight = state.fontWeight || themeSection?.fontWeight || defaultTheme.fontWeight;
   const fontColor = state.fontColor || themeSection?.fontColor || defaultTheme.fontColor;
   const textAlign = state.textAlign || themeSection?.textAlign || defaultTheme.textAlign;
-  const referenceColor = state.referenceColor || state.theme?.lowerThird?.accentColor || defaultTheme.referenceColor;
+  
+  const syncRefColor = themeSection?.syncRefColor;
+  const referenceColor = syncRefColor
+    ? fontColor
+    : (state.referenceColor || themeSection?.referenceColor || state.theme?.lowerThird?.accentColor || defaultTheme.referenceColor);
+
+  const shadowEnabled = themeSection?.textShadowEnabled;
+  const shadowLevel = themeSection?.textShadowLevel || 'medium';
+  const shadowColor = themeSection?.textShadowColor || 'rgba(0,0,0,0.85)';
+  const shadowBlur = typeof themeSection?.textShadowBlur === 'number' ? themeSection.textShadowBlur : (shadowLevel === 'heavy' ? 12 : shadowLevel === 'subtle' ? 3 : 6);
+  const shadowCss = shadowEnabled ? `0px 2px ${shadowBlur}px ${shadowColor}` : undefined;
+
   const showReference = state.showReference !== false;
   const showStageBackground = !scene || mode === 'fullscreen';
 
@@ -167,6 +178,7 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
     fontWeight,
     color: fontColor,
     textAlign,
+    textShadow: shadowCss,
     lineHeight: mode === 'fullscreen' ? state.theme?.fullScreen?.lineHeight : undefined,
   };
   const themeRefFontSize = mode === 'lowerThird' ? state.theme?.lowerThird?.referenceFontSize : state.theme?.fullScreen?.referenceFontSize;
@@ -175,6 +187,7 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
     fontSize: referenceFontSize({ ...state, referenceFontSize: state.referenceFontSize ?? themeRefFontSize ?? 0 }, preview),
     color: referenceColor,
     fontWeight,
+    textShadow: shadowCss,
   };
   const fsOffsetX = state.theme?.fullScreen?.offsetX || 0;
   const fsOffsetY = state.theme?.fullScreen?.offsetY || 0;

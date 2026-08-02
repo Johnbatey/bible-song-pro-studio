@@ -221,6 +221,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
     var fs = config.fontSize > 0 ? config.fontSize + 'px' : (config.mode === 'lowerThird' ? 'clamp(16px,2.2vw,44px)' : 'clamp(20px,2.8vw,64px)');
     var refFs = config.referenceFontSize > 0 ? config.referenceFontSize + 'px' : 'clamp(12px,1.4vw,28px)';
 
+    var themeSec = config.mode === 'lowerThird' ? (state.theme ? state.theme.lowerThird : null) : (state.theme ? state.theme.fullScreen : null);
+    var syncRef = themeSec && themeSec.syncRefColor;
+    var refColor = syncRef ? config.fontColor : (themeSec && themeSec.referenceColor ? themeSec.referenceColor : config.referenceColor);
+
+    var shadowEnabled = themeSec && themeSec.textShadowEnabled;
+    var shadowBlur = themeSec && typeof themeSec.textShadowBlur === 'number' ? themeSec.textShadowBlur : (themeSec && themeSec.textShadowLevel === 'heavy' ? 12 : 6);
+    var shadowColor = themeSec && themeSec.textShadowColor ? themeSec.textShadowColor : 'rgba(0,0,0,0.85)';
+    var shadowStyle = shadowEnabled ? 'text-shadow: 0px 2px ' + shadowBlur + 'px ' + shadowColor + ';' : '';
+
     // Dual-translation check
     var isCompare = verse.compareLeft && verse.compareRight;
 
@@ -228,23 +237,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
     if (isCompare) {
       html = '<div class="compare-layout">' +
         '<div class="compare-pane">' +
-          (verse.compareLeft.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-family:' + config.fontFamily + ';font-size:' + refFs + '"><span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(config.referenceColor) + ';font-weight:' + config.fontWeight + '">' + esc(verse.compareLeft.ref) + '</span>' +
-          (config.showTranslation && verse.compareLeft.translation ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.56;font-size:.85em">' + esc(verse.compareLeft.translation) + '</span>' : '') + '</div>' : '') +
-        '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + '">' + esc(verse.compareLeft.text) + '</div></div>' +
+          (verse.compareLeft.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-family:' + config.fontFamily + ';font-size:' + refFs + '"><span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(refColor) + ';font-weight:' + config.fontWeight + ';' + shadowStyle + '">' + esc(verse.compareLeft.ref) + '</span>' +
+          (config.showTranslation && verse.compareLeft.translation ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.56;font-size:.85em;' + shadowStyle + '">' + esc(verse.compareLeft.translation) + '</span>' : '') + '</div>' : '') +
+        '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + ';' + shadowStyle + '">' + esc(verse.compareLeft.text) + '</div></div>' +
         '<div class="compare-divider"></div>' +
         '<div class="compare-pane">' +
-          (verse.compareRight.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-family:' + config.fontFamily + ';font-size:' + refFs + '"><span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(config.referenceColor) + ';font-weight:' + config.fontWeight + '">' + esc(verse.compareRight.ref) + '</span>' +
-          (config.showTranslation && verse.compareRight.translation ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.56;font-size:.85em">' + esc(verse.compareRight.translation) + '</span>' : '') + '</div>' : '') +
-        '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + '">' + esc(verse.compareRight.text) + '</div></div>' +
+          (verse.compareRight.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-family:' + config.fontFamily + ';font-size:' + refFs + '"><span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(refColor) + ';font-weight:' + config.fontWeight + ';' + shadowStyle + '">' + esc(verse.compareRight.ref) + '</span>' +
+          (config.showTranslation && verse.compareRight.translation ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.56;font-size:.85em;' + shadowStyle + '">' + esc(verse.compareRight.translation) + '</span>' : '') + '</div>' : '') +
+        '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + ';' + shadowStyle + '">' + esc(verse.compareRight.text) + '</div></div>' +
       '</div>';
     } else {
       var refJustify = config.textAlign === 'left' ? 'flex-start' : (config.textAlign === 'right' ? 'flex-end' : 'center');
       html = '<div class="verse-reference-row" style="font-family:' + config.fontFamily + ';font-size:' + refFs + '; justify-content:' + refJustify + '; text-align:' + config.textAlign + '">' +
-        (config.showReference && ref ? '<span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(config.referenceColor) + ';font-weight:' + config.fontWeight + '">' + esc(ref) + '</span>' : '') +
-        (config.showTranslation && trans ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.56;font-size:.85em">' + esc(trans) + '</span>' : '') +
-        (bookmark ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.4;font-size:.8em">' + esc(bookmark) + '</span>' : '') +
+        (config.showReference && ref ? '<span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(refColor) + ';font-weight:' + config.fontWeight + ';' + shadowStyle + '">' + esc(ref) + '</span>' : '') +
+        (config.showTranslation && trans ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.56;font-size:.85em;' + shadowStyle + '">' + esc(trans) + '</span>' : '') +
+        (bookmark ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.4;font-size:.8em;' + shadowStyle + '">' + esc(bookmark) + '</span>' : '') +
       '</div>' +
-      '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + '">' + esc(text) + '</div>';
+      '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + ';' + shadowStyle + '">' + esc(text) + '</div>';
     }
 
     // Song credit footer — small, low-contrast, always last. Most CCLI licences

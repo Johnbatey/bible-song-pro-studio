@@ -27,12 +27,14 @@ const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
-      backgroundColor: '#0c0e14',
-      fontFamily: '-apple-system, SF Pro Display, sans-serif',
-      fontSize: 48,
-      referenceFontSize: 28,
+      background: '#9c1a1a',
+      backgroundColor: '#9c1a1a',
+      fontFamily: 'Georgia, serif',
+      fontSize: 65,
+      referenceFontSize: 50,
       fontWeight: 700,
-      fontColor: '#F4E4B0',
+      fontColor: '#ffffff',
+      referenceColor: '#F4E4B0',
       textAlign: 'center',
       animation: 'fadeIn',
       offsetX: 0,
@@ -70,6 +72,7 @@ const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
+      background: 'linear-gradient(135deg, #0f172a, #1e1b4b, #312e81)',
       backgroundColor: '#0f0c29',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 44,
@@ -113,6 +116,7 @@ const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
+      background: 'linear-gradient(135deg, #001a0a, #00411c, #178e4c)',
       backgroundColor: '#001a0a',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 48,
@@ -156,6 +160,7 @@ const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
+      background: 'linear-gradient(135deg, #1b0000, #781414, #e65100)',
       backgroundColor: '#1a0000',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 48,
@@ -199,6 +204,7 @@ const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
+      background: '#ffffff',
       backgroundColor: '#ffffff',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 48,
@@ -242,6 +248,7 @@ const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
+      background: 'linear-gradient(135deg, #1a0033, #4a148c, #7b1fa2)',
       backgroundColor: '#1a0033',
       fontFamily: 'Inter, sans-serif',
       fontSize: 46,
@@ -285,6 +292,7 @@ const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
+      background: 'linear-gradient(135deg, #001f3f, #003366, #00509d)',
       backgroundColor: '#002171',
       fontFamily: 'Montserrat, sans-serif',
       fontSize: 46,
@@ -328,6 +336,7 @@ const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
+      background: 'linear-gradient(135deg, #1b0000, #4a1500, #e65100)',
       backgroundColor: '#1b0000',
       fontFamily: 'Inter, sans-serif',
       fontSize: 48,
@@ -397,189 +406,333 @@ export function ThemePanel() {
 
   return (
     <div style={styles.panel}>
-      <div style={styles.header}>
-        <h2 style={{ ...type.title }}>Design</h2>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {activeTheme && (
-            <button className="btn btn-sm btn-secondary" onClick={() => setEditTheme(activeTheme)}>
-              Customize Active
-            </button>
-          )}
-          <button
-            className="btn btn-sm btn-primary"
-            onClick={() => {
-            const t: Theme = {
-              id: `theme-${Date.now()}`,
-              name: `Custom Design ${themes.length + 1}`,
-              lowerThird: {
-                background: 'rgba(0,0,0,0.8)',
-                backgroundColor: '#000',
-                backgroundOpacity: 0.8,
-                accentColor: '#C9A96E',
-                fontFamily: '-apple-system, SF Pro Display, sans-serif',
-                fontSize: 32,
-                fontWeight: 600,
-                fontColor: '#ffffff',
-                textAlign: 'left',
-                padding: 16,
-                borderRadius: 8,
-                animation: 'fadeIn',
-                position: 'bottom-left',
-              },
-              fullScreen: {
-                backgroundColor: '#0c0e14',
-                fontFamily: '-apple-system, SF Pro Display, sans-serif',
-                fontSize: 40,
-                fontWeight: 600,
-                fontColor: '#ffffff',
-                textAlign: 'center',
-                animation: 'fadeIn',
-              },
-              slideTheme: {
-                backgroundColor: '#0c0e14',
-                fontFamily: '-apple-system, SF Pro Display, sans-serif',
-                fontSize: 32,
-                fontWeight: 500,
-                fontColor: '#f0ece4',
-                accentColor: '#C9A96E',
-                transition: 'crossfade',
-              },
-            };
-            addTheme(t);
-            setActiveTheme(t);
-            setEditTheme(t);
-          }}
-          >
-            + Custom Design
-          </button>
-        </div>
-      </div>
-
-      <div style={styles.body}>
-        <div style={styles.themeGrid}>
-          {allThemes.map((theme) => (
-            <div
-              key={theme.id}
-              className={`card card-hover ${activeTheme?.id === theme.id ? 'glass-accent' : ''}`}
-              style={{ cursor: 'pointer' }}
-              onClick={() => setActiveTheme(theme)}
-            >
-              {/* Preview bar */}
-              <div
-                style={{
-                  height: 60,
-                  borderRadius: 'var(--radius-sm)',
-                  marginBottom: 10,
-                  background: theme.lowerThird.background || theme.lowerThird.backgroundColor,
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                  padding: 8,
+      {!editTheme ? (
+        /* PAGE 1: PRESET GRID VIEW */
+        <>
+          <div style={styles.header}>
+            <h2 style={{ ...type.title }}>Design Presets</h2>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {activeTheme && (
+                <button className="btn btn-sm btn-secondary" onClick={() => setEditTheme(activeTheme)}>
+                  Customize Active
+                </button>
+              )}
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => {
+                  const t: Theme = {
+                    id: `theme-${Date.now()}`,
+                    name: `Custom Design ${themes.length + 1}`,
+                    lowerThird: {
+                      background: 'rgba(0,0,0,0.85)',
+                      backgroundColor: '#000000',
+                      backgroundOpacity: 0.85,
+                      accentColor: '#C9A96E',
+                      fontFamily: '-apple-system, SF Pro Display, sans-serif',
+                      fontSize: 32,
+                      fontWeight: 600,
+                      fontColor: '#ffffff',
+                      textAlign: 'left',
+                      padding: 16,
+                      borderRadius: 8,
+                      animation: 'fadeIn',
+                      position: 'bottom-left',
+                    },
+                    fullScreen: {
+                      background: 'linear-gradient(135deg, #0f172a, #1e1b4b, #312e81)',
+                      backgroundColor: '#0c0e14',
+                      fontFamily: '-apple-system, SF Pro Display, sans-serif',
+                      fontSize: 44,
+                      fontWeight: 600,
+                      fontColor: '#ffffff',
+                      textAlign: 'center',
+                      animation: 'fadeIn',
+                    },
+                    slideTheme: {
+                      backgroundColor: '#0c0e14',
+                      fontFamily: '-apple-system, SF Pro Display, sans-serif',
+                      fontSize: 32,
+                      fontWeight: 500,
+                      fontColor: '#f0ece4',
+                      accentColor: '#C9A96E',
+                      transition: 'crossfade',
+                    },
+                  };
+                  addTheme(t);
+                  setActiveTheme(t);
+                  setEditTheme(t);
                 }}
               >
-                <div
-                  style={{
-                    width: '60%',
-                    height: 6,
-                    borderRadius: 3,
-                    background: theme.lowerThird.fontColor,
-                    opacity: 0.8,
-                  }}
-                />
-              </div>
-              <div style={{ ...type.heading, fontWeight: fontWeight.medium }}>{theme.name}</div>
-              <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                <span className="badge" style={{ background: 'var(--blue-dim)', color: 'var(--blue)' }}>
-                  LT
-                </span>
-                <span className="badge" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>
-                  Full
-                </span>
-                <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                  Slides
-                </span>
-              </div>
-              <div style={{ marginTop: 8, ...type.caption, color: 'var(--text-dim)' }}>
-                Anim: {theme.lowerThird.animation}
-              </div>
-              <div style={styles.cardActions}>
-                <button
-                  className="btn btn-sm btn-secondary"
-                  style={{ flex: 1 }}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setActiveTheme(theme);
-                    setEditTheme(theme);
-                  }}
-                >
-                  Edit Design
-                </button>
-                {themes.some((item) => item.id === theme.id) && (
-                  <button
-                    className="btn btn-sm btn-secondary"
-                    style={styles.deleteButton}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      deleteTheme(theme);
-                    }}
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>
+                + Custom Design
+              </button>
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* Theme editor */}
-        {editTheme && (
-          <div className="card" style={styles.editorCard}>
-            <div style={styles.editorHeader}>
-              <label style={styles.nameField}>
-                <span style={styles.nameLabel}>Design Preset Name</span>
-                <input
-                  className="input"
-                  value={editTheme.name}
-                  onChange={(event) => renameTheme(editTheme, event.target.value)}
-                  onBlur={() => commitThemeName(editTheme)}
-                />
-              </label>
+          <div style={styles.body}>
+            <div style={styles.themeGrid}>
+              {allThemes.map((theme) => (
+                <div
+                  key={theme.id}
+                  className={`card card-hover ${activeTheme?.id === theme.id ? 'glass-accent' : ''}`}
+                  style={{ cursor: 'pointer', padding: 12 }}
+                  onClick={() => setActiveTheme(theme)}
+                >
+                  {/* Realistic 16:9 Presentation Display Thumbnail */}
+                  <ThemeThumbnailPreview theme={theme} />
+
+                  {/* Header Row: Preset Name & Badges on the Same Line */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, gap: 6 }}>
+                    <div style={{ ...type.heading, fontWeight: fontWeight.bold, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                      {theme.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                      <span className="badge" style={{ background: 'var(--blue-dim)', color: 'var(--blue)', fontSize: 9, padding: '2px 4px' }}>
+                        LT
+                      </span>
+                      <span className="badge" style={{ background: 'var(--green-dim)', color: 'var(--green)', fontSize: 9, padding: '2px 4px' }}>
+                        FULL
+                      </span>
+                      <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 9, padding: '2px 4px' }}>
+                        SLIDES
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons Row */}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      style={{ flex: 1, padding: '5px 8px', fontSize: 12 }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setActiveTheme(theme);
+                        setEditTheme(theme);
+                      }}
+                    >
+                      Edit Design
+                    </button>
+                    {themes.some((item) => item.id === theme.id) && (
+                      <button
+                        className="btn btn-sm btn-secondary"
+                        style={{ ...styles.deleteButton, padding: '5px 8px', fontSize: 12 }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          deleteTheme(theme);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        /* PAGE 2: PRESET EDITOR VIEW */
+        <>
+          <div style={styles.header}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button className="btn btn-sm btn-secondary" onClick={() => setEditTheme(null)}>
+                ← Back to Design Presets
+              </button>
+              <h2 style={{ ...type.title, fontSize: 18 }}>
+                Edit Design: <span style={{ color: 'var(--accent)' }}>{editTheme.name}</span>
+              </h2>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
               {themes.some((theme) => theme.id === editTheme.id) && (
                 <button className="btn btn-sm btn-secondary" style={styles.deleteButton} onClick={() => deleteTheme(editTheme)}>
                   Delete Design
                 </button>
               )}
-              <button className="btn btn-sm btn-secondary" onClick={() => setEditTheme(null)}>
-                Back to Design
+              <button className="btn btn-sm btn-primary" onClick={() => setEditTheme(null)}>
+                Done
               </button>
             </div>
-            <div style={styles.editorBody}>
-              <div style={styles.editorColumn}>
-                <div className="section-title">Lower Third</div>
-                <ThemeFormSection
-                  values={editTheme.lowerThird}
-                  onChange={(updates) => {
-                    const updated = { ...editTheme, lowerThird: { ...editTheme.lowerThird, ...updates } };
-                    setEditTheme(updated);
-                    setActiveTheme(updated);
-                    updateTheme(editTheme.id, updated);
-                  }}
-                />
+          </div>
+
+          <div style={styles.body}>
+            <div className="card" style={{ ...styles.editorCard, height: '100%' }}>
+              <div style={styles.editorHeader}>
+                <label style={styles.nameField}>
+                  <span style={styles.nameLabel}>Design Preset Name</span>
+                  <input
+                    className="input"
+                    value={editTheme.name}
+                    onChange={(event) => renameTheme(editTheme, event.target.value)}
+                    onBlur={() => commitThemeName(editTheme)}
+                  />
+                </label>
               </div>
-              <div style={styles.editorColumn}>
-                <div className="section-title">Full Screen</div>
-                <ThemeFormSection
-                  values={editTheme.fullScreen}
-                  onChange={(updates) => {
-                    const updated = { ...editTheme, fullScreen: { ...editTheme.fullScreen, ...updates } };
-                    setEditTheme(updated);
-                    setActiveTheme(updated);
-                    updateTheme(editTheme.id, updated);
-                  }}
-                />
+              <div style={styles.editorBody}>
+                {/* Column 1: FULL SCREEN (Left Column) */}
+                <div style={styles.editorColumn}>
+                  <div className="section-title" style={{ color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="badge" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>FULL SCREEN</span>
+                  </div>
+                  <ThemeFormSection
+                    values={editTheme.fullScreen}
+                    onChange={(updates) => {
+                      const updated = { ...editTheme, fullScreen: { ...editTheme.fullScreen, ...updates } };
+                      setEditTheme(updated);
+                      setActiveTheme(updated);
+                      updateTheme(editTheme.id, updated);
+                    }}
+                  />
+                </div>
+
+                {/* Column 2: LOWER THIRD (Right Column) */}
+                <div style={styles.editorColumn}>
+                  <div className="section-title" style={{ color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="badge" style={{ background: 'var(--blue-dim)', color: 'var(--blue)' }}>LOWER THIRD</span>
+                  </div>
+                  <ThemeFormSection
+                    values={editTheme.lowerThird}
+                    onChange={(updates) => {
+                      const updated = { ...editTheme, lowerThird: { ...editTheme.lowerThird, ...updates } };
+                      setEditTheme(updated);
+                      setActiveTheme(updated);
+                      updateTheme(editTheme.id, updated);
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ThemeThumbnailPreview({ theme }: { theme: Theme }) {
+  const fs = theme.fullScreen;
+  const lt = theme.lowerThird;
+
+  const fsBg = fs.background || fs.backgroundColor || '#0c0e14';
+  const ltBg = lt.background || lt.backgroundColor || 'rgba(0,0,0,0.85)';
+  const ltOpacity = typeof lt.backgroundOpacity === 'number' ? lt.backgroundOpacity : 0.95;
+  const ltRadius = lt.borderRadius ? Math.min(6, lt.borderRadius / 2) : 4;
+  const ltWidth = lt.width ? `${lt.width}%` : '92%';
+  const textAlign = fs.textAlign || 'center';
+  const ltTextAlign = lt.textAlign || 'left';
+
+  const fsRefColor = fs.syncRefColor ? fs.fontColor : (fs.referenceColor || lt.accentColor || fs.fontColor || '#ffffff');
+  const ltRefColor = lt.syncRefColor ? lt.fontColor : (lt.referenceColor || lt.accentColor || '#C9A96E');
+
+  const fsShadowCss = fs.textShadowEnabled ? '0px 1px 4px rgba(0,0,0,0.9)' : undefined;
+  const ltShadowCss = lt.textShadowEnabled ? '0px 1px 3px rgba(0,0,0,0.9)' : undefined;
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        aspectRatio: '16 / 9',
+        borderRadius: 8,
+        overflow: 'hidden',
+        position: 'relative',
+        background: fsBg,
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+        marginBottom: 8,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: '8px 10px 6px 10px',
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* Full Screen Content Preview */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center',
+          justifyContent: 'center',
+          flex: 1,
+          width: '100%',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: fs.fontFamily,
+            fontWeight: fs.fontWeight || 700,
+            color: fsRefColor,
+            fontSize: 9,
+            lineHeight: 1.2,
+            marginBottom: 2,
+            opacity: 0.9,
+            textShadow: fsShadowCss,
+          }}
+        >
+          Genesis 1:1
+        </div>
+        <div
+          style={{
+            fontFamily: fs.fontFamily,
+            fontWeight: fs.fontWeight || 600,
+            color: fs.fontColor || '#ffffff',
+            fontSize: 10,
+            lineHeight: 1.25,
+            textAlign,
+            maxWidth: '92%',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            textShadow: fsShadowCss,
+          }}
+        >
+          In the beginning God created...
+        </div>
+      </div>
+
+      {/* Mini Lower Third Overlay Preview */}
+      <div
+        style={{
+          width: ltWidth,
+          margin: '0 auto',
+          background: ltBg,
+          opacity: ltOpacity,
+          borderRadius: ltRadius,
+          padding: '3px 6px',
+          boxSizing: 'border-box',
+          borderLeft: lt.accentColor ? `3px solid ${lt.accentColor}` : undefined,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: ltTextAlign === 'right' ? 'flex-end' : ltTextAlign === 'center' ? 'center' : 'flex-start',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: lt.fontFamily || fs.fontFamily,
+            fontWeight: 700,
+            color: lt.fontColor || '#ffffff',
+            fontSize: 8,
+            lineHeight: 1.1,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+            textShadow: ltShadowCss,
+          }}
+        >
+          In the beginning God created the heaven
+        </div>
+        <div
+          style={{
+            fontFamily: lt.fontFamily || fs.fontFamily,
+            fontWeight: 600,
+            color: ltRefColor,
+            fontSize: 7,
+            lineHeight: 1.1,
+            marginTop: 1,
+            textShadow: ltShadowCss,
+          }}
+        >
+          Genesis 1:1 (KJV)
+        </div>
       </div>
     </div>
   );
@@ -630,18 +783,22 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
     if (newType === 'transparent') {
       onChange({ backgroundType: 'transparent', background: 'transparent', backgroundColor: 'transparent' });
     } else if (newType === 'solid') {
-      onChange({ backgroundType: 'solid', background: currentSolid, backgroundColor: currentSolid });
+      const solidColor = currentSolid && currentSolid !== 'transparent' ? currentSolid : (values.gradientStart || '#0f172a');
+      onChange({ backgroundType: 'solid', background: solidColor, backgroundColor: solidColor });
     } else if (newType === 'gradient') {
-      const gradCss = currentDir === 'radial'
-        ? `radial-gradient(circle, ${currentStart}, ${currentEnd})`
-        : `linear-gradient(${currentDir}, ${currentStart}, ${currentEnd})`;
+      const start = currentStart && currentStart !== 'transparent' ? currentStart : '#0f172a';
+      const end = currentEnd && currentEnd !== 'transparent' ? currentEnd : '#312e81';
+      const dir = currentDir || '135deg';
+      const gradCss = dir === 'radial'
+        ? `radial-gradient(circle, ${start}, ${end})`
+        : `linear-gradient(${dir}, ${start}, ${end})`;
       onChange({
         backgroundType: 'gradient',
         background: gradCss,
-        backgroundColor: currentStart,
-        gradientStart: currentStart,
-        gradientEnd: currentEnd,
-        gradientDirection: currentDir,
+        backgroundColor: start,
+        gradientStart: start,
+        gradientEnd: end,
+        gradientDirection: dir,
       });
     }
   };
@@ -758,6 +915,99 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
             <option value="right">Right</option>
           </select>
         </div>
+      </div>
+
+      {/* Reference Color & Sync to Verse Option */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', marginTop: 2 }}>
+        <div style={{ flex: 1 }}>
+          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Reference Color</label>
+          <input
+            className="input"
+            type="color"
+            disabled={Boolean(values.syncRefColor)}
+            value={values.syncRefColor ? (values.fontColor || '#ffffff') : (values.referenceColor || values.accentColor || '#C9A96E')}
+            onChange={(e) => onChange({ referenceColor: e.target.value, syncRefColor: false })}
+            style={{ height: 34, padding: 2, opacity: values.syncRefColor ? 0.4 : 1, cursor: values.syncRefColor ? 'not-allowed' : 'pointer' }}
+          />
+        </div>
+        <div style={{ flex: 1, paddingBottom: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', ...type.label, color: 'var(--text-dim)' }}>
+            <input
+              type="checkbox"
+              checked={Boolean(values.syncRefColor)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                onChange({
+                  syncRefColor: checked,
+                  referenceColor: checked ? (values.fontColor || '#ffffff') : (values.referenceColor || values.accentColor || '#C9A96E'),
+                });
+              }}
+            />
+            Sync to Verse
+          </label>
+        </div>
+      </div>
+
+      {/* Text Shadow Controls Block */}
+      <div style={{ background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)', marginTop: 2 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: values.textShadowEnabled ? 6 : 0 }}>
+          <span style={{ ...type.label, color: 'var(--text-dim)', fontWeight: 600 }}>Text Shadow</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', ...type.label, color: 'var(--text-dim)' }}>
+            <input
+              type="checkbox"
+              checked={Boolean(values.textShadowEnabled)}
+              onChange={(e) => onChange({ textShadowEnabled: e.target.checked })}
+            />
+            Enable Shadow
+          </label>
+        </div>
+
+        {values.textShadowEnabled && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Shadow Level</label>
+                <select
+                  className="input"
+                  value={values.textShadowLevel || 'medium'}
+                  onChange={(e) => {
+                    const lvl = e.target.value;
+                    const blur = lvl === 'heavy' ? 16 : lvl === 'subtle' ? 4 : 8;
+                    onChange({ textShadowLevel: lvl, textShadowBlur: blur });
+                  }}
+                >
+                  <option value="subtle">Subtle (Soft Drop)</option>
+                  <option value="medium">Medium (Broadcast Sharp)</option>
+                  <option value="heavy">Heavy (Deep Glow)</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Shadow Color</label>
+                <input
+                  className="input"
+                  type="color"
+                  value={values.textShadowColor || '#000000'}
+                  onChange={(e) => onChange({ textShadowColor: e.target.value })}
+                  style={{ height: 34, padding: 2 }}
+                />
+              </div>
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                <label style={{ ...type.label, color: 'var(--text-dim)' }}>Blur Radius</label>
+                <span style={{ ...type.caption, color: 'var(--text-dim)' }}>{values.textShadowBlur ?? 8}px</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="30"
+                value={values.textShadowBlur ?? 8}
+                onChange={(e) => onChange({ textShadowBlur: safeInt(e.target.value, 8) })}
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Background Style Editor */}
