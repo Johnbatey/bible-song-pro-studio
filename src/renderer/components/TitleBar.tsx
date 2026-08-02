@@ -299,7 +299,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     height: 56,
     padding: '0 14px',
-    background: '#0c0c0e',
+    background: 'var(--bg-primary)',
     borderBottom: '1px solid var(--block-line)',
     flexShrink: 0,
     zIndex: 100,

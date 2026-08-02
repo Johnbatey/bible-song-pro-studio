@@ -503,7 +503,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'fixed',
     inset: 0,
     zIndex: 2000,
-    background: '#0c0c0e',
+    background: 'var(--bg-primary)',
     display: 'flex',
     flexDirection: 'column',
     fontFamily: 'var(--font-ui)',
@@ -707,7 +707,7 @@ const styles: Record<string, React.CSSProperties> = {
   centerCol: {
     flex: 1,
     position: 'relative',
-    background: '#0c0c0e',
+    background: 'var(--bg-primary)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
