@@ -231,7 +231,6 @@ export function PreviewProgramView() {
             />
             <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom + ZOOM_STEP)} title="Zoom in">+</button>
             <button style={styles.zoomBtnWide} onClick={fitStage} title="Fit preview/program to view">FIT</button>
-            <button style={styles.zoomBtnWide} onClick={() => { updateZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset scale and pan">1:1</button>
           </div>
         </>
       )}

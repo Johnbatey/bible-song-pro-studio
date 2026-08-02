@@ -17,7 +17,6 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
   
-  const [isMaximized, setIsMaximized] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isBlackout, setIsBlackout] = useState(false);
   const isStudio = mode === 'studio';
@@ -25,7 +24,6 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
 
   useEffect(() => {
     if (window.BSP) {
-      window.BSP.window.isMaximized().then(setIsMaximized);
       window.BSP.window.isFullScreen().then(setIsFullScreen);
       window.BSP.window.onFullScreenChange(setIsFullScreen);
     }
@@ -246,47 +244,7 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
           </button>
         </div>
 
-        <div style={styles.divider} />
-
-        {/* macOS / Window Control Buttons */}
-        <div style={styles.winControls}>
-          <button
-            style={styles.winIconBtn}
-            onClick={() => window.BSP?.window.minimize()}
-            title="Minimize"
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
-          <button
-            style={styles.winIconBtn}
-            onClick={async () => {
-              await window.BSP?.window.maximize();
-              const maxed = await window.BSP?.window.isMaximized();
-              setIsMaximized(!!maxed);
-            }}
-            title={isMaximized ? 'Restore' : 'Maximize'}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              {isMaximized ? (
-                <rect x="5" y="5" width="14" height="14" rx="1" />
-              ) : (
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-              )}
-            </svg>
-          </button>
-          <button
-            style={{ ...styles.winIconBtn, color: 'var(--red)' }}
-            onClick={() => window.BSP?.window.close()}
-            title="Close"
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+        {/* No window controls here — the OS frame already draws them. */}
       </div>
     </div>
   );
@@ -410,23 +368,5 @@ const styles: Record<string, React.CSSProperties> = {
     width: 1,
     height: 22,
     background: 'var(--block-line)',
-  },
-  winControls: {
-    display: 'flex',
-    gap: 4,
-    marginLeft: 2,
-  },
-  winIconBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 26,
-    height: 26,
-    border: 'none',
-    background: 'transparent',
-    borderRadius: 6,
-    cursor: 'pointer',
-    color: 'var(--text-secondary)',
-    transition: 'all 0.15s ease',
   },
 };

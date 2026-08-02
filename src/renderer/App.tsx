@@ -43,6 +43,7 @@ type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'p
 function displayFieldsFor(theme: Theme | null, outputMode: 'fullscreen' | 'lowerThird') {
   const section = outputMode === 'lowerThird' ? theme?.lowerThird : theme?.fullScreen;
   const bible = theme?.bibleOptions;
+  const fontColor = section?.fontColor || '#ffffff';
 
   return {
     // The display renderer calls this `mode`
@@ -50,10 +51,17 @@ function displayFieldsFor(theme: Theme | null, outputMode: 'fullscreen' | 'lower
     fontFamily: section?.fontFamily || 'Poppins',
     fontSize: section?.fontSize ?? 0,
     fontWeight: section?.fontWeight ?? 700,
-    fontColor: section?.fontColor || '#ffffff',
+    fontColor,
     textAlign: section?.textAlign || 'center',
-    referenceColor: theme?.lowerThird?.accentColor || '#e8541a',
-    referenceFontSize: theme?.fullScreen?.referenceFontSize ?? 0,
+    // These flat fields take precedence over the theme on the display side, so
+    // they have to resolve the reference exactly the way ProgramSurface does for
+    // the Program pane: sync follows the verse colour, otherwise the *active*
+    // section's own reference colour wins. Reading lowerThird/fullScreen
+    // unconditionally is what made the external output disagree with Program.
+    referenceColor: section?.syncRefColor
+      ? fontColor
+      : (section?.referenceColor || theme?.lowerThird?.accentColor || '#e8541a'),
+    referenceFontSize: section?.referenceFontSize ?? 0,
     // No theme control hides the reference today, so it always shows.
     showReference: true,
     showTranslation: bible?.showVersion ?? true,

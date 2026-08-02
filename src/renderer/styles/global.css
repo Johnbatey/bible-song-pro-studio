@@ -68,7 +68,7 @@
   --block-line: #262628;      /* Black Beauty — block border + chrome rule */
   --block-active: #232221;    /* Black Chestnut Oak — chrome switch highlight */
   --block-radius: 6px;
-  --block-gap: 9px;           /* space between two blocks (divider sits in it) */
+  --block-gap: 4px;           /* gutter between blocks, and the window inset */
   --block-chrome-h: 40px;
   --block-pad: 12px;
 }
@@ -411,6 +411,14 @@ html, body, #root {
 .resizer-handle:hover::after,
 .resizer-handle.is-dragging::after {
   background: var(--accent);
+}
+
+/* The gutter is too narrow to grab comfortably, so each handle carries an
+   invisible pad that reaches past it into both neighbouring blocks. */
+.resizer-handle::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
 }
 
 .resizer-handle-h {
