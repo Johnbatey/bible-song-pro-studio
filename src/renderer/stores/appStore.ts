@@ -115,6 +115,10 @@ interface AppState {
   activeSettingsCategory: string;
   openSettings: (category?: string) => void;
   closeSettings: () => void;
+
+  isThemeDesignerOpen: boolean;
+  openThemeDesigner: () => void;
+  closeThemeDesigner: () => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -297,6 +301,10 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   activeSettingsCategory: 'output',
   openSettings: (category) => set((s) => ({ isSettingsOpen: true, activeSettingsCategory: category || s.activeSettingsCategory || 'output' })),
   closeSettings: () => set({ isSettingsOpen: false }),
+
+  isThemeDesignerOpen: false,
+  openThemeDesigner: () => set({ isThemeDesignerOpen: true }),
+  closeThemeDesigner: () => set({ isThemeDesignerOpen: false }),
 }), {
   name: 'bsp-app-state',
   version: 1,

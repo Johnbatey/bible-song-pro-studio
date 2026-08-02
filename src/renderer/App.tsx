@@ -13,6 +13,7 @@ import { PresentationPanel } from './components/PresentationPanel';
 import { SongLibrary } from './components/SongLibrary';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SettingsModal } from './components/SettingsModal';
+import { ThemeDesignerModal } from './components/ThemeDesignerModal';
 import { AnimatedAlert } from './components/AnimatedAlert';
 import { AIConsole } from './components/AIConsole';
 import { StatusBar } from './components/StatusBar';
@@ -350,6 +351,7 @@ export function App() {
       </div>
       {showAIConsole && <AIConsole onClose={() => setShowAIConsole(false)} />}
       <SettingsModal />
+      <ThemeDesignerModal />
       {activeAlert && (
         <AnimatedAlert
           alert={activeAlert}

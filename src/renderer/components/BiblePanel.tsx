@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import type { BibleBook, BibleSearchResult, BibleVerse, BibleVersion, Scene } from '../types';
 import { type, fontWeight, numeric } from '../styles/type';
+import { CustomDropdown } from './CustomDropdown';
 
 const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', 'Revelation'];
 
@@ -436,81 +437,87 @@ export function BiblePanel() {
 
   return (
     <div ref={containerRef} style={styles.panel}>
-      <div className="glass" style={styles.searchShell}>
+      <div style={styles.searchShell}>
         <div style={styles.controlsRow}>
-          <h2 style={{ ...styles.h2, margin: 0, paddingRight: 6, flexShrink: 0 }}>Bible</h2>
+          {/* Custom Dark Version Dropdown Popup matching the reference design */}
+          <CustomDropdown
+            value={selectedVersion}
+            options={versionOptions.map((v) => ({ value: v.id, label: v.abbreviation, sublabel: v.name }))}
+            onChange={(val) => setSelectedVersion(val)}
+            title="Select Translation"
+          />
 
+          {/* Segmented Pill Switcher with Clean SVGs matching the reference design */}
+          <div style={styles.pillGroup}>
+            <button
+              style={{
+                ...styles.pillBtn,
+                background: !dualVersion ? '#FF5500' : 'transparent',
+                color: !dualVersion ? '#ffffff' : '#a1a1aa',
+              }}
+              onClick={() => setDualVersion(false)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
+              <span>Single Version</span>
+            </button>
+            <button
+              style={{
+                ...styles.pillBtn,
+                background: dualVersion ? '#FF5500' : 'transparent',
+                color: dualVersion ? '#ffffff' : '#a1a1aa',
+              }}
+              onClick={() => setDualVersion(true)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
+                <path d="M16 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
+              </svg>
+              <span>Dual Version</span>
+            </button>
+          </div>
+
+          {/* Secondary Version Selector when Dual Version is active */}
+          {dualVersion && (
+            <CustomDropdown
+              value={secondaryVersion}
+              options={versionOptions.map((v) => ({ value: v.id, label: `+ ${v.abbreviation}`, sublabel: v.name }))}
+              onChange={(val) => setSecondaryVersion(val)}
+              title="Secondary Parallel Translation"
+            />
+          )}
+
+          {/* Unified Search Input (Book/Reference and Keyword search together) */}
           <input
-            className="input"
+            style={styles.searchInput}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleSearchKeyDown}
             onBlur={() => setQuery((current) => normalizeReferenceQuery(current))}
-            placeholder="Search reference or words, e.g. John 3:16"
-            style={{ flex: '1 1 160px', minWidth: 120, maxWidth: 220 }}
+            placeholder="John 3:16 or keyword search..."
           />
-          <button className="btn btn-secondary btn-sm" onClick={pinCurrent}>Pin</button>
 
-          <select
-            className="input"
-            value={selectedBook}
-            onChange={(e) => {
-              const nextBook = e.target.value;
-              setSelectedBook(nextBook);
-              setChapter(nextBook ? 1 : 0);
-              setResults([]);
-              setHighlightedVerse(null);
-            }}
-            style={{ width: 130 }}
-          >
-            <option value="">Select Book</option>
-            {bookOptions.map((book) => <option key={book.name} value={book.name}>{book.name}</option>)}
-          </select>
-
-          <select
-            className="input"
-            value={chapter || ''}
-            onChange={(e) => {
-              setChapter(Number(e.target.value) || 0);
-              setResults([]);
-              setHighlightedVerse(null);
-            }}
-            disabled={!selectedBook}
-            style={{ width: 68 }}
-          >
-            <option value="">Ch</option>
-            {Array.from({ length: selectedChapterCount }, (_, i) => i + 1).map((num) => <option key={num} value={num}>Ch {num}</option>)}
-          </select>
-
-          <button className="btn btn-secondary btn-sm" disabled={!visibleVerses.length} onClick={() => sendAdjacentVerse(-1)}>Prev</button>
-          <button className="btn btn-secondary btn-sm" disabled={!visibleVerses.length} onClick={() => sendAdjacentVerse(1)}>Next</button>
-
-          <div style={{ ...styles.segmented, marginLeft: 'auto' }}>
-            <button className={`btn btn-sm ${mode === 'text' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('text')}>Text</button>
-            <button className={`btn btn-sm ${mode === 'buttons' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMode('buttons')}>Buttons</button>
-          </div>
-        </div>
-
-        <div style={styles.versionBar}>
-          {versionOptions.map((version) => (
+          {/* Previous & Next Chapter Navigation Buttons */}
+          <div style={{ display: 'flex', gap: 4 }}>
             <button
-              key={version.id}
-              className={`btn btn-sm ${selectedVersion === version.id ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setSelectedVersion(version.id)}
-              title={version.name}
+              style={styles.iconNavBtn}
+              disabled={!visibleVerses.length}
+              onClick={() => sendAdjacentVerse(-1)}
+              title="Previous chapter"
             >
-              {version.abbreviation}
+              ‹
             </button>
-          ))}
-          <label style={styles.inlineToggle}>
-            <input type="checkbox" checked={dualVersion} onChange={(e) => setDualVersion(e.target.checked)} />
-            Dual
-          </label>
-          {dualVersion && (
-            <select className="input" value={secondaryVersion} onChange={(e) => setSecondaryVersion(e.target.value)} style={styles.secondarySelect}>
-              {versionOptions.map((version) => <option key={version.id} value={version.id}>{version.abbreviation}</option>)}
-            </select>
-          )}
+            <button
+              style={styles.iconNavBtn}
+              disabled={!visibleVerses.length}
+              onClick={() => sendAdjacentVerse(1)}
+              title="Next chapter"
+            >
+              ›
+            </button>
+          </div>
         </div>
       </div>
 
@@ -628,8 +635,71 @@ const styles: Record<string, React.CSSProperties> = {
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   h2: { ...type.title },
   segmented: { display: 'flex', gap: 6 },
-  searchShell: { padding: '8px 12px', borderRadius: 'var(--radius-md)', marginBottom: 10, flexShrink: 0, background: 'var(--bg-secondary)', border: '1px solid rgba(255, 255, 255, 0.08)' },
-  controlsRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
+  searchShell: { padding: '8px 10px', borderRadius: 8, marginBottom: 10, flexShrink: 0, background: '#141416', border: '1px solid rgba(255, 255, 255, 0.08)' },
+  controlsRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap' },
+  versionSelect: {
+    padding: '5px 10px',
+    background: '#202024',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: 6,
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    outline: 'none',
+  },
+  pillGroup: {
+    display: 'flex',
+    background: '#202024',
+    borderRadius: 6,
+    padding: 3,
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    flexShrink: 0,
+    height: 34,
+    boxSizing: 'border-box',
+  },
+  pillBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+    padding: '0 14px',
+    height: 28,
+    border: 'none',
+    borderRadius: 4,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    fontFamily: 'var(--font-ui)',
+  },
+  searchInput: {
+    flex: 1,
+    height: 34,
+    minWidth: 140,
+    padding: '0 14px',
+    background: '#202024',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: 6,
+    color: '#ffffff',
+    fontSize: 13,
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'var(--font-ui)',
+  },
+  iconNavBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 34,
+    height: 34,
+    background: '#202024',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: 6,
+    color: '#ffffff',
+    fontSize: 16,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
   versionBar: { display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 },
   inlineToggle: { display: 'flex', alignItems: 'center', gap: 5, marginLeft: 6, ...type.caption, color: 'var(--text-secondary)' },
   secondarySelect: { width: 84, height: 28, padding: '2px 8px', ...type.secondary },
