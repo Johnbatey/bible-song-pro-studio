@@ -85,6 +85,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
+    overflowY: 'auto',
   },
   infoCard: {
     display: 'flex',

@@ -27,7 +27,7 @@ export function ScenePanel() {
   };
 
   return (
-    <div>
+    <div style={{ height: '100%', minHeight: 0, overflowY: 'auto', paddingRight: 4, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ ...type.title }}>Scenes</h2>
         <button className="btn btn-primary btn-sm" onClick={handleAddScene}>

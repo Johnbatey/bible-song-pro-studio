@@ -324,11 +324,10 @@ html, body, #root {
   padding: 12px 4px;
 }
 
-.transcript-panel__text,
-.transcript-panel__placeholder {
+.transcript-panel__text {
   max-width: 100%;
   color: var(--text-primary);
-  font-size: var(--fs-display);
+  font-size: 14px;
   line-height: var(--lh-tight);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--ls-tight);
@@ -337,7 +336,14 @@ html, body, #root {
 }
 
 .transcript-panel__placeholder {
+  max-width: 100%;
   color: rgba(240, 236, 228, 0.42);
+  font-size: 11px;
+  line-height: var(--lh-tight);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--ls-tight);
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .transcript-panel__footer {

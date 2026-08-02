@@ -93,7 +93,7 @@ export function SongLibrary() {
   };
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding: 16, height: '100%', minHeight: 0, overflowY: 'auto', boxSizing: 'border-box' }}>
       <h2 style={{ ...type.title, marginBottom: 16 }}>Song Library</h2>
 
       {/* Library filter. Online catalogue search (CCLI SongSelect etc.) is not built yet. */}
