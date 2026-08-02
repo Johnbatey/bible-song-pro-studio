@@ -119,6 +119,11 @@ interface AppState {
   isThemeDesignerOpen: boolean;
   openThemeDesigner: () => void;
   closeThemeDesigner: () => void;
+
+  isSlideEditorOpen: boolean;
+  activePresentationId: string | null;
+  openSlideEditor: (id?: string) => void;
+  closeSlideEditor: () => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -305,6 +310,11 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   isThemeDesignerOpen: false,
   openThemeDesigner: () => set({ isThemeDesignerOpen: true }),
   closeThemeDesigner: () => set({ isThemeDesignerOpen: false }),
+
+  isSlideEditorOpen: false,
+  activePresentationId: null,
+  openSlideEditor: (id) => set({ isSlideEditorOpen: true, activePresentationId: id || null }),
+  closeSlideEditor: () => set({ isSlideEditorOpen: false, activePresentationId: null }),
 }), {
   name: 'bsp-app-state',
   version: 1,

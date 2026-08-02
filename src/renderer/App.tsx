@@ -14,6 +14,7 @@ import { SongLibrary } from './components/SongLibrary';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SettingsModal } from './components/SettingsModal';
 import { ThemeDesignerModal } from './components/ThemeDesignerModal';
+import { SlideEditorModal } from './components/SlideEditorModal';
 import { AnimatedAlert } from './components/AnimatedAlert';
 import { AIConsole } from './components/AIConsole';
 import { StatusBar } from './components/StatusBar';
@@ -352,6 +353,7 @@ export function App() {
       {showAIConsole && <AIConsole onClose={() => setShowAIConsole(false)} />}
       <SettingsModal />
       <ThemeDesignerModal />
+      <SlideEditorModal />
       {activeAlert && (
         <AnimatedAlert
           alert={activeAlert}

@@ -144,6 +144,8 @@ export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps)
           onClick={() => {
             if (panel.id === 'settings') {
               openSettings('output');
+            } else if (panel.id === 'themes') {
+              useAppStore.getState().openThemeDesigner();
             } else {
               onPanelChange(panel.id);
             }
