@@ -85,12 +85,20 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
     else if (state.bgFill.includes('gradient')) style.backgroundImage = state.bgFill;
     else style.backgroundColor = state.bgFill;
   } else {
-    const bg = state.scene?.background;
-    if (bg?.type === 'image' && bg.mediaUrl) style.backgroundImage = `url("${assetUrl(bg.mediaUrl, assetBaseUrl).replace(/"/g, '%22')}")`;
-    else if (bg?.type === 'gradient' && bg.gradient) style.backgroundImage = bg.gradient;
-    else if (bg?.type === 'solid' && bg.color) style.backgroundColor = bg.color;
-    else if (bg?.type === 'transparent') style.backgroundColor = 'transparent';
-    else if (mode === 'fullscreen' && state.theme?.fullScreen?.backgroundColor) style.backgroundColor = state.theme.fullScreen.backgroundColor;
+    const themeFs = state.theme?.fullScreen;
+    if (themeFs?.background) {
+      if (themeFs.background === 'transparent') style.backgroundColor = 'transparent';
+      else if (themeFs.background.includes('gradient')) style.backgroundImage = themeFs.background;
+      else style.backgroundColor = themeFs.background;
+    } else if (themeFs?.backgroundColor) {
+      style.backgroundColor = themeFs.backgroundColor;
+    } else {
+      const bg = state.scene?.background;
+      if (bg?.type === 'image' && bg.mediaUrl) style.backgroundImage = `url("${assetUrl(bg.mediaUrl, assetBaseUrl).replace(/"/g, '%22')}")`;
+      else if (bg?.type === 'gradient' && bg.gradient) style.backgroundImage = bg.gradient;
+      else if (bg?.type === 'solid' && bg.color) style.backgroundColor = bg.color;
+      else if (bg?.type === 'transparent') style.backgroundColor = 'transparent';
+    }
   }
 
   return style;
@@ -163,6 +171,7 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
   };
   const themeRefFontSize = mode === 'lowerThird' ? state.theme?.lowerThird?.referenceFontSize : state.theme?.fullScreen?.referenceFontSize;
   const refStyle: React.CSSProperties = {
+    fontFamily,
     fontSize: referenceFontSize({ ...state, referenceFontSize: state.referenceFontSize ?? themeRefFontSize ?? 0 }, preview),
     color: referenceColor,
     fontWeight,

@@ -339,12 +339,6 @@ export function BiblePanel() {
             }
           : undefined,
       },
-      background: {
-        type: 'gradient',
-        gradient: outputMode === 'lowerThird'
-          ? 'linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,0.82))'
-          : 'linear-gradient(135deg, #0f172a, #1e1b4b, #312e81)',
-      },
       transition: { type: 'fade', duration: 0.45, easing: 'ease' },
     };
     addVerseToHistory(verse);

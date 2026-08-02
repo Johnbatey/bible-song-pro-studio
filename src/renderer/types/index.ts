@@ -129,7 +129,13 @@ export interface LowerThirdTheme {
 }
 
 export interface FullScreenTheme {
+  background?: string;
   backgroundColor: string;
+  backgroundType?: string;
+  gradientStart?: string;
+  gradientEnd?: string;
+  gradientDirection?: string;
+  backgroundOpacity?: number;
   fontFamily: string;
   fontSize: number;
   fontWeight: number;
