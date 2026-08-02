@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog, systemPreferences, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -341,6 +341,24 @@ function createSlideEditorWindow() {
 }
 
 app.whenReady().then(async () => {
+  // Session permission request handler
+  if (session && session.defaultSession) {
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      callback(true);
+    });
+    session.defaultSession.setPermissionCheckHandler(() => true);
+  }
+
+  // Trigger macOS system permission prompts for Microphone and Camera
+  if (process.platform === 'darwin' && systemPreferences && systemPreferences.askForMediaAccess) {
+    systemPreferences.askForMediaAccess('microphone').then((granted) => {
+      console.log('macOS Microphone Access:', granted ? 'GRANTED' : 'DENIED');
+    }).catch(() => {});
+    systemPreferences.askForMediaAccess('camera').then((granted) => {
+      console.log('macOS Camera Access:', granted ? 'GRANTED' : 'DENIED');
+    }).catch(() => {});
+  }
+
   transcriptionService = createTranscriptionService({ app });
   verseDetectionService = createVerseDetectionService();
   ndiService = createNdiService();
