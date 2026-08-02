@@ -287,8 +287,8 @@ export function SongsPanel() {
                   className={`card card-hover`}
                   style={{
                     cursor: 'pointer',
-                    borderColor: isSelected ? 'var(--accent, #eab308)' : undefined,
-                    background: isSelected ? 'rgba(234, 179, 8, 0.08)' : undefined,
+                    borderColor: isSelected ? '#FF5500' : 'rgba(255, 255, 255, 0.08)',
+                    background: isSelected ? 'rgba(255, 85, 0, 0.12)' : '#161618',
                     padding: 10,
                   }}
                   onClick={() => setSelectedSong(song)}

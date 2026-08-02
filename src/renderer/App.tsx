@@ -212,7 +212,7 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <TitleBar />
+      <TitleBar activePanel={activePanel} onPanelChange={(p) => setActivePanel(p)} />
       <div className="app-body">
         <div className="app-main">
           <div className="operator-workspace" style={workspaceStyle}>

@@ -152,19 +152,20 @@ export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps)
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            padding: '10px 16px',
+            padding: '9px 14px',
             border: 'none',
+            borderLeft: activePanel === panel.id ? '3px solid var(--accent)' : '3px solid transparent',
             background: activePanel === panel.id ? 'var(--accent-dim)' : 'transparent',
             color: activePanel === panel.id ? 'var(--accent)' : 'var(--text-secondary)',
             ...type.body,
             fontWeight: activePanel === panel.id ? fontWeight.semibold : fontWeight.regular,
             cursor: 'pointer',
             transition: 'all 0.15s',
-            borderRadius: 0,
+            borderRadius: '0 6px 6px 0',
             fontFamily: 'var(--font-ui)',
             whiteSpace: 'nowrap',
             justifyContent: collapsed ? 'center' : 'flex-start',
-            paddingLeft: collapsed ? 0 : 16,
+            paddingLeft: collapsed ? 0 : 14,
           }}
           onMouseEnter={(e) => {
             if (activePanel !== panel.id) {

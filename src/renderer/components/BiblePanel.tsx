@@ -545,24 +545,20 @@ export function BiblePanel() {
               const isPreview = previewScene?.type === 'bible' && previewScene.name === verse.reference;
 
               const borderStyle = isLive
-                ? '2px solid #ef4444'
+                ? '1px solid #ef4444'
                 : isPreview
-                ? '2px solid #3b82f6'
+                ? '1px solid #3b82f6'
                 : isHighlighted
-                ? '2px solid var(--accent, #eab308)'
-                : '1px solid var(--border-primary)';
+                ? '1px solid #FF5500'
+                : '1px solid rgba(255, 255, 255, 0.08)';
 
               const backgroundStyle = isHighlighted
-                ? 'rgba(234, 179, 8, 0.12)'
+                ? 'rgba(255, 85, 0, 0.12)'
                 : isLive
                 ? 'rgba(239, 68, 68, 0.08)'
                 : isPreview
                 ? 'rgba(59, 130, 246, 0.08)'
-                : 'var(--bg-surface)';
-
-              const boxShadowStyle = isHighlighted
-                ? '0 0 12px rgba(234, 179, 8, 0.25)'
-                : 'none';
+                : '#161618';
 
               return (
                 <button
@@ -572,7 +568,6 @@ export function BiblePanel() {
                     ...styles.verseButton,
                     border: borderStyle,
                     background: backgroundStyle,
-                    boxShadow: boxShadowStyle,
                     transition: 'all 0.15s ease',
                   }}
                   onClick={() => sendVerse(verse)}
@@ -581,19 +576,39 @@ export function BiblePanel() {
                     ? 'Click to stage in Preview · double-click to go straight to Program'
                     : 'Click to go live'}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{
-                      ...styles.verseRef,
-                      color: isHighlighted ? 'var(--accent, #eab308)' : styles.verseRef.color,
-                      fontWeight: isHighlighted ? 800 : 700,
-                    }}>
-                      {verse.reference}
-                    </span>
-                    {isLive && <span style={styles.liveBadge}>LIVE</span>}
-                    {isPreview && !isLive && <span style={styles.previewBadge}>PREVIEW</span>}
-                    {isHighlighted && !isLive && !isPreview && <span style={styles.highlightBadge}>SEARCHED</span>}
+                  <div style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 4,
+                    background: isHighlighted ? '#FF5500' : 'rgba(255, 85, 0, 0.85)',
+                    color: '#ffffff',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: 1,
+                  }}>
+                    {verse.verse}
                   </div>
-                  <span style={styles.verseText}>{verse.text}</span>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {results.length > 0 && (
+                        <span style={styles.verseRef}>
+                          {verse.reference}
+                        </span>
+                      )}
+                      {isLive && <span style={styles.liveBadge}>LIVE</span>}
+                      {isPreview && !isLive && <span style={styles.previewBadge}>PREVIEW</span>}
+                    </div>
+                    <span style={{
+                      ...styles.verseText,
+                      color: isHighlighted ? '#ffffff' : '#d4d4d8',
+                    }}>
+                      {verse.text}
+                    </span>
+                  </div>
                 </button>
               );
             })}
@@ -613,33 +628,33 @@ const styles: Record<string, React.CSSProperties> = {
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   h2: { ...type.title },
   segmented: { display: 'flex', gap: 6 },
-  searchShell: { padding: '8px 12px', borderRadius: 'var(--radius-md)', marginBottom: 10, flexShrink: 0 },
+  searchShell: { padding: '8px 12px', borderRadius: 'var(--radius-md)', marginBottom: 10, flexShrink: 0, background: '#161618', border: '1px solid rgba(255, 255, 255, 0.08)' },
   controlsRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
   versionBar: { display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 },
   inlineToggle: { display: 'flex', alignItems: 'center', gap: 5, marginLeft: 6, ...type.caption, color: 'var(--text-secondary)' },
   secondarySelect: { width: 84, height: 28, padding: '2px 8px', ...type.secondary },
   resultsPane: { flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 2 },
   chips: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 },
+  grid: { display: 'flex', flexDirection: 'column', gap: 6 },
   verseButton: {
-    border: '1px solid var(--border-primary)',
-    background: 'var(--bg-surface)',
-    color: 'var(--text-primary)',
-    borderRadius: 8,
-    padding: 12,
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: '#161618',
+    color: '#ffffff',
+    borderRadius: 6,
+    padding: '8px 12px',
     textAlign: 'left',
     cursor: 'pointer',
-    minHeight: 112,
     display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
     fontFamily: 'var(--font-ui)',
   },
-  verseRef: { ...type.caption, ...numeric, color: 'var(--accent)', fontWeight: fontWeight.semibold },
-  verseText: { ...type.secondary, color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+  verseRef: { ...type.caption, ...numeric, color: '#FF5500', fontWeight: fontWeight.bold },
+  verseText: { fontSize: 13, lineHeight: 1.45, color: '#d4d4d8' },
   textMode: { minHeight: 360, height: '100%', resize: 'none', whiteSpace: 'pre-wrap', lineHeight: 1.55 },
   footerNote: { marginTop: 10, ...type.caption, color: 'var(--text-dim)' },
   liveBadge: { ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#ef4444', color: '#fff' },
   previewBadge: { ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#3b82f6', color: '#fff' },
-  highlightBadge: { ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: 'var(--accent, #eab308)', color: '#000' },
+  highlightBadge: { ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#FF5500', color: '#fff' },
 };
