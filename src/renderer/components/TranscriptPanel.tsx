@@ -83,7 +83,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     padding: '12px 14px',
-    background: '#161618',
+    background: 'var(--bg-secondary)',
     border: '1px solid rgba(255, 255, 255, 0.08)',
     borderRadius: 8,
   },

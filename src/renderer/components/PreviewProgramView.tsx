@@ -318,7 +318,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     minHeight: 0,
     padding: '12px 14px',
-    background: '#161618',
+    background: 'var(--bg-secondary)',
     borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
   },
   viewport: {
@@ -326,7 +326,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     minHeight: 0,
     overflow: 'hidden',
-    background: '#121214',
+    background: 'var(--bg-primary)',
     borderRadius: 8,
     border: '1px solid rgba(255, 255, 255, 0.08)',
     touchAction: 'none',

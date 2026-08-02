@@ -300,7 +300,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     height: 48,
     padding: '0 14px',
-    background: '#121214',
+    background: '#0c0c0e',
     borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
     flexShrink: 0,
     zIndex: 100,

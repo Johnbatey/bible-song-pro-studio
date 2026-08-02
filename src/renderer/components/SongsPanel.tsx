@@ -288,7 +288,7 @@ export function SongsPanel() {
                   style={{
                     cursor: 'pointer',
                     borderColor: isSelected ? '#FF5500' : 'rgba(255, 255, 255, 0.08)',
-                    background: isSelected ? 'rgba(255, 85, 0, 0.12)' : '#161618',
+                    background: isSelected ? 'rgba(255, 85, 0, 0.12)' : 'var(--bg-secondary)',
                     padding: 10,
                   }}
                   onClick={() => setSelectedSong(song)}

@@ -558,7 +558,7 @@ export function BiblePanel() {
                 ? 'rgba(239, 68, 68, 0.08)'
                 : isPreview
                 ? 'rgba(59, 130, 246, 0.08)'
-                : '#161618';
+                : 'var(--bg-secondary)';
 
               return (
                 <button
@@ -628,7 +628,7 @@ const styles: Record<string, React.CSSProperties> = {
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   h2: { ...type.title },
   segmented: { display: 'flex', gap: 6 },
-  searchShell: { padding: '8px 12px', borderRadius: 'var(--radius-md)', marginBottom: 10, flexShrink: 0, background: '#161618', border: '1px solid rgba(255, 255, 255, 0.08)' },
+  searchShell: { padding: '8px 12px', borderRadius: 'var(--radius-md)', marginBottom: 10, flexShrink: 0, background: 'var(--bg-secondary)', border: '1px solid rgba(255, 255, 255, 0.08)' },
   controlsRow: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' },
   versionBar: { display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 },
   inlineToggle: { display: 'flex', alignItems: 'center', gap: 5, marginLeft: 6, ...type.caption, color: 'var(--text-secondary)' },
@@ -638,7 +638,7 @@ const styles: Record<string, React.CSSProperties> = {
   grid: { display: 'flex', flexDirection: 'column', gap: 6 },
   verseButton: {
     border: '1px solid rgba(255, 255, 255, 0.08)',
-    background: '#161618',
+    background: 'var(--bg-secondary)',
     color: '#ffffff',
     borderRadius: 6,
     padding: '8px 12px',

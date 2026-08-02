@@ -1,9 +1,9 @@
 :root {
-  --bg-primary: #121214;
-  --bg-secondary: #161618;
-  --bg-surface: #1c1c1f;
-  --bg-elevated: #242429;
-  --bg-hover: #2a2a30;
+  --bg-primary: #0c0c0e;
+  --bg-secondary: #141416;
+  --bg-surface: #18181b;
+  --bg-elevated: #202024;
+  --bg-hover: #26262a;
   --border-primary: rgba(255, 255, 255, 0.08);
   --border-accent: rgba(255, 85, 0, 0.4);
   --text-primary: #ffffff;

@@ -127,7 +127,7 @@ export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps)
         minWidth: collapsed ? 56 : 200,
         height: '100%',
         minHeight: 0,
-        background: 'var(--bg-secondary)',
+        background: 'var(--bg-primary)',
         borderRight: '1px solid var(--border-primary)',
         display: 'flex',
         flexDirection: 'column',
