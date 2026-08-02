@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice } from '../types';
+import { SongPacks } from './settings/SongPacks';
 
 export type SettingsCategory =
   | 'account'
   | 'scripture'
+  | 'songs'
   | 'audio'
   | 'output'
   | 'fullscreen'
@@ -40,6 +42,17 @@ const categories: CategoryItem[] = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'songs',
+    label: 'Songs',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 18V5l12-2v13" />
+        <circle cx="6" cy="18" r="3" />
+        <circle cx="18" cy="16" r="3" />
       </svg>
     ),
   },
@@ -368,7 +381,19 @@ export function SettingsModal() {
               </div>
             )}
 
-            {/* 3. Audio & Speech AI View */}
+            {/* 3. Songs — packs move here; the workspace no longer carries a
+                   Song Library panel. */}
+            {activeCategory === 'songs' && (
+              <div>
+                <div style={modalStyles.sectionIntro}>
+                  <div style={modalStyles.rowTitle}>Song packs</div>
+                  <div style={modalStyles.rowSub}>Browse and add song packs to your library</div>
+                </div>
+                <SongPacks />
+              </div>
+            )}
+
+            {/* 4. Audio & Speech AI View */}
             {activeCategory === 'audio' && (
               <div>
                 <div style={modalStyles.formRow}>
@@ -957,22 +982,22 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   container: {
     position: 'relative',
-    width: 820,
+    width: 960,
     maxWidth: 'calc(100vw - 32px)',
-    height: 550,
+    height: 640,
     maxHeight: 'calc(100vh - 48px)',
-    background: '#161618',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
+    background: 'var(--settings-panel)',
+    border: '1px solid var(--settings-line)',
+    borderRadius: 10,
     boxShadow: '0 24px 80px rgba(0, 0, 0, 0.8)',
     display: 'flex',
     overflow: 'hidden',
   },
   sidebar: {
-    width: 220,
-    minWidth: 220,
-    background: '#141416',
-    borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+    width: 260,
+    minWidth: 260,
+    background: 'var(--settings-sidebar)',
+    borderRight: '1px solid var(--settings-line)',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
@@ -1014,10 +1039,10 @@ const modalStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    background: '#202024',
+    background: 'var(--settings-card)',
     borderRadius: 999,
     padding: '4px 6px 4px 14px',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    border: '1px solid var(--settings-line)',
   },
   planLabel: {
     fontSize: 12,
@@ -1042,16 +1067,16 @@ const modalStyles: Record<string, React.CSSProperties> = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    background: '#161618',
+    background: 'var(--settings-panel)',
     overflow: 'hidden',
   },
   contentHeader: {
-    height: 50,
-    padding: '0 20px',
+    height: 56,
+    padding: '0 24px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    borderBottom: '1px solid var(--settings-line)',
   },
   contentTitle: {
     fontSize: 15,
@@ -1069,23 +1094,26 @@ const modalStyles: Record<string, React.CSSProperties> = {
   scrollBody: {
     flex: 1,
     overflowY: 'auto',
-    padding: '16px 24px',
+    padding: '8px 24px 24px',
   },
   formRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '14px 0',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+    padding: '16px 0',
+    borderBottom: '1px solid var(--settings-line)',
     gap: 16,
   },
   helpRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '14px 0',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+    padding: '16px 0',
+    borderBottom: '1px solid var(--settings-line)',
     gap: 16,
+  },
+  sectionIntro: {
+    padding: '16px 0 14px',
   },
   rowTitle: {
     fontSize: 13,
@@ -1099,10 +1127,10 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   pillGroup: {
     display: 'flex',
-    background: '#202024',
+    background: 'var(--settings-card)',
     borderRadius: 8,
     padding: 3,
-    border: '1px solid rgba(255, 255, 255, 0.06)',
+    border: '1px solid var(--settings-line)',
   },
   pillBtn: {
     padding: '5px 14px',
@@ -1114,8 +1142,8 @@ const modalStyles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   selectInput: {
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
     borderRadius: 6,
     color: '#ffffff',
     fontSize: 13,
@@ -1137,8 +1165,8 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   actionBtn: {
     padding: '6px 14px',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
     borderRadius: 6,
     color: '#ffffff',
     fontSize: 12,
@@ -1147,9 +1175,9 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   langCard: {
     flex: 1,
-    background: '#202024',
+    background: 'var(--settings-card)',
     borderRadius: 8,
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    border: '1px solid var(--settings-line)',
     padding: 12,
     display: 'flex',
     flexDirection: 'column',
@@ -1158,8 +1186,8 @@ const modalStyles: Record<string, React.CSSProperties> = {
   downloadBtn: {
     width: '100%',
     padding: '6px',
-    background: 'rgba(255, 255, 255, 0.06)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
     borderRadius: 6,
     color: '#ffffff',
     fontSize: 12,
@@ -1171,12 +1199,12 @@ const modalStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '10px 0',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+    borderBottom: '1px solid var(--settings-line)',
   },
   keyBadge: {
     padding: '3px 8px',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.12)',
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
     borderRadius: 4,
     color: '#ffffff',
     fontSize: 11,
@@ -1185,8 +1213,8 @@ const modalStyles: Record<string, React.CSSProperties> = {
   textInput: {
     width: '100%',
     padding: '8px 12px',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
     borderRadius: 6,
     color: '#ffffff',
     fontSize: 13,
@@ -1195,8 +1223,8 @@ const modalStyles: Record<string, React.CSSProperties> = {
   textareaInput: {
     width: '100%',
     padding: '10px 12px',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
     borderRadius: 6,
     color: '#ffffff',
     fontSize: 13,
@@ -1206,8 +1234,8 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   chipBadge: {
     padding: '4px 10px',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
     borderRadius: 999,
     color: '#a1a1aa',
     fontSize: 11,

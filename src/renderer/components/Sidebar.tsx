@@ -1,7 +1,7 @@
 import { useAppStore } from '../stores/appStore';
 import { type, fontWeight, iconSize } from '../styles/type';
 
-type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'presentation' | 'songlibrary' | 'settings' | 'history';
+type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'presentation' | 'settings' | 'history';
 
 interface SidebarProps {
   activePanel: PanelView;
@@ -81,17 +81,6 @@ const panels: Array<{ id: PanelView; label: string; icon: React.ReactNode }> = [
         <circle cx="7.5" cy="11.5" r="1.5" fill="currentColor" />
         <circle cx="12" cy="7.5" r="1.5" fill="currentColor" />
         <circle cx="16.5" cy="11.5" r="1.5" fill="currentColor" />
-      </svg>
-    ),
-  },
-  {
-    id: 'songlibrary',
-    label: 'Song Library',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="currentColor" fillOpacity="0.15" />
-        <path d="M8 7h8M8 11h6" />
       </svg>
     ),
   },

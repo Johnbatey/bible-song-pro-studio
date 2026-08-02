@@ -67,10 +67,18 @@
   --block-bg: #161414;        /* Matt Black — block surface */
   --block-line: #262628;      /* Black Beauty — block border + chrome rule */
   --block-active: #232221;    /* Black Chestnut Oak — chrome switch highlight */
-  --block-radius: 6px;
+  --block-radius: 3px;        /* just enough to soften the corner */
   --block-gap: 4px;           /* gutter between blocks, and the window inset */
   --block-chrome-h: 40px;
   --block-pad: 12px;
+
+  /* ── Settings dialog ──
+     Its own ramp: the sidebar drops to the block surface while the panel
+     beside it sits a step lighter. */
+  --settings-sidebar: #161414; /* Matt Black */
+  --settings-panel: #1E1C1C;   /* Eerie Black */
+  --settings-line: #312F2D;    /* Acadia */
+  --settings-card: #252323;    /* Young Night */
 }
 
 * {

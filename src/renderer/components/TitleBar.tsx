@@ -84,9 +84,9 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
           <button
             style={{
               ...styles.pillBtn,
-              background: activePanel === 'songs' || activePanel === 'songlibrary' ? 'var(--accent)' : 'transparent',
-              color: activePanel === 'songs' || activePanel === 'songlibrary' ? '#ffffff' : 'var(--text-secondary)',
-              fontWeight: activePanel === 'songs' || activePanel === 'songlibrary' ? fontWeight.semibold : fontWeight.medium,
+              background: activePanel === 'songs' ? 'var(--accent)' : 'transparent',
+              color: activePanel === 'songs' ? '#ffffff' : 'var(--text-secondary)',
+              fontWeight: activePanel === 'songs' ? fontWeight.semibold : fontWeight.medium,
             }}
             onClick={() => handleTabClick('songs')}
           >

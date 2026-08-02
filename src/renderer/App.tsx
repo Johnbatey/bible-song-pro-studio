@@ -11,7 +11,6 @@ import { SongsPanel } from './components/SongsPanel';
 import { ThemePanel } from './components/ThemePanel';
 import { MediaPanel } from './components/MediaPanel';
 import { PresentationPanel } from './components/PresentationPanel';
-import { SongLibrary } from './components/SongLibrary';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SettingsModal } from './components/SettingsModal';
 import { ThemeDesignerModal } from './components/ThemeDesignerModal';
@@ -25,7 +24,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { useBroadcastSync } from './hooks/useBroadcastSync';
 import type { Scene, Theme } from './types';
 
-type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'presentation' | 'songlibrary' | 'settings' | 'history';
+type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'presentation' | 'settings' | 'history';
 
 /**
  * The audience display renderer consumes flat background fields
@@ -279,9 +278,6 @@ export function App() {
                   </div>
                   <div style={{ display: activePanel === 'presentation' ? 'block' : 'none', height: '100%' }}>
                     {visitedPanels.has('presentation') && <PresentationPanel />}
-                  </div>
-                  <div style={{ display: activePanel === 'songlibrary' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('songlibrary') && <SongLibrary />}
                   </div>
                   <div style={{ display: activePanel === 'settings' ? 'block' : 'none', height: '100%' }}>
                     {visitedPanels.has('settings') && <SettingsPanel />}
