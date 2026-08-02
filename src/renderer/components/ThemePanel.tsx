@@ -585,10 +585,82 @@ export function ThemePanel() {
   );
 }
 
+function parseBackgroundInfo(bgStr: string | undefined, colorStr: string | undefined) {
+  const str = bgStr || colorStr || '#0c0e14';
+  if (str === 'transparent') {
+    return { type: 'transparent', color: '#000000', start: '#0f172a', end: '#312e81', dir: '135deg' };
+  }
+  if (str.includes('gradient')) {
+    const hexes = str.match(/#[0-9a-fA-F]{3,8}/g) || [];
+    const rgbes = str.match(/rgba?\([^)]+\)/g) || [];
+    const colors = [...hexes, ...rgbes];
+    const dirMatch = str.match(/(\d+deg|circle)/i);
+    return {
+      type: 'gradient',
+      color: colors[0] || '#0f172a',
+      start: colors[0] || '#0f172a',
+      end: colors[colors.length - 1] || '#312e81',
+      dir: dirMatch ? dirMatch[1] : '135deg',
+    };
+  }
+  return {
+    type: 'solid',
+    color: str.startsWith('#') || str.startsWith('rgb') ? str : '#0c0e14',
+    start: '#0f172a',
+    end: '#312e81',
+    dir: '135deg',
+  };
+}
+
 function ThemeFormSection({ values, onChange }: { values: any; onChange: (updates: any) => void }) {
   const safeInt = (val: string, fallback = 0) => {
     const parsed = parseInt(val, 10);
     return isNaN(parsed) ? fallback : parsed;
+  };
+
+  const bgInfo = parseBackgroundInfo(values.background, values.backgroundColor);
+  const currentBgType = values.backgroundType || bgInfo.type;
+  const currentStart = values.gradientStart || bgInfo.start;
+  const currentEnd = values.gradientEnd || bgInfo.end;
+  const currentDir = values.gradientDirection || bgInfo.dir;
+  const currentSolid = values.backgroundColor || bgInfo.color;
+  const currentOpacity = typeof values.backgroundOpacity === 'number' ? values.backgroundOpacity : 0.95;
+
+  const handleBgTypeChange = (newType: string) => {
+    if (newType === 'transparent') {
+      onChange({ backgroundType: 'transparent', background: 'transparent', backgroundColor: 'transparent' });
+    } else if (newType === 'solid') {
+      onChange({ backgroundType: 'solid', background: currentSolid, backgroundColor: currentSolid });
+    } else if (newType === 'gradient') {
+      const gradCss = currentDir === 'radial'
+        ? `radial-gradient(circle, ${currentStart}, ${currentEnd})`
+        : `linear-gradient(${currentDir}, ${currentStart}, ${currentEnd})`;
+      onChange({
+        backgroundType: 'gradient',
+        background: gradCss,
+        backgroundColor: currentStart,
+        gradientStart: currentStart,
+        gradientEnd: currentEnd,
+        gradientDirection: currentDir,
+      });
+    }
+  };
+
+  const handleGradientChange = (updates: { start?: string; end?: string; dir?: string }) => {
+    const s = updates.start ?? currentStart;
+    const e = updates.end ?? currentEnd;
+    const d = updates.dir ?? currentDir;
+    const gradCss = d === 'radial'
+      ? `radial-gradient(circle, ${s}, ${e})`
+      : `linear-gradient(${d}, ${s}, ${e})`;
+    onChange({
+      backgroundType: 'gradient',
+      background: gradCss,
+      backgroundColor: s,
+      gradientStart: s,
+      gradientEnd: e,
+      gradientDirection: d,
+    });
   };
 
   return (
@@ -687,17 +759,143 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
           </select>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Background</label>
-          <input
-            className="input"
-            type="color"
-            value={values.backgroundColor || values.background?.match(/#[0-9a-fA-F]{6}/)?.[0] || '#0c0e14'}
-            onChange={(e) => onChange({ backgroundColor: e.target.value, background: e.target.value })}
-            style={{ height: 34, padding: 2 }}
-          />
+
+      {/* Background Style Editor */}
+      <div style={{ background: 'rgba(255,255,255,0.03)', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
+        <div style={{ ...type.label, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span>Background Style</span>
+          <span className="badge" style={{ fontSize: 10 }}>{currentBgType.toUpperCase()}</span>
         </div>
+
+        {/* Live Swatch Preview */}
+        <div
+          style={{
+            height: 36,
+            borderRadius: 6,
+            marginBottom: 10,
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: values.background || values.backgroundColor || '#0c0e14',
+            opacity: currentOpacity,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            fontSize: 11,
+            fontWeight: 600,
+            textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+          }}
+        >
+          {currentBgType === 'gradient' ? 'Gradient Preview' : currentBgType === 'transparent' ? 'Transparent' : 'Solid Preview'}
+        </div>
+
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Background Type</label>
+            <select
+              className="input"
+              value={currentBgType}
+              onChange={(e) => handleBgTypeChange(e.target.value)}
+            >
+              <option value="solid">Solid Color</option>
+              <option value="gradient">Gradient</option>
+              <option value="transparent">Transparent</option>
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Opacity ({Math.round(currentOpacity * 100)}%)</label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={currentOpacity}
+              onChange={(e) => onChange({ backgroundOpacity: parseFloat(e.target.value) })}
+              style={{ width: '100%', marginTop: 8 }}
+            />
+          </div>
+        </div>
+
+        {currentBgType === 'solid' && (
+          <div>
+            <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Solid Fill Color</label>
+            <input
+              className="input"
+              type="color"
+              value={currentSolid.startsWith('#') ? currentSolid : '#0c0e14'}
+              onChange={(e) => onChange({ backgroundColor: e.target.value, background: e.target.value })}
+              style={{ height: 34, padding: 2, width: '100%' }}
+            />
+          </div>
+        )}
+
+        {currentBgType === 'gradient' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* Gradient Presets */}
+            <div>
+              <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Gradient Presets</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+                {[
+                  { name: 'Sapphire', start: '#0f172a', end: '#312e81', dir: '135deg' },
+                  { name: 'Purple', start: '#1a0033', end: '#7b1fa2', dir: '135deg' },
+                  { name: 'Emerald', start: '#001a0a', end: '#178e4c', dir: '135deg' },
+                  { name: 'Crimson', start: '#1b0000', end: '#e65100', dir: '135deg' },
+                  { name: 'Gold', start: '#1a140a', end: '#c9a96e', dir: '135deg' },
+                  { name: 'Midnight', start: '#070913', end: '#0f172a', dir: '180deg' },
+                ].map((p) => (
+                  <button
+                    key={p.name}
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    style={{ fontSize: 10, padding: '3px 6px', background: `linear-gradient(${p.dir}, ${p.start}, ${p.end})`, color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
+                    onClick={() => handleGradientChange({ start: p.start, end: p.end, dir: p.dir })}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Start Color</label>
+                <input
+                  className="input"
+                  type="color"
+                  value={currentStart.startsWith('#') ? currentStart : '#0f172a'}
+                  onChange={(e) => handleGradientChange({ start: e.target.value })}
+                  style={{ height: 32, padding: 2 }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>End Color</label>
+                <input
+                  className="input"
+                  type="color"
+                  value={currentEnd.startsWith('#') ? currentEnd : '#312e81'}
+                  onChange={(e) => handleGradientChange({ end: e.target.value })}
+                  style={{ height: 32, padding: 2 }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Direction</label>
+                <select
+                  className="input"
+                  value={currentDir}
+                  onChange={(e) => handleGradientChange({ dir: e.target.value })}
+                >
+                  <option value="135deg">Diagonal (135°)</option>
+                  <option value="180deg">Top to Bottom (180°)</option>
+                  <option value="90deg">Left to Right (90°)</option>
+                  <option value="45deg">Reverse Diag (45°)</option>
+                  <option value="radial">Radial Circle</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 6 }}>
         <div style={{ flex: 1 }}>
           <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Radius</label>
           <input
