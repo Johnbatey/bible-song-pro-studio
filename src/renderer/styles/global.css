@@ -7,8 +7,8 @@
   --border-primary: #262628;
   --border-accent: rgba(255, 85, 0, 0.4);
   --text-primary: #ffffff;
-  --text-secondary: #a1a1aa;
-  --text-dim: #71717a;
+  --text-secondary: #ffffff;
+  --text-dim: #d4d4d8;
   --accent: #FF5500;
   --accent-light: #FF7728;
   --accent-dim: rgba(255, 85, 0, 0.12);
@@ -788,13 +788,15 @@ html, body, #root {
   color: var(--red);
 }
 
+/* A heading, so it reads white. Only the line *under* a heading — the
+   subtitle / description — keeps the dim step. */
 .section-title {
   font-size: var(--fs-label);
   font-weight: var(--fw-semibold);
   line-height: var(--lh-tight);
   letter-spacing: var(--ls-caps);
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--text-primary);
   margin-bottom: 8px;
 }
 
@@ -888,7 +890,7 @@ html, body, #root {
   border-radius: 6px;
   border: none;
   background: transparent;
-  color: #a1a1aa;
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 16px;
   transition: all 0.15s;
@@ -926,7 +928,7 @@ html, body, #root {
   font-size: 13px;
   font-weight: 500;
   line-height: var(--lh-base);
-  color: #a1a1aa;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
@@ -976,7 +978,7 @@ html, body, #root {
   font-size: 12px;
   font-weight: 400;
   line-height: 1.45;
-  color: #a1a1aa;
+  color: var(--text-secondary);
   margin-bottom: 16px;
 }
 
@@ -1011,6 +1013,6 @@ html, body, #root {
   font-size: 12px;
   font-weight: 400;
   line-height: 1.4;
-  color: #a1a1aa;
+  color: var(--text-secondary);
   margin-top: 2px;
 }

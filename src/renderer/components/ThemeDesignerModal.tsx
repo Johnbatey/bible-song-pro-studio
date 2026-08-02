@@ -88,7 +88,7 @@ export function ThemeDesignerModal() {
           <div style={styles.sectionLabel}>ALL THEMES ({themes.length || 3})</div>
 
           <div style={styles.searchBox}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input placeholder="Search themes" style={styles.searchInput} />
           </div>
 
@@ -97,7 +97,7 @@ export function ThemeDesignerModal() {
               style={{
                 ...styles.pillBtn,
                 background: categoryTab === 'scriptures' ? '#FF5500' : 'transparent',
-                color: categoryTab === 'scriptures' ? '#ffffff' : '#a1a1aa',
+                color: categoryTab === 'scriptures' ? '#ffffff' : 'var(--text-secondary)',
               }}
               onClick={() => setCategoryTab('scriptures')}
             >
@@ -107,7 +107,7 @@ export function ThemeDesignerModal() {
               style={{
                 ...styles.pillBtn,
                 background: categoryTab === 'slides' ? '#FF5500' : 'transparent',
-                color: categoryTab === 'slides' ? '#ffffff' : '#a1a1aa',
+                color: categoryTab === 'slides' ? '#ffffff' : 'var(--text-secondary)',
               }}
               onClick={() => setCategoryTab('slides')}
             >
@@ -261,7 +261,7 @@ export function ThemeDesignerModal() {
               style={{ width: 100, accentColor: '#FF5500' }}
             />
             <button style={styles.zoomBtn} onClick={() => setZoomLevel(Math.min(150, zoomLevel + 10))}>+</button>
-            <span style={{ fontSize: 11, color: '#a1a1aa' }}>{zoomLevel}%</span>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{zoomLevel}%</span>
           </div>
         </div>
 
@@ -352,7 +352,7 @@ export function ThemeDesignerModal() {
                 />
               </div>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#a1a1aa', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={lockAspect}
@@ -449,7 +449,7 @@ export function ThemeDesignerModal() {
                     value={fontColor.replace('#', '').toUpperCase()}
                     onChange={(e) => setFontColor(`#${e.target.value}`)}
                   />
-                  <span style={{ fontSize: 11, color: '#71717a', fontWeight: 600 }}>100%</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>100%</span>
                 </div>
               </div>
 
@@ -538,7 +538,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#202024',
     border: '1px solid rgba(255, 255, 255, 0.1)',
     borderRadius: 6,
-    color: '#a1a1aa',
+    color: 'var(--text-secondary)',
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
@@ -575,7 +575,7 @@ const styles: Record<string, React.CSSProperties> = {
   sectionLabel: {
     fontSize: 10,
     fontWeight: 700,
-    color: '#71717a',
+    color: 'var(--text-dim)',
     marginBottom: 8,
     letterSpacing: 0.5,
   },
@@ -725,7 +725,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toolbarLabel: {
     fontSize: 10,
-    color: '#71717a',
+    color: 'var(--text-dim)',
     fontWeight: 600,
   },
   floatingToolbar: {
@@ -856,7 +856,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   propLabel: {
     fontSize: 11,
-    color: '#a1a1aa',
+    color: 'var(--text-secondary)',
     marginBottom: 4,
   },
   propRow: {
@@ -894,7 +894,7 @@ const styles: Record<string, React.CSSProperties> = {
   inputPrefix: {
     fontSize: 11,
     fontWeight: 600,
-    color: '#71717a',
+    color: 'var(--text-dim)',
     marginRight: 6,
   },
   propInputNoBorder: {

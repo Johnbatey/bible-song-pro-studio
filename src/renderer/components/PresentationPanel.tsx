@@ -55,7 +55,7 @@ export function PresentationPanel() {
         />
 
         <div style={styles.searchBox}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input
             placeholder="Search for slide title or content"
             value={searchQuery}
@@ -195,13 +195,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cardSubtitle: {
     fontSize: 11,
-    color: '#71717a',
+    color: 'var(--text-dim)',
     marginTop: 2,
   },
   moreBtn: {
     background: 'transparent',
     border: 'none',
-    color: '#a1a1aa',
+    color: 'var(--text-secondary)',
     fontSize: 14,
     fontWeight: 700,
     cursor: 'pointer',

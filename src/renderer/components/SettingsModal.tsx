@@ -254,7 +254,7 @@ export function SettingsModal() {
                     key={item.id}
                     style={{
                       ...modalStyles.sidebarItem,
-                      color: isActive ? '#FF5500' : '#a1a1aa',
+                      color: isActive ? '#FF5500' : 'var(--text-secondary)',
                       fontWeight: isActive ? 600 : 500,
                     }}
                     onClick={() => setActiveCategory(item.id)}
@@ -329,7 +329,7 @@ export function SettingsModal() {
                     <div style={modalStyles.rowTitle}>System Engine Specs</div>
                     <div style={modalStyles.rowSub}>macOS Metal Hardware Acceleration • Port 8942</div>
                   </div>
-                  <span style={{ fontSize: 12, color: '#a1a1aa' }}>Active</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Active</span>
                 </div>
               </div>
             )}
@@ -347,7 +347,7 @@ export function SettingsModal() {
                       style={{
                         ...modalStyles.pillBtn,
                         background: live.autoProject ? '#FF5500' : 'transparent',
-                        color: live.autoProject ? '#ffffff' : '#a1a1aa',
+                        color: live.autoProject ? '#ffffff' : 'var(--text-secondary)',
                       }}
                       onClick={() => setLive({ autoProject: true })}
                     >
@@ -357,7 +357,7 @@ export function SettingsModal() {
                       style={{
                         ...modalStyles.pillBtn,
                         background: !live.autoProject ? '#FF5500' : 'transparent',
-                        color: !live.autoProject ? '#ffffff' : '#a1a1aa',
+                        color: !live.autoProject ? '#ffffff' : 'var(--text-secondary)',
                       }}
                       onClick={() => setLive({ autoProject: false })}
                     >
@@ -406,7 +406,7 @@ export function SettingsModal() {
                       style={{
                         ...modalStyles.pillBtn,
                         background: (settings?.sttEngine || 'deepgram') === 'deepgram' ? '#FF5500' : 'transparent',
-                        color: (settings?.sttEngine || 'deepgram') === 'deepgram' ? '#ffffff' : '#a1a1aa',
+                        color: (settings?.sttEngine || 'deepgram') === 'deepgram' ? '#ffffff' : 'var(--text-secondary)',
                       }}
                       onClick={() => saveSettings({ sttEngine: 'deepgram' })}
                     >
@@ -416,7 +416,7 @@ export function SettingsModal() {
                       style={{
                         ...modalStyles.pillBtn,
                         background: settings?.sttEngine === 'local' ? '#FF5500' : 'transparent',
-                        color: settings?.sttEngine === 'local' ? '#ffffff' : '#a1a1aa',
+                        color: settings?.sttEngine === 'local' ? '#ffffff' : 'var(--text-secondary)',
                       }}
                       onClick={() => saveSettings({ sttEngine: 'local' })}
                     >
@@ -482,7 +482,7 @@ export function SettingsModal() {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <div style={modalStyles.rowTitle}>Input gain</div>
-                      <div style={{ fontSize: 12, color: '#a1a1aa' }}>{inputGain}dB</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{inputGain}dB</div>
                     </div>
                     <div style={modalStyles.rowSub}>Adjust microphone sensitivity</div>
                     <input
@@ -664,7 +664,7 @@ export function SettingsModal() {
                       style={{
                         ...modalStyles.pillBtn,
                         background: (activeTheme?.fullScreen.textAlign || 'center') === 'left' ? '#FF5500' : 'transparent',
-                        color: (activeTheme?.fullScreen.textAlign || 'center') === 'left' ? '#ffffff' : '#a1a1aa',
+                        color: (activeTheme?.fullScreen.textAlign || 'center') === 'left' ? '#ffffff' : 'var(--text-secondary)',
                       }}
                       onClick={() => patchFullScreen({ textAlign: 'left' })}
                     >
@@ -674,7 +674,7 @@ export function SettingsModal() {
                       style={{
                         ...modalStyles.pillBtn,
                         background: (activeTheme?.fullScreen.textAlign || 'center') === 'center' ? '#FF5500' : 'transparent',
-                        color: (activeTheme?.fullScreen.textAlign || 'center') === 'center' ? '#ffffff' : '#a1a1aa',
+                        color: (activeTheme?.fullScreen.textAlign || 'center') === 'center' ? '#ffffff' : 'var(--text-secondary)',
                       }}
                       onClick={() => patchFullScreen({ textAlign: 'center' })}
                     >
@@ -770,7 +770,7 @@ export function SettingsModal() {
                         <span style={{ fontSize: 20 }}>🇫🇷</span>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>French</div>
-                          <div style={{ fontSize: 11, color: '#a1a1aa' }}>LSG & OST</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>LSG & OST</div>
                         </div>
                       </div>
                       <button style={modalStyles.downloadBtn}>Download (93.1 MB)</button>
@@ -781,7 +781,7 @@ export function SettingsModal() {
                         <span style={{ fontSize: 20 }}>🇪🇸</span>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Spanish</div>
-                          <div style={{ fontSize: 11, color: '#a1a1aa' }}>RV1909 & VBL</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>RV1909 & VBL</div>
                         </div>
                       </div>
                       <button style={modalStyles.downloadBtn}>Download (91.1 MB)</button>
@@ -876,7 +876,7 @@ export function SettingsModal() {
                     style={{
                       ...modalStyles.pillBtn,
                       background: feedbackType === 'bug' ? '#FF5500' : 'transparent',
-                      color: feedbackType === 'bug' ? '#ffffff' : '#a1a1aa',
+                      color: feedbackType === 'bug' ? '#ffffff' : 'var(--text-secondary)',
                     }}
                     onClick={() => setFeedbackType('bug')}
                   >
@@ -886,7 +886,7 @@ export function SettingsModal() {
                     style={{
                       ...modalStyles.pillBtn,
                       background: feedbackType === 'feature' ? '#FF5500' : 'transparent',
-                      color: feedbackType === 'feature' ? '#ffffff' : '#a1a1aa',
+                      color: feedbackType === 'feature' ? '#ffffff' : 'var(--text-secondary)',
                     }}
                     onClick={() => setFeedbackType('feature')}
                   >
@@ -896,7 +896,7 @@ export function SettingsModal() {
 
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>
-                    Email <span style={{ color: '#71717a' }}>(optional)</span>
+                    Email <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
                   </div>
                   <input
                     type="email"
@@ -909,7 +909,7 @@ export function SettingsModal() {
 
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 4 }}>Report a bug</div>
-                  <div style={{ fontSize: 11, color: '#a1a1aa', marginBottom: 8 }}>A clear report helps us reproduce it quickly.</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>A clear report helps us reproduce it quickly.</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
                     <span style={modalStyles.chipBadge}>What you were doing</span>
                     <span style={modalStyles.chipBadge}>What you expected</span>
@@ -958,7 +958,7 @@ export function SettingsModal() {
                     <div style={modalStyles.rowTitle}>Local Verse Index Size</div>
                     <div style={modalStyles.rowSub}>31,102 Bible verses indexed in memory</div>
                   </div>
-                  <span style={{ fontSize: 12, color: '#a1a1aa' }}>6.2 MB</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>6.2 MB</span>
                 </div>
               </div>
             )}
@@ -1061,7 +1061,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   versionText: {
     fontSize: 11,
-    color: '#71717a',
+    color: 'var(--text-dim)',
   },
   contentArea: {
     flex: 1,
@@ -1086,7 +1086,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   closeBtn: {
     border: 'none',
     background: 'transparent',
-    color: '#a1a1aa',
+    color: 'var(--text-secondary)',
     fontSize: 16,
     cursor: 'pointer',
     padding: 4,
@@ -1122,7 +1122,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   rowSub: {
     fontSize: 12,
-    color: '#a1a1aa',
+    color: 'var(--text-secondary)',
     marginTop: 2,
   },
   pillGroup: {
@@ -1237,7 +1237,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     background: 'var(--settings-card)',
     border: '1px solid var(--settings-line)',
     borderRadius: 999,
-    color: '#a1a1aa',
+    color: 'var(--text-secondary)',
     fontSize: 11,
     cursor: 'pointer',
   },

@@ -73,7 +73,7 @@ export function CustomDropdown<T extends string = string>({
           style={{
             transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 0.15s ease',
-            color: '#a1a1aa',
+            color: '#ffffff',
           }}
         >
           <path d="M6 9l6 6 6-6" />
@@ -140,7 +140,7 @@ export function CustomDropdown<T extends string = string>({
               >
                 <span>{opt.label}</span>
                 {opt.sublabel && (
-                  <span style={{ fontSize: 11, color: '#71717a' }}>{opt.sublabel}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{opt.sublabel}</span>
                 )}
               </button>
             );

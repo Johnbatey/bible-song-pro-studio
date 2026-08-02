@@ -360,7 +360,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 11,
     fontWeight: 500,
-    color: 'var(--text-secondary)',
+    color: '#ffffff',
     transition: 'all 0.15s ease',
     fontFamily: 'var(--font-ui)',
   },

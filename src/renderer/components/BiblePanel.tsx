@@ -459,12 +459,13 @@ export function BiblePanel() {
             <button
               style={{
                 ...styles.pillBtn,
-                background: !dualVersion ? 'var(--block-active)' : 'transparent',
-                color: !dualVersion ? '#ffffff' : '#a1a1aa',
+                background: !dualVersion ? '#FF5500' : 'transparent',
+                color: '#ffffff',
+                opacity: !dualVersion ? 1 : 0.85,
               }}
               onClick={() => setDualVersion(false)}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
               </svg>
@@ -473,12 +474,13 @@ export function BiblePanel() {
             <button
               style={{
                 ...styles.pillBtn,
-                background: dualVersion ? 'var(--block-active)' : 'transparent',
-                color: dualVersion ? '#ffffff' : '#a1a1aa',
+                background: dualVersion ? '#FF5500' : 'transparent',
+                color: '#ffffff',
+                opacity: dualVersion ? 1 : 0.85,
               }}
               onClick={() => setDualVersion(true)}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
                 <path d="M16 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
               </svg>
@@ -622,7 +624,7 @@ export function BiblePanel() {
                     </div>
                     <span style={{
                       ...styles.verseText,
-                      color: isHighlighted ? '#ffffff' : '#d4d4d8',
+                      color: '#ffffff',
                     }}>
                       {verse.text}
                     </span>
@@ -730,7 +732,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-ui)',
   },
   verseRef: { ...type.caption, ...numeric, color: '#FF5500', fontWeight: fontWeight.bold },
-  verseText: { fontSize: 13, lineHeight: 1.45, color: '#d4d4d8' },
+  verseText: { fontSize: 13, lineHeight: 1.45, color: '#ffffff' },
   textMode: { minHeight: 360, height: '100%', resize: 'none', whiteSpace: 'pre-wrap', lineHeight: 1.55 },
   footerNote: { marginTop: 10, ...type.caption, color: 'var(--text-dim)' },
   liveBadge: { ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#ef4444', color: '#fff' },

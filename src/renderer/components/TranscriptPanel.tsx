@@ -82,7 +82,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   placeholder: {
     fontSize: 12,
-    color: '#71717a',
+    color: 'var(--text-dim)',
     textAlign: 'center',
   },
   startBtn: {

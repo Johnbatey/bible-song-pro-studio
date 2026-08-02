@@ -146,7 +146,7 @@ export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps)
             border: 'none',
             borderLeft: activePanel === panel.id ? '3px solid var(--accent)' : '3px solid transparent',
             background: activePanel === panel.id ? 'var(--accent-dim)' : 'transparent',
-            color: activePanel === panel.id ? 'var(--accent)' : 'var(--text-secondary)',
+            color: activePanel === panel.id ? 'var(--accent)' : '#ffffff',
             ...type.body,
             fontWeight: activePanel === panel.id ? fontWeight.semibold : fontWeight.regular,
             cursor: 'pointer',
@@ -160,13 +160,13 @@ export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps)
           onMouseEnter={(e) => {
             if (activePanel !== panel.id) {
               e.currentTarget.style.background = 'var(--bg-hover)';
-              e.currentTarget.style.color = 'var(--text-primary)';
+              e.currentTarget.style.color = '#ffffff';
             }
           }}
           onMouseLeave={(e) => {
             if (activePanel !== panel.id) {
               e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = 'var(--text-secondary)';
+              e.currentTarget.style.color = '#ffffff';
             }
           }}
         >

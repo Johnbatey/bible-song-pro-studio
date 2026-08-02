@@ -58,7 +58,7 @@ export function SlideEditorModal() {
           <div style={styles.pagesList}>
             {pages.map((pg, idx) => (
               <div key={pg.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#71717a', marginTop: 4 }}>{idx + 1}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginTop: 4 }}>{idx + 1}</span>
                 <div
                   style={{
                     ...styles.pageThumb,
@@ -131,7 +131,7 @@ export function SlideEditorModal() {
               style={{ width: 100, accentColor: '#FF5500' }}
             />
             <button style={styles.zoomBtn} onClick={() => setZoomLevel(Math.min(150, zoomLevel + 10))}>+</button>
-            <span style={{ fontSize: 11, color: '#a1a1aa' }}>{zoomLevel}%</span>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{zoomLevel}%</span>
           </div>
         </div>
 
@@ -172,7 +172,7 @@ export function SlideEditorModal() {
                   value={colorOverlay.replace('#', '').toUpperCase()}
                   onChange={(e) => setColorOverlay(`#${e.target.value}`)}
                 />
-                <span style={{ fontSize: 11, color: '#71717a', fontWeight: 600 }}>100%</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>100%</span>
               </div>
             </div>
           </div>
@@ -222,7 +222,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#202024',
     border: '1px solid rgba(255, 255, 255, 0.1)',
     borderRadius: 6,
-    color: '#a1a1aa',
+    color: 'var(--text-secondary)',
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
@@ -290,7 +290,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toolbarLabel: {
     fontSize: 10,
-    color: '#71717a',
+    color: 'var(--text-dim)',
     fontWeight: 600,
   },
   floatingToolbar: {
@@ -395,7 +395,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   propLabel: {
     fontSize: 11,
-    color: '#a1a1aa',
+    color: 'var(--text-secondary)',
     marginBottom: 4,
   },
   colorInputContainer: {

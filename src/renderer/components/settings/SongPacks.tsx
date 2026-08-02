@@ -150,7 +150,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 0,
     fontFamily: 'var(--font-ui)',
   },
-  allInstalled: { fontSize: 13, color: '#71717a' },
+  allInstalled: { fontSize: 13, color: 'var(--text-dim)' },
   chevron: {
     display: 'inline-flex',
     alignItems: 'center',
