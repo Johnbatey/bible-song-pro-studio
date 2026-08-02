@@ -167,8 +167,8 @@ export function BiblePanel() {
   const [selectedVersion, setSelectedVersion] = useState('KJV');
   const [secondaryVersion, setSecondaryVersion] = useState('NKJV');
   const [dualVersion, setDualVersion] = useState(false);
-  const [selectedBook, setSelectedBook] = useState('');
-  const [chapter, setChapter] = useState(0);
+  const [selectedBook, setSelectedBook] = useState('Genesis');
+  const [chapter, setChapter] = useState(1);
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<'text' | 'buttons'>('buttons');
   const [results, setResults] = useState<BibleSearchResult[]>([]);

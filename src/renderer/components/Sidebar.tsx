@@ -9,17 +9,112 @@ interface SidebarProps {
   collapsed: boolean;
 }
 
-const panels: Array<{ id: PanelView; label: string; icon: string }> = [
-  { id: 'scenes', label: 'Scenes', icon: '🎬' },
-  { id: 'bible', label: 'Bible', icon: '📖' },
-  { id: 'songs', label: 'Songs', icon: '🎵' },
-  { id: 'live', label: 'Live Scripture', icon: '🎙️' },
-  { id: 'presentation', label: 'Slides', icon: '📽️' },
-  { id: 'media', label: 'Media', icon: '🖼️' },
-  { id: 'themes', label: 'Design', icon: '🎨' },
-  { id: 'songlibrary', label: 'Song Library', icon: '📚' },
-  { id: 'history', label: 'History', icon: '📋' },
-  { id: 'settings', label: 'Settings', icon: '⚙️' },
+const panels: Array<{ id: PanelView; label: string; icon: React.ReactNode }> = [
+  {
+    id: 'scenes',
+    label: 'Scenes',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8H4z" fill="currentColor" fillOpacity="0.15" />
+        <path d="M4 11h16M4 7h16M4 7l3-4h3l-3 4M11 7l3-4h3l-3 4M18 7l3-4" />
+      </svg>
+    ),
+  },
+  {
+    id: 'bible',
+    label: 'Bible',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" fill="currentColor" fillOpacity="0.15" />
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" fill="currentColor" fillOpacity="0.15" />
+      </svg>
+    ),
+  },
+  {
+    id: 'songs',
+    label: 'Songs',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 18V5l12-2v13" />
+        <circle cx="6" cy="18" r="3" fill="currentColor" fillOpacity="0.25" />
+        <circle cx="18" cy="16" r="3" fill="currentColor" fillOpacity="0.25" />
+      </svg>
+    ),
+  },
+  {
+    id: 'live',
+    label: 'Live Scripture',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="2" width="6" height="11" rx="3" fill="currentColor" fillOpacity="0.2" />
+        <path d="M5 10a7 7 0 0 0 14 0M12 17v4M8 21h8" />
+      </svg>
+    ),
+  },
+  {
+    id: 'presentation',
+    label: 'Slides',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" fill="currentColor" fillOpacity="0.15" />
+        <path d="M8 21h8M12 17v4M10 8.5l5 3-5 3v-6z" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    id: 'media',
+    label: 'Media',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="3" fill="currentColor" fillOpacity="0.12" />
+        <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
+        <path d="M21 15l-5-5L5 21" />
+      </svg>
+    ),
+  },
+  {
+    id: 'themes',
+    label: 'Design',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a10 10 0 0 0-10 10c0 4.42 3.58 8 8 8 1.1 0 2-.9 2-2 0-.46-.17-.88-.44-1.21-.26-.33-.44-.75-.44-1.22 0-1.1.9-2 2-2h2.8a5.2 5.2 0 0 0 5.2-5.2A10 10 0 0 0 12 2z" fill="currentColor" fillOpacity="0.15" />
+        <circle cx="7.5" cy="11.5" r="1.5" fill="currentColor" />
+        <circle cx="12" cy="7.5" r="1.5" fill="currentColor" />
+        <circle cx="16.5" cy="11.5" r="1.5" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    id: 'songlibrary',
+    label: 'Song Library',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="currentColor" fillOpacity="0.15" />
+        <path d="M8 7h8M8 11h6" />
+      </svg>
+    ),
+  },
+  {
+    id: 'history',
+    label: 'History',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5M12 7v5l4 2" />
+      </svg>
+    ),
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" fill="currentColor" fillOpacity="0.2" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    ),
+  },
 ];
 
 export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps) {
@@ -84,7 +179,7 @@ export function Sidebar({ activePanel, onPanelChange, collapsed }: SidebarProps)
             }
           }}
         >
-          <span style={{ fontSize: iconSize.md, lineHeight: 1 }}>{panel.icon}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20 }}>{panel.icon}</span>
           {!collapsed && <span>{panel.label}</span>}
         </button>
       ))}
