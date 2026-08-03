@@ -20,6 +20,7 @@ import { AIConsole } from './components/AIConsole';
 import { StatusBar } from './components/StatusBar';
 import { LiveScripturePanel } from './components/LiveScripturePanel';
 import { SessionHistoryPanel } from './components/SessionHistoryPanel';
+import { QueuePanel } from './components/QueuePanel';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useBroadcastSync } from './hooks/useBroadcastSync';
 import type { Scene, Theme } from './types';
@@ -178,9 +179,14 @@ export function App() {
     return saved ? parseInt(saved, 10) : 220;
   });
 
-  const [activeDrag, setActiveDrag] = useState<'sidebar' | 'transcript' | 'history' | 'program' | null>(null);
+  const [queueHeight, setQueueHeight] = useState<number>(() => {
+    const saved = localStorage.getItem('bsp_queueHeight');
+    return saved ? parseInt(saved, 10) : 220;
+  });
 
-  const startResizing = (type: 'sidebar' | 'transcript' | 'history' | 'program', e: React.PointerEvent) => {
+  const [activeDrag, setActiveDrag] = useState<'sidebar' | 'transcript' | 'history' | 'program' | 'queue' | null>(null);
+
+  const startResizing = (type: 'sidebar' | 'transcript' | 'history' | 'program' | 'queue', e: React.PointerEvent) => {
     e.preventDefault();
     setActiveDrag(type);
     const startX = e.clientX;
@@ -189,6 +195,7 @@ export function App() {
     const initialTranscriptH = transcriptHeight;
     const initialHistoryH = historyHeight;
     const initialProgramH = programDockHeight;
+    const initialQueueH = queueHeight;
 
     const onPointerMove = (moveEvent: PointerEvent) => {
       if (type === 'sidebar') {
@@ -206,6 +213,11 @@ export function App() {
         const nextH = Math.min(600, Math.max(100, initialHistoryH + deltaY));
         setHistoryHeight(nextH);
         localStorage.setItem('bsp_historyHeight', String(nextH));
+      } else if (type === 'queue') {
+        const deltaY = startY - moveEvent.clientY;
+        const nextH = Math.min(600, Math.max(100, initialQueueH + deltaY));
+        setQueueHeight(nextH);
+        localStorage.setItem('bsp_queueHeight', String(nextH));
       } else if (type === 'program') {
         const deltaY = moveEvent.clientY - startY;
         const nextH = Math.min(800, Math.max(140, initialProgramH + deltaY));
@@ -335,6 +347,17 @@ export function App() {
                   </div>
                 </div>
               </main>
+
+              {/* Vertical resizer between Active Workspace Panel and Queue */}
+              <div
+                className={`resizer-handle resizer-handle-v ${activeDrag === 'queue' ? 'is-dragging' : ''}`}
+                onPointerDown={(e) => startResizing('queue', e)}
+                title="Drag to resize Queue height"
+              />
+
+              <div className="queue-region" style={{ height: queueHeight }}>
+                <QueuePanel />
+              </div>
             </div>
           </div>
         </div>

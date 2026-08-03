@@ -7,6 +7,16 @@ export interface Scene {
   transition?: Transition;
 }
 
+export interface QueueItem {
+  id: string;
+  reference: string;
+  text: string;
+  type: 'bible' | 'song' | 'slide' | 'media';
+  source?: 'Manual' | 'Auto';
+  scene: Scene;
+  timestamp: number;
+}
+
 export interface SceneContent {
   text?: string;
   reference?: string;

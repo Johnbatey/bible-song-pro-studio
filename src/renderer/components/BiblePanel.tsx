@@ -161,6 +161,7 @@ export function BiblePanel() {
   const setCurrentScene = useAppStore((s) => s.setCurrentScene);
   const setPreviewScene = useAppStore((s) => s.setPreviewScene);
   const addVerseToHistory = useAppStore((s) => s.addVerseToHistory);
+  const addToQueue = useAppStore((s) => s.addToQueue);
   const outputMode = useAppStore((s) => s.display.outputMode);
   const operatingMode = useAppStore((s) => s.display.mode);
 
@@ -169,6 +170,8 @@ export function BiblePanel() {
   const [selectedVersion, setSelectedVersion] = useState('KJV');
   const [secondaryVersion, setSecondaryVersion] = useState('NKJV');
   const [dualVersion, setDualVersion] = useState(false);
+  const [searchMode, setSearchMode] = useState<'book' | 'context'>('book');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [selectedBook, setSelectedBook] = useState('Genesis');
   const [chapter, setChapter] = useState(1);
   const [query, setQuery] = useState('');
@@ -179,7 +182,7 @@ export function BiblePanel() {
   const [pinned, setPinned] = useState<BibleVerse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const searchTimerRef = useRef<number | null>(null);
-  const verseRefs = useRef<Record<number, HTMLButtonElement | null>>({});
+  const verseRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const currentVersion = versions.find((v) => v.id === selectedVersion);
   const versionOptions = versions.length ? versions : [
@@ -189,6 +192,18 @@ export function BiblePanel() {
     { id: 'NLT', name: 'New Living Translation', abbreviation: 'NLT', language: 'en', books: [] },
   ];
   const bookOptions = books.length ? books : FALLBACK_BOOKS.map((name) => ({ name, chapters: 1 }));
+
+  const autocompleteMatches = useMemo(() => {
+    if (!query.trim() || query.length < 2) return [];
+    const q = normalizeSearchText(query).toLowerCase();
+    const pool = results.length ? results : chapterVerses;
+    const matches = pool.filter((v) => normalizeSearchText(v.text).toLowerCase().includes(q) || v.reference.toLowerCase().includes(q));
+    return matches.slice(0, 5).map((verse, index) => {
+      const isDirectRef = verse.reference.toLowerCase().includes(q);
+      const confidence = isDirectRef ? 98 : Math.max(70, 95 - index * 5);
+      return { verse, confidence };
+    });
+  }, [query, results, chapterVerses]);
 
   useEffect(() => {
     window.BSP?.bible?.getVersions()
@@ -454,37 +469,72 @@ export function BiblePanel() {
             title="Select Translation"
           />
 
-          {/* Segmented Pill Switcher with Clean SVGs matching the reference design */}
-          <div style={styles.pillGroup}>
-            <button
+          {/* Segmented Pill Switcher with Smooth Sliding Animation */}
+          <div style={{ position: 'relative', display: 'flex', background: '#232221', borderRadius: 6, padding: 3, border: '1px solid #262628', flexShrink: 0, height: 34 }}>
+            <div
               style={{
-                ...styles.pillBtn,
-                background: !dualVersion ? '#FF5500' : 'transparent',
-                color: '#ffffff',
-                opacity: !dualVersion ? 1 : 0.85,
+                position: 'absolute',
+                top: 3,
+                bottom: 3,
+                left: searchMode === 'book' ? 3 : 'calc(50% + 1.5px)',
+                width: 'calc(50% - 4.5px)',
+                background: '#262628',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: 4,
+                transition: 'left 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
+                zIndex: 1,
               }}
-              onClick={() => setDualVersion(false)}
+            />
+            <button
+              type="button"
+              onClick={() => setSearchMode('book')}
+              style={{
+                position: 'relative',
+                zIndex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '0 12px',
+                height: '100%',
+                background: 'transparent',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+              }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
               </svg>
-              <span>Single Version</span>
+              <span>Book search</span>
             </button>
             <button
+              type="button"
+              onClick={() => setSearchMode('context')}
               style={{
-                ...styles.pillBtn,
-                background: dualVersion ? '#FF5500' : 'transparent',
+                position: 'relative',
+                zIndex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '0 12px',
+                height: '100%',
+                background: 'transparent',
+                border: 'none',
                 color: '#ffffff',
-                opacity: dualVersion ? 1 : 0.85,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
               }}
-              onClick={() => setDualVersion(true)}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
-                <path d="M16 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
-              <span>Dual Version</span>
+              <span>Context search</span>
             </button>
           </div>
 
@@ -498,15 +548,79 @@ export function BiblePanel() {
             />
           )}
 
-          {/* Unified Search Input (Book/Reference and Keyword search together) */}
-          <input
-            style={styles.searchInput}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            onBlur={() => setQuery((current) => normalizeReferenceQuery(current))}
-            placeholder="John 3:16 or keyword search..."
-          />
+          {/* Unified Search Input with Live Autocomplete Popover */}
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input
+              style={styles.searchInput}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => {
+                setTimeout(() => setIsSearchFocused(false), 200);
+                setQuery((current) => normalizeReferenceQuery(current));
+              }}
+              onKeyDown={handleSearchKeyDown}
+              placeholder={searchMode === 'book' ? "John 3:16 or Genesis 1..." : "Search keyword across scripture..."}
+            />
+
+            {/* Live Autocomplete Highlighting Dropdown */}
+            {isSearchFocused && autocompleteMatches.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: 6,
+                  background: '#161414',
+                  border: '1px solid #262628',
+                  borderRadius: 6,
+                  boxShadow: '0 12px 36px rgba(0, 0, 0, 0.8)',
+                  zIndex: 2000,
+                  maxHeight: 260,
+                  overflowY: 'auto',
+                  padding: 4,
+                }}
+              >
+                {autocompleteMatches.map((match, idx) => (
+                  <div
+                    key={idx}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      void sendVerse(match.verse, { direct: true });
+                      setIsSearchFocused(false);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#232221'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#FF5500' }}>{match.verse.reference}</span>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, background: '#232221', border: '1px solid #262628', color: '#a1a1aa', padding: '1px 5px', borderRadius: 3 }}>
+                          {selectedVersion}
+                        </span>
+                        <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}>
+                          {match.confidence}% match
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#ffffff', lineHeight: 1.35 }}>
+                      {match.verse.text}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Previous & Next Chapter Navigation Buttons matching the reference design */}
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -577,71 +691,121 @@ export function BiblePanel() {
               const isPreview = previewScene?.type === 'bible' && previewScene.name === verse.reference;
 
               const borderStyle = isLive
-                ? '1px solid #ef4444'
+                ? '1px solid #FF5500'
                 : isPreview
                 ? '1px solid #3b82f6'
                 : isHighlighted
                 ? '1px solid #FF5500'
-                : '1px solid rgba(255, 255, 255, 0.08)';
+                : '1px solid #262628';
 
-              const backgroundStyle = isHighlighted
-                ? 'rgba(255, 85, 0, 0.12)'
-                : isLive
-                ? 'rgba(239, 68, 68, 0.08)'
+              const backgroundStyle = isLive
+                ? '#3d1403'
                 : isPreview
-                ? 'rgba(59, 130, 246, 0.08)'
-                : 'var(--bg-secondary)';
+                ? '#232221'
+                : isHighlighted
+                ? 'rgba(255, 85, 0, 0.12)'
+                : '#141416';
 
               return (
-                <button
+                <div
                   key={`${verse.reference}-${verse.version}`}
                   ref={(el) => { verseRefs.current[verse.verse] = el; }}
-                  style={{
-                    ...styles.verseButton,
-                    border: borderStyle,
-                    background: backgroundStyle,
-                    transition: 'all 0.15s ease',
-                  }}
                   onClick={() => sendVerse(verse)}
                   onDoubleClick={() => sendVerse(verse, { direct: true })}
+                  style={{
+                    height: 38,
+                    minHeight: 38,
+                    padding: '0 12px',
+                    background: backgroundStyle,
+                    border: borderStyle,
+                    borderRadius: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    userSelect: 'none',
+                    boxSizing: 'border-box',
+                  }}
                   title={operatingMode === 'studio'
                     ? 'Click to stage in Preview · double-click to go straight to Program'
                     : 'Click to go live'}
                 >
-                  <div style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 4,
-                    background: isHighlighted ? '#FF5500' : 'rgba(255, 85, 0, 0.85)',
-                    color: '#ffffff',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    marginTop: 1,
-                  }}>
+                  {/* Orange Verse Number */}
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#FF5500', minWidth: 22, flexShrink: 0 }}>
                     {verse.verse}
-                  </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {results.length > 0 && (
-                        <span style={styles.verseRef}>
-                          {verse.reference}
-                        </span>
-                      )}
-                      {isLive && <span style={styles.liveBadge}>LIVE</span>}
-                      {isPreview && !isLive && <span style={styles.previewBadge}>PREVIEW</span>}
-                    </div>
-                    <span style={{
-                      ...styles.verseText,
-                      color: '#ffffff',
-                    }}>
-                      {verse.text}
+                  </span>
+
+                  {/* Reference label when displaying search results */}
+                  {results.length > 0 && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#FF5500', flexShrink: 0 }}>
+                      {verse.reference}
                     </span>
-                  </div>
-                </button>
+                  )}
+
+                  {/* Inline Status Badges */}
+                  {isLive && <span style={styles.liveBadge}>LIVE</span>}
+                  {isPreview && !isLive && <span style={styles.previewBadge}>PREVIEW</span>}
+
+                  {/* Verse Body Text (Single Line with Ellipsis matching the reference design) */}
+                  <span
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      color: '#ffffff',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      lineHeight: '38px',
+                    }}
+                    title={verse.text}
+                  >
+                    {verse.text}
+                  </span>
+
+                  {/* Queue Plus (+) Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const sceneId = bibleSceneId(verse);
+                      const scene: Scene = {
+                        id: sceneId,
+                        name: verse.reference,
+                        type: 'bible',
+                        content: {
+                          text: verse.text,
+                          reference: verse.reference,
+                          version: selectedVersion,
+                        },
+                      };
+                      addToQueue({
+                        reference: verse.reference,
+                        text: verse.text,
+                        type: 'bible',
+                        source: 'Manual',
+                        scene,
+                      });
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontSize: 16,
+                      fontWeight: 400,
+                      cursor: 'pointer',
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                    title="Add verse to Queue"
+                  >
+                    +
+                  </button>
+                </div>
               );
             })}
           </div>

@@ -3,7 +3,7 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import type {
   Scene, Theme, Song, BibleVersion, BibleVerse,
   DisplayState, AIProvider, TranscriptionState, Alert, LiveScriptureState, AudioInputDevice,
-  OperatingMode
+  OperatingMode, QueueItem
 } from '../types';
 
 /**
@@ -90,6 +90,12 @@ interface AppState {
   setBibleVersions: (versions: BibleVersion[]) => void;
   setCurrentBibleVersion: (version: BibleVersion | null) => void;
   addVerseToHistory: (verse: BibleVerse) => void;
+
+  // Queue
+  queue: QueueItem[];
+  addToQueue: (item: Omit<QueueItem, 'id' | 'timestamp'>) => void;
+  removeFromQueue: (id: string) => void;
+  clearQueue: () => void;
 
   // AI / Transcription
   aiProviders: AIProvider[];
@@ -252,6 +258,21 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   setCurrentBibleVersion: (version) => set({ currentBibleVersion: version }),
   addVerseToHistory: (verse) =>
     set((s) => ({ verseHistory: [verse, ...s.verseHistory].slice(0, 100) })),
+
+  queue: [],
+  addToQueue: (item) =>
+    set((s) => ({
+      queue: [
+        ...s.queue,
+        {
+          ...item,
+          id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          timestamp: Date.now(),
+        },
+      ],
+    })),
+  removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
+  clearQueue: () => set({ queue: [] }),
 
   aiProviders: [
     { id: 'deepgram', name: 'Deepgram', type: 'deepgram', enabled: false },
