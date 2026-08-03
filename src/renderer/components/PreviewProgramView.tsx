@@ -203,26 +203,11 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
       bodyStyle={{ display: 'flex', overflow: 'hidden' }}
       footer={(
         <div style={styles.footerGrid}>
-          {/* Left: scale controls */}
-          <div style={styles.footerLeft}>
-            <span style={styles.footerLabel}>SCALE</span>
-            <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom - ZOOM_STEP)} title="Zoom out">-</button>
-            <span style={styles.zoomValue}>{zoomLabel}</span>
-            <input
-              style={styles.zoomSlider}
-              type="range"
-              min={ZOOM_MIN}
-              max={ZOOM_MAX}
-              step={0.01}
-              value={zoom}
-              onChange={(event) => setZoomAround(Number(event.currentTarget.value))}
-              title="Preview/program scale"
-            />
-            <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom + ZOOM_STEP)} title="Zoom in">+</button>
-            <button style={styles.zoomBtnWide} onClick={fitStage} title="Fit preview/program to view">FIT</button>
-          </div>
+          {/* Empty left track — the grid's 1fr/auto/1fr is what centres the
+              cluster, so both flanks have to stay even when unused. */}
+          <div style={styles.footerLeft} />
 
-          {/* Centre: Studio with the output-mode switch beside it */}
+          {/* Centre: Studio, then the output-mode switch, then scale */}
           <div style={styles.footerCentre}>
           <button
             style={{
@@ -268,9 +253,27 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                 LT
               </BlockButton>
             </BlockSegment>
+
+            <div style={styles.footerScale}>
+              <span style={styles.footerLabel}>SCALE</span>
+              <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom - ZOOM_STEP)} title="Zoom out">-</button>
+              <span style={styles.zoomValue}>{zoomLabel}</span>
+              <input
+                style={styles.zoomSlider}
+                type="range"
+                min={ZOOM_MIN}
+                max={ZOOM_MAX}
+                step={0.01}
+                value={zoom}
+                onChange={(event) => setZoomAround(Number(event.currentTarget.value))}
+                title="Preview/program scale"
+              />
+              <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom + ZOOM_STEP)} title="Zoom in">+</button>
+              <button style={styles.zoomBtnWide} onClick={fitStage} title="Fit preview/program to view">FIT</button>
+            </div>
           </div>
 
-          {/* Empty right track, so the centre group holds the true middle. */}
+          {/* Both flanking tracks stay, so the cluster holds the true middle. */}
           <div style={styles.footerRight} />
         </div>
       )}
@@ -347,6 +350,14 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: '100%',
   },
   footerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
+  /* Scale trails the output-mode switch; its own inner spacing is tighter than
+     the block gutter separating the three controls. */
+  footerScale: {
     display: 'flex',
     alignItems: 'center',
     gap: 6,

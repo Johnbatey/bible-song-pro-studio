@@ -86,8 +86,16 @@ export function SongDeck({ song, title, emptyLabel, targetText }: SongDeckProps)
   function step(direction: 1 | -1) {
     if (!song || slides.length === 0) return;
     const index = slides.findIndex((s) => songSceneId(song, s) === activeSceneId);
-    const fallback = direction > 0 ? -1 : slides.length;
-    const next = Math.max(0, Math.min(slides.length - 1, (index === -1 ? fallback : index) + direction));
+    if (index === -1) {
+      // Nothing of this song is showing — start from whichever end we came at.
+      send(slides[direction > 0 ? 0 : slides.length - 1], { direct: true });
+      return;
+    }
+    /* Wrap rather than clamp. Clamping re-sent the slide already showing, which
+       send() treats as "clicked what is live" and clears the output — so the
+       end of a song went blank, and only the press after that came back to the
+       start. */
+    const next = (index + direction + slides.length) % slides.length;
     send(slides[next], { direct: true });
   }
 

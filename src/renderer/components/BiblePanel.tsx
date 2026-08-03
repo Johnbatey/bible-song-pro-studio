@@ -353,6 +353,19 @@ export function BiblePanel() {
       ? previewScene.name
       : '';
 
+  /* Set when a step crosses a chapter boundary; consumed once the new
+     chapter's verses arrive, to project the one at that end. */
+  const pendingEdgeRef = useRef<'first' | 'last' | null>(null);
+
+  useEffect(() => {
+    if (!pendingEdgeRef.current || chapterVerses.length === 0) return;
+    const edge = pendingEdgeRef.current;
+    pendingEdgeRef.current = null;
+    const verse = edge === 'first' ? chapterVerses[0] : chapterVerses[chapterVerses.length - 1];
+    if (verse) void sendVerse(verse, { direct: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapterVerses]);
+
   /* Stepping with the chevrons or the arrow keys walks past the bottom of the
      list, so the row that just went live has to be brought back into view. */
   useEffect(() => {
@@ -402,13 +415,65 @@ export function BiblePanel() {
     projectScene(scene, { direct: opts.direct });
   }
 
+  /**
+   * Crosses into the neighbouring chapter, projecting the verse at whichever
+   * end we arrive from. The chapter loads asynchronously, so the edge is
+   * recorded and acted on once the verses land.
+   */
+  function stepChapter(direction: 1 | -1) {
+    const bookIndex = bookOptions.findIndex((b) => b.name === selectedBook);
+    if (bookIndex === -1) return;
+
+    if (direction > 0) {
+      pendingEdgeRef.current = 'first';
+      if (chapter < (bookOptions[bookIndex].chapters || 1)) {
+        setChapter(chapter + 1);
+      } else {
+        // Past the last chapter: on into the next book, wrapping at Revelation.
+        const nextBook = bookOptions[(bookIndex + 1) % bookOptions.length];
+        setSelectedBook(nextBook.name);
+        setChapter(1);
+      }
+      return;
+    }
+
+    pendingEdgeRef.current = 'last';
+    if (chapter > 1) {
+      setChapter(chapter - 1);
+    } else {
+      const prevBook = bookOptions[(bookIndex - 1 + bookOptions.length) % bookOptions.length];
+      setSelectedBook(prevBook.name);
+      setChapter(prevBook.chapters || 1);
+    }
+  }
+
   async function sendAdjacentVerse(direction: 1 | -1) {
     if (!visibleVerses.length) return;
     const currentIndex = visibleVerses.findIndex((verse) => verse.reference === activeReference);
-    const fallbackIndex = direction > 0 ? -1 : visibleVerses.length;
-    const nextIndex = Math.max(0, Math.min(visibleVerses.length - 1, (currentIndex === -1 ? fallbackIndex : currentIndex) + direction));
-    const verse = visibleVerses[nextIndex];
-    if (verse) await sendVerse(verse, { direct: true });
+
+    if (currentIndex === -1) {
+      // Nothing of this list is showing — enter from the end we came at.
+      const verse = visibleVerses[direction > 0 ? 0 : visibleVerses.length - 1];
+      if (verse) await sendVerse(verse, { direct: true });
+      return;
+    }
+
+    const nextIndex = currentIndex + direction;
+    if (nextIndex >= 0 && nextIndex < visibleVerses.length) {
+      await sendVerse(visibleVerses[nextIndex], { direct: true });
+      return;
+    }
+
+    /* Past an edge. Clamping used to re-send the verse already live, which
+       sendVerse reads as "clicked what is showing" and clears the output — so
+       the end of a chapter went blank and the next press jumped to the start. */
+    if (results.length) {
+      // A search result list has no neighbouring chapter, so wrap within it.
+      const wrapped = (nextIndex + visibleVerses.length) % visibleVerses.length;
+      await sendVerse(visibleVerses[wrapped], { direct: true });
+      return;
+    }
+    stepChapter(direction);
   }
 
   function pinCurrent() {
