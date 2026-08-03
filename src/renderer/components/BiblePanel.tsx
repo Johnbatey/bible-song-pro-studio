@@ -199,6 +199,15 @@ export function BiblePanel() {
   const [chapterVerses, setChapterVerses] = useState<BibleVerse[]>([]);
   const [highlightedVerse, setHighlightedVerse] = useState<number | null>(null);
   const [pinned, setPinned] = useState<BibleVerse[]>([]);
+  /** Where the control bar sits — above the verse list, or under it. */
+  const [barPosition, setBarPosition] = useState<'top' | 'bottom'>(() =>
+    localStorage.getItem('bsp_bibleBarPosition') === 'bottom' ? 'bottom' : 'top');
+
+  const moveBar = () => {
+    const next = barPosition === 'top' ? 'bottom' : 'top';
+    setBarPosition(next);
+    localStorage.setItem('bsp_bibleBarPosition', next);
+  };
   const [isLoading, setIsLoading] = useState(false);
   const searchTimerRef = useRef<number | null>(null);
   /* Keyed by reference, not verse number: search results span books, so verse
@@ -489,8 +498,12 @@ export function BiblePanel() {
     ? `${selectedBook} ${chapter}`
     : 'Scripture';
 
-  return (
-    <div ref={containerRef} className="blk-col" style={styles.panel}>
+  /**
+   * Built once and rendered into whichever slot is chosen, rather than written
+   * twice — the footer copy is the same element with the same classes, so it
+   * scrolls sideways and behaves identically by construction.
+   */
+  const toolbar = (
       <div className="blk blk--bar">
         <div style={styles.controlsRow}>
           {/* Custom Dark Version Dropdown Popup matching the reference design */}
@@ -584,8 +597,37 @@ export function BiblePanel() {
               </svg>
             </button>
           </div>
+
+          {/* Send the whole bar to the other end of the panel. */}
+          <button
+            style={styles.iconNavBtn}
+            onClick={moveBar}
+            title={barPosition === 'top'
+              ? 'Move this toolbar to the bottom of the Bible window'
+              : 'Move this toolbar back to the top of the Bible window'}
+            aria-label="Move toolbar"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              {barPosition === 'top' ? (
+                <>
+                  <path d="M12 5v14" />
+                  <path d="m19 12-7 7-7-7" />
+                </>
+              ) : (
+                <>
+                  <path d="M12 19V5" />
+                  <path d="m5 12 7-7 7 7" />
+                </>
+              )}
+            </svg>
+          </button>
         </div>
       </div>
+  );
+
+  return (
+    <div ref={containerRef} className="blk-col" style={styles.panel}>
+      {barPosition === 'top' && toolbar}
 
       <Block
         className="blk-fill"
@@ -759,6 +801,8 @@ export function BiblePanel() {
           Click a verse card to load it into Preview.
         </div>
       </Block>
+
+      {barPosition === 'bottom' && toolbar}
     </div>
   );
 }
