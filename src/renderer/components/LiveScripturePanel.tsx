@@ -8,6 +8,8 @@ import { SlidingSwitch } from './SlidingSwitch';
 import { CustomDropdown } from './CustomDropdown';
 import { AppleToggle } from './AppleToggle';
 import { PanelSplitter } from './PanelSplitter';
+import { SongDeck } from './song/SongDeck';
+import { detectSongs, type SongDetection } from '../utils/song-detection';
 
 /** Short enough to feel live, while still giving Whisper enough speech context. */
 const LOCAL_CHUNK_SECONDS = 3;
@@ -30,6 +32,7 @@ export function LiveScripturePanel() {
   const setLive = useAppStore((s) => s.setLiveScripture);
   const setTranscription = useAppStore((s) => s.setTranscription);
   const projectScene = useAppStore((s) => s.projectScene);
+  const songs = useAppStore((s) => s.songs);
 
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [version, setVersion] = useState('KJV');
@@ -41,6 +44,8 @@ export function LiveScripturePanel() {
   const [rankedDetections, setRankedDetections] = useState<VerseDetection[]>([]);
   const [detectionIsFinal, setDetectionIsFinal] = useState(false);
   const [detectionLatencyMs, setDetectionLatencyMs] = useState(0);
+  const [songMatches, setSongMatches] = useState<SongDetection[]>([]);
+  const [pickedSongId, setPickedSongId] = useState<string | null>(null);
   const [primaryWidth, setPrimaryWidth] = useState<number>(() => {
     const saved = localStorage.getItem('bsp_livePrimaryWidth');
     return saved ? parseInt(saved, 10) : 340;
@@ -361,6 +366,27 @@ export function LiveScripturePanel() {
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
 
+  const isSongMode = live.detectionMode === 'song';
+  /* The operator's pick wins; otherwise follow the detector's leader so the
+     deck tracks the singing without a click. */
+  const activeSongMatch = pickedSongId
+    ? songMatches.find((m) => m.song.id === pickedSongId) || songMatches[0]
+    : songMatches[0];
+  const pickedSong = (pickedSongId ? songs.find((x) => x.id === pickedSongId) : null)
+    || activeSongMatch?.song
+    || null;
+
+  /* Derived from the transcript rather than fired inside the STT callback, so
+     flipping to Song mid-service ranks what has already been heard. */
+  useEffect(() => {
+    if (!isSongMode) {
+      if (songMatches.length) setSongMatches([]);
+      return;
+    }
+    setSongMatches(detectSongs(live.transcript || '', songs));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSongMode, live.transcript, songs]);
+
   const statusInfo = STATE_LABELS[sttStatus?.state || 'idle'];
   const deepgramUnavailable = engine === 'deepgram' && !keyConfigured;
 
@@ -601,83 +627,153 @@ export function LiveScripturePanel() {
         </div>
       )}
 
-      <div className="blk-row" style={styles.matchDashboard}>
-        <Block
-          style={{ ...styles.primaryColumn, flex: `0 0 ${primaryWidth}px` }}
-          title="Best Match"
-          tools={(
-            <span style={detectionIsFinal ? styles.finalBadge : styles.trackingBadge}>
-              {detectionIsFinal ? 'Final' : 'Tracking'}
-            </span>
-          )}
-          bodyStyle={{ display: 'flex', flexDirection: 'column' }}
-        >
-          {live.bestHit ? (
-            <button style={styles.hit} onClick={() => sendHit(live.bestHit!, { goLive: true, confidence: rankedDetections[0]?.confidence, sourceMode: rankedDetections[0]?.mode })}>
-              <div style={styles.primaryReferenceRow}>
-                <strong style={styles.primaryReference}>{live.bestHit.reference}</strong>
-                <span style={styles.versionBadge}>{live.bestHit.version || version}</span>
+      {isSongMode ? (
+        <div className="blk-row" style={styles.matchDashboard}>
+          {/* Left, where Bible shows Best Match: the ranked song candidates. */}
+          <Block
+            style={{ ...styles.primaryColumn, flex: `0 0 ${primaryWidth}px` }}
+            title="Candidate Index"
+            tools={<span style={styles.countBadge}>{songMatches.length} matches</span>}
+          >
+            {songMatches.length === 0 ? (
+              <div style={styles.emptyHint}>
+                {songs.length === 0
+                  ? 'No songs in the library yet. Import songs to match against.'
+                  : live.isActive
+                    ? 'Listening for lyrics…'
+                    : 'Start listening to match what is being sung.'}
               </div>
-              <span style={styles.primaryText}>{live.bestHit.text}</span>
-            </button>
-          ) : <div style={styles.placeholder}>Top detected verse will appear here.</div>}
-          {rankedDetections[0] && (
-            <div style={styles.primaryMetrics}>
-              <Metric label="Confidence" value={`${confidencePercent(rankedDetections[0].confidence)}%`} />
-              <Metric label="Match tier" value={formatMatchMode(rankedDetections[0].mode)} />
-              <Metric label="Words matched" value={rankedDetections[0].wordOverlap != null ? `${Math.round(rankedDetections[0].wordOverlap * 100)}%` : 'Direct'} />
-              <Metric label="Search time" value={`${detectionLatencyMs} ms`} />
-            </div>
-          )}
-        </Block>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {songMatches.map((match) => {
+                  const isPicked = pickedSong?.id === match.song.id;
+                  return (
+                    <button
+                      key={match.song.id}
+                      onClick={() => setPickedSongId(match.song.id)}
+                      style={{
+                        ...styles.songCandidate,
+                        borderColor: isPicked ? 'var(--chrome-control-active)' : 'var(--border-primary)',
+                        background: isPicked ? 'var(--chrome-control-active)' : 'var(--bg-surface)',
+                      }}
+                      title={`Show the lyrics for ${match.song.title}`}
+                    >
+                      <div style={styles.songCandidateHead}>
+                        <span style={styles.songCandidateTitle}>{match.song.title}</span>
+                        <span style={styles.songConfidence}>
+                          <span style={styles.songConfidenceDot} />
+                          {Math.round(match.confidence * 100)}%
+                        </span>
+                      </div>
+                      <div style={styles.songCandidateMeta}>
+                        {match.song.artist || 'Unknown Artist'}
+                        {match.slideLabel ? ` · ${match.slideLabel}` : ''}
+                      </div>
+                      {match.excerpt && (
+                        <div style={styles.songCandidateExcerpt}>“{match.excerpt}”</div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Block>
 
-        <PanelSplitter
-          width={primaryWidth}
-          onChange={setPrimaryWidthPersisted}
-          min={220}
-          max={620}
-          title="Drag to resize the match panels"
-        />
+          <PanelSplitter
+            width={primaryWidth}
+            onChange={setPrimaryWidthPersisted}
+            min={220}
+            max={620}
+            title="Drag to resize the song panels"
+          />
 
-        <Block
-          title="Candidate Index"
-          style={styles.indexColumn}
-          tools={<span style={styles.countBadge}>{Math.max(0, live.suggestions.length - 1)} matches</span>}
-          bodyStyle={{ display: 'flex', flexDirection: 'column' }}
-        >
-          {live.suggestions.length > 1 ? (
-            <div style={styles.suggestions}>
-              {live.suggestions.slice(1).map((hit, index) => {
-                const detection = rankedDetections[index + 1];
-                const confidence = detection?.confidence;
-                return (
-                  <button key={`${hit.reference}-${index}`} style={styles.suggestionCard} onClick={() => sendHit(hit, { goLive: true, confidence: detection?.confidence, sourceMode: detection?.mode })}>
-                    <div style={styles.candidateTopRow}>
-                      <span style={styles.rankBadge}>#{index + 2}</span>
-                      <strong style={styles.suggestionReference}>{hit.reference}</strong>
-                      <span style={styles.candidateConfidence}>{confidence != null ? `${confidencePercent(confidence)}%` : 'Candidate'}</span>
-                    </div>
-                    <span style={styles.suggestionText}>
-                      {hit.text || detection?.text || 'Verse content is unavailable for this Bible version.'}
-                    </span>
-                    <div style={styles.candidateFooter}>
-                      <span>{formatMatchMode(detection?.mode || 'search')}</span>
-                      <span>{hit.version || version}</span>
-                    </div>
-                    {confidence != null && (
-                      <span style={styles.confidenceTrack}>
-                        <span style={{ ...styles.confidenceFill, width: `${Math.max(4, Math.min(100, confidence * 100))}%` }} />
+          {/* Right: the same deck the Songs panel uses, tools and all. */}
+          <SongDeck
+            song={pickedSong}
+            title="Lyrics"
+            targetText={activeSongMatch?.excerpt}
+            emptyLabel="Pick a song from the candidate index to project its lyrics."
+          />
+        </div>
+      ) : (
+        <div className="blk-row" style={styles.matchDashboard}>
+          <Block
+            style={{ ...styles.primaryColumn, flex: `0 0 ${primaryWidth}px` }}
+            title="Best Match"
+            tools={(
+              <span style={detectionIsFinal ? styles.finalBadge : styles.trackingBadge}>
+                {detectionIsFinal ? 'Final' : 'Tracking'}
+              </span>
+            )}
+            bodyStyle={{ display: 'flex', flexDirection: 'column' }}
+          >
+            {live.bestHit ? (
+              <button style={styles.hit} onClick={() => sendHit(live.bestHit!, { goLive: true, confidence: rankedDetections[0]?.confidence, sourceMode: rankedDetections[0]?.mode })}>
+                <div style={styles.primaryReferenceRow}>
+                  <strong style={styles.primaryReference}>{live.bestHit.reference}</strong>
+                  <span style={styles.versionBadge}>{live.bestHit.version || version}</span>
+                </div>
+                <span style={styles.primaryText}>{live.bestHit.text}</span>
+              </button>
+            ) : <div style={styles.placeholder}>Top detected verse will appear here.</div>}
+            {rankedDetections[0] && (
+              <div style={styles.primaryMetrics}>
+                <Metric label="Confidence" value={`${confidencePercent(rankedDetections[0].confidence)}%`} />
+                <Metric label="Match tier" value={formatMatchMode(rankedDetections[0].mode)} />
+                <Metric label="Words matched" value={rankedDetections[0].wordOverlap != null ? `${Math.round(rankedDetections[0].wordOverlap * 100)}%` : 'Direct'} />
+                <Metric label="Search time" value={`${detectionLatencyMs} ms`} />
+              </div>
+            )}
+          </Block>
+
+          <PanelSplitter
+            width={primaryWidth}
+            onChange={setPrimaryWidthPersisted}
+            min={220}
+            max={620}
+            title="Drag to resize the match panels"
+          />
+
+          <Block
+            title="Candidate Index"
+            style={styles.indexColumn}
+            tools={<span style={styles.countBadge}>{Math.max(0, live.suggestions.length - 1)} matches</span>}
+            bodyStyle={{ display: 'flex', flexDirection: 'column' }}
+          >
+            {live.suggestions.length > 1 ? (
+              <div style={styles.suggestions}>
+                {live.suggestions.slice(1).map((hit, index) => {
+                  const detection = rankedDetections[index + 1];
+                  const confidence = detection?.confidence;
+                  return (
+                    <button key={`${hit.reference}-${index}`} style={styles.suggestionCard} onClick={() => sendHit(hit, { goLive: true, confidence: detection?.confidence, sourceMode: detection?.mode })}>
+                      <div style={styles.candidateTopRow}>
+                        <span style={styles.rankBadge}>#{index + 2}</span>
+                        <strong style={styles.suggestionReference}>{hit.reference}</strong>
+                        <span style={styles.candidateConfidence}>{confidence != null ? `${confidencePercent(confidence)}%` : 'Candidate'}</span>
+                      </div>
+                      <span style={styles.suggestionText}>
+                        {hit.text || detection?.text || 'Verse content is unavailable for this Bible version.'}
                       </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div style={styles.placeholder}>Close matches will be indexed here as words arrive.</div>
-          )}
-        </Block>
-      </div>
+                      <div style={styles.candidateFooter}>
+                        <span>{formatMatchMode(detection?.mode || 'search')}</span>
+                        <span>{hit.version || version}</span>
+                      </div>
+                      {confidence != null && (
+                        <span style={styles.confidenceTrack}>
+                          <span style={{ ...styles.confidenceFill, width: `${Math.max(4, Math.min(100, confidence * 100))}%` }} />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={styles.placeholder}>Close matches will be indexed here as words arrive.</div>
+            )}
+          </Block>
+        </div>
+      )}
     </div>
   );
 }
@@ -760,6 +856,19 @@ const styles: Record<string, React.CSSProperties> = {
   meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)', borderRadius: 999, transition: 'width 90ms linear' },
   meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: '#fff', transition: 'left 140ms ease-out' },
   check: { display: 'flex', alignItems: 'center', gap: 6, ...type.caption, color: 'var(--text-secondary)' },
+  emptyHint: { ...type.secondary, color: 'var(--text-dim)', textAlign: 'center', padding: 20 },
+  songCandidate: {
+    display: 'flex', flexDirection: 'column', gap: 3, width: '100%',
+    padding: '9px 11px', borderRadius: 6, border: '1px solid var(--border-primary)',
+    background: 'var(--bg-surface)', cursor: 'pointer', textAlign: 'left',
+    fontFamily: 'var(--font-ui)', transition: 'all 0.15s ease',
+  },
+  songCandidateHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  songCandidateTitle: { ...type.secondary, fontWeight: fontWeight.semibold, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  songCandidateMeta: { ...type.caption, color: 'var(--text-dim)' },
+  songCandidateExcerpt: { ...type.caption, color: 'var(--text-secondary)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  songConfidence: { display: 'inline-flex', alignItems: 'center', gap: 5, ...numeric, ...type.caption, color: '#22c55e', fontWeight: fontWeight.semibold, flexShrink: 0 },
+  songConfidenceDot: { width: 6, height: 6, borderRadius: '50%', background: '#22c55e' },
   matchDashboard: { flex: '1 1 auto', minHeight: 0, overflow: 'hidden' },
   primaryColumn: { minWidth: 220 },
   indexColumn: { flex: '1 1 0%', minWidth: 220 },

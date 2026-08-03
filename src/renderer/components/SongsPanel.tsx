@@ -6,6 +6,7 @@ import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { AppleToggle } from './AppleToggle';
 import { PanelSplitter } from './PanelSplitter';
+import { SongDeck } from './song/SongDeck';
 import { isFocusedDock } from './dock/dockFocus';
 
 const DEMO_SONGS: Song[] = [
@@ -58,7 +59,6 @@ export function SongsPanel() {
 
   const [search, setSearch] = useState('');
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
-  const [linesPerSlide, setLinesPerSlide] = useState<number | 'auto'>('auto');
   const [isDragging, setIsDragging] = useState(false);
   const [importing, setImporting] = useState(false);
   /** The lyric a search sent us to, so the right block can point at it. */
@@ -140,143 +140,8 @@ export function SongsPanel() {
     setSongs(songs.map((s) => (s.id === updated.id ? updated : s)));
   };
 
-  interface FormattedSlide {
-    id: string;
-    label: string;
-    text: string;
-  }
-
-  const getFormattedSlides = (song: Song, lineCount: number | 'auto'): FormattedSlide[] => {
-    if (lineCount === 'auto') {
-      return song.slides.map((slide) => ({
-        id: slide.id,
-        label: slide.label,
-        text: slide.text,
-      }));
-    }
-
-    const result: FormattedSlide[] = [];
-    song.slides.forEach((slide) => {
-      const rawLines = slide.text.split('\n').map((l) => l.trim()).filter(Boolean);
-      if (rawLines.length <= lineCount) {
-        result.push({ id: slide.id, label: slide.label, text: slide.text });
-      } else {
-        const chunkCount = Math.ceil(rawLines.length / lineCount);
-        for (let i = 0; i < chunkCount; i++) {
-          const chunk = rawLines.slice(i * lineCount, (i + 1) * lineCount);
-          result.push({
-            id: `${slide.id}-p${i + 1}`,
-            label: `${slide.label} (${i + 1}/${chunkCount})`,
-            text: chunk.join('\n'),
-          });
-        }
-      }
-    });
-    return result;
-  };
-
-  const formattedSlides = selectedSong ? getFormattedSlides(selectedSong, linesPerSlide) : [];
-
-  /* Resolved against the *formatted* slides rather than stored at click time,
-     so the mark follows the lyric when Lines per slide re-chunks the song. */
-  const targetSlideId = lyricTarget
-    ? formattedSlides.find((s) => s.text.toLowerCase().includes(lyricTarget))?.id
-    : undefined;
-  const targetSlideRef = useRef<HTMLDivElement | null>(null);
-  const slideRefs = useRef<Record<string, HTMLDivElement | null>>({});
-
-  useEffect(() => {
-    if (targetSlideId) targetSlideRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [targetSlideId]);
-
-  const songSceneId = (song: Song, slide: FormattedSlide) =>
-    `song-${song.id}-${slide.id}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
-
-  /** Live wins over staged — the same rule the row highlight follows. */
-  const activeSceneId = currentScene?.type === 'song'
-    ? currentScene.id
-    : previewScene?.type === 'song'
-      ? previewScene.id
-      : '';
-
-  /* Prev/Next and the arrow keys can walk the song past the visible slides, so
-     the one that just went out has to be pulled back into view. */
-  useEffect(() => {
-    if (!activeSceneId) return;
-    slideRefs.current[activeSceneId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [activeSceneId, formattedSlides.length, selectedSong?.id]);
-
-  const buildSongScene = (song: Song, slide: FormattedSlide): Scene => {
-    const includeCredits = showSongCredits && linesPerSlide === 'auto';
-    return {
-      id: songSceneId(song, slide),
-      name: `${song.title} - ${slide.label}`,
-      type: 'song',
-      content: {
-        text: slide.text,
-        reference: `${song.title} (${song.key || ''})`,
-        songCredit: (includeCredits && (song.author || song.copyright || song.ccli))
-          ? { title: song.title, author: song.author || song.artist, copyright: song.copyright, ccli: song.ccli }
-          : undefined,
-      },
-      background: {
-        type: 'gradient',
-        gradient: 'linear-gradient(135deg, #1a0a2e, #16213e, #0f3460)',
-      },
-    };
-  };
-
-  const handleSendSlideToDisplay = (song: Song, slide: FormattedSlide, opts: { direct?: boolean } = {}) => {
-    const sceneId = songSceneId(song, slide);
-    const goesLive = opts.direct || operatingMode === 'basic';
-    const activeScene = goesLive ? currentScene : previewScene;
-    if (activeScene?.id === sceneId) {
-      if (goesLive) {
-        setCurrentScene(null);
-        setPreviewScene(null);
-      } else {
-        setPreviewScene(null);
-      }
-      return;
-    }
-    const scene = buildSongScene(song, slide);
-    projectScene(scene, { direct: opts.direct });
-  };
-
-  const sendAdjacentSlide = (direction: 1 | -1) => {
-    if (!selectedSong || !formattedSlides.length) return;
-    const activeId = currentScene?.type === 'song'
-      ? currentScene.id
-      : previewScene?.type === 'song'
-        ? previewScene.id
-        : '';
-    const currentIndex = formattedSlides.findIndex((slide) => songSceneId(selectedSong, slide) === activeId);
-    const fallbackIndex = direction > 0 ? -1 : formattedSlides.length;
-    const nextIndex = Math.max(0, Math.min(formattedSlides.length - 1, (currentIndex === -1 ? fallbackIndex : currentIndex) + direction));
-    const slide = formattedSlides[nextIndex];
-    if (slide) handleSendSlideToDisplay(selectedSong, slide, { direct: true });
-  };
-
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
-      if (!isFocusedDock(containerRef.current)) return;
-      const target = event.target as HTMLElement | null;
-      const tagName = target?.tagName?.toLowerCase();
-      if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || target?.isContentEditable) return;
-      if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        sendAdjacentSlide(1);
-      } else if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        sendAdjacentSlide(-1);
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedSong, linesPerSlide, currentScene, previewScene, operatingMode]);
 
   return (
     <div ref={containerRef} className="blk-row" style={{ height: '100%', minHeight: 0 }}>
@@ -418,150 +283,12 @@ export function SongsPanel() {
         title="Drag to resize the song list"
       />
 
-      {/* Right block: song details & lyric slides */}
-      <Block
-        className="blk-fill"
-        title={selectedSong ? selectedSong.title : 'Lyrics'}
-        subtitle={selectedSong
-          ? `${selectedSong.artist || 'Unknown Artist'}${selectedSong.key ? ` · Key: ${selectedSong.key}` : ''}`
-          : undefined}
-        tools={selectedSong ? (
-          <>
-            <BlockButton disabled={!formattedSlides.length} onClick={() => sendAdjacentSlide(-1)}>Prev</BlockButton>
-            <BlockButton disabled={!formattedSlides.length} onClick={() => sendAdjacentSlide(1)}>Next</BlockButton>
-          </>
-        ) : undefined}
-        footer={selectedSong ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ ...type.caption, color: 'var(--text-dim)' }}>Lines per slide</span>
-              <BlockSegment>
-                {(['auto', 1, 2, 4, 6] as const).map((val) => (
-                  <BlockButton
-                    key={String(val)}
-                    active={linesPerSlide === val}
-                    onClick={() => setLinesPerSlide(val)}
-                  >
-                    {val === 'auto' ? 'Auto' : String(val)}
-                  </BlockButton>
-                ))}
-              </BlockSegment>
-            </div>
-
-            <AppleToggle
-              label="Display credits"
-              checked={showSongCredits}
-              onChange={setShowSongCredits}
-            />
-          </>
-        ) : undefined}
-      >
-        {selectedSong ? (
-          <>
-            {/* Clickable Lyric Buttons Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
-                {formattedSlides.map((slide) => {
-                  const sceneId = songSceneId(selectedSong, slide);
-                  const isLive = currentScene?.type === 'song' && currentScene.id === sceneId;
-                  const isPreview = previewScene?.type === 'song' && previewScene.id === sceneId;
-
-                  const isTarget = slide.id === targetSlideId;
-
-                  const borderStyle = isLive
-                    ? '2px solid #FF5500'
-                    : isPreview
-                    ? '2px solid #3b82f6'
-                    : isTarget
-                    ? '1px solid var(--chrome-control-active)'
-                    : '1px solid var(--border-primary)';
-
-                  const backgroundStyle = isLive
-                    ? '#3d1403'
-                    : isPreview
-                    ? 'rgba(59, 130, 246, 0.08)'
-                    : isTarget
-                    ? 'var(--chrome-control-active)'
-                    : 'var(--bg-surface)';
-
-                  return (
-                    <div
-                      key={slide.id}
-                      className="row-hover"
-                      ref={(el) => {
-                        slideRefs.current[sceneId] = el;
-                        if (isTarget) targetSlideRef.current = el;
-                      }}
-                      style={{
-                        border: borderStyle,
-                        background: backgroundStyle,
-                        color: 'var(--text-primary)',
-                        borderRadius: 8,
-                        padding: 12,
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        minHeight: 100,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                        fontFamily: 'var(--font-ui)',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onClick={() => handleSendSlideToDisplay(selectedSong, slide)}
-                      onDoubleClick={() => handleSendSlideToDisplay(selectedSong, slide, { direct: true })}
-                      title={operatingMode === 'studio'
-                        ? 'Click to stage in Preview · double-click to go straight to Program'
-                        : 'Click to go live'}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-                        <span style={{ ...type.label, color: 'var(--accent)', fontWeight: fontWeight.bold }}>
-                          {slide.label}
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {isLive && <span style={{ ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#FF5500', color: '#fff' }}>LIVE</span>}
-                          {isPreview && !isLive && <span style={{ ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#3b82f6', color: '#fff' }}>PREVIEW</span>}
-                          {/* Queue Plus (+) — revealed on hover */}
-                          <button
-                            type="button"
-                            className="row-action"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addToQueue({
-                                reference: `${selectedSong.title} · ${slide.label}`,
-                                text: slide.text,
-                                type: 'song',
-                                source: 'Manual',
-                                scene: buildSongScene(selectedSong, slide),
-                              });
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ffffff',
-                              fontSize: 16,
-                              cursor: 'pointer',
-                              padding: '0 4px',
-                              lineHeight: 1,
-                            }}
-                            title="Add slide to Queue"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                      <span style={{ ...type.secondary, lineHeight: 1.45, whiteSpace: 'pre-line', color: 'var(--text-secondary)' }}>
-                        {slide.text}
-                      </span>
-                    </div>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)', ...type.body }}>
-            Select a song from the left list to view lyrics & button mode controls.
-          </div>
-        )}
-      </Block>
+      {/* Right block: the shared lyric deck, also used by Live song mode */}
+      <SongDeck
+        song={selectedSong}
+        targetText={lyricTarget || undefined}
+        emptyLabel="Select a song from the left list to view its lyrics."
+      />
     </div>
   );
 }

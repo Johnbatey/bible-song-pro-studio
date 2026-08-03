@@ -77,6 +77,9 @@ interface AppState {
   // Songs
   songs: Song[];
   showSongCredits: boolean;
+  /** Shared by the Songs panel and Live's song mode so the two agree. */
+  songLinesPerSlide: number | 'auto';
+  setSongLinesPerSlide: (value: number | 'auto') => void;
   addSong: (song: Song) => void;
   removeSong: (id: string) => void;
   updateSong: (id: string, updates: Partial<Song>) => void;
@@ -248,6 +251,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
 
   songs: [],
   showSongCredits: false,
+  songLinesPerSlide: 'auto',
   addSong: (song) => set((s) => ({ songs: [...s.songs, song] })),
   removeSong: (id) => set((s) => ({ songs: s.songs.filter((so) => so.id !== id) })),
   updateSong: (id, updates) =>
@@ -256,6 +260,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     })),
   setSongs: (songs) => set({ songs }),
   setShowSongCredits: (showSongCredits) => set({ showSongCredits }),
+  setSongLinesPerSlide: (songLinesPerSlide) => set({ songLinesPerSlide }),
 
   bibleVersions: [],
   currentBibleVersion: null,
