@@ -39,40 +39,49 @@ async function main() {
       return { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
     };
     return {
-      workspace: box('.operator-workspace'),
-      transcript: box('.transcript-region'),
-      program: box('.program-dock'),
-      sidebar: box('.sidebar-region'),
-      content: box('.left-workspace'),
-      previewStage: box('.pv-dock [title="Fullscreen output"]') ? box('.pv-dock') : null,
+      dockRoot: box('.bsp-dock-root'),
+      groups: Array.from(document.querySelectorAll('.dv-groupview')).map((el) => {
+        const rect = el.getBoundingClientRect();
+        return { w: rect.width, h: rect.height };
+      }),
+      tabTitles: Array.from(document.querySelectorAll('.dv-default-tab'))
+        .map((el) => el.textContent.trim())
+        .filter(Boolean),
+      panels: Array.from(document.querySelectorAll('.dock-panel')).length,
       transcriptPanel: Boolean(document.querySelector('.transcript-panel')),
+      programDock: Boolean(document.querySelector('.pv-dock')),
       bottomTranscriptBar: Boolean(document.querySelector('.transcription-bar')),
     };
   })()`);
 
-  assertBox('workspace', layout.workspace);
-  assertBox('transcript', layout.transcript);
-  assertBox('program', layout.program);
-  assertBox('sidebar', layout.sidebar);
-  assertBox('content', layout.content);
+  // The arrangement is the operator's to change, so position is no longer
+  // assertable. What must hold is that the dock host is up, every dock in the
+  // default layout is present, and none of them collapsed to nothing.
+  assertBox('dock root', layout.dockRoot);
+
+  const EXPECTED = ['Live transcript', 'Output', 'History', 'Bible', 'Queue'];
+  for (const title of EXPECTED) {
+    if (!layout.tabTitles.some((t) => t.toLowerCase() === title.toLowerCase())) {
+      throw new Error(`Default layout is missing the "${title}" dock (saw: ${layout.tabTitles.join(', ') || 'none'})`);
+    }
+  }
+
+  if (layout.groups.length < 2) {
+    throw new Error(`Expected the default layout to be split across several groups, saw ${layout.groups.length}`);
+  }
+  layout.groups.forEach((g, i) => assertBox(`dock group ${i}`, g));
 
   if (!layout.transcriptPanel) {
-    throw new Error('Transcript panel is not rendered in the top-left region');
+    throw new Error('Transcript panel is not rendered in any dock');
+  }
+  if (!layout.programDock) {
+    throw new Error('Preview/Program dock is not rendered');
   }
   if (layout.bottomTranscriptBar) {
     throw new Error('Legacy bottom transcription bar is still rendered');
   }
-  if (!(layout.transcript.x < layout.program.x && layout.transcript.y < layout.sidebar.y)) {
-    throw new Error('Transcript region is not positioned top-left of the operator layout');
-  }
-  if (!(layout.program.y < layout.content.y && layout.program.x > layout.transcript.x)) {
-    throw new Error('Program dock is not positioned in the top-right region');
-  }
-  if (!(layout.sidebar.x < layout.content.x && layout.sidebar.y > layout.transcript.y)) {
-    throw new Error('Sidebar region is not positioned below the transcript panel');
-  }
 
-  console.log(`Operator layout verified, screenshot ${pngPath}`);
+  console.log(`Dock layout verified (${layout.groups.length} groups: ${layout.tabTitles.join(', ')}), screenshot ${pngPath}`);
   win.destroy();
   app.quit();
 }

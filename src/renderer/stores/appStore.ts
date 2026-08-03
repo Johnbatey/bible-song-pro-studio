@@ -114,6 +114,12 @@ interface AppState {
   dismissAlert: () => void;
 
   // UI State
+  /**
+   * Which docks are currently open. Mirrored out of dockview so the title bar
+   * tabs can light up; the layout tree itself lives in localStorage, not here.
+   */
+  openDockIds: string[];
+  setOpenDockIds: (ids: string[]) => void;
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   setSidebarOpen: (v: boolean) => void;
@@ -319,6 +325,14 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   triggerAlert: (alert) => set({ activeAlert: alert }),
   dismissAlert: () => set({ activeAlert: null }),
 
+  openDockIds: [],
+  setOpenDockIds: (ids) => set((s) => (
+    // dockview fires layout changes constantly while dragging; only push a new
+    // array when the set of open docks actually differs.
+    s.openDockIds.length === ids.length && ids.every((id, i) => s.openDockIds[i] === id)
+      ? s
+      : { openDockIds: ids }
+  )),
   sidebarOpen: true,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSidebarOpen: (v) => set({ sidebarOpen: v }),

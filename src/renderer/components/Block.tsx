@@ -1,4 +1,6 @@
+import { useContext } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { DockedContext } from './dock/DockedContext';
 
 /**
  * The window block — the one shape every panel in the app is built from.
@@ -48,9 +50,13 @@ export function Block({
   bodyStyle,
   children,
 }: BlockProps) {
-  const hasChrome = Boolean(chrome || title || tools);
+  // The dock tab above this block is already showing its title.
+  const titleShownByDock = useContext(DockedContext);
+  const showTitle = Boolean(title) && !titleShownByDock;
+  const showSubtitle = Boolean(subtitle) && !titleShownByDock;
+  const hasChrome = Boolean(chrome || showTitle || tools);
 
-  return (
+  const section = (
     <section className={`blk blk--fill ${className}`.trim()} style={style}>
       {hasChrome && (
         chrome ? (
@@ -58,8 +64,8 @@ export function Block({
         ) : (
           <div className="blk__chrome">
             <div className="blk__titlegroup">
-              {title && <span className="blk__title">{title}</span>}
-              {subtitle && <span className="blk__subtitle">{subtitle}</span>}
+              {showTitle && <span className="blk__title">{title}</span>}
+              {showSubtitle && <span className="blk__subtitle">{subtitle}</span>}
             </div>
             {tools && <div className="blk__tools">{tools}</div>}
           </div>
@@ -79,6 +85,8 @@ export function Block({
       {footer && <div className="blk__footer">{footer}</div>}
     </section>
   );
+
+  return <DockedContext.Provider value={false}>{section}</DockedContext.Provider>;
 }
 
 interface BlockButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

@@ -1,29 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useAppStore } from './stores/appStore';
 import { TitleBar } from './components/TitleBar';
-import { Block } from './components/Block';
-import { PreviewProgramView } from './components/PreviewProgramView';
-import { TranscriptPanel } from './components/TranscriptPanel';
-import { ScenePanel } from './components/ScenePanel';
-import { BiblePanel } from './components/BiblePanel';
-import { SongsPanel } from './components/SongsPanel';
-import { ThemePanel } from './components/ThemePanel';
-import { MediaPanel } from './components/MediaPanel';
-import { PresentationPanel } from './components/PresentationPanel';
-import { SettingsPanel } from './components/SettingsPanel';
+import { DockHost } from './components/dock/DockHost';
 import { SettingsModal } from './components/SettingsModal';
 import { ThemeDesignerModal } from './components/ThemeDesignerModal';
 import { SlideEditorModal } from './components/SlideEditorModal';
 import { AnimatedAlert } from './components/AnimatedAlert';
 import { StatusBar } from './components/StatusBar';
-import { LiveScripturePanel } from './components/LiveScripturePanel';
-import { SessionHistoryPanel } from './components/SessionHistoryPanel';
-import { QueuePanel } from './components/QueuePanel';
-import { ErrorBoundary } from './components/ErrorBoundary';
 import { useBroadcastSync } from './hooks/useBroadcastSync';
 import type { Scene, Theme } from './types';
-
-type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'presentation' | 'settings';
 
 /**
  * The audience display renderer consumes flat background fields
@@ -101,8 +86,6 @@ export function App() {
   const dismissAlert = useAppStore((s) => s.dismissAlert);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
 
-  const [activePanel, setActivePanel] = useState<PanelView>('scenes');
-
   useEffect(() => {
     async function init() {
       if (window.BSP) {
@@ -155,192 +138,14 @@ export function App() {
     return unsubscribe;
   }, []);
 
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    const saved = localStorage.getItem('bsp_sidebarWidth');
-    return saved ? parseInt(saved, 10) : 280;
-  });
-
-  const [transcriptHeight, setTranscriptHeight] = useState<number>(() => {
-    const saved = localStorage.getItem('bsp_transcriptHeight');
-    return saved ? parseInt(saved, 10) : 360;
-  });
-
-  const [programDockHeight, setProgramDockHeight] = useState<number>(() => {
-    const saved = localStorage.getItem('bsp_programDockHeight');
-    return saved ? parseInt(saved, 10) : 360;
-  });
-
-  const [queueWidth, setQueueWidth] = useState<number>(() => {
-    const saved = localStorage.getItem('bsp_queueWidth');
-    return saved ? parseInt(saved, 10) : 340;
-  });
-
-  const [activeDrag, setActiveDrag] = useState<'sidebar' | 'transcript' | 'program' | 'queue' | null>(null);
-
-  const startResizing = (type: 'sidebar' | 'transcript' | 'program' | 'queue', e: React.PointerEvent) => {
-    e.preventDefault();
-    setActiveDrag(type);
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const initialSidebarW = sidebarWidth;
-    const initialTranscriptH = transcriptHeight;
-    const initialProgramH = programDockHeight;
-    const initialQueueW = queueWidth;
-
-    const onPointerMove = (moveEvent: PointerEvent) => {
-      if (type === 'sidebar') {
-        const deltaX = moveEvent.clientX - startX;
-        const nextW = Math.min(500, Math.max(160, initialSidebarW + deltaX));
-        setSidebarWidth(nextW);
-        localStorage.setItem('bsp_sidebarWidth', String(nextW));
-      } else if (type === 'transcript') {
-        const deltaY = moveEvent.clientY - startY;
-        const nextH = Math.min(700, Math.max(120, initialTranscriptH + deltaY));
-        setTranscriptHeight(nextH);
-        localStorage.setItem('bsp_transcriptHeight', String(nextH));
-      } else if (type === 'queue') {
-        // Queue sits to the right of the panel, so dragging left widens it.
-        const deltaX = startX - moveEvent.clientX;
-        const nextW = Math.min(640, Math.max(220, initialQueueW + deltaX));
-        setQueueWidth(nextW);
-        localStorage.setItem('bsp_queueWidth', String(nextW));
-      } else if (type === 'program') {
-        const deltaY = moveEvent.clientY - startY;
-        const nextH = Math.min(800, Math.max(140, initialProgramH + deltaY));
-        setProgramDockHeight(nextH);
-        localStorage.setItem('bsp_programDockHeight', String(nextH));
-      }
-    };
-
-    const onPointerUp = () => {
-      setActiveDrag(null);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerUp);
-    };
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
-  };
-
-  const [visitedPanels, setVisitedPanels] = useState<Set<string>>(() => new Set([activePanel]));
-
-  useEffect(() => {
-    setVisitedPanels((prev) => {
-      if (prev.has(activePanel)) return prev;
-      const next = new Set(prev);
-      next.add(activePanel);
-      return next;
-    });
-  }, [activePanel]);
-
-  const workspaceStyle = {
-    '--sidebar-width': `${sidebarWidth}px`,
-    '--transcript-height': `${transcriptHeight}px`,
-  } as React.CSSProperties;
-
   return (
     <div className="app-shell">
-      <TitleBar activePanel={activePanel} onPanelChange={(p) => setActivePanel(p)} />
+      <TitleBar />
       <div className="app-body">
         <div className="app-main">
-          <div className="operator-workspace" style={workspaceStyle}>
-            <div className="left-column-region">
-              <div className="transcript-region" style={{ height: transcriptHeight }}>
-                <TranscriptPanel onOpenLiveScripture={() => setActivePanel('live')} />
-              </div>
-
-              {/* Vertical resizer between Live transcript and History */}
-              <div
-                className={`resizer-handle resizer-handle-v ${activeDrag === 'transcript' ? 'is-dragging' : ''}`}
-                onPointerDown={(e) => startResizing('transcript', e)}
-                aria-label="Drag to resize transcript height"
-              />
-
-              <div className="history-region">
-                <SessionHistoryPanel />
-              </div>
-            </div>
-
-            {/* Horizontal resizer between the left column and the workspace */}
-            <div
-              className={`resizer-handle resizer-handle-h sidebar-resizer ${activeDrag === 'sidebar' ? 'is-dragging' : ''}`}
-              onPointerDown={(e) => startResizing('sidebar', e)}
-              aria-label="Drag to resize the left column width"
-            />
-
-            <div className="right-column-region">
-              <section className="program-dock" style={{ height: programDockHeight }}>
-                <ErrorBoundary label="Preview / Program">
-                  <PreviewProgramView onPanelChange={(p) => setActivePanel(p as PanelView)} />
-                </ErrorBoundary>
-              </section>
-
-              {/* Vertical resizer between Main Output display and Main Workspace Panel */}
-              <div
-                className={`resizer-handle resizer-handle-v ${activeDrag === 'program' ? 'is-dragging' : ''}`}
-                onPointerDown={(e) => startResizing('program', e)}
-                aria-label="Drag to resize display height"
-              />
-
-              <div className="lower-dock-region">
-                <main className="left-workspace">
-                  <div className="app-content">
-                    <div className="app-content-inner">
-                      <ErrorBoundary label="Panel">
-                      <div style={{ display: activePanel === 'scenes' ? 'block' : 'none', height: '100%' }}>
-                        {visitedPanels.has('scenes') && <ScenePanel />}
-                      </div>
-                      <div style={{ display: activePanel === 'bible' ? 'block' : 'none', height: '100%' }}>
-                        {visitedPanels.has('bible') && <BiblePanel />}
-                      </div>
-                      <div style={{ display: activePanel === 'songs' ? 'block' : 'none', height: '100%' }}>
-                        {visitedPanels.has('songs') && <SongsPanel />}
-                      </div>
-                      <div style={{ display: activePanel === 'live' ? 'block' : 'none', height: '100%' }}>
-                        {visitedPanels.has('live') && <LiveScripturePanel />}
-                      </div>
-                      <div style={{ display: activePanel === 'media' ? 'block' : 'none', height: '100%' }}>
-                        {visitedPanels.has('media') && <MediaPanel />}
-                      </div>
-                      <div style={{ display: activePanel === 'themes' ? 'block' : 'none', height: '100%' }}>
-                        {visitedPanels.has('themes') && <ThemePanel />}
-                      </div>
-                      <div style={{ display: activePanel === 'presentation' ? 'block' : 'none', height: '100%' }}>
-                        {visitedPanels.has('presentation') && <PresentationPanel />}
-                      </div>
-                      <div style={{ display: activePanel === 'settings' ? 'block' : 'none', height: '100%' }}>
-                        {visitedPanels.has('settings') && <SettingsPanel />}
-                      </div>
-                      </ErrorBoundary>
-                    </div>
-                  </div>
-                </main>
-
-                {/* Horizontal resizer between the Workspace panel and Queue */}
-                <div
-                  className={`resizer-handle resizer-handle-h ${activeDrag === 'queue' ? 'is-dragging' : ''}`}
-                  onPointerDown={(e) => startResizing('queue', e)}
-                  aria-label="Drag to resize Queue width"
-                />
-
-                <div className="queue-region" style={{ width: queueWidth }}>
-                  <QueuePanel />
-                </div>
-              </div>
-            </div>
-          </div>
+          <DockHost />
         </div>
       </div>
-      {activeDrag && (
-        <div
-          className="resize-drag-overlay"
-          style={{
-            cursor: activeDrag === 'transcript' ? 'ns-resize' : 'ew-resize',
-          }}
-        />
-      )}
       <StatusBar />
       <SettingsModal />
       <ThemeDesignerModal />

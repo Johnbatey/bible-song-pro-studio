@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { useAppStore } from './stores/appStore';
+// Ahead of global.css so the .bsp-dock theme block can override dockview's own
+// variable defaults rather than fighting import order.
+import 'dockview/dist/styles/dockview.css';
 import './styles/global.css';
 
 /**

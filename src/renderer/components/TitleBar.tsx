@@ -1,25 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type, fontWeight } from '../styles/type';
+import { NAV_DOCKS } from './dock/docks';
+import { toggleDock } from './dock/dockController';
+import { resetDockLayout } from './dock/DockHost';
 
-interface TitleBarProps {
-  activePanel?: string;
-  onPanelChange?: (panel: any) => void;
-}
-
-/**
- * The app's only navigation. Every workspace panel a user can reach directly is
- * here — Scenes is deliberately absent, since Studio mode routes to it.
- */
-const TABS: Array<{ id: string; label: string }> = [
-  { id: 'bible', label: 'Bible' },
-  { id: 'songs', label: 'Songs' },
-  { id: 'presentation', label: 'Pro Slides' },
-  { id: 'live', label: 'Live' },
-  { id: 'media', label: 'Media' },
-];
-
-export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps) {
+export function TitleBar() {
   const mode = useAppStore((s) => s.display.mode);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
@@ -27,6 +13,7 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
   const setExternalDisplay = useAppStore((s) => s.setExternalDisplay);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
+  const openDockIds = useAppStore((s) => s.openDockIds);
   
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isBlackout, setIsBlackout] = useState(false);
@@ -40,11 +27,6 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
     }
   }, []);
 
-  const handleTabClick = (tab: string) => {
-    if (onPanelChange) {
-      onPanelChange(tab);
-    }
-  };
 
   const toggleBlackout = () => {
     const nextState = !isBlackout;
@@ -68,22 +50,23 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
           <img src="./bible-song-pro-icon.svg" alt="" style={styles.logo} />
         </div>
 
-        {/* Panel navigation — selection is a lift in the chrome, never the accent */}
+        {/* Dock visibility — a lit tab means that dock is on screen */}
         <div style={styles.pillContainer}>
-          {TABS.map((tab) => {
-            const isActive = activePanel === tab.id;
+          {NAV_DOCKS.map((dock) => {
+            const isOpen = openDockIds.includes(dock.id);
             return (
               <button
-                key={tab.id}
+                key={dock.id}
                 style={{
                   ...styles.pillBtn,
-                  background: isActive ? 'var(--chrome-control-active)' : 'transparent',
-                  color: isActive ? '#ffffff' : 'var(--text-dim)',
-                  fontWeight: isActive ? fontWeight.semibold : fontWeight.medium,
+                  background: isOpen ? 'var(--chrome-control-active)' : 'transparent',
+                  color: isOpen ? '#ffffff' : 'var(--text-dim)',
+                  fontWeight: isOpen ? fontWeight.semibold : fontWeight.medium,
                 }}
-                onClick={() => handleTabClick(tab.id)}
+                onClick={() => toggleDock(dock.id)}
+                title={isOpen ? `Close the ${dock.title} dock` : `Open the ${dock.title} dock`}
               >
-                {tab.label}
+                {dock.title}
               </button>
             );
           })}
@@ -203,10 +186,10 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
           <button
             style={{
               ...styles.toolbarBtn,
-              background: activePanel === 'themes' ? 'var(--chrome-control-active)' : styles.toolbarBtn.background,
-              color: activePanel === 'themes' ? '#ffffff' : 'var(--text-secondary)',
+              background: openDockIds.includes('themes') ? 'var(--chrome-control-active)' : styles.toolbarBtn.background,
+              color: openDockIds.includes('themes') ? '#ffffff' : 'var(--text-secondary)',
             }}
-            onClick={() => onPanelChange && onPanelChange('themes')}
+            onClick={() => toggleDock('themes')}
             title="Themes Library"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -239,6 +222,19 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
             Alerts
+          </button>
+
+          {/* Reset the dock arrangement back to the shipped layout */}
+          <button
+            style={{ ...styles.toolbarBtn, color: 'var(--text-secondary)' }}
+            onClick={() => resetDockLayout()}
+            title="Reset panel layout"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+            Layout
           </button>
 
           {/* Settings Button */}

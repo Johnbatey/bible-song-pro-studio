@@ -148,49 +148,8 @@ html, body, #root {
   min-width: 0;
 }
 
-.operator-workspace {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: var(--sidebar-width, 280px) var(--block-gap) minmax(0, 1fr);
-  grid-template-rows: 1fr;
-  overflow: hidden;
-  background: var(--bg-primary);
-  padding: var(--block-gap);
-  position: relative;
-}
 
-.left-column-region {
-  grid-column: 1;
-  grid-row: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-}
 
-.transcript-region {
-  flex-shrink: 0;
-  min-width: 0;
-  min-height: 120px;
-  overflow: hidden;
-  background: transparent;
-  padding: 0;
-}
-
-/* The left column is Transcript over History; the transcript carries the
-   dragged height and History takes whatever is left. */
-.history-region {
-  flex: 1 1 0%;
-  min-width: 0;
-  min-height: 100px;
-  overflow: hidden;
-  background: transparent;
-  padding: 0;
-}
 
 /* Row actions (queue +, and friends) stay out of the way until the pointer
    lands on the row, so a list of verses reads as text rather than as a wall of
@@ -205,32 +164,95 @@ html, body, #root {
   opacity: 1;
 }
 
-/* The bottom half of the right column: active panel on the left, Queue
-   standing beside it as its own block. */
-.lower-dock-region {
-  flex: 1 1 0%;
+/* ── Dock layout ───────────────────────────────────────────────────────
+   dockview owns the arrangement: drag a dock's title bar onto another's edge
+   to split, or onto its middle to stack them as tabs.
+
+   The tab strip is a slim dock title bar sitting above whatever the panel
+   draws — the same shape OBS uses. It is deliberately shorter and quieter
+   than .blk__chrome so that a docked panel's own chrome still reads as the
+   panel's, not the dock's. */
+.bsp-dock-root {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.bsp-dock {
+  --dv-group-view-background-color: var(--block-bg);
+  --dv-tabs-and-actions-container-background-color: var(--block-bg);
+  --dv-tabs-and-actions-container-height: 30px;
+  --dv-tabs-and-actions-container-font-size: 11px;
+  --dv-tab-font-size: 11px;
+
+  --dv-activegroup-visiblepanel-tab-background-color: var(--chrome-control-active);
+  --dv-activegroup-visiblepanel-tab-color: #ffffff;
+  --dv-activegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-activegroup-hiddenpanel-tab-color: var(--text-dim);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--chrome-control);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--text-dim);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--text-dim);
+
+  --dv-separator-border: var(--block-line);
+  --dv-tab-divider-color: transparent;
+  --dv-border-radius: var(--block-radius);
+  --dv-tab-border-radius: var(--block-radius);
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: var(--accent);
+
+  /* The only place the accent appears in the dock chrome: the drop target,
+     which is a momentary answer to "where will this land". */
+  --dv-drag-over-background-color: rgba(255, 85, 0, 0.12);
+  --dv-drag-over-border-color: var(--accent);
+
+  --dv-floating-titlebar-background-color: var(--block-bg);
+  --dv-floating-titlebar-height: 30px;
+  --dv-floating-box-shadow: var(--shadow-lg);
+  --dv-floating-group-border: 1px solid var(--block-line);
+
+  background: var(--bg-primary);
+  padding: var(--block-gap);
+}
+
+/* Each group is drawn as a window block, so a dock is visually the same
+   object as a .blk whether or not the panel inside draws its own chrome. */
+.bsp-dock .dv-groupview {
+  background: var(--block-bg);
+  border: 1px solid var(--block-line);
+  border-radius: var(--block-radius);
+  overflow: hidden;
+}
+
+.bsp-dock .dv-tabs-and-actions-container {
+  border-bottom: 1px solid var(--block-line);
+}
+
+.bsp-dock .dv-default-tab {
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  font-weight: var(--fw-semibold);
+}
+
+/* A panel fills its dock; the panel's own Block draws the rest. */
+.dock-panel {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
-.queue-region {
-  flex-shrink: 0;
-  min-width: 220px;
-  min-height: 0;
-  overflow: hidden;
-  background: transparent;
-  padding: 0;
-}
-
-/* The grid placement on .resizer-handle-h is for the sidebar seam; inside the
-   lower dock the handle is just a flex child. */
-.lower-dock-region > .resizer-handle-h {
-  grid-row: auto;
-  flex-shrink: 0;
-  margin: 0 2px;
+/* When a panel IS a single block, the group frame is already its border —
+   drawing a second one nests two rounded rectangles. Panels that lay out
+   several blocks (.blk-row / .blk-col) keep theirs, since those are genuinely
+   separate sub-windows inside the one dock. */
+.dock-panel > .blk {
+  border: none;
+  border-radius: 0;
+  height: 100%;
 }
 
 /* ── Window block ──────────────────────────────────────────────────────
@@ -425,115 +447,27 @@ html, body, #root {
   min-height: 0;
 }
 
-.right-column-region {
-  grid-column: 3;
-  grid-row: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-}
 
-.left-workspace {
-  flex: 1 1 0%;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg-primary);
-}
 
-.program-dock {
-  flex-shrink: 0;
-  min-width: 0;
-  min-height: 140px;
-  display: flex;
-  flex-direction: column;
-  background: transparent;
-  overflow: hidden;
-}
 
 /* ── Resizers ──
    The resizer is the divider that sits in the gap between two blocks: a
    hairline in Black Beauty, centred in the gap, with the whole gap as the
    grab target. */
-.resizer-handle {
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
-  background: transparent;
-  position: relative;
-  z-index: 10;
-}
 
 /* The hairline stays invisible — each block already draws its own border, so
    a third line in the gap only adds noise. It lights up on hover/drag to show
    the gap is grabbable. */
-.resizer-handle::after {
-  content: '';
-  position: absolute;
-  background: transparent;
-  transition: background 0.15s ease;
-}
 
-.resizer-handle:hover::after,
-.resizer-handle.is-dragging::after {
-  background: var(--accent);
-}
 
 /* The gutter is too narrow to grab comfortably, so each handle carries an
    invisible pad that reaches past it into both neighbouring blocks. */
-.resizer-handle::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-}
 
-.resizer-handle-h {
-  grid-row: 1 / -1;
-  cursor: ew-resize;
-  width: var(--block-gap);
-}
 
-.resizer-handle-h::after {
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-}
 
-.resizer-handle-h.sidebar-resizer {
-  grid-column: 2;
-}
 
-.resizer-handle-v {
-  flex-shrink: 0;
-  cursor: ns-resize;
-  height: var(--block-gap, 6px);
-  position: relative;
-  margin: 2px 0;
-}
 
-.resizer-handle-v::after {
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-  background: var(--border-primary);
-  transform: translateY(-50%);
-}
 
-.resize-drag-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
-  user-select: none;
-  -webkit-user-select: none;
-}
 
 .app-content {
   flex: 1;
@@ -615,50 +549,9 @@ html, body, #root {
 }
 
 @media (max-width: 1180px) {
-  .operator-workspace {
-    --sidebar-width: 220px;
-    --transcript-height: 300px;
-  }
-
   .transcript-panel__text,
   .transcript-panel__placeholder {
     font-size: var(--fs-title);
-  }
-}
-
-@media (max-width: 860px) {
-  .operator-workspace {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(220px, 34vh) auto minmax(0, 1fr);
-  }
-
-  .transcript-region,
-  .history-region,
-  .program-dock,
-  .left-workspace {
-    grid-column: 1;
-  }
-
-  .transcript-region {
-    grid-row: 1;
-    max-height: 180px;
-  }
-
-  .program-dock {
-    grid-row: 2;
-  }
-
-  .history-region {
-    grid-row: 3;
-    max-height: 200px;
-  }
-
-  .left-workspace {
-    grid-row: 4;
-  }
-
-  .resizer-handle {
-    display: none;
   }
 }
 

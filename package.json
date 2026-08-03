@@ -94,6 +94,8 @@
     "@deepgram/sdk": "^3.6.0",
     "@xenova/transformers": "^2.17.2",
     "animejs": "^3.2.2",
+    "dockview": "^7.0.4",
+    "dockview-react": "^7.0.4",
     "jszip": "^3.10.1",
     "koffi": "^3.1.2",
     "lodash-es": "^4.17.21",
