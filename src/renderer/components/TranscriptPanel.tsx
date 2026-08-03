@@ -11,15 +11,27 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
   const aiProviders = useAppStore((s) => s.aiProviders);
   const enabledProvider = aiProviders.find((p) => p.enabled);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /**
+   * Whether to keep following new speech. Tracked as intent rather than
+   * measured from scroll position: when a burst of text arrives the container
+   * grows before the effect runs, so "distance from the bottom" is momentarily
+   * huge and a position check would conclude the operator had scrolled away —
+   * after which it would never follow again. Only the operator's own wheel or
+   * drag changes this.
+   */
+  const followRef = useRef(true);
   const hasText = Boolean(transcription.text || transcription.interimText);
 
-  // Speech runs off the bottom, so follow it — but only when the operator has
-  // not scrolled back to read something earlier.
-  useEffect(() => {
+  const onUserScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
-    if (atBottom) el.scrollTop = el.scrollHeight;
+    followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !followRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [transcription.text, transcription.interimText]);
 
   function startTranscription() {
@@ -47,6 +59,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
         </BlockButton>
       )}
       flush
+      bodyStyle={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       footer={(
         <>
           {transcription.isActive ? (
@@ -78,7 +91,12 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
         </>
       )}
     >
-      <div ref={scrollRef} className="transcript-panel__scroll">
+      <div
+        ref={scrollRef}
+        className="transcript-panel__scroll"
+        onWheel={onUserScroll}
+        onTouchMove={onUserScroll}
+      >
         {hasText ? (
           <p className="transcript-panel__flow">
             {transcription.text}
@@ -89,6 +107,11 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                     provisional rather than allowed to rewrite settled text. */}
                 <span className="transcript-panel__interim">{transcription.interimText}</span>
               </>
+            )}
+            {transcription.isActive && (
+              <span className="transcript-cursor" aria-hidden="true">
+                <i /><i /><i />
+              </span>
             )}
           </p>
         ) : (

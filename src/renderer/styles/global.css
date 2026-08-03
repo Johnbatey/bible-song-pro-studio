@@ -658,15 +658,18 @@ html, body, #root {
 .transcript-panel__scroll {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* Sized by the flex parent rather than height:100%, so this is the one and
+     only scroller — the Block body above it is set to overflow:hidden. */
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: var(--block-pad);
 }
 
-/* Pins the text to the bottom while leaving it scrollable upward. */
+/* Starts at the top and grows down; once it passes the fold the container
+   scrolls to follow. (It used to be pinned to the bottom with margin-top:auto,
+   which left a short transcript floating in the middle of an empty panel.) */
 .transcript-panel__flow {
-  margin-top: auto;
   color: var(--text-primary);
   font-size: 14px;
   line-height: var(--lh-relaxed);
@@ -677,6 +680,37 @@ html, body, #root {
 
 .transcript-panel__interim {
   color: var(--text-dim);
+}
+
+/* Three rings breathing in sequence at the point of writing — enough to show
+   the engine is listening, quiet enough to ignore while reading. */
+.transcript-cursor {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 7px;
+  vertical-align: middle;
+}
+
+.transcript-cursor i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  border: 1px solid var(--text-dim);
+  background: transparent;
+  animation: transcript-breathe 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.transcript-cursor i:nth-child(2) { animation-delay: 0.19s; }
+.transcript-cursor i:nth-child(3) { animation-delay: 0.38s; }
+
+@keyframes transcript-breathe {
+  0%, 100% { opacity: 0.22; transform: scale(0.82); }
+  40%      { opacity: 0.95; transform: scale(1.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transcript-cursor i { animation: none; opacity: 0.6; }
 }
 
 .transcript-panel__idle {
