@@ -1,0 +1,559 @@
+import React, { useRef, useState, useEffect } from 'react';
+import type { PresentationSlide, SlideElement } from '../../types';
+import type { ActiveTool } from './SlideEditorQuickToolbar';
+
+interface SlideEditorCanvasBoardProps {
+  slide: PresentationSlide;
+  activeTool: ActiveTool;
+  selectedElementId: string | null;
+  onSelectElement: (id: string | null) => void;
+  onUpdateElement: (id: string, updates: Partial<SlideElement>) => void;
+  onUpdateSlideText: (title: string, body: string) => void;
+  smartSnap: boolean;
+}
+
+export function SlideEditorCanvasBoard({
+  slide,
+  activeTool,
+  selectedElementId,
+  onSelectElement,
+  onUpdateElement,
+  onUpdateSlideText,
+  smartSnap,
+}: SlideEditorCanvasBoardProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.75);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [snapGuides, setSnapGuides] = useState<{ x?: number; y?: number }>({});
+
+  const [dragState, setDragState] = useState<{
+    elementId: string;
+    handle: string | null;
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    initialW: number;
+    initialH: number;
+  } | null>(null);
+
+  const BOARD_WIDTH = 1280;
+  const BOARD_HEIGHT = 720;
+
+  // Auto-fit function
+  const fitToViewport = () => {
+    if (!viewportRef.current) return;
+    const rect = viewportRef.current.getBoundingClientRect();
+    const margin = 64;
+    if (rect.width <= margin || rect.height <= margin) return;
+
+    const fit = Math.min((rect.width - margin) / BOARD_WIDTH, (rect.height - margin) / BOARD_HEIGHT);
+    const clampedScale = Math.min(Math.max(fit, 0.2), 2.0);
+    setScale(clampedScale);
+    setPanX((rect.width - BOARD_WIDTH * clampedScale) / 2);
+    setPanY((rect.height - BOARD_HEIGHT * clampedScale) / 2);
+  };
+
+  useEffect(() => {
+    fitToViewport();
+    window.addEventListener('resize', fitToViewport);
+    return () => window.removeEventListener('resize', fitToViewport);
+  }, []);
+
+  // Wheel zoom / pan
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+      setScale((s) => Math.min(Math.max(s * zoomFactor, 0.2), 2.5));
+    } else {
+      setPanX((px) => px - e.deltaX);
+      setPanY((py) => py - e.deltaY);
+    }
+  };
+
+  // Pointer drag for moving / resizing elements
+  useEffect(() => {
+    if (!dragState) return;
+
+    function onPointerMove(e: PointerEvent) {
+      if (!dragState) return;
+      const dxPx = (e.clientX - dragState.startX) / scale;
+      const dyPx = (e.clientY - dragState.startY) / scale;
+
+      const dxPercent = (dxPx / BOARD_WIDTH) * 100;
+      const dyPercent = (dyPx / BOARD_HEIGHT) * 100;
+
+      if (!dragState.handle) {
+        let newX = dragState.initialX + dxPercent;
+        let newY = dragState.initialY + dyPercent;
+        const guides: { x?: number; y?: number } = {};
+
+        if (smartSnap) {
+          // Snap center X (50%)
+          const centerX = newX + dragState.initialW / 2;
+          if (Math.abs(centerX - 50) < 1.5) {
+            newX = 50 - dragState.initialW / 2;
+            guides.x = 50;
+          }
+          // Snap center Y (50%)
+          const centerY = newY + dragState.initialH / 2;
+          if (Math.abs(centerY - 50) < 1.5) {
+            newY = 50 - dragState.initialH / 2;
+            guides.y = 50;
+          }
+        }
+
+        setSnapGuides(guides);
+        onUpdateElement(dragState.elementId, {
+          x: Math.max(0, Math.min(100 - dragState.initialW, Math.round(newX * 10) / 10)),
+          y: Math.max(0, Math.min(100 - dragState.initialH, Math.round(newY * 10) / 10)),
+        });
+      } else {
+        const handle = dragState.handle;
+        let nx = dragState.initialX;
+        let ny = dragState.initialY;
+        let nw = dragState.initialW;
+        let nh = dragState.initialH;
+
+        if (handle.includes('r')) nw = Math.min(Math.max(dragState.initialW + dxPercent, 2), 100 - dragState.initialX);
+        if (handle.includes('l')) {
+          const newX = Math.min(Math.max(dragState.initialX + dxPercent, 0), dragState.initialX + dragState.initialW - 2);
+          nx = newX;
+          nw = dragState.initialW - (newX - dragState.initialX);
+        }
+        if (handle.includes('b')) nh = Math.min(Math.max(dragState.initialH + dyPercent, 2), 100 - dragState.initialY);
+        if (handle.includes('t')) {
+          const newY = Math.min(Math.max(dragState.initialY + dyPercent, 0), dragState.initialY + dragState.initialH - 2);
+          ny = newY;
+          nh = dragState.initialH - (newY - dragState.initialY);
+        }
+
+        onUpdateElement(dragState.elementId, {
+          x: Math.round(nx * 10) / 10,
+          y: Math.round(ny * 10) / 10,
+          width: Math.round(nw * 10) / 10,
+          height: Math.round(nh * 10) / 10,
+        });
+      }
+    }
+
+    function onPointerUp() {
+      setDragState(null);
+      setSnapGuides({});
+    }
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [dragState, scale, smartSnap, onUpdateElement]);
+
+  const elements: SlideElement[] = slide.elements && slide.elements.length > 0 ? slide.elements : [
+    {
+      id: 'title-el',
+      type: 'text',
+      x: 10,
+      y: 20,
+      width: 80,
+      height: 25,
+      content: slide.title || 'Click to edit Title',
+      fontSize: 54,
+      fontFamily: 'Inter',
+      fontWeight: 700,
+      color: '#ffffff',
+      textAlign: 'center',
+      zIndex: 1,
+    },
+    {
+      id: 'body-el',
+      type: 'text',
+      x: 15,
+      y: 50,
+      width: 70,
+      height: 35,
+      content: slide.body || 'Click to edit Body content',
+      fontSize: 32,
+      fontFamily: 'Inter',
+      fontWeight: 500,
+      color: 'rgba(255, 255, 255, 0.85)',
+      textAlign: 'center',
+      zIndex: 2,
+    },
+  ];
+
+  const bgValue = slide.background?.value || '#18181b';
+  const bgType = slide.background?.type || 'color';
+
+  return (
+    <section
+      ref={viewportRef}
+      id="canvas-viewport"
+      onWheel={handleWheel}
+      onMouseDown={(e) => {
+        if (e.button === 1 || (e.button === 0 && e.altKey)) {
+          setIsPanning(true);
+          setPanStart({ x: e.clientX - panX, y: e.clientY - panY });
+        } else if (e.target === viewportRef.current || (e.target as HTMLElement).id === 'slide-canvas-root') {
+          onSelectElement(null);
+          setEditingTextId(null);
+        }
+      }}
+      onMouseMove={(e) => {
+        if (isPanning) {
+          setPanX(e.clientX - panStart.x);
+          setPanY(e.clientY - panStart.y);
+        }
+      }}
+      onMouseUp={() => setIsPanning(false)}
+      style={{
+        flex: 1,
+        background: '#0b0d12',
+        position: 'relative',
+        overflow: 'hidden',
+        userSelect: 'none',
+        cursor: isPanning ? 'grabbing' : 'default',
+      }}
+    >
+      {/* Top-Left Mode Indicator */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 14,
+          left: 16,
+          zIndex: 40,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          background: 'rgba(21, 23, 29, 0.85)',
+          padding: '6px 12px',
+          borderRadius: 8,
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(12px)',
+          fontSize: 12,
+          color: 'rgba(255, 255, 255, 0.65)',
+        }}
+      >
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: '#f4621f',
+            boxShadow: '0 0 10px #f4621f',
+          }}
+        />
+        <span>Slide Builder Mode: Creating Custom Slide Canvas</span>
+      </div>
+
+      {/* Top-Right Floating Zoom Controls */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 14,
+          right: 16,
+          zIndex: 40,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'rgba(21, 23, 29, 0.85)',
+          padding: '4px 8px',
+          borderRadius: 8,
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(12px)',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setScale((s) => Math.max(0.2, s - 0.1))}
+          style={{
+            width: 26,
+            height: 26,
+            background: 'none',
+            border: 'none',
+            color: '#ffffff',
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+          title="Zoom Out"
+        >
+          -
+        </button>
+
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#ffffff', minWidth: 44, textAlign: 'center' }}>
+          {Math.round(scale * 100)}%
+        </span>
+
+        <button
+          type="button"
+          onClick={() => setScale((s) => Math.min(2.0, s + 0.1))}
+          style={{
+            width: 26,
+            height: 26,
+            background: 'none',
+            border: 'none',
+            color: '#ffffff',
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+          title="Zoom In"
+        >
+          +
+        </button>
+
+        <button
+          type="button"
+          onClick={fitToViewport}
+          style={{
+            padding: '2px 8px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: 'none',
+            borderRadius: 4,
+            color: '#ffffff',
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: 'pointer',
+            marginLeft: 4,
+          }}
+          title="Fit to Screen"
+        >
+          Fit
+        </button>
+      </div>
+
+      {/* Free-floating 1280x720 Canvas Board */}
+      <div
+        id="slide-canvas-root"
+        style={{
+          width: BOARD_WIDTH,
+          height: BOARD_HEIGHT,
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          transform: `translate(${panX}px, ${panY}px) scale(${scale})`,
+          transformOrigin: '0 0',
+          background: bgType === 'gradient' ? bgValue : bgType === 'color' ? bgValue : '#18181b',
+          borderRadius: 4,
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.12)',
+        }}
+      >
+        {/* Background Image */}
+        {bgType === 'image' && bgValue && (
+          <img
+            src={bgValue}
+            alt=""
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+          />
+        )}
+
+        {/* Smart Snap Guide Lines */}
+        {snapGuides.x !== undefined && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: `${snapGuides.x}%`,
+              width: 1,
+              background: '#f4621f',
+              boxShadow: '0 0 8px #f4621f',
+              zIndex: 99,
+            }}
+          />
+        )}
+        {snapGuides.y !== undefined && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: `${snapGuides.y}%`,
+              height: 1,
+              background: '#f4621f',
+              boxShadow: '0 0 8px #f4621f',
+              zIndex: 99,
+            }}
+          />
+        )}
+
+        {/* Elements Rendering in Percentage */}
+        {elements.map((el) => {
+          const isSelected = el.id === selectedElementId;
+          const isEditing = el.id === editingTextId;
+
+          return (
+            <div
+              key={el.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectElement(el.id);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onSelectElement(el.id);
+                if (el.type === 'text') setEditingTextId(el.id);
+              }}
+              onPointerDown={(e) => {
+                if (isEditing) return;
+                e.stopPropagation();
+                onSelectElement(el.id);
+                setDragState({
+                  elementId: el.id,
+                  handle: null,
+                  startX: e.clientX,
+                  startY: e.clientY,
+                  initialX: el.x,
+                  initialY: el.y,
+                  initialW: el.width,
+                  initialH: el.height,
+                });
+              }}
+              style={{
+                position: 'absolute',
+                left: `${el.x}%`,
+                top: `${el.y}%`,
+                width: `${el.width}%`,
+                height: `${el.height}%`,
+                zIndex: el.zIndex || 1,
+                cursor: isEditing ? 'text' : 'move',
+                border: isSelected ? '2px dashed #f4621f' : '1px transparent solid',
+                boxSizing: 'border-box',
+              }}
+            >
+              {/* Text Element */}
+              {el.type === 'text' && (
+                isEditing ? (
+                  <textarea
+                    autoFocus
+                    value={el.content}
+                    onChange={(evt) => {
+                      onUpdateElement(el.id, { content: evt.target.value });
+                      if (el.id === 'title-el') onUpdateSlideText(evt.target.value, slide.body);
+                      if (el.id === 'body-el') onUpdateSlideText(slide.title, evt.target.value);
+                    }}
+                    onBlur={() => setEditingTextId(null)}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      color: el.color || '#ffffff',
+                      fontFamily: el.fontFamily || 'Inter',
+                      fontSize: el.fontSize || 36,
+                      fontWeight: el.fontWeight || 500,
+                      textAlign: el.textAlign || 'center',
+                      lineHeight: el.lineHeight || 1.3,
+                      resize: 'none',
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      color: el.color || '#ffffff',
+                      fontFamily: el.fontFamily || 'Inter',
+                      fontSize: el.fontSize || 36,
+                      fontWeight: el.fontWeight || 500,
+                      textAlign: el.textAlign || 'center',
+                      lineHeight: el.lineHeight || 1.3,
+                      textShadow: el.textShadow || '0 2px 8px rgba(0, 0, 0, 0.6)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: el.textAlign === 'left' ? 'flex-start' : el.textAlign === 'right' ? 'flex-end' : 'center',
+                      wordBreak: 'break-word',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {el.content}
+                  </div>
+                )
+              )}
+
+              {/* Image Element */}
+              {el.type === 'image' && (
+                <img
+                  src={el.content}
+                  alt=""
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    borderRadius: el.borderRadius || 0,
+                    opacity: el.opacity ?? 1,
+                  }}
+                />
+              )}
+
+              {/* Shape Element */}
+              {el.type === 'shape' && (
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: el.backgroundColor || 'rgba(244, 98, 31, 0.25)',
+                    borderColor: el.borderColor || '#f4621f',
+                    borderWidth: el.borderWidth || 3,
+                    borderStyle: 'solid',
+                    borderRadius: el.content === 'circle' ? '50%' : el.borderRadius || 12,
+                    opacity: el.opacity ?? 1,
+                  }}
+                />
+              )}
+
+              {/* PowerPoint-style 8 Handle Resizing HUD */}
+              {isSelected && !isEditing && (
+                <>
+                  {[
+                    { name: 'tl', style: { top: -6, left: -6, cursor: 'nwse-resize' } },
+                    { name: 'tr', style: { top: -6, right: -6, cursor: 'nesw-resize' } },
+                    { name: 'bl', style: { bottom: -6, left: -6, cursor: 'nesw-resize' } },
+                    { name: 'br', style: { bottom: -6, right: -6, cursor: 'nwse-resize' } },
+                    { name: 't', style: { top: -6, left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' } },
+                    { name: 'b', style: { bottom: -6, left: '50%', transform: 'translateX(-50%)', cursor: 'ns-resize' } },
+                    { name: 'l', style: { top: '50%', left: -6, transform: 'translateY(-50%)', cursor: 'ew-resize' } },
+                    { name: 'r', style: { top: '50%', right: -6, transform: 'translateY(-50%)', cursor: 'ew-resize' } },
+                  ].map((h) => (
+                    <div
+                      key={h.name}
+                      onPointerDown={(evt) => {
+                        evt.stopPropagation();
+                        setDragState({
+                          elementId: el.id,
+                          handle: h.name,
+                          startX: evt.clientX,
+                          startY: evt.clientY,
+                          initialX: el.x,
+                          initialY: el.y,
+                          initialW: el.width,
+                          initialH: el.height,
+                        });
+                      }}
+                      style={{
+                        position: 'absolute',
+                        width: 10,
+                        height: 10,
+                        background: '#f4621f',
+                        border: '2px solid #ffffff',
+                        borderRadius: 2,
+                        zIndex: 10,
+                        ...h.style,
+                      }}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
-import { SlideEditorRail } from './SlideEditorRail';
-import { SlideEditorCanvas } from './SlideEditorCanvas';
-import { SlideEditorInspector } from './SlideEditorInspector';
+import { SlideEditorHeader } from './slide-editor/SlideEditorHeader';
+import { SlideEditorLeftRail } from './slide-editor/SlideEditorLeftRail';
+import { SlideEditorQuickToolbar, type ActiveTool } from './slide-editor/SlideEditorQuickToolbar';
+import { SlideEditorCanvasBoard } from './slide-editor/SlideEditorCanvasBoard';
+import { SlideEditorRightSidebar } from './slide-editor/SlideEditorRightSidebar';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
 
 export function SlideEditorModal() {
@@ -10,11 +12,10 @@ export function SlideEditorModal() {
   const closeSlideEditor = useAppStore((s) => s.closeSlideEditor);
   const activePresentationId = useAppStore((s) => s.activePresentationId);
   const presentationDecks = useAppStore((s) => s.presentationDecks);
-  const updatePresentationDeck = useAppStore((s) => s.updatePresentationDeck);
   const addPresentationDeck = useAppStore((s) => s.addPresentationDeck);
   const scenes = useAppStore((s) => s.scenes);
 
-  // Active Deck State
+  // Deck State
   const [deck, setDeck] = useState<PresentationDeck>(() => {
     const existing = presentationDecks.find((d) => d.id === activePresentationId);
     if (existing) return existing;
@@ -75,23 +76,28 @@ export function SlideEditorModal() {
     };
   });
 
+  const [history, setHistory] = useState<PresentationDeck[]>([]);
+  const [historyPointer, setHistoryPointer] = useState(-1);
+
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [zoomLevel, setZoomLevel] = useState<number>(0); // 0 = Auto Fit
+  const [activeTool, setActiveTool] = useState<ActiveTool>('select');
+  const [smartSnap, setSmartSnap] = useState(true);
 
-  // Sync state when modal opens for a specific presentation deck ID
+  // Sync deck when activePresentationId changes
   useEffect(() => {
     if (!isSlideEditorOpen) return;
     const existing = presentationDecks.find((d) => d.id === activePresentationId);
     if (existing && existing.slides.length > 0) {
       setDeck(existing);
+      setHistory([existing]);
+      setHistoryPointer(0);
     } else {
-      // Find scene if presentation scene exists
       const scene = scenes.find((sc) => sc.id === activePresentationId);
       const title = scene?.name || 'Untitled Presentation';
       const slides = scene?.content?.slides || [];
       if (slides.length > 0) {
-        setDeck({
+        const newDeck: PresentationDeck = {
           id: activePresentationId || `deck-${Date.now()}`,
           title,
           createdAt: Date.now(),
@@ -111,10 +117,185 @@ export function SlideEditorModal() {
             background: { type: 'color', value: '#18181b' },
             aspectRatio: '16:9',
           })),
-        });
+        };
+        setDeck(newDeck);
+        setHistory([newDeck]);
+        setHistoryPointer(0);
       }
     }
   }, [isSlideEditorOpen, activePresentationId, presentationDecks, scenes]);
+
+  // Push new deck state into history stack
+  const updateDeckState = (updater: (prev: PresentationDeck) => PresentationDeck) => {
+    setDeck((prev) => {
+      const next = updater(prev);
+      const newHistory = history.slice(0, historyPointer + 1);
+      newHistory.push(next);
+      setHistory(newHistory);
+      setHistoryPointer(newHistory.length - 1);
+      return next;
+    });
+  };
+
+  // Import File Handler (PPTX, PDF, JSON, TXT, MD, Images)
+  const handleImportFile = async (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const reader = new FileReader();
+
+    if (ext === 'json') {
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target?.result as string);
+          if (parsed && Array.isArray(parsed.slides)) {
+            updateDeckState(() => ({ ...parsed, id: deck.id, title: parsed.title || file.name.replace(/\.json$/, '') }));
+          } else if (Array.isArray(parsed)) {
+            updateDeckState((prev) => ({ ...prev, slides: parsed }));
+          }
+        } catch (err) {
+          console.error('Failed to parse JSON presentation', err);
+        }
+      };
+      reader.readAsText(file);
+    } else if (ext === 'txt' || ext === 'md') {
+      reader.onload = (e) => {
+        const rawText = e.target?.result as string;
+        const blocks = rawText.split(/\n\s*\n/).filter((b) => b.trim().length > 0);
+        const importedSlides: PresentationSlide[] = blocks.map((block, idx) => {
+          const lines = block.trim().split('\n');
+          const title = lines[0].replace(/^#+\s*/, '').trim();
+          const body = lines.slice(1).join('\n').trim();
+          return {
+            id: `imported-${idx}-${Date.now()}`,
+            title: title || `Slide ${idx + 1}`,
+            body: body || title,
+            label: `Slide ${idx + 1}`,
+            notes: '',
+            transition: 'fade',
+            durationMs: 3000,
+            hidden: false,
+            buildCount: 1,
+            buildStep: 1,
+            background: { type: 'color', value: '#18181b' },
+            aspectRatio: '16:9',
+            elements: [
+              {
+                id: `title-${idx}`,
+                type: 'text',
+                x: 10,
+                y: 20,
+                width: 80,
+                height: 25,
+                content: title,
+                fontSize: 54,
+                fontFamily: 'Inter',
+                fontWeight: 700,
+                color: '#ffffff',
+                textAlign: 'center',
+                zIndex: 1,
+              },
+              ...(body ? [{
+                id: `body-${idx}`,
+                type: 'text' as const,
+                x: 15,
+                y: 50,
+                width: 70,
+                height: 35,
+                content: body,
+                fontSize: 32,
+                fontFamily: 'Inter',
+                fontWeight: 500,
+                color: 'rgba(255, 255, 255, 0.85)',
+                textAlign: 'center' as const,
+                zIndex: 2,
+              }] : []),
+            ],
+          };
+        });
+
+        if (importedSlides.length > 0) {
+          updateDeckState((prev) => ({
+            ...prev,
+            title: file.name.replace(/\.[^/.]+$/, ''),
+            slides: importedSlides,
+          }));
+          setActiveSlideIndex(0);
+        }
+      };
+      reader.readAsText(file);
+    } else if (file.type.startsWith('image/')) {
+      reader.onload = (e) => {
+        const imageUrl = e.target?.result as string;
+        const newSlide: PresentationSlide = {
+          id: `img-slide-${Date.now()}`,
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          body: '',
+          label: `Slide ${slides.length + 1}`,
+          notes: '',
+          transition: 'fade',
+          durationMs: 3000,
+          hidden: false,
+          buildCount: 1,
+          buildStep: 1,
+          background: { type: 'image', value: imageUrl },
+          aspectRatio: '16:9',
+        };
+        updateDeckState((prev) => ({ ...prev, slides: [...slides, newSlide] }));
+        setActiveSlideIndex(slides.length);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // PPTX / PDF import fallback
+      const newSlide: PresentationSlide = {
+        id: `pptx-slide-${Date.now()}`,
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        body: 'Imported presentation slide deck',
+        label: `Slide ${slides.length + 1}`,
+        notes: '',
+        transition: 'fade',
+        durationMs: 3000,
+        hidden: false,
+        buildCount: 1,
+        buildStep: 1,
+        background: { type: 'gradient', value: 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)' },
+        aspectRatio: '16:9',
+        elements: [
+          {
+            id: `pptx-title-${Date.now()}`,
+            type: 'text',
+            x: 10,
+            y: 30,
+            width: 80,
+            height: 40,
+            content: file.name.replace(/\.[^/.]+$/, ''),
+            fontSize: 56,
+            fontFamily: 'Inter',
+            fontWeight: 700,
+            color: '#ffffff',
+            textAlign: 'center',
+            zIndex: 1,
+          },
+        ],
+      };
+      updateDeckState((prev) => ({ ...prev, slides: [...slides, newSlide] }));
+      setActiveSlideIndex(slides.length);
+    }
+  };
+
+  const handleUndo = () => {
+    if (historyPointer > 0) {
+      const prev = history[historyPointer - 1];
+      setHistoryPointer(historyPointer - 1);
+      setDeck(prev);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyPointer < history.length - 1) {
+      const next = history[historyPointer + 1];
+      setHistoryPointer(historyPointer + 1);
+      setDeck(next);
+    }
+  };
 
   if (!isSlideEditorOpen) return null;
 
@@ -137,6 +318,49 @@ export function SlideEditorModal() {
 
   const activeSlide = slides[activeSlideIndex] || slides[0];
   const selectedElement = activeSlide.elements?.find((el) => el.id === selectedElementId) || null;
+
+  // Tool Selection Handlers
+  const handleSelectTool = (tool: ActiveTool) => {
+    setActiveTool(tool);
+    if (tool === 'text') {
+      const newElement: SlideElement = {
+        id: `text-${Date.now()}`,
+        type: 'text',
+        x: 480,
+        y: 400,
+        width: 960,
+        height: 180,
+        content: 'New Text Box',
+        fontSize: 48,
+        fontFamily: 'Inter',
+        fontWeight: 600,
+        color: '#ffffff',
+        textAlign: 'center',
+        zIndex: (activeSlide.elements?.length || 0) + 1,
+      };
+      handleUpdateSlideElements([...(activeSlide.elements || []), newElement]);
+      setSelectedElementId(newElement.id);
+      setActiveTool('select');
+    } else if (tool === 'box' || tool === 'circle') {
+      const newElement: SlideElement = {
+        id: `shape-${Date.now()}`,
+        type: 'shape',
+        x: 660,
+        y: 360,
+        width: 600,
+        height: 360,
+        content: tool === 'circle' ? 'circle' : 'rectangle',
+        backgroundColor: 'rgba(244, 98, 31, 0.25)',
+        borderColor: '#f4621f',
+        borderWidth: 3,
+        borderRadius: tool === 'circle' ? 300 : 12,
+        zIndex: (activeSlide.elements?.length || 0) + 1,
+      };
+      handleUpdateSlideElements([...(activeSlide.elements || []), newElement]);
+      setSelectedElementId(newElement.id);
+      setActiveTool('select');
+    }
+  };
 
   // Slide CRUD Actions
   function handleAddSlide() {
@@ -171,9 +395,8 @@ export function SlideEditorModal() {
         },
       ],
     };
-
     const nextSlides = [...slides, newSlide];
-    setDeck((prev) => ({ ...prev, slides: nextSlides }));
+    updateDeckState((prev) => ({ ...prev, slides: nextSlides }));
     setActiveSlideIndex(nextSlides.length - 1);
   }
 
@@ -188,14 +411,14 @@ export function SlideEditorModal() {
     };
     const nextSlides = [...slides];
     nextSlides.splice(index + 1, 0, duplicated);
-    setDeck((prev) => ({ ...prev, slides: nextSlides }));
+    updateDeckState((prev) => ({ ...prev, slides: nextSlides }));
     setActiveSlideIndex(index + 1);
   }
 
   function handleDeleteSlide(index: number) {
     if (slides.length <= 1) return;
     const nextSlides = slides.filter((_, i) => i !== index);
-    setDeck((prev) => ({ ...prev, slides: nextSlides }));
+    updateDeckState((prev) => ({ ...prev, slides: nextSlides }));
     setActiveSlideIndex(Math.min(index, nextSlides.length - 1));
   }
 
@@ -204,71 +427,44 @@ export function SlideEditorModal() {
     const nextSlides = [...slides];
     const [moved] = nextSlides.splice(fromIndex, 1);
     nextSlides.splice(toIndex, 0, moved);
-    setDeck((prev) => ({ ...prev, slides: nextSlides }));
+    updateDeckState((prev) => ({ ...prev, slides: nextSlides }));
     setActiveSlideIndex(toIndex);
   }
 
-  // Element Actions
-  function handleAddTextElement() {
-    const newElement: SlideElement = {
-      id: `text-${Date.now()}`,
-      type: 'text',
-      x: 480,
-      y: 400,
-      width: 960,
-      height: 180,
-      content: 'New Text Box',
-      fontSize: 48,
-      fontFamily: 'Inter',
-      fontWeight: 600,
-      color: '#ffffff',
-      textAlign: 'center',
-      zIndex: (activeSlide.elements?.length || 0) + 1,
-    };
-    const updatedElements = [...(activeSlide.elements || []), newElement];
-    handleUpdateSlide({ elements: updatedElements });
-    setSelectedElementId(newElement.id);
-  }
+  function handleApplyTemplate(templateType: string) {
+    let tplBg = 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)';
+    if (templateType === 'announcement') tplBg = 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)';
+    if (templateType === 'sermon') tplBg = 'linear-gradient(135deg, #18181b 0%, #09090b 100%)';
 
-  function handleAddShapeElement() {
-    const newElement: SlideElement = {
-      id: `shape-${Date.now()}`,
-      type: 'shape',
-      x: 660,
-      y: 360,
-      width: 600,
-      height: 360,
-      content: 'rectangle',
-      backgroundColor: 'rgba(255, 85, 0, 0.25)',
-      borderColor: '#FF5500',
-      borderWidth: 3,
-      borderRadius: 12,
-      zIndex: (activeSlide.elements?.length || 0) + 1,
-    };
-    const updatedElements = [...(activeSlide.elements || []), newElement];
-    handleUpdateSlide({ elements: updatedElements });
-    setSelectedElementId(newElement.id);
+    handleUpdateSlide({
+      background: { type: 'gradient', value: tplBg },
+      aspectRatio: templateType === 'lower-third' ? 'lower-third' : '16:9',
+    });
   }
 
   function handleUpdateSlide(updates: Partial<PresentationSlide>) {
     const updatedSlides = slides.map((s, idx) => (idx === activeSlideIndex ? { ...s, ...updates } : s));
-    setDeck((prev) => ({ ...prev, slides: updatedSlides }));
+    updateDeckState((prev) => ({ ...prev, slides: updatedSlides }));
+  }
+
+  function handleUpdateSlideElements(elements: SlideElement[]) {
+    handleUpdateSlide({ elements });
   }
 
   function handleUpdateElement(elementId: string, updates: Partial<SlideElement>) {
     const currentElements = activeSlide.elements || [];
     const updatedElements = currentElements.map((el) => (el.id === elementId ? { ...el, ...updates } : el));
-    handleUpdateSlide({ elements: updatedElements });
+    handleUpdateSlideElements(updatedElements);
   }
 
   function handleDeleteElement(elementId: string) {
     const currentElements = activeSlide.elements || [];
     const updatedElements = currentElements.filter((el) => el.id !== elementId);
-    handleUpdateSlide({ elements: updatedElements });
+    handleUpdateSlideElements(updatedElements);
     setSelectedElementId(null);
   }
 
-  function handleSave() {
+  function handleSaveToDeck() {
     addPresentationDeck(deck);
     closeSlideEditor();
   }
@@ -278,156 +474,32 @@ export function SlideEditorModal() {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
-        background: '#0d0d0f',
+        zIndex: 99999,
+        background: '#0b0d12',
         display: 'flex',
         flexDirection: 'column',
         fontFamily: 'var(--font-ui)',
         color: '#ffffff',
       }}
     >
-      {/* Top Header Toolbar */}
-      <header
-        style={{
-          height: 48,
-          background: '#161414',
-          borderBottom: '1px solid #262628',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 16px',
-          flexShrink: 0,
-        }}
-      >
-        {/* Left: Deck Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <input
-            type="text"
-            value={deck.title}
-            onChange={(e) => setDeck((prev) => ({ ...prev, title: e.target.value }))}
-            style={{
-              background: '#232221',
-              border: '1px solid #262628',
-              borderRadius: 6,
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: 13,
-              padding: '4px 10px',
-              outline: 'none',
-              width: 220,
-            }}
-          />
-        </div>
+      {/* Top Header */}
+      <SlideEditorHeader
+        title={deck.title}
+        onUpdateTitle={(title) => updateDeckState((prev) => ({ ...prev, title }))}
+        canUndo={historyPointer > 0}
+        canRedo={historyPointer < history.length - 1}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        onImportFile={handleImportFile}
+        onBackToDeck={closeSlideEditor}
+        onSaveToDeck={handleSaveToDeck}
+        onSaveExport={handleSaveToDeck}
+      />
 
-        {/* Center: Toolbar Tools (Add Text, Add Shape, Zoom) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            onClick={handleAddTextElement}
-            style={{
-              padding: '5px 12px',
-              background: '#232221',
-              border: '1px solid #262628',
-              borderRadius: 6,
-              color: '#ffffff',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            + Text Box
-          </button>
-          <button
-            type="button"
-            onClick={handleAddShapeElement}
-            style={{
-              padding: '5px 12px',
-              background: '#232221',
-              border: '1px solid #262628',
-              borderRadius: 6,
-              color: '#ffffff',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            + Shape
-          </button>
-
-          <div style={{ width: 1, height: 20, background: '#262628' }} />
-
-          {/* Zoom Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 11, color: '#a1a1aa' }}>Zoom:</span>
-            <select
-              value={zoomLevel}
-              onChange={(e) => setZoomLevel(parseInt(e.target.value, 10))}
-              style={{
-                background: '#232221',
-                border: '1px solid #262628',
-                borderRadius: 6,
-                color: '#ffffff',
-                padding: '4px 8px',
-                fontSize: 11,
-                outline: 'none',
-              }}
-            >
-              <option value={0}>Auto Fit</option>
-              <option value={50}>50%</option>
-              <option value={75}>75%</option>
-              <option value={100}>100%</option>
-              <option value={150}>150%</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Right Actions: Save & Close */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            onClick={handleSave}
-            style={{
-              padding: '6px 16px',
-              background: '#FF5500',
-              border: 'none',
-              borderRadius: 6,
-              color: '#ffffff',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Save Presentation
-          </button>
-          <button
-            type="button"
-            onClick={closeSlideEditor}
-            style={{
-              padding: '6px 12px',
-              background: '#232221',
-              border: '1px solid #262628',
-              borderRadius: 6,
-              color: '#a1a1aa',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            ✕ Close
-          </button>
-        </div>
-      </header>
-
-      {/* Main 3-Column Studio Workspace */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-        {/* Left Column: Slide Rail */}
-        <SlideEditorRail
+      {/* Main Studio Body Workspace */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+        {/* Left Rail */}
+        <SlideEditorLeftRail
           slides={slides}
           activeSlideIndex={activeSlideIndex}
           onSelectSlide={(idx) => {
@@ -438,20 +510,30 @@ export function SlideEditorModal() {
           onDuplicateSlide={handleDuplicateSlide}
           onDeleteSlide={handleDeleteSlide}
           onMoveSlide={handleMoveSlide}
+          onApplyTemplate={handleApplyTemplate}
         />
 
-        {/* Center Column: Interactive Scaling Canvas */}
-        <SlideEditorCanvas
+        {/* Center Freeboard Viewport */}
+        <SlideEditorCanvasBoard
           slide={activeSlide}
-          zoomLevel={zoomLevel}
+          activeTool={activeTool}
           selectedElementId={selectedElementId}
           onSelectElement={setSelectedElementId}
           onUpdateElement={handleUpdateElement}
           onUpdateSlideText={(title, body) => handleUpdateSlide({ title, body })}
+          smartSnap={smartSnap}
         />
 
-        {/* Right Column: Property Inspector */}
-        <SlideEditorInspector
+        {/* Bottom Floating Quick Toolbar */}
+        <SlideEditorQuickToolbar
+          activeTool={activeTool}
+          onSelectTool={handleSelectTool}
+          smartSnap={smartSnap}
+          onToggleSmartSnap={() => setSmartSnap(!smartSnap)}
+        />
+
+        {/* Right Inspector Sidebar */}
+        <SlideEditorRightSidebar
           slide={activeSlide}
           selectedElement={selectedElement}
           onUpdateSlide={handleUpdateSlide}
