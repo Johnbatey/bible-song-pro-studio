@@ -129,6 +129,7 @@ export function DockHost() {
       defaultTabComponent={DockTab}
       singleTabMode="fullwidth"
       disableFloatingGroups={false}
+      floatingGroupDragHandle="titlebar"
       floatingGroupBounds="boundedWithinViewport"
     />
   );

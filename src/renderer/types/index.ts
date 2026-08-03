@@ -422,7 +422,14 @@ export interface AIProvider {
 export interface TranscriptionState {
   isActive: boolean;
   provider: AIProvider | null;
+  /** Finalised speech only. Never rewritten, so it can render as settled text. */
   text: string;
+  /**
+   * The tail the engine is still revising. Kept apart from `text` because
+   * interims rewrite themselves on every packet — folding them into one string
+   * is what made the whole paragraph reflow several times a second.
+   */
+  interimText: string;
   confidence: number;
 }
 

@@ -151,6 +151,42 @@ html, body, #root {
 
 
 
+/* A seam between two blocks inside one panel — distinct from the dock seams,
+   which dockview owns. Invisible until pointed at, like the dock resizers. */
+.panel-splitter {
+  flex: 0 0 auto;
+  width: var(--block-gap);
+  align-self: stretch;
+  cursor: ew-resize;
+  position: relative;
+  user-select: none;
+  touch-action: none;
+}
+
+/* The gap is too narrow to grab, so the handle reaches past it both ways. */
+.panel-splitter::before {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
+}
+
+.panel-splitter::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.panel-splitter:hover::after,
+.panel-splitter.is-dragging::after {
+  background: var(--accent);
+}
+
 /* Row actions (queue +, and friends) stay out of the way until the pointer
    lands on the row, so a list of verses reads as text rather than as a wall of
    controls. Keyboard users get them via :focus-within. */
@@ -282,6 +318,32 @@ html, body, #root {
 .dock-tab__action:hover {
   background: var(--chrome-control-active);
   color: #ffffff;
+}
+
+/* The bar dockview renders above a floating group's tabs IS its move handle,
+   but it ships transparent — invisible, so there is nothing to aim at and the
+   window feels stuck. Give it a surface, a grip and a move cursor. */
+.bsp-dock .dv-floating-titlebar {
+  background: var(--chrome-control);
+  border-bottom: 1px solid var(--block-line);
+  cursor: move;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bsp-dock .dv-floating-titlebar::after {
+  content: '';
+  width: 34px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--text-dim);
+  opacity: 0.35;
+  transition: opacity 0.15s ease;
+}
+
+.bsp-dock .dv-floating-titlebar:hover::after {
+  opacity: 0.8;
 }
 
 /* A floating dock is lifted off the layout, so it gets the shadow and a full
@@ -588,6 +650,40 @@ html, body, #root {
 .transcript-panel__status.is-live::before {
   background: var(--green);
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* A running transcript reads like a log: text settles at the left margin and
+   grows downward, so new words never reflow what is already on screen. The
+   previous centred layout re-laid-out every line on each update. */
+.transcript-panel__scroll {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--block-pad);
+}
+
+/* Pins the text to the bottom while leaving it scrollable upward. */
+.transcript-panel__flow {
+  margin-top: auto;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: var(--lh-relaxed);
+  font-weight: var(--fw-medium);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.transcript-panel__interim {
+  color: var(--text-dim);
+}
+
+.transcript-panel__idle {
+  margin: auto;
+  color: rgba(240, 236, 228, 0.42);
+  font-size: var(--fs-secondary);
+  text-align: center;
 }
 
 .transcript-panel__text {

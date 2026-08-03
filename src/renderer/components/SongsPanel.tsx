@@ -5,6 +5,7 @@ import type { Scene, Song } from '../types';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { AppleToggle } from './AppleToggle';
+import { PanelSplitter } from './PanelSplitter';
 import { isFocusedDock } from './dock/dockFocus';
 
 const DEMO_SONGS: Song[] = [
@@ -62,6 +63,15 @@ export function SongsPanel() {
   const [importing, setImporting] = useState(false);
   /** The lyric a search sent us to, so the right block can point at it. */
   const [lyricTarget, setLyricTarget] = useState<string | null>(null);
+  const [listWidth, setListWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('bsp_songsListWidth');
+    return saved ? parseInt(saved, 10) : 300;
+  });
+
+  const setListWidthPersisted = (next: number) => {
+    setListWidth(next);
+    localStorage.setItem('bsp_songsListWidth', String(next));
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddDemoSongs = () => {
@@ -286,7 +296,7 @@ export function SongsPanel() {
       <Block
         title="Songs"
         subtitle={`${songs.length}`}
-        style={{ flex: '0 0 300px', minWidth: 220 }}
+        style={{ flex: `0 0 ${listWidth}px`, minWidth: 180 }}
         tools={(
           <>
             {songs.length === 0 && (
@@ -399,6 +409,14 @@ export function SongsPanel() {
           )}
         </div>
       </Block>
+
+      <PanelSplitter
+        width={listWidth}
+        onChange={setListWidthPersisted}
+        min={180}
+        max={560}
+        title="Drag to resize the song list"
+      />
 
       {/* Right block: song details & lyric slides */}
       <Block

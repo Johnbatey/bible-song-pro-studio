@@ -130,7 +130,10 @@ export function App() {
         state.display.outputMode !== prev.display.outputMode ||
         state.activeTheme !== prev.activeTheme ||
         state.activeAlert !== prev.activeAlert ||
-        state.transcription.text !== prev.transcription.text
+        state.transcription.text !== prev.transcription.text ||
+        // Opening the output window has to push current state at it, or the
+        // display shows a stale background until something else changes.
+        state.display.isExternalDisplayActive !== prev.display.isExternalDisplayActive
       ) {
         sendState();
       }

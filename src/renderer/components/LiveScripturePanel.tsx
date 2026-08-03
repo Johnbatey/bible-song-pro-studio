@@ -7,11 +7,14 @@ import { Block } from './Block';
 import { SlidingSwitch } from './SlidingSwitch';
 import { CustomDropdown } from './CustomDropdown';
 import { AppleToggle } from './AppleToggle';
+import { PanelSplitter } from './PanelSplitter';
 
 /** Short enough to feel live, while still giving Whisper enough speech context. */
 const LOCAL_CHUNK_SECONDS = 3;
 const DETECT_DEBOUNCE_MS = 90;
 const DETECT_WINDOW_WORDS = 48;
+/** Roughly an hour of speech; the panel only ever shows the tail anyway. */
+const TRANSCRIPT_MAX_CHARS = 20000;
 
 const STATE_LABELS: Record<SttState, { text: string; color: string }> = {
   idle: { text: 'Idle', color: 'var(--text-dim)' },
@@ -38,6 +41,15 @@ export function LiveScripturePanel() {
   const [rankedDetections, setRankedDetections] = useState<VerseDetection[]>([]);
   const [detectionIsFinal, setDetectionIsFinal] = useState(false);
   const [detectionLatencyMs, setDetectionLatencyMs] = useState(0);
+  const [primaryWidth, setPrimaryWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('bsp_livePrimaryWidth');
+    return saved ? parseInt(saved, 10) : 340;
+  });
+
+  const setPrimaryWidthPersisted = (next: number) => {
+    setPrimaryWidth(next);
+    localStorage.setItem('bsp_livePrimaryWidth', String(next));
+  };
 
   const captureRef = useRef<AudioCaptureHandle | null>(null);
   const localBufferRef = useRef<Float32Array[]>([]);
@@ -80,7 +92,7 @@ export function LiveScripturePanel() {
     };
     const stopFromTranscriptPanel = () => {
       stopLive();
-      setTranscription({ isActive: false, text: '' });
+      setTranscription({ isActive: false, text: '', interimText: '' });
     };
     window.addEventListener('bsp:live-transcription-start', startFromTranscriptPanel);
     window.addEventListener('bsp:live-transcription-stop', stopFromTranscriptPanel);
@@ -115,14 +127,24 @@ export function LiveScripturePanel() {
    */
   function handleTranscript(text: string, isFinal: boolean) {
     if (isFinal) {
-      finalTranscriptRef.current = `${finalTranscriptRef.current} ${text}`.trim();
+      const appended = `${finalTranscriptRef.current} ${text}`.trim();
+      // A service runs for hours; keep the tail rather than growing forever.
+      finalTranscriptRef.current = appended.length > TRANSCRIPT_MAX_CHARS
+        ? appended.slice(appended.length - TRANSCRIPT_MAX_CHARS).replace(/^\S*\s/, '')
+        : appended;
       interimTranscriptRef.current = '';
     } else {
       interimTranscriptRef.current = text;
     }
     const combined = `${finalTranscriptRef.current} ${interimTranscriptRef.current}`.trim();
     setLive({ transcript: combined });
-    setTranscription({ isActive: true, text: combined });
+    // Sent apart so the panel can hold settled text still and only redraw the
+    // tail the engine is still revising.
+    setTranscription({
+      isActive: true,
+      text: finalTranscriptRef.current,
+      interimText: interimTranscriptRef.current,
+    });
     scheduleDetection(combined, isFinal);
   }
 
@@ -176,7 +198,7 @@ export function LiveScripturePanel() {
     setDetectionIsFinal(isFinal);
     setDetectionLatencyMs(Math.max(0, Math.round(performance.now() - detectionStartedAt)));
     setLive({ bestHit, suggestions });
-    setTranscription({ isActive: true, text: cleaned, confidence: detections[0]?.confidence ?? (bestHit ? 0.65 : 0.45) });
+    setTranscription({ isActive: true, confidence: detections[0]?.confidence ?? (bestHit ? 0.65 : 0.45) });
     // Keep Program accuracy tied to Deepgram's final transcript. Fast endpointing
     // makes this final arrive promptly without projecting a revisable hypothesis.
     if (isFinal && bestHit && detections[0]) {
@@ -581,8 +603,8 @@ export function LiveScripturePanel() {
 
       <div className="blk-row" style={styles.matchDashboard}>
         <Block
+          style={{ ...styles.primaryColumn, flex: `0 0 ${primaryWidth}px` }}
           title="Best Match"
-          style={styles.primaryColumn}
           tools={(
             <span style={detectionIsFinal ? styles.finalBadge : styles.trackingBadge}>
               {detectionIsFinal ? 'Final' : 'Tracking'}
@@ -608,6 +630,14 @@ export function LiveScripturePanel() {
             </div>
           )}
         </Block>
+
+        <PanelSplitter
+          width={primaryWidth}
+          onChange={setPrimaryWidthPersisted}
+          min={220}
+          max={620}
+          title="Drag to resize the match panels"
+        />
 
         <Block
           title="Candidate Index"
@@ -726,13 +756,13 @@ function Metric({ label, value }: { label: string; value: string }) {
 const styles: Record<string, React.CSSProperties> = {
   root: { height: '100%', minHeight: 0, overflow: 'hidden' },
   controlBar: { flexWrap: 'nowrap', minWidth: '100%' },
-  meter: { position: 'relative', flex: 1, height: 12, minWidth: 100, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' },
-  meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)', borderRadius: 999 },
-  meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: '#fff' },
+  meter: { position: 'relative', flexShrink: 0, width: 96, height: 6, background: 'rgba(255,255,255,0.10)', borderRadius: 999, overflow: 'hidden' },
+  meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)', borderRadius: 999, transition: 'width 90ms linear' },
+  meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: '#fff', transition: 'left 140ms ease-out' },
   check: { display: 'flex', alignItems: 'center', gap: 6, ...type.caption, color: 'var(--text-secondary)' },
   matchDashboard: { flex: '1 1 auto', minHeight: 0, overflow: 'hidden' },
-  primaryColumn: { flex: '0.82 1 300px', minWidth: 260 },
-  indexColumn: { flex: '1.55 1 500px', minWidth: 300 },
+  primaryColumn: { minWidth: 220 },
+  indexColumn: { flex: '1 1 0%', minWidth: 220 },
   finalBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(46,204,113,.25)', ...type.label, fontWeight: fontWeight.bold },
   trackingBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--blue-dim)', color: 'var(--blue)', border: '1px solid rgba(52,152,219,.25)', ...type.label, fontWeight: fontWeight.bold },
   countBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', ...type.caption, ...numeric, whiteSpace: 'nowrap' },

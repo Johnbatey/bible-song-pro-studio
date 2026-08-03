@@ -73,7 +73,7 @@ export function TranscriptionBar() {
       </span>
       <button
         className="btn btn-sm btn-ghost"
-        onClick={() => setTranscription({ isActive: false, text: '' })}
+        onClick={() => setTranscription({ isActive: false, text: '', interimText: '' })}
         style={{ color: 'var(--red)' }}
       >
         Stop

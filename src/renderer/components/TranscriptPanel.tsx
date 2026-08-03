@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { Block, BlockButton } from './Block';
 
@@ -9,6 +10,17 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
   const transcription = useAppStore((s) => s.transcription);
   const aiProviders = useAppStore((s) => s.aiProviders);
   const enabledProvider = aiProviders.find((p) => p.enabled);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const hasText = Boolean(transcription.text || transcription.interimText);
+
+  // Speech runs off the bottom, so follow it — but only when the operator has
+  // not scrolled back to read something earlier.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    if (atBottom) el.scrollTop = el.scrollHeight;
+  }, [transcription.text, transcription.interimText]);
 
   function startTranscription() {
     onOpenLiveScripture?.();
@@ -34,7 +46,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
           </svg>
         </BlockButton>
       )}
-      centered
+      flush
       footer={(
         <>
           {transcription.isActive ? (
@@ -66,9 +78,25 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
         </>
       )}
     >
-      <p style={transcription.text ? styles.text : styles.placeholder}>
-        {transcription.text || (transcription.isActive ? 'Listening for Bible verses...' : 'Transcript appears here')}
-      </p>
+      <div ref={scrollRef} className="transcript-panel__scroll">
+        {hasText ? (
+          <p className="transcript-panel__flow">
+            {transcription.text}
+            {transcription.interimText && (
+              <>
+                {transcription.text ? ' ' : ''}
+                {/* The engine is still revising this tail, so it is marked as
+                    provisional rather than allowed to rewrite settled text. */}
+                <span className="transcript-panel__interim">{transcription.interimText}</span>
+              </>
+            )}
+          </p>
+        ) : (
+          <p className="transcript-panel__idle">
+            {transcription.isActive ? 'Listening…' : 'Transcript appears here'}
+          </p>
+        )}
+      </div>
     </Block>
   );
 }

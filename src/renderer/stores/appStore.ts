@@ -289,6 +289,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     isActive: false,
     provider: null,
     text: '',
+    interimText: '',
     confidence: 0,
   },
   liveScripture: {
