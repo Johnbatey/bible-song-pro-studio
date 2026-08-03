@@ -17,11 +17,17 @@ function clampZoom(value: number) {
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
 }
 
-export function PreviewProgramView() {
+interface PreviewProgramViewProps {
+  /** Studio mode opens the Scenes panel, basic mode returns to Bible. */
+  onPanelChange?: (panel: string) => void;
+}
+
+export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = {}) {
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
   const isTransitioning = useAppStore((s) => s.display.isTransitioning);
   const mode = useAppStore((s) => s.display.mode);
+  const setMode = useAppStore((s) => s.setMode);
   const outputMode = useAppStore((s) => s.display.outputMode);
   const setOutputMode = useAppStore((s) => s.setOutputMode);
   const activeTheme = useAppStore((s) => s.activeTheme);
@@ -193,30 +199,13 @@ export function PreviewProgramView() {
       className="pv-dock"
       title="Output"
       subtitle={isStudio ? 'Preview · Program' : 'Program'}
-      tools={(
-        <BlockSegment>
-          <BlockButton
-            active={outputMode === 'fullscreen'}
-            onClick={() => setOutputMode('fullscreen')}
-            title="Fullscreen Output Mode (FS)"
-          >
-            FS
-          </BlockButton>
-          <BlockButton
-            active={outputMode === 'lowerThird'}
-            onClick={() => setOutputMode('lowerThird')}
-            title="Lower Third Output Mode (LT)"
-          >
-            LT
-          </BlockButton>
-        </BlockSegment>
-      )}
       flush
       bodyStyle={{ display: 'flex', overflow: 'hidden' }}
       footer={(
-        <>
-          <span style={styles.footerLabel}>SCALE</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <div style={styles.footerGrid}>
+          {/* Left: scale controls */}
+          <div style={styles.footerLeft}>
+            <span style={styles.footerLabel}>SCALE</span>
             <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom - ZOOM_STEP)} title="Zoom out">-</button>
             <span style={styles.zoomValue}>{zoomLabel}</span>
             <input
@@ -232,7 +221,54 @@ export function PreviewProgramView() {
             <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom + ZOOM_STEP)} title="Zoom in">+</button>
             <button style={styles.zoomBtnWide} onClick={fitStage} title="Fit preview/program to view">FIT</button>
           </div>
-        </>
+
+          {/* Centre: Studio toggle, icon and label on one line */}
+          <button
+            style={{
+              ...styles.studioBtn,
+              color: isStudio ? 'var(--accent)' : 'var(--text-secondary)',
+              borderColor: isStudio ? 'var(--accent)' : 'var(--block-line)',
+              background: isStudio ? 'rgba(255, 85, 0, 0.12)' : 'var(--block-active)',
+            }}
+            onClick={() => {
+              if (isStudio) {
+                setMode('basic');
+                onPanelChange?.('bible');
+              } else {
+                setMode('studio');
+                onPanelChange?.('scenes');
+              }
+            }}
+            title="Toggle Studio Mode & Canvas Editor"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 9h18" />
+              <path d="M9 21V9" />
+            </svg>
+            <span>Studio</span>
+          </button>
+
+          {/* Right: output mode */}
+          <div style={styles.footerRight}>
+            <BlockSegment>
+              <BlockButton
+                active={outputMode === 'fullscreen'}
+                onClick={() => setOutputMode('fullscreen')}
+                title="Fullscreen Output Mode (FS)"
+              >
+                FS
+              </BlockButton>
+              <BlockButton
+                active={outputMode === 'lowerThird'}
+                onClick={() => setOutputMode('lowerThird')}
+                title="Lower Third Output Mode (LT)"
+              >
+                LT
+              </BlockButton>
+            </BlockSegment>
+          </div>
+        </div>
       )}
     >
       <div
@@ -295,6 +331,45 @@ export function PreviewProgramView() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  /* Three tracks so the Studio button lands on the true centre of the bar,
+     whatever the scale controls and FS/LT weigh on either side. */
+  footerGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr auto 1fr',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    minWidth: 0,
+  },
+  footerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
+  footerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 0,
+  },
+  studioBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 28,
+    padding: '0 14px',
+    borderRadius: 6,
+    border: '1px solid var(--block-line)',
+    fontSize: 12,
+    fontWeight: 600,
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-ui)',
+    transition: 'color 0.15s ease, background 0.15s ease, border-color 0.15s ease',
+  },
   viewport: {
     position: 'relative',
     flex: 1,

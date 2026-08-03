@@ -26,16 +26,19 @@ function normalizeReferenceQuery(value: string) {
 }
 
 /**
- * Wraps every occurrence of `term` in the verse so the reader can see what the
- * search actually caught. Falls through to plain text when nothing is searched.
+ * Marks what the search actually caught. Each word of the query is highlighted
+ * on its own rather than only the whole phrase, so a multi-word search still
+ * shows why a verse ranked where it did.
  */
 function highlightTerm(text: string, term: string): React.ReactNode {
-  if (!term || term.length < 2) return text;
-  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const words = term.split(/\s+/).filter((w) => w.length >= 2);
+  if (!words.length) return text;
+  const escaped = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
   const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
   if (parts.length === 1) return text;
+  const lower = new Set(words.map((w) => w.toLowerCase()));
   return parts.map((part, i) =>
-    part.toLowerCase() === term.toLowerCase()
+    lower.has(part.toLowerCase())
       ? <mark key={i} style={styles.mark}>{part}</mark>
       : <span key={i}>{part}</span>
   );
@@ -665,6 +668,7 @@ export function BiblePanel() {
               return (
                 <div
                   key={`${verse.reference}-${verse.version}`}
+                  className="row-hover"
                   ref={(el) => { verseRefs.current[verse.verse] = el; }}
                   onClick={() => sendVerse(verse)}
                   onDoubleClick={() => sendVerse(verse, { direct: true })}
@@ -727,9 +731,10 @@ export function BiblePanel() {
                     {highlightTerm(verse.text, searchTerm)}
                   </span>
 
-                  {/* Queue Plus (+) Button */}
+                  {/* Queue Plus (+) Button — revealed on row hover */}
                   <button
                     type="button"
+                    className="row-action"
                     onClick={(e) => {
                       e.stopPropagation();
                       const sceneId = bibleSceneId(verse);

@@ -191,6 +191,19 @@ html, body, #root {
   padding: 0;
 }
 
+/* Row actions (queue +, and friends) stay out of the way until the pointer
+   lands on the row, so a list of verses reads as text rather than as a wall of
+   controls. Keyboard users get them via :focus-within. */
+.row-action {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.row-hover:hover .row-action,
+.row-hover:focus-within .row-action {
+  opacity: 1;
+}
+
 /* The bottom half of the right column: active panel on the left, Queue
    standing beside it as its own block. */
 .lower-dock-region {

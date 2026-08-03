@@ -9,7 +9,6 @@ interface TitleBarProps {
 
 export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps) {
   const mode = useAppStore((s) => s.display.mode);
-  const setMode = useAppStore((s) => s.setMode);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
   const takeToProgram = useAppStore((s) => s.takeToProgram);
@@ -197,31 +196,6 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
               <path d="M12 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
             </svg>
             Themes
-          </button>
-
-          {/* Studio Toggle Button */}
-          <button
-            style={{
-              ...styles.toolbarBtn,
-              color: isStudio || activePanel === 'scenes' ? 'var(--accent)' : 'var(--text-secondary)',
-            }}
-            onClick={() => {
-              if (isStudio) {
-                setMode('basic');
-                if (onPanelChange) onPanelChange('bible');
-              } else {
-                setMode('studio');
-                if (onPanelChange) onPanelChange('scenes');
-              }
-            }}
-            title="Toggle Studio Mode & Canvas Editor"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M3 9h18" />
-              <path d="M9 21V9" />
-            </svg>
-            Studio
           </button>
 
           {/* Alerts Button */}

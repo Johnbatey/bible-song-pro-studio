@@ -305,7 +305,7 @@ export function App() {
             <div className="right-column-region">
               <section className="program-dock" style={{ height: programDockHeight }}>
                 <ErrorBoundary label="Preview / Program">
-                  <PreviewProgramView />
+                  <PreviewProgramView onPanelChange={(p) => setActivePanel(p as PanelView)} />
                 </ErrorBoundary>
               </section>
 

@@ -51,6 +51,7 @@ export function SongsPanel() {
   const operatingMode = useAppStore((s) => s.display.mode);
   const showSongCredits = useAppStore((s) => s.showSongCredits);
   const setShowSongCredits = useAppStore((s) => s.setShowSongCredits);
+  const addToQueue = useAppStore((s) => s.addToQueue);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
 
   const [search, setSearch] = useState('');
@@ -58,6 +59,8 @@ export function SongsPanel() {
   const [linesPerSlide, setLinesPerSlide] = useState<number | 'auto'>('auto');
   const [isDragging, setIsDragging] = useState(false);
   const [importing, setImporting] = useState(false);
+  /** The lyric a search sent us to, so the right block can point at it. */
+  const [lyricTarget, setLyricTarget] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddDemoSongs = () => {
@@ -89,11 +92,34 @@ export function SongsPanel() {
     }
   };
 
+  const searchQuery = search.trim().toLowerCase();
+
   const filteredSongs = songs.filter(
     (s) =>
-      s.title.toLowerCase().includes(search.toLowerCase()) ||
-      (s.artist && s.artist.toLowerCase().includes(search.toLowerCase()))
+      s.title.toLowerCase().includes(searchQuery) ||
+      (s.artist && s.artist.toLowerCase().includes(searchQuery))
   );
+
+  /**
+   * Lyric hits are listed separately from title/author hits: the operator is
+   * usually searching a half-remembered line, and what they want back is the
+   * song *plus* the point in it where that line sits.
+   */
+  const lyricMatches = searchQuery.length < 3 ? [] : songs.flatMap((song) => {
+    const titleHit = song.title.toLowerCase().includes(searchQuery)
+      || (song.artist || '').toLowerCase().includes(searchQuery);
+    const hits: Array<{ song: Song; label: string; line: string }> = [];
+    for (const slide of song.slides) {
+      const line = (slide.text || '')
+        .split('\n')
+        .find((l) => l.toLowerCase().includes(searchQuery));
+      // A title hit already lists the song above; only add it here if the
+      // lyric points at somewhere specific to start from.
+      if (line) hits.push({ song, label: slide.label, line: line.trim() });
+      if (hits.length >= 4) break;
+    }
+    return titleHit && hits.length === 0 ? [] : hits;
+  }).slice(0, 20);
 
   /** Edits the selected song in place; persisted with the rest of the library. */
   const patchSelectedSong = (patch: Partial<Song>) => {
@@ -140,25 +166,24 @@ export function SongsPanel() {
 
   const formattedSlides = selectedSong ? getFormattedSlides(selectedSong, linesPerSlide) : [];
 
+  /* Resolved against the *formatted* slides rather than stored at click time,
+     so the mark follows the lyric when Lines per slide re-chunks the song. */
+  const targetSlideId = lyricTarget
+    ? formattedSlides.find((s) => s.text.toLowerCase().includes(lyricTarget))?.id
+    : undefined;
+  const targetSlideRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (targetSlideId) targetSlideRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [targetSlideId]);
+
   const songSceneId = (song: Song, slide: FormattedSlide) =>
     `song-${song.id}-${slide.id}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
 
-  const handleSendSlideToDisplay = (song: Song, slide: FormattedSlide, opts: { direct?: boolean } = {}) => {
-    const sceneId = songSceneId(song, slide);
-    const goesLive = opts.direct || operatingMode === 'basic';
-    const activeScene = goesLive ? currentScene : previewScene;
-    if (activeScene?.id === sceneId) {
-      if (goesLive) {
-        setCurrentScene(null);
-        setPreviewScene(null);
-      } else {
-        setPreviewScene(null);
-      }
-      return;
-    }
+  const buildSongScene = (song: Song, slide: FormattedSlide): Scene => {
     const includeCredits = showSongCredits && linesPerSlide === 'auto';
-    const scene: Scene = {
-      id: sceneId,
+    return {
+      id: songSceneId(song, slide),
       name: `${song.title} - ${slide.label}`,
       type: 'song',
       content: {
@@ -173,6 +198,22 @@ export function SongsPanel() {
         gradient: 'linear-gradient(135deg, #1a0a2e, #16213e, #0f3460)',
       },
     };
+  };
+
+  const handleSendSlideToDisplay = (song: Song, slide: FormattedSlide, opts: { direct?: boolean } = {}) => {
+    const sceneId = songSceneId(song, slide);
+    const goesLive = opts.direct || operatingMode === 'basic';
+    const activeScene = goesLive ? currentScene : previewScene;
+    if (activeScene?.id === sceneId) {
+      if (goesLive) {
+        setCurrentScene(null);
+        setPreviewScene(null);
+      } else {
+        setPreviewScene(null);
+      }
+      return;
+    }
+    const scene = buildSongScene(song, slide);
     projectScene(scene, { direct: opts.direct });
   };
 
@@ -244,9 +285,9 @@ export function SongsPanel() {
       >
         <input
           className="input"
-          placeholder="Search songs..."
+          placeholder="Search title, author, or a line of lyrics..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setLyricTarget(null); }}
           style={{ flexShrink: 0 }}
         />
 
@@ -302,7 +343,38 @@ export function SongsPanel() {
                 </div>
               );
             })}
-          {filteredSongs.length === 0 && (
+          {/* Lyric hits — clicking one opens the song at that section */}
+          {lyricMatches.length > 0 && (
+            <>
+              <div style={styles.matchHeading}>In lyrics</div>
+              {lyricMatches.map((match, i) => (
+                <div
+                  key={`${match.song.id}-${match.label}-${i}`}
+                  className="card card-hover"
+                  style={{ cursor: 'pointer', padding: 10, borderColor: 'rgba(255, 255, 255, 0.08)', background: 'var(--bg-secondary)' }}
+                  onClick={() => {
+                    setSelectedSong(match.song);
+                    setLyricTarget(searchQuery);
+                  }}
+                  title={`Open ${match.song.title} at ${match.label}`}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span style={{ ...type.label, color: 'var(--accent)', fontWeight: fontWeight.bold, flexShrink: 0 }}>
+                      {match.label}
+                    </span>
+                    <span style={{ ...type.caption, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {match.song.title}
+                    </span>
+                  </div>
+                  <div style={{ ...type.caption, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.4 }}>
+                    {match.line}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {filteredSongs.length === 0 && lyricMatches.length === 0 && (
             <div style={{ ...type.secondary, color: 'var(--text-dim)', textAlign: 'center', padding: 24 }}>
               {songs.length === 0
                 ? 'No songs yet. Import a file or load demo songs.'
@@ -359,21 +431,29 @@ export function SongsPanel() {
                   const isLive = currentScene?.type === 'song' && currentScene.id === sceneId;
                   const isPreview = previewScene?.type === 'song' && previewScene.id === sceneId;
 
+                  const isTarget = slide.id === targetSlideId;
+
                   const borderStyle = isLive
-                    ? '2px solid #ef4444'
+                    ? '2px solid #FF5500'
                     : isPreview
                     ? '2px solid #3b82f6'
+                    : isTarget
+                    ? '1px solid #FF5500'
                     : '1px solid var(--border-primary)';
 
                   const backgroundStyle = isLive
-                    ? 'rgba(239, 68, 68, 0.08)'
+                    ? '#3d1403'
                     : isPreview
                     ? 'rgba(59, 130, 246, 0.08)'
+                    : isTarget
+                    ? 'rgba(255, 85, 0, 0.12)'
                     : 'var(--bg-surface)';
 
                   return (
-                    <button
+                    <div
                       key={slide.id}
+                      className="row-hover"
+                      ref={isTarget ? targetSlideRef : undefined}
                       style={{
                         border: borderStyle,
                         background: backgroundStyle,
@@ -395,17 +475,46 @@ export function SongsPanel() {
                         ? 'Click to stage in Preview · double-click to go straight to Program'
                         : 'Click to go live'}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                         <span style={{ ...type.label, color: 'var(--accent)', fontWeight: fontWeight.bold }}>
                           {slide.label}
                         </span>
-                        {isLive && <span style={{ ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#ef4444', color: '#fff' }}>LIVE</span>}
-                        {isPreview && !isLive && <span style={{ ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#3b82f6', color: '#fff' }}>PREVIEW</span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {isLive && <span style={{ ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#FF5500', color: '#fff' }}>LIVE</span>}
+                          {isPreview && !isLive && <span style={{ ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#3b82f6', color: '#fff' }}>PREVIEW</span>}
+                          {/* Queue Plus (+) — revealed on hover */}
+                          <button
+                            type="button"
+                            className="row-action"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToQueue({
+                                reference: `${selectedSong.title} · ${slide.label}`,
+                                text: slide.text,
+                                type: 'song',
+                                source: 'Manual',
+                                scene: buildSongScene(selectedSong, slide),
+                              });
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#ffffff',
+                              fontSize: 16,
+                              cursor: 'pointer',
+                              padding: '0 4px',
+                              lineHeight: 1,
+                            }}
+                            title="Add slide to Queue"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                       <span style={{ ...type.secondary, lineHeight: 1.45, whiteSpace: 'pre-line', color: 'var(--text-secondary)' }}>
                         {slide.text}
                       </span>
-                    </button>
+                    </div>
                 );
               })}
             </div>
@@ -419,3 +528,14 @@ export function SongsPanel() {
     </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  matchHeading: {
+    ...type.label,
+    fontWeight: fontWeight.semibold,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: 'var(--text-dim)',
+    padding: '8px 2px 2px',
+  },
+};
