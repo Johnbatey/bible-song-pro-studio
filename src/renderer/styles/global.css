@@ -67,10 +67,10 @@
   --block-bg: #161414;        /* Matt Black — block surface */
   --block-line: #262628;      /* Black Beauty — block border + chrome rule */
   --block-active: #232221;    /* Black Chestnut Oak — chrome switch highlight */
-  --block-radius: 3px;        /* just enough to soften the corner */
-  --block-gap: 4px;           /* gutter between blocks, and the window inset */
-  --block-chrome-h: 40px;
-  --block-pad: 12px;
+  --block-radius: 4px;        /* soften the corner matching the reference design */
+  --block-gap: 4px;           /* gutter between blocks */
+  --block-chrome-h: 44px;
+  --block-pad: 14px;
 
   /* ── Settings dialog ──
      Its own ramp: the sidebar drops to the block surface while the panel
@@ -251,11 +251,12 @@ html, body, #root {
 }
 
 .blk__title {
-  font-size: var(--fs-heading);
-  font-weight: var(--fw-semibold);
+  font-size: 13px;
+  font-weight: 700;
   line-height: var(--lh-tight);
-  color: var(--text-primary);
+  color: #ffffff;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 .blk__subtitle {

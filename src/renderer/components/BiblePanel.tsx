@@ -508,23 +508,35 @@ export function BiblePanel() {
             placeholder="John 3:16 or keyword search..."
           />
 
-          {/* Previous & Next Chapter Navigation Buttons */}
-          <div style={{ display: 'flex', gap: 4 }}>
+          {/* Previous & Next Chapter Navigation Buttons matching the reference design */}
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
             <button
-              style={styles.iconNavBtn}
+              style={{
+                ...styles.iconNavBtn,
+                opacity: !visibleVerses.length ? 0.4 : 1,
+                cursor: !visibleVerses.length ? 'not-allowed' : 'pointer',
+              }}
               disabled={!visibleVerses.length}
               onClick={() => sendAdjacentVerse(-1)}
-              title="Previous chapter"
+              title="Previous verse / chapter"
             >
-              ‹
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
             </button>
             <button
-              style={styles.iconNavBtn}
+              style={{
+                ...styles.iconNavBtn,
+                opacity: !visibleVerses.length ? 0.4 : 1,
+                cursor: !visibleVerses.length ? 'not-allowed' : 'pointer',
+              }}
               disabled={!visibleVerses.length}
               onClick={() => sendAdjacentVerse(1)}
-              title="Next chapter"
+              title="Next verse / chapter"
             >
-              ›
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
           </div>
         </div>
