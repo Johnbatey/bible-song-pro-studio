@@ -335,7 +335,9 @@ html, body, #root {
 }
 
 /* A block that is nothing but a chrome bar — a standalone toolbar window.
-   Overflow stays visible so dropdown popups can escape it. */
+   Docks can be dragged narrow, so the bar scrolls sideways rather than
+   crushing its controls. CustomDropdown portals its menu to the body for
+   exactly this reason: an overflow container would otherwise clip it. */
 .blk--bar {
   flex: 0 0 auto;
   flex-direction: row;
@@ -343,7 +345,23 @@ html, body, #root {
   gap: 8px;
   min-height: var(--block-chrome-h);
   padding: 6px var(--block-pad);
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+/* Controls keep their size and let the bar scroll instead of squashing. */
+.blk--bar > * {
+  flex-shrink: 0;
+}
+
+.blk--bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.blk--bar::-webkit-scrollbar-thumb {
+  background: var(--chrome-control-active);
+  border-radius: 2px;
 }
 
 .blk__chrome {

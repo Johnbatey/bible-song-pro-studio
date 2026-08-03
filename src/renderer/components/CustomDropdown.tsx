@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface DropdownOption<T extends string = string> {
   value: T;
@@ -24,22 +25,57 @@ export function CustomDropdown<T extends string = string>({
   buttonStyle,
 }: CustomDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
+  const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number; flip: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((o) => o.value === value) || options[0];
 
+  /**
+   * The menu is portalled to the body rather than positioned inside the
+   * container, so a toolbar that scrolls horizontally can clip its own
+   * overflow without also clipping this. That means measuring the button.
+   */
+  const measure = useCallback(() => {
+    const button = containerRef.current?.getBoundingClientRect();
+    if (!button) return;
+    const estimatedHeight = Math.min(240, options.length * 38 + 8);
+    const flip = button.bottom + estimatedHeight + 8 > window.innerHeight;
+    setMenuRect({
+      top: flip ? button.top - 4 : button.bottom + 4,
+      left: button.left,
+      width: button.width,
+      flip,
+    });
+  }, [options.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    measure();
+    // Capture phase so scrolling any ancestor — including the toolbar itself —
+    // keeps the menu attached to its button.
+    const reflow = () => measure();
+    window.addEventListener('scroll', reflow, true);
+    window.addEventListener('resize', reflow);
+    return () => {
+      window.removeEventListener('scroll', reflow, true);
+      window.removeEventListener('resize', reflow);
+    };
+  }, [isOpen, measure]);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = event.target as Node;
+      // The menu no longer lives inside the container, so it needs its own check.
+      if (containerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setIsOpen(false);
     }
     window.addEventListener('mousedown', handleClickOutside);
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block', ...style }}>
+    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block', flexShrink: 0, ...style }}>
       <button
         style={{
           display: 'flex',
@@ -80,14 +116,16 @@ export function CustomDropdown<T extends string = string>({
         </svg>
       </button>
 
-      {isOpen && (
+      {isOpen && menuRect && createPortal(
         <div
+          ref={menuRef}
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
+            position: 'fixed',
+            top: menuRect.top,
+            left: menuRect.left,
+            transform: menuRect.flip ? 'translateY(-100%)' : undefined,
             zIndex: 1500,
-            minWidth: '100%',
+            minWidth: menuRect.width,
             width: 'max-content',
             background: '#161414',
             border: '1px solid #262628',
@@ -145,7 +183,8 @@ export function CustomDropdown<T extends string = string>({
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

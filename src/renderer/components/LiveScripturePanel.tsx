@@ -725,7 +725,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 const styles: Record<string, React.CSSProperties> = {
   root: { height: '100%', minHeight: 0, overflow: 'hidden' },
-  controlBar: { flexWrap: 'wrap' },
+  controlBar: { flexWrap: 'nowrap', minWidth: '100%' },
   meter: { position: 'relative', flex: 1, height: 12, minWidth: 100, background: 'rgba(255,255,255,0.08)', borderRadius: 999, overflow: 'hidden' },
   meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)', borderRadius: 999 },
   meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: '#fff' },

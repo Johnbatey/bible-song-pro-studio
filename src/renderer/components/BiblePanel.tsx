@@ -768,7 +768,7 @@ const styles: Record<string, React.CSSProperties> = {
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   h2: { ...type.title },
   segmented: { display: 'flex', gap: 6 },
-  controlsRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap', width: '100%' },
+  controlsRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap', minWidth: '100%' },
   versionSelect: {
     padding: '5px 10px',
     background: 'var(--chrome-control)',
