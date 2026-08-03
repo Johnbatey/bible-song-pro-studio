@@ -72,6 +72,14 @@
   --block-chrome-h: 48px;
   --block-pad: 14px;
 
+  /* ── Chrome-bar controls ──
+     Dropdowns, switches, search fields and nav buttons sit only a hair off the
+     Matt Black they stand on, and carry no contrasting outline — the fill alone
+     draws the shape. Giving them --block-line for a border rings each control
+     in a lighter rectangle, which is what makes a toolbar look busy. */
+  --chrome-control: #1d1b1c;         /* control fill */
+  --chrome-control-active: #2e2c2b;  /* selected segment / pressed state */
+
   /* ── Settings dialog ──
      Its own ramp: the sidebar drops to the block surface while the panel
      beside it sits a step lighter. */

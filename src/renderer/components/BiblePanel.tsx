@@ -498,6 +498,7 @@ export function BiblePanel() {
             options={versionOptions.map((v) => ({ value: v.id, label: v.abbreviation, sublabel: v.name }))}
             onChange={(val) => setSelectedVersion(val)}
             title="Select Translation"
+            buttonStyle={{ height: 38 }}
           />
 
           {/* Segmented Pill Switcher with Smooth Sliding Animation */}
@@ -537,6 +538,7 @@ export function BiblePanel() {
               options={versionOptions.map((v) => ({ value: v.id, label: `+ ${v.abbreviation}`, sublabel: v.name }))}
               onChange={(val) => setSecondaryVersion(val)}
               title="Secondary Parallel Translation"
+              buttonStyle={{ height: 38 }}
             />
           )}
 
@@ -768,8 +770,8 @@ const styles: Record<string, React.CSSProperties> = {
   controlsRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap', width: '100%' },
   versionSelect: {
     padding: '5px 10px',
-    background: '#232221',
-    border: '1px solid #262628',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--chrome-control)',
     borderRadius: 6,
     color: '#ffffff',
     fontSize: 12,
@@ -779,10 +781,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   pillGroup: {
     display: 'flex',
-    background: '#232221',
+    background: 'var(--chrome-control)',
     borderRadius: 6,
     padding: 3,
-    border: '1px solid #262628',
+    border: '1px solid var(--chrome-control)',
     flexShrink: 0,
     height: 34,
     boxSizing: 'border-box',
@@ -806,8 +808,8 @@ const styles: Record<string, React.CSSProperties> = {
     height: 38,
     minWidth: 140,
     padding: '0 14px',
-    background: '#232221',
-    border: '1px solid #262628',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--chrome-control)',
     borderRadius: 6,
     color: '#ffffff',
     fontSize: 13,
@@ -821,8 +823,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: 40,
     height: 38,
-    background: '#232221',
-    border: '1px solid #262628',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--chrome-control)',
     borderRadius: 6,
     color: '#ffffff',
     fontSize: 16,
