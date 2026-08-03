@@ -582,7 +582,6 @@ export function LiveScripturePanel() {
       <div className="blk-row" style={styles.matchDashboard}>
         <Block
           title="Best Match"
-          subtitle="Current highest-ranked scripture"
           style={styles.primaryColumn}
           tools={(
             <span style={detectionIsFinal ? styles.finalBadge : styles.trackingBadge}>
@@ -612,7 +611,6 @@ export function LiveScripturePanel() {
 
         <Block
           title="Candidate Index"
-          subtitle="Ranked alternatives updating with the speaker"
           style={styles.indexColumn}
           tools={<span style={styles.countBadge}>{Math.max(0, live.suggestions.length - 1)} matches</span>}
           bodyStyle={{ display: 'flex', flexDirection: 'column' }}
