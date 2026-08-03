@@ -226,9 +226,11 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
           <button
             style={{
               ...styles.studioBtn,
-              color: isStudio ? 'var(--accent)' : 'var(--text-secondary)',
-              borderColor: isStudio ? 'var(--accent)' : 'var(--block-line)',
-              background: isStudio ? 'rgba(255, 85, 0, 0.12)' : 'var(--block-active)',
+              // Studio is a workspace mode — nothing is on air because of it.
+              color: '#ffffff',
+              borderColor: isStudio ? 'var(--chrome-control-active)' : 'var(--chrome-control)',
+              background: isStudio ? 'var(--chrome-control-active)' : 'var(--chrome-control)',
+              fontWeight: isStudio ? 600 : 500,
             }}
             onClick={() => {
               if (isStudio) {

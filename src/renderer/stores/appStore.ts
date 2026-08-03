@@ -122,6 +122,11 @@ interface AppState {
   openSettings: (category?: string) => void;
   closeSettings: () => void;
 
+  /** Lives here rather than in App so the title bar can drive it. */
+  isAIConsoleOpen: boolean;
+  toggleAIConsole: () => void;
+  closeAIConsole: () => void;
+
   isThemeDesignerOpen: boolean;
   openThemeDesigner: () => void;
   closeThemeDesigner: () => void;
@@ -327,6 +332,10 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   activeSettingsCategory: 'output',
   openSettings: (category) => set((s) => ({ isSettingsOpen: true, activeSettingsCategory: category || s.activeSettingsCategory || 'output' })),
   closeSettings: () => set({ isSettingsOpen: false }),
+
+  isAIConsoleOpen: false,
+  toggleAIConsole: () => set((s) => ({ isAIConsoleOpen: !s.isAIConsoleOpen })),
+  closeAIConsole: () => set({ isAIConsoleOpen: false }),
 
   isThemeDesignerOpen: false,
   openThemeDesigner: () => set({ isThemeDesignerOpen: true }),

@@ -340,13 +340,13 @@ export function SongsPanel() {
                   className={`card card-hover`}
                   style={{
                     cursor: 'pointer',
-                    borderColor: isSelected ? '#FF5500' : 'rgba(255, 255, 255, 0.08)',
-                    background: isSelected ? 'rgba(255, 85, 0, 0.12)' : 'var(--bg-secondary)',
+                    borderColor: isSelected ? 'var(--chrome-control-active)' : 'rgba(255, 255, 255, 0.08)',
+                    background: isSelected ? 'var(--chrome-control-active)' : 'var(--bg-secondary)',
                     padding: 10,
                   }}
                   onClick={() => setSelectedSong(song)}
                 >
-                  <div style={{ ...type.heading, fontWeight: isSelected ? fontWeight.semibold : fontWeight.medium, color: isSelected ? 'var(--accent)' : 'var(--text-primary)' }}>
+                  <div style={{ ...type.heading, fontWeight: isSelected ? fontWeight.semibold : fontWeight.medium, color: 'var(--text-primary)' }}>
                     {song.title}
                   </div>
                   <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 2 }}>
@@ -453,7 +453,7 @@ export function SongsPanel() {
                     : isPreview
                     ? '2px solid #3b82f6'
                     : isTarget
-                    ? '1px solid #FF5500'
+                    ? '1px solid var(--chrome-control-active)'
                     : '1px solid var(--border-primary)';
 
                   const backgroundStyle = isLive
@@ -461,7 +461,7 @@ export function SongsPanel() {
                     : isPreview
                     ? 'rgba(59, 130, 246, 0.08)'
                     : isTarget
-                    ? 'rgba(255, 85, 0, 0.12)'
+                    ? 'var(--chrome-control-active)'
                     : 'var(--bg-surface)';
 
                   return (

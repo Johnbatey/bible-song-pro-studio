@@ -7,6 +7,18 @@ interface TitleBarProps {
   onPanelChange?: (panel: any) => void;
 }
 
+/**
+ * The app's only navigation. Every workspace panel a user can reach directly is
+ * here — Scenes is deliberately absent, since Studio mode routes to it.
+ */
+const TABS: Array<{ id: string; label: string }> = [
+  { id: 'bible', label: 'Bible' },
+  { id: 'songs', label: 'Songs' },
+  { id: 'presentation', label: 'Pro Slides' },
+  { id: 'live', label: 'Live' },
+  { id: 'media', label: 'Media' },
+];
+
 export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps) {
   const mode = useAppStore((s) => s.display.mode);
   const currentScene = useAppStore((s) => s.display.currentScene);
@@ -15,6 +27,8 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
   const setExternalDisplay = useAppStore((s) => s.setExternalDisplay);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
+  const isAIConsoleOpen = useAppStore((s) => s.isAIConsoleOpen);
+  const toggleAIConsole = useAppStore((s) => s.toggleAIConsole);
   
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isBlackout, setIsBlackout] = useState(false);
@@ -28,7 +42,7 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
     }
   }, []);
 
-  const handleTabClick = (tab: 'bible' | 'presentation' | 'songs') => {
+  const handleTabClick = (tab: string) => {
     if (onPanelChange) {
       onPanelChange(tab);
     }
@@ -56,41 +70,25 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
           <img src="./bible-song-pro-icon.svg" alt="" style={styles.logo} />
         </div>
 
-        {/* Segmented pill switcher */}
+        {/* Panel navigation — selection is a lift in the chrome, never the accent */}
         <div style={styles.pillContainer}>
-          <button
-            style={{
-              ...styles.pillBtn,
-              background: activePanel === 'bible' ? 'var(--accent)' : 'transparent',
-              color: activePanel === 'bible' ? '#ffffff' : 'var(--text-secondary)',
-              fontWeight: activePanel === 'bible' ? fontWeight.semibold : fontWeight.medium,
-            }}
-            onClick={() => handleTabClick('bible')}
-          >
-            Scriptures
-          </button>
-          <button
-            style={{
-              ...styles.pillBtn,
-              background: activePanel === 'presentation' ? 'var(--accent)' : 'transparent',
-              color: activePanel === 'presentation' ? '#ffffff' : 'var(--text-secondary)',
-              fontWeight: activePanel === 'presentation' ? fontWeight.semibold : fontWeight.medium,
-            }}
-            onClick={() => handleTabClick('presentation')}
-          >
-            Slides
-          </button>
-          <button
-            style={{
-              ...styles.pillBtn,
-              background: activePanel === 'songs' ? 'var(--accent)' : 'transparent',
-              color: activePanel === 'songs' ? '#ffffff' : 'var(--text-secondary)',
-              fontWeight: activePanel === 'songs' ? fontWeight.semibold : fontWeight.medium,
-            }}
-            onClick={() => handleTabClick('songs')}
-          >
-            Songs
-          </button>
+          {TABS.map((tab) => {
+            const isActive = activePanel === tab.id;
+            return (
+              <button
+                key={tab.id}
+                style={{
+                  ...styles.pillBtn,
+                  background: isActive ? 'var(--chrome-control-active)' : 'transparent',
+                  color: isActive ? '#ffffff' : 'var(--text-dim)',
+                  fontWeight: isActive ? fontWeight.semibold : fontWeight.medium,
+                }}
+                onClick={() => handleTabClick(tab.id)}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -136,7 +134,7 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
 
         <div style={styles.divider} />
 
-        {/* Quick Toolbar Action Buttons: Outputs, Themes, Studio, Alerts, Settings */}
+        {/* Quick Toolbar Action Buttons: Outputs, Copy URL, Design, Themes, AI, Alerts, Settings */}
         <div style={styles.toolbarGroup}>
           {/* Outputs Button */}
           <button
@@ -163,6 +161,28 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
             Outputs
           </button>
 
+          {/* Copy Display URL — sits with Outputs, the control it relates to */}
+          <button
+            style={{ ...styles.toolbarBtn, color: 'var(--text-secondary)' }}
+            onClick={() => {
+              navigator.clipboard?.writeText(window.location.href);
+              triggerAlert({
+                id: `url-${Date.now()}`,
+                text: 'Display URL copied to clipboard',
+                type: 'info',
+                duration: 3,
+                animation: 'slideDown',
+              });
+            }}
+            title="Copy Display URL"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+            Copy URL
+          </button>
+
           {/* Design Button (Opens Full Page Theme Designer) */}
           <button
             style={{
@@ -185,7 +205,8 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
           <button
             style={{
               ...styles.toolbarBtn,
-              color: activePanel === 'themes' ? 'var(--accent)' : 'var(--text-secondary)',
+              background: activePanel === 'themes' ? 'var(--chrome-control-active)' : undefined,
+              color: 'var(--text-secondary)',
             }}
             onClick={() => onPanelChange && onPanelChange('themes')}
             title="Themes Library"
@@ -196,6 +217,24 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
               <path d="M12 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
             </svg>
             Themes
+          </button>
+
+          {/* AI Console — was a floating circle over the Queue block */}
+          <button
+            style={{
+              ...styles.toolbarBtn,
+              background: isAIConsoleOpen ? 'var(--chrome-control-active)' : undefined,
+              color: 'var(--text-secondary)',
+            }}
+            onClick={toggleAIConsole}
+            title="AI Console"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+            AI
           </button>
 
           {/* Alerts Button */}

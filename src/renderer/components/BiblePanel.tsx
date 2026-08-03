@@ -628,7 +628,7 @@ export function BiblePanel() {
                 : isPreview
                 ? '1px solid #3b82f6'
                 : isHighlighted
-                ? '1px solid #FF5500'
+                ? '1px solid var(--chrome-control-active)'
                 : '1px solid #262628';
 
               const backgroundStyle = isLive
@@ -636,7 +636,7 @@ export function BiblePanel() {
                 : isPreview
                 ? '#232221'
                 : isHighlighted
-                ? 'rgba(255, 85, 0, 0.12)'
+                ? 'var(--chrome-control-active)'
                 : '#141416';
 
               return (
@@ -672,7 +672,7 @@ export function BiblePanel() {
                       {confidenceFor(verse, index)}%
                     </span>
                   ) : (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#FF5500', minWidth: 22, flexShrink: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-dim)', minWidth: 22, flexShrink: 0 }}>
                       {verse.verse}
                     </span>
                   )}

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from './stores/appStore';
 import { TitleBar } from './components/TitleBar';
-import { Sidebar } from './components/Sidebar';
 import { Block } from './components/Block';
 import { PreviewProgramView } from './components/PreviewProgramView';
 import { TranscriptPanel } from './components/TranscriptPanel';
@@ -25,7 +24,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { useBroadcastSync } from './hooks/useBroadcastSync';
 import type { Scene, Theme } from './types';
 
-type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'presentation' | 'settings' | 'history';
+type PanelView = 'scenes' | 'bible' | 'songs' | 'live' | 'media' | 'themes' | 'presentation' | 'settings';
 
 /**
  * The audience display renderer consumes flat background fields
@@ -99,13 +98,13 @@ function backgroundFieldsFor(scene: Scene | null, theme: Theme | null, outputMod
 
 export function App() {
   const platform = useAppStore((s) => s.platform);
-  const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const activeAlert = useAppStore((s) => s.activeAlert);
   const dismissAlert = useAppStore((s) => s.dismissAlert);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
+  const isAIConsoleOpen = useAppStore((s) => s.isAIConsoleOpen);
+  const closeAIConsole = useAppStore((s) => s.closeAIConsole);
 
   const [activePanel, setActivePanel] = useState<PanelView>('scenes');
-  const [showAIConsole, setShowAIConsole] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -174,26 +173,20 @@ export function App() {
     return saved ? parseInt(saved, 10) : 360;
   });
 
-  const [historyHeight, setHistoryHeight] = useState<number>(() => {
-    const saved = localStorage.getItem('bsp_historyHeight');
-    return saved ? parseInt(saved, 10) : 220;
-  });
-
   const [queueWidth, setQueueWidth] = useState<number>(() => {
     const saved = localStorage.getItem('bsp_queueWidth');
     return saved ? parseInt(saved, 10) : 340;
   });
 
-  const [activeDrag, setActiveDrag] = useState<'sidebar' | 'transcript' | 'history' | 'program' | 'queue' | null>(null);
+  const [activeDrag, setActiveDrag] = useState<'sidebar' | 'transcript' | 'program' | 'queue' | null>(null);
 
-  const startResizing = (type: 'sidebar' | 'transcript' | 'history' | 'program' | 'queue', e: React.PointerEvent) => {
+  const startResizing = (type: 'sidebar' | 'transcript' | 'program' | 'queue', e: React.PointerEvent) => {
     e.preventDefault();
     setActiveDrag(type);
     const startX = e.clientX;
     const startY = e.clientY;
     const initialSidebarW = sidebarWidth;
     const initialTranscriptH = transcriptHeight;
-    const initialHistoryH = historyHeight;
     const initialProgramH = programDockHeight;
     const initialQueueW = queueWidth;
 
@@ -208,11 +201,6 @@ export function App() {
         const nextH = Math.min(700, Math.max(120, initialTranscriptH + deltaY));
         setTranscriptHeight(nextH);
         localStorage.setItem('bsp_transcriptHeight', String(nextH));
-      } else if (type === 'history') {
-        const deltaY = startY - moveEvent.clientY;
-        const nextH = Math.min(600, Math.max(100, initialHistoryH + deltaY));
-        setHistoryHeight(nextH);
-        localStorage.setItem('bsp_historyHeight', String(nextH));
       } else if (type === 'queue') {
         // Queue sits to the right of the panel, so dragging left widens it.
         const deltaX = startX - moveEvent.clientX;
@@ -266,40 +254,23 @@ export function App() {
                 <TranscriptPanel onOpenLiveScripture={() => setActivePanel('live')} />
               </div>
 
-              {/* Vertical resizer between Live transcript and Workspace */}
+              {/* Vertical resizer between Live transcript and History */}
               <div
                 className={`resizer-handle resizer-handle-v ${activeDrag === 'transcript' ? 'is-dragging' : ''}`}
                 onPointerDown={(e) => startResizing('transcript', e)}
-                title="Drag to resize transcript height"
+                aria-label="Drag to resize transcript height"
               />
 
-              <div className="sidebar-region">
-                <Block title="Workspace" flush>
-                  <Sidebar
-                    activePanel={activePanel as PanelView}
-                    onPanelChange={(p) => setActivePanel(p)}
-                    collapsed={!sidebarOpen}
-                  />
-                </Block>
-              </div>
-
-              {/* Vertical resizer between Workspace and History */}
-              <div
-                className={`resizer-handle resizer-handle-v ${activeDrag === 'history' ? 'is-dragging' : ''}`}
-                onPointerDown={(e) => startResizing('history', e)}
-                title="Drag to resize history height"
-              />
-
-              <div className="history-region" style={{ height: historyHeight }}>
+              <div className="history-region">
                 <SessionHistoryPanel />
               </div>
             </div>
 
-            {/* Horizontal resizer between Sidebar and Left Workspace */}
+            {/* Horizontal resizer between the left column and the workspace */}
             <div
               className={`resizer-handle resizer-handle-h sidebar-resizer ${activeDrag === 'sidebar' ? 'is-dragging' : ''}`}
               onPointerDown={(e) => startResizing('sidebar', e)}
-              title="Drag to resize Sidebar width"
+              aria-label="Drag to resize the left column width"
             />
 
             <div className="right-column-region">
@@ -313,7 +284,7 @@ export function App() {
               <div
                 className={`resizer-handle resizer-handle-v ${activeDrag === 'program' ? 'is-dragging' : ''}`}
                 onPointerDown={(e) => startResizing('program', e)}
-                title="Drag to resize display height"
+                aria-label="Drag to resize display height"
               />
 
               <div className="lower-dock-region">
@@ -354,7 +325,7 @@ export function App() {
                 <div
                   className={`resizer-handle resizer-handle-h ${activeDrag === 'queue' ? 'is-dragging' : ''}`}
                   onPointerDown={(e) => startResizing('queue', e)}
-                  title="Drag to resize Queue width"
+                  aria-label="Drag to resize Queue width"
                 />
 
                 <div className="queue-region" style={{ width: queueWidth }}>
@@ -374,53 +345,7 @@ export function App() {
         />
       )}
       <StatusBar />
-      <div style={{ position: 'fixed', bottom: 60, right: 20, zIndex: 50, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button
-          className="btn btn-primary btn-sm"
-          style={{
-            width: 36,
-            height: 36,
-            padding: 0,
-            borderRadius: '50%',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          }}
-          onClick={() => setShowAIConsole(!showAIConsole)}
-          title="AI Console"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 16v-4" />
-            <path d="M12 8h.01" />
-          </svg>
-        </button>
-        <button
-          className="btn btn-sm btn-secondary"
-          style={{
-            width: 36,
-            height: 36,
-            padding: 0,
-            borderRadius: '50%',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          }}
-          onClick={() => {
-            navigator.clipboard?.writeText(window.location.href);
-            triggerAlert({
-              id: `url-${Date.now()}`,
-              text: 'Display URL copied to clipboard',
-              type: 'info',
-              duration: 3,
-              animation: 'slideDown',
-            });
-          }}
-          title="Copy Display URL"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" />
-            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-          </svg>
-        </button>
-      </div>
-      {showAIConsole && <AIConsole onClose={() => setShowAIConsole(false)} />}
+      {isAIConsoleOpen && <AIConsole onClose={closeAIConsole} />}
       <SettingsModal />
       <ThemeDesignerModal />
       <SlideEditorModal />
