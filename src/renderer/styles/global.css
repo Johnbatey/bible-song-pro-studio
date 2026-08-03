@@ -229,10 +229,68 @@ html, body, #root {
   border-bottom: 1px solid var(--block-line);
 }
 
-.bsp-dock .dv-default-tab {
+/* Dock title bar: name on the left, pop-out and close on the right.
+   A custom tab component does not get dockview's .dv-default-tab class, so the
+   type has to be set here rather than inherited from the theme block. */
+.dock-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px 0 10px;
+  font-size: var(--fs-label);
+}
+
+.dock-tab__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   letter-spacing: var(--ls-caps);
   text-transform: uppercase;
   font-weight: var(--fw-semibold);
+}
+
+/* Quiet until the dock is hovered — the same rule the queue + follows, so a
+   row of docks reads as titles rather than as a row of buttons. */
+.dock-tab__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.dv-groupview:hover .dock-tab__action,
+.dv-active-group .dock-tab__action,
+.dock-tab__action:focus-visible {
+  opacity: 1;
+}
+
+.dock-tab__action:hover {
+  background: var(--chrome-control-active);
+  color: #ffffff;
+}
+
+/* A floating dock is lifted off the layout, so it gets the shadow and a full
+   border rather than sitting flush in the grid. */
+.bsp-dock .dv-floating-overlay-host .dv-groupview,
+.bsp-dock .dv-resize-container .dv-groupview {
+  border: 1px solid var(--block-line);
+  border-radius: var(--block-radius);
+  box-shadow: var(--shadow-lg);
 }
 
 /* A panel fills its dock; the panel's own Block draws the rest. */

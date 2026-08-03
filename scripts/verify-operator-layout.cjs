@@ -44,9 +44,12 @@ async function main() {
         const rect = el.getBoundingClientRect();
         return { w: rect.width, h: rect.height };
       }),
-      tabTitles: Array.from(document.querySelectorAll('.dv-default-tab'))
+      tabTitles: Array.from(document.querySelectorAll('.dock-tab__title'))
         .map((el) => el.textContent.trim())
         .filter(Boolean),
+      // Every dock must offer pop-out and close.
+      tabActions: Array.from(document.querySelectorAll('.dock-tab'))
+        .map((el) => el.querySelectorAll('.dock-tab__action').length),
       panels: Array.from(document.querySelectorAll('.dock-panel')).length,
       transcriptPanel: Boolean(document.querySelector('.transcript-panel')),
       programDock: Boolean(document.querySelector('.pv-dock')),
@@ -64,6 +67,10 @@ async function main() {
     if (!layout.tabTitles.some((t) => t.toLowerCase() === title.toLowerCase())) {
       throw new Error(`Default layout is missing the "${title}" dock (saw: ${layout.tabTitles.join(', ') || 'none'})`);
     }
+  }
+
+  if (layout.tabActions.some((n) => n !== 2)) {
+    throw new Error(`Every dock title bar needs a pop-out and a close button, saw counts: ${layout.tabActions.join(', ')}`);
   }
 
   if (layout.groups.length < 2) {

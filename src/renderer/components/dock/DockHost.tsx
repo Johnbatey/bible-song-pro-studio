@@ -3,6 +3,7 @@ import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type Dockview
 import { useAppStore } from '../../stores/appStore';
 import { DOCK_COMPONENTS, DOCKS, type DockId } from './docks';
 import { getDockApi, setDockApi } from './dockController';
+import { DockTab } from './DockTab';
 
 const LAYOUT_KEY = 'bsp_dockLayout';
 
@@ -125,8 +126,10 @@ export function DockHost() {
       components={DOCK_COMPONENTS}
       theme={BSP_THEME}
       onReady={onReady}
+      defaultTabComponent={DockTab}
       singleTabMode="fullwidth"
       disableFloatingGroups={false}
+      floatingGroupBounds="boundedWithinViewport"
     />
   );
 }
