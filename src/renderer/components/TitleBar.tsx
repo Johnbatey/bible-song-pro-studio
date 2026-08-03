@@ -27,8 +27,6 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
   const setExternalDisplay = useAppStore((s) => s.setExternalDisplay);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
-  const isAIConsoleOpen = useAppStore((s) => s.isAIConsoleOpen);
-  const toggleAIConsole = useAppStore((s) => s.toggleAIConsole);
   
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isBlackout, setIsBlackout] = useState(false);
@@ -124,7 +122,7 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
         <button
           style={{
             ...styles.blackBtn,
-            background: isBlackout ? '#ef4444' : 'var(--block-active)',
+            background: isBlackout ? '#ef4444' : 'var(--chrome-control)',
             color: isBlackout ? '#ffffff' : 'var(--text-secondary)',
           }}
           onClick={toggleBlackout}
@@ -134,7 +132,7 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
 
         <div style={styles.divider} />
 
-        {/* Quick Toolbar Action Buttons: Outputs, Copy URL, Design, Themes, AI, Alerts, Settings */}
+        {/* Quick Toolbar Action Buttons: Outputs, Copy URL, Design, Themes, Alerts, Settings */}
         <div style={styles.toolbarGroup}>
           {/* Outputs Button */}
           <button
@@ -219,24 +217,6 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
             Themes
           </button>
 
-          {/* AI Console — was a floating circle over the Queue block */}
-          <button
-            style={{
-              ...styles.toolbarBtn,
-              background: isAIConsoleOpen ? 'var(--chrome-control-active)' : undefined,
-              color: 'var(--text-secondary)',
-            }}
-            onClick={toggleAIConsole}
-            title="AI Console"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 16v-4" />
-              <path d="M12 8h.01" />
-            </svg>
-            AI
-          </button>
-
           {/* Alerts Button */}
           <button
             style={styles.toolbarBtn}
@@ -313,11 +293,11 @@ const styles: Record<string, React.CSSProperties> = {
   pillContainer: {
     display: 'flex',
     alignItems: 'center',
-    background: 'var(--block-bg)',
+    background: 'var(--chrome-control)',
     borderRadius: 8,
     padding: 3,
     gap: 2,
-    border: '1px solid var(--block-line)',
+    border: '1px solid var(--chrome-control)',
   },
   pillBtn: {
     padding: '5px 14px',
@@ -352,8 +332,8 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ffffff',
     padding: '4px 10px',
     borderRadius: 6,
-    background: 'var(--block-active)',
-    border: '1px solid var(--block-line)',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--chrome-control)',
     letterSpacing: '0.04em',
   },
   liveDot: {
@@ -365,7 +345,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   blackBtn: {
     padding: '4px 10px',
-    border: '1px solid var(--block-line)',
+    border: '1px solid transparent',
     borderRadius: 6,
     fontSize: 11,
     fontWeight: 700,
@@ -385,8 +365,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: 2,
     padding: '4px 10px',
-    border: '1px solid var(--block-line)',
-    background: 'var(--block-active)',
+    border: '1px solid var(--chrome-control)',
+    background: 'var(--chrome-control)',
     borderRadius: 6,
     cursor: 'pointer',
     fontSize: 11,

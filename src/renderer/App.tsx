@@ -15,7 +15,6 @@ import { SettingsModal } from './components/SettingsModal';
 import { ThemeDesignerModal } from './components/ThemeDesignerModal';
 import { SlideEditorModal } from './components/SlideEditorModal';
 import { AnimatedAlert } from './components/AnimatedAlert';
-import { AIConsole } from './components/AIConsole';
 import { StatusBar } from './components/StatusBar';
 import { LiveScripturePanel } from './components/LiveScripturePanel';
 import { SessionHistoryPanel } from './components/SessionHistoryPanel';
@@ -101,8 +100,6 @@ export function App() {
   const activeAlert = useAppStore((s) => s.activeAlert);
   const dismissAlert = useAppStore((s) => s.dismissAlert);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
-  const isAIConsoleOpen = useAppStore((s) => s.isAIConsoleOpen);
-  const closeAIConsole = useAppStore((s) => s.closeAIConsole);
 
   const [activePanel, setActivePanel] = useState<PanelView>('scenes');
 
@@ -345,7 +342,6 @@ export function App() {
         />
       )}
       <StatusBar />
-      {isAIConsoleOpen && <AIConsole onClose={closeAIConsole} />}
       <SettingsModal />
       <ThemeDesignerModal />
       <SlideEditorModal />
