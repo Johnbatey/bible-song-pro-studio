@@ -69,7 +69,7 @@
   --block-active: #232221;    /* Black Chestnut Oak — chrome switch highlight */
   --block-radius: 4px;        /* soften the corner matching the reference design */
   --block-gap: 4px;           /* gutter between blocks */
-  --block-chrome-h: 44px;
+  --block-chrome-h: 48px;
   --block-pad: 14px;
 
   /* ── Settings dialog ──
@@ -260,7 +260,7 @@ html, body, #root {
 }
 
 .blk__title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   line-height: var(--lh-tight);
   color: #ffffff;
