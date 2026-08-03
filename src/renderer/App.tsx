@@ -179,9 +179,9 @@ export function App() {
     return saved ? parseInt(saved, 10) : 220;
   });
 
-  const [queueHeight, setQueueHeight] = useState<number>(() => {
-    const saved = localStorage.getItem('bsp_queueHeight');
-    return saved ? parseInt(saved, 10) : 220;
+  const [queueWidth, setQueueWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('bsp_queueWidth');
+    return saved ? parseInt(saved, 10) : 340;
   });
 
   const [activeDrag, setActiveDrag] = useState<'sidebar' | 'transcript' | 'history' | 'program' | 'queue' | null>(null);
@@ -195,7 +195,7 @@ export function App() {
     const initialTranscriptH = transcriptHeight;
     const initialHistoryH = historyHeight;
     const initialProgramH = programDockHeight;
-    const initialQueueH = queueHeight;
+    const initialQueueW = queueWidth;
 
     const onPointerMove = (moveEvent: PointerEvent) => {
       if (type === 'sidebar') {
@@ -214,10 +214,11 @@ export function App() {
         setHistoryHeight(nextH);
         localStorage.setItem('bsp_historyHeight', String(nextH));
       } else if (type === 'queue') {
-        const deltaY = startY - moveEvent.clientY;
-        const nextH = Math.min(600, Math.max(100, initialQueueH + deltaY));
-        setQueueHeight(nextH);
-        localStorage.setItem('bsp_queueHeight', String(nextH));
+        // Queue sits to the right of the panel, so dragging left widens it.
+        const deltaX = startX - moveEvent.clientX;
+        const nextW = Math.min(640, Math.max(220, initialQueueW + deltaX));
+        setQueueWidth(nextW);
+        localStorage.setItem('bsp_queueWidth', String(nextW));
       } else if (type === 'program') {
         const deltaY = moveEvent.clientY - startY;
         const nextH = Math.min(800, Math.max(140, initialProgramH + deltaY));
@@ -315,48 +316,50 @@ export function App() {
                 title="Drag to resize display height"
               />
 
-              <main className="left-workspace">
-                <div className="app-content">
-                  <div className="app-content-inner">
-                    <ErrorBoundary label="Panel">
-                    <div style={{ display: activePanel === 'scenes' ? 'block' : 'none', height: '100%' }}>
-                      {visitedPanels.has('scenes') && <ScenePanel />}
+              <div className="lower-dock-region">
+                <main className="left-workspace">
+                  <div className="app-content">
+                    <div className="app-content-inner">
+                      <ErrorBoundary label="Panel">
+                      <div style={{ display: activePanel === 'scenes' ? 'block' : 'none', height: '100%' }}>
+                        {visitedPanels.has('scenes') && <ScenePanel />}
+                      </div>
+                      <div style={{ display: activePanel === 'bible' ? 'block' : 'none', height: '100%' }}>
+                        {visitedPanels.has('bible') && <BiblePanel />}
+                      </div>
+                      <div style={{ display: activePanel === 'songs' ? 'block' : 'none', height: '100%' }}>
+                        {visitedPanels.has('songs') && <SongsPanel />}
+                      </div>
+                      <div style={{ display: activePanel === 'live' ? 'block' : 'none', height: '100%' }}>
+                        {visitedPanels.has('live') && <LiveScripturePanel />}
+                      </div>
+                      <div style={{ display: activePanel === 'media' ? 'block' : 'none', height: '100%' }}>
+                        {visitedPanels.has('media') && <MediaPanel />}
+                      </div>
+                      <div style={{ display: activePanel === 'themes' ? 'block' : 'none', height: '100%' }}>
+                        {visitedPanels.has('themes') && <ThemePanel />}
+                      </div>
+                      <div style={{ display: activePanel === 'presentation' ? 'block' : 'none', height: '100%' }}>
+                        {visitedPanels.has('presentation') && <PresentationPanel />}
+                      </div>
+                      <div style={{ display: activePanel === 'settings' ? 'block' : 'none', height: '100%' }}>
+                        {visitedPanels.has('settings') && <SettingsPanel />}
+                      </div>
+                      </ErrorBoundary>
                     </div>
-                    <div style={{ display: activePanel === 'bible' ? 'block' : 'none', height: '100%' }}>
-                      {visitedPanels.has('bible') && <BiblePanel />}
-                    </div>
-                    <div style={{ display: activePanel === 'songs' ? 'block' : 'none', height: '100%' }}>
-                      {visitedPanels.has('songs') && <SongsPanel />}
-                    </div>
-                    <div style={{ display: activePanel === 'live' ? 'block' : 'none', height: '100%' }}>
-                      {visitedPanels.has('live') && <LiveScripturePanel />}
-                    </div>
-                    <div style={{ display: activePanel === 'media' ? 'block' : 'none', height: '100%' }}>
-                      {visitedPanels.has('media') && <MediaPanel />}
-                    </div>
-                    <div style={{ display: activePanel === 'themes' ? 'block' : 'none', height: '100%' }}>
-                      {visitedPanels.has('themes') && <ThemePanel />}
-                    </div>
-                    <div style={{ display: activePanel === 'presentation' ? 'block' : 'none', height: '100%' }}>
-                      {visitedPanels.has('presentation') && <PresentationPanel />}
-                    </div>
-                    <div style={{ display: activePanel === 'settings' ? 'block' : 'none', height: '100%' }}>
-                      {visitedPanels.has('settings') && <SettingsPanel />}
-                    </div>
-                    </ErrorBoundary>
                   </div>
+                </main>
+
+                {/* Horizontal resizer between the Workspace panel and Queue */}
+                <div
+                  className={`resizer-handle resizer-handle-h ${activeDrag === 'queue' ? 'is-dragging' : ''}`}
+                  onPointerDown={(e) => startResizing('queue', e)}
+                  title="Drag to resize Queue width"
+                />
+
+                <div className="queue-region" style={{ width: queueWidth }}>
+                  <QueuePanel />
                 </div>
-              </main>
-
-              {/* Vertical resizer between Active Workspace Panel and Queue */}
-              <div
-                className={`resizer-handle resizer-handle-v ${activeDrag === 'queue' ? 'is-dragging' : ''}`}
-                onPointerDown={(e) => startResizing('queue', e)}
-                title="Drag to resize Queue height"
-              />
-
-              <div className="queue-region" style={{ height: queueHeight }}>
-                <QueuePanel />
               </div>
             </div>
           </div>

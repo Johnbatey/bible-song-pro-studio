@@ -191,13 +191,32 @@ html, body, #root {
   padding: 0;
 }
 
+/* The bottom half of the right column: active panel on the left, Queue
+   standing beside it as its own block. */
+.lower-dock-region {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: row;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .queue-region {
   flex-shrink: 0;
-  min-width: 0;
-  min-height: 100px;
+  min-width: 220px;
+  min-height: 0;
   overflow: hidden;
   background: transparent;
   padding: 0;
+}
+
+/* The grid placement on .resizer-handle-h is for the sidebar seam; inside the
+   lower dock the handle is just a flex child. */
+.lower-dock-region > .resizer-handle-h {
+  grid-row: auto;
+  flex-shrink: 0;
+  margin: 0 2px;
 }
 
 .sidebar-region nav {
