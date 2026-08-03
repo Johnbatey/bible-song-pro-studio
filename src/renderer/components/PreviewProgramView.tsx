@@ -303,7 +303,7 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                 Preview{hasPendingTake ? ' · ready to take' : ''}
               </div>
               <div style={{ ...styles.displayBox, borderColor: hasPendingTake ? '#f1c40f' : undefined }}>
-                <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
+                <div style={{ ...styles.outputFrame, zoom: outputScale }}>
                   <ProgramSurface
                     preview
                     state={{ scene: previewScene, outputMode, theme: activeTheme }}
@@ -323,7 +323,7 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                   <div style={styles.transitionSpinner} />
                 </div>
               )}
-              <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
+              <div style={{ ...styles.outputFrame, zoom: outputScale }}>
                 <ProgramSurface
                   preview
                   state={{ scene: currentScene, outputMode, theme: activeTheme, activeAlert, transcription }}
@@ -411,7 +411,10 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
     alignItems: 'stretch',
     transformOrigin: 'center center',
-    willChange: 'transform',
+    /* No will-change here on purpose. Promoting this to a composited layer
+       makes Chromium rasterise it once and stretch that texture as the scale
+       changes, which is what made the output blur as you zoomed in. Left
+       alone, it re-rasterises at the scale actually being shown. */
   },
   previewCol: {
     flex: '0 0 auto',
@@ -458,7 +461,9 @@ const styles: Record<string, React.CSSProperties> = {
     top: 0,
     width: 1920,
     height: 1080,
-    transformOrigin: 'top left',
+    /* Scaled with `zoom` rather than a transform: zoom re-runs layout at the
+       target size so glyphs are rendered at their true pixel size, where a
+       transform would rasterise the 1920-wide design and resample it down. */
   },
   transitionOverlay: {
     position: 'absolute',
