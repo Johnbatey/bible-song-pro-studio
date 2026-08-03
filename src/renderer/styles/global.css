@@ -502,6 +502,41 @@ html, body, #root {
   min-height: var(--block-chrome-h);
   padding: 6px var(--block-pad);
   border-top: 1px solid var(--block-line);
+  /* Docks can be dragged narrow, so a footer full of controls scrolls sideways
+     rather than crushing them — same rule as .blk--bar. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.blk__footer > * {
+  flex-shrink: 0;
+}
+
+/* Any row of controls that is not a .blk--bar or a footer — a switcher strip
+   inside a body, say. Dropdowns inside these portal their menus, so an
+   overflow container here does not clip them. */
+.bar-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.bar-scroll > * {
+  flex-shrink: 0;
+}
+
+.blk--bar::-webkit-scrollbar,
+.blk__footer::-webkit-scrollbar,
+.bar-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.blk--bar::-webkit-scrollbar-thumb,
+.blk__footer::-webkit-scrollbar-thumb,
+.bar-scroll::-webkit-scrollbar-thumb {
+  background: var(--chrome-control-active);
+  border-radius: 2px;
 }
 
 /* ── Chrome controls ──

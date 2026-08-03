@@ -342,8 +342,9 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: '1fr auto 1fr',
     alignItems: 'center',
     gap: 10,
-    width: '100%',
-    minWidth: 0,
+    /* minWidth rather than width so the row can exceed a narrow footer and let
+       it scroll, instead of absorbing the squeeze and crushing the controls. */
+    minWidth: '100%',
   },
   footerLeft: {
     display: 'flex',
@@ -499,6 +500,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   zoomSlider: {
     width: 92,
-    accentColor: 'var(--accent)',
+    /* Tinting the track with the accent made the loudest thing in the footer a
+       zoom control. Left to the native dark rendering — grey track, white
+       thumb — it recedes and orange goes back to meaning live. */
+    accentColor: 'var(--chrome-control-active)',
   },
 };

@@ -75,8 +75,8 @@ export function SessionHistoryPanel() {
         </>
       )}
     >
-      {/* Session Switcher & Export Bar */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #262628' }}>
+      {/* Session Switcher & Export Bar — scrolls sideways in a narrow dock */}
+      <div className="bar-scroll" style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #262628' }}>
         <CustomDropdown
           value={selectedSession}
           onChange={(val) => loadSession(val)}
