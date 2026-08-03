@@ -203,8 +203,8 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
           <button
             style={{
               ...styles.toolbarBtn,
-              background: activePanel === 'themes' ? 'var(--chrome-control-active)' : undefined,
-              color: 'var(--text-secondary)',
+              background: activePanel === 'themes' ? 'var(--chrome-control-active)' : styles.toolbarBtn.background,
+              color: activePanel === 'themes' ? '#ffffff' : 'var(--text-secondary)',
             }}
             onClick={() => onPanelChange && onPanelChange('themes')}
             title="Themes Library"
