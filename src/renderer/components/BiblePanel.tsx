@@ -4,6 +4,7 @@ import type { BibleBook, BibleSearchResult, BibleVerse, BibleVersion, Scene } fr
 import { type, fontWeight, numeric } from '../styles/type';
 import { CustomDropdown } from './CustomDropdown';
 import { SlidingSwitch } from './SlidingSwitch';
+import { isFocusedDock } from './dock/dockFocus';
 import { Block } from './Block';
 
 const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', 'Revelation'];
@@ -466,7 +467,7 @@ export function BiblePanel() {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
-      if (!containerRef.current || containerRef.current.offsetParent === null) return;
+      if (!isFocusedDock(containerRef.current)) return;
       const target = event.target as HTMLElement | null;
       const tagName = target?.tagName?.toLowerCase();
       if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || target?.isContentEditable) return;

@@ -5,6 +5,7 @@ import type { Scene, Song } from '../types';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { AppleToggle } from './AppleToggle';
+import { isFocusedDock } from './dock/dockFocus';
 
 const DEMO_SONGS: Song[] = [
   {
@@ -251,7 +252,7 @@ export function SongsPanel() {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
-      if (!containerRef.current || containerRef.current.offsetParent === null) return;
+      if (!isFocusedDock(containerRef.current)) return;
       const target = event.target as HTMLElement | null;
       const tagName = target?.tagName?.toLowerCase();
       if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || target?.isContentEditable) return;
