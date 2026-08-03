@@ -4,6 +4,8 @@ import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHan
 import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection } from '../types';
 import { type, fontWeight, numeric } from '../styles/type';
 import { Block, BlockButton, BlockSegment } from './Block';
+import { CustomDropdown } from './CustomDropdown';
+import { AppleToggle } from './AppleToggle';
 
 /** Short enough to feel live, while still giving Whisper enough speech context. */
 const LOCAL_CHUNK_SECONDS = 3;
@@ -334,6 +336,8 @@ export function LiveScripturePanel() {
     setNotice(`Bible version switched to ${requested.abbreviation}.`);
   }
 
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+
   const statusInfo = STATE_LABELS[sttStatus?.state || 'idle'];
   const deepgramUnavailable = engine === 'deepgram' && !keyConfigured;
 
@@ -344,47 +348,95 @@ export function LiveScripturePanel() {
           <BlockButton active={live.detectionMode === 'bible'} onClick={() => setLive({ detectionMode: 'bible' })}>Bible</BlockButton>
           <BlockButton active={live.detectionMode === 'song'} onClick={() => setLive({ detectionMode: 'song' })}>Song</BlockButton>
         </BlockSegment>
-        <BlockButton onClick={refreshInputs} title="Re-scan audio inputs">Refresh Inputs</BlockButton>
-        <BlockButton
-          active={!live.isActive}
-          onClick={live.isActive ? stopLive : startLive}
-          disabled={deepgramUnavailable}
-          title={deepgramUnavailable ? 'Add a Deepgram API key in Settings first' : undefined}
-        >
-          {live.isActive ? 'Stop' : 'Start'}
-        </BlockButton>
-        <select
-          className="input"
-          value={live.selectedInputId}
-          onChange={(e) => setLive({ selectedInputId: e.target.value })}
-          disabled={live.isActive}
-          style={{ maxWidth: 220 }}
-        >
-          {devices.length === 0 && <option value="">No microphone available</option>}
-          {devices.map((device) => <option key={device.deviceId} value={device.deviceId}>{device.label}</option>)}
-        </select>
-        <select
-          className="input"
-          value={engine}
-          onChange={(e) => {
-            const next = e.target.value as 'local' | 'deepgram';
-            setEngine(next);
-            window.BSP?.settings?.set({ sttEngine: next }).catch(() => {});
+
+        {/* Play (▶) / Stop (■) Button */}
+        {live.isActive ? (
+          <button
+            onClick={stopLive}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              height: 30,
+              padding: '0 12px',
+              background: '#ef4444',
+              border: 'none',
+              borderRadius: 6,
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+            }}
+            title="Stop Live Scripture"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="5" y="5" width="14" height="14" rx="2" />
+            </svg>
+            <span>Stop</span>
+          </button>
+        ) : (
+          <button
+            onClick={startLive}
+            disabled={deepgramUnavailable}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              height: 30,
+              padding: '0 12px',
+              background: '#22c55e',
+              border: 'none',
+              borderRadius: 6,
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: deepgramUnavailable ? 'not-allowed' : 'pointer',
+              opacity: deepgramUnavailable ? 0.5 : 1,
+              fontFamily: 'var(--font-ui)',
+            }}
+            title={deepgramUnavailable ? 'Add a Deepgram API key in Settings first' : 'Start Live Scripture'}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span>Play</span>
+          </button>
+        )}
+
+        {/* Config Button */}
+        <button
+          onClick={() => setIsConfigOpen(true)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            height: 30,
+            padding: '0 12px',
+            background: '#232221',
+            border: '1px solid #262628',
+            borderRadius: 6,
+            color: '#ffffff',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'var(--font-ui)',
           }}
-          disabled={live.isActive}
-          style={{ maxWidth: 150 }}
+          title="Live Scripture Settings & Audio Inputs"
         >
-          <option value="local">Local (Whisper)</option>
-          <option value="deepgram">Deepgram (cloud)</option>
-        </select>
-        <select className="input" value={version} onChange={(e) => setVersion(e.target.value)} style={{ maxWidth: 110 }}>
-          {(versions.length ? versions : [{ id: 'KJV', abbreviation: 'KJV', name: 'King James Version' }]).map((v) => <option key={v.id} value={v.id}>{v.abbreviation}</option>)}
-        </select>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span>Config</span>
+        </button>
+
         <div style={styles.meter} aria-label="Mic meter">
           <div style={{ ...styles.meterFill, width: `${Math.round(live.meter.level * 100)}%` }} />
           <div style={{ ...styles.meterPeak, left: `${Math.round(live.meter.peak * 100)}%` }} />
         </div>
-        <span style={{ ...type.caption, color: statusInfo.color, fontWeight: fontWeight.semibold, whiteSpace: 'nowrap' }}>
+
+        <span style={{ ...type.caption, color: statusInfo.color, fontWeight: fontWeight.semibold, whiteSpace: 'nowrap', marginLeft: 'auto' }}>
           ● {engine === 'deepgram' ? statusInfo.text : live.isActive ? 'Listening' : 'Idle'}
         </span>
       </div>
@@ -396,11 +448,110 @@ export function LiveScripturePanel() {
       )}
       {notice && <div style={styles.warn}>{notice}</div>}
 
-      <div className="blk blk--bar" style={styles.controlBar}>
-        <label style={styles.check}><input type="checkbox" checked={live.autoProject} onChange={(e) => setDirectAutoProject(e.target.checked)} /> Auto project direct references</label>
-        <label style={styles.check}><input type="checkbox" checked={live.autoVersionSwitch} onChange={(e) => setAutoVersionSwitch(e.target.checked)} /> Auto version switch</label>
-        <label style={styles.check}><input type="checkbox" checked={live.autoProjectQuoted} onChange={(e) => setQuotedAutoProject(e.target.checked)} /> Project quoted matches</label>
-      </div>
+      {/* Config Popup Window */}
+      {isConfigOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 460, maxWidth: '92vw', background: '#161414', border: '1px solid #262628', borderRadius: 8, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.8)' }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid #262628', background: '#141416' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#ffffff', margin: 0 }}>Live Scripture Config</h3>
+              <button
+                onClick={() => setIsConfigOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: '#ffffff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Microphone Select */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>Audio Input Microphone</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <CustomDropdown
+                    value={live.selectedInputId}
+                    onChange={(val) => setLive({ selectedInputId: val })}
+                    options={devices.length === 0 ? [{ value: '', label: 'No microphone available' }] : devices.map((d) => ({ value: d.deviceId, label: d.label }))}
+                    buttonStyle={{ flex: 1 }}
+                    title="Select Microphone"
+                  />
+                  <button
+                    onClick={refreshInputs}
+                    style={{ padding: '0 12px', height: 34, background: '#232221', border: '1px solid #262628', borderRadius: 6, color: '#ffffff', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                    title="Refresh audio inputs"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {/* AI Engine Select */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>AI Speech Model Engine</div>
+                <CustomDropdown
+                  value={engine}
+                  onChange={(val) => {
+                    const next = val as 'local' | 'deepgram';
+                    setEngine(next);
+                    window.BSP?.settings?.set({ sttEngine: next }).catch(() => {});
+                  }}
+                  options={[
+                    { value: 'local', label: 'Local (Whisper AI)' },
+                    { value: 'deepgram', label: 'Deepgram (Cloud API)' },
+                  ]}
+                  buttonStyle={{ width: '100%' }}
+                  title="Select AI Speech Model"
+                />
+              </div>
+
+              {/* Bible Version Select */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>Bible Version</div>
+                <CustomDropdown
+                  value={version}
+                  onChange={(val) => setVersion(val)}
+                  options={(versions.length ? versions : [{ id: 'KJV', abbreviation: 'KJV', name: 'King James Version' }]).map((v) => ({
+                    value: v.id,
+                    label: `${v.abbreviation} - ${v.name}`,
+                  }))}
+                  buttonStyle={{ width: '100%' }}
+                  title="Select Bible Version"
+                />
+              </div>
+
+              {/* Apple Toggle Switches */}
+              <div style={{ display: 'flex', flexDirection: 'column', marginTop: 4 }}>
+                <AppleToggle
+                  label="Auto project direct references"
+                  checked={live.autoProject}
+                  onChange={(val) => setDirectAutoProject(val)}
+                />
+                <AppleToggle
+                  label="Project quoted matches"
+                  checked={live.autoProjectQuoted}
+                  onChange={(val) => setQuotedAutoProject(val)}
+                />
+                <AppleToggle
+                  label="Auto-version switch"
+                  checked={live.autoVersionSwitch}
+                  onChange={(val) => setAutoVersionSwitch(val)}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '12px 20px', borderTop: '1px solid #262628', background: '#141416', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setIsConfigOpen(false)}
+                style={{ padding: '6px 16px', background: '#FF5500', border: 'none', borderRadius: 6, color: '#ffffff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="blk-row" style={styles.matchDashboard}>
         <Block

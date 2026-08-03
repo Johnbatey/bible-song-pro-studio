@@ -4,6 +4,7 @@ import type { AppSettings, AppSettingsPatch, ObsStatus, DisplayTarget } from '..
 import { ensureTheme } from '../utils/defaultTheme';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton, BlockSegment } from './Block';
+import { AppleToggle } from './AppleToggle';
 
 type Tab = 'output' | 'fullscreen' | 'lowerthird' | 'songs' | 'bible' | 'background' | 'fx' | 'audio' | 'ai' | 'streaming';
 
@@ -258,25 +259,27 @@ export function SettingsPanel() {
 
           {activeTab === 'songs' && (
             <Section title="Song Options">
-              <label style={styles.check}>
-                <input
-                  type="checkbox"
-                  checked={showSongCredits}
-                  onChange={(e) => setShowSongCredits(e.target.checked)}
-                />
-                Show Song Credits on Display Output (Author, CCLI, Copyright)
-              </label>
-              <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 4, marginLeft: 24 }}>
-                Disabled by default. When enabled, credits will only show at the bottom of output when Auto (Section) mode is active.
-              </div>
+              <AppleToggle
+                label="Show Song Credits on Display Output (Author, CCLI, Copyright)"
+                description="Disabled by default. When enabled, credits will only show at the bottom of output when Auto (Section) mode is active."
+                checked={showSongCredits}
+                onChange={setShowSongCredits}
+              />
             </Section>
           )}
 
           {activeTab === 'bible' && (
             <Section title="Bible Options">
-              {['Show Bible Version', 'Shorten Bible Versions', 'Shorten Book Names', 'Show Verse Numbers', 'Version Switch Updates Output'].map((label, i) => (
-                <label key={label} style={styles.check}><input type="checkbox" defaultChecked={i !== 2 && i !== 3} /> {label}</label>
-              ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {['Show Bible Version', 'Shorten Bible Versions', 'Shorten Book Names', 'Show Verse Numbers', 'Version Switch Updates Output'].map((label, i) => (
+                  <AppleToggle
+                    key={label}
+                    label={label}
+                    checked={i !== 2 && i !== 3}
+                    onChange={() => {}}
+                  />
+                ))}
+              </div>
             </Section>
           )}
 

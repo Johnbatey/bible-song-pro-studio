@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton } from './Block';
+import { CustomDropdown } from './CustomDropdown';
 
 export function SessionHistoryPanel() {
   const [sessions, setSessions] = useState<Array<any>>([]);
-  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [selectedSession, setSelectedSession] = useState<string>('');
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
   const [sessionData, setSessionData] = useState<any>(null);
   const [status, setStatus] = useState<any>(null);
 
@@ -15,7 +17,12 @@ export function SessionHistoryPanel() {
     const s = await window.BSP?.session?.status().catch(() => null);
     setStatus(s);
     const list = await window.BSP?.session?.list().catch(() => ({ sessions: [] }));
-    setSessions(list?.sessions || []);
+    const allSessions = list?.sessions || [];
+    setSessions(allSessions);
+    if (allSessions.length > 0) {
+      const activeId = selectedSession || allSessions[0].id;
+      loadSession(activeId);
+    }
   }
 
   async function loadSession(id: string) {
@@ -36,73 +43,103 @@ export function SessionHistoryPanel() {
     URL.revokeObjectURL(url);
   }
 
-  return (
-    <div className="blk-row" style={{ height: '100%' }}>
-      <Block
-        title="Sessions"
-        subtitle={status?.active ? '● Recording' : '○ Idle'}
-        style={{ flex: '0 0 300px' }}
-        tools={(
-          <>
-            <BlockButton
-              onClick={async () => { await window.BSP?.session?.start({ name: 'Session ' + new Date().toLocaleString() }); refresh(); }}
-              title="Start a new session"
-            >
-              New
-            </BlockButton>
-            <BlockButton onClick={async () => { await window.BSP?.session?.end(); refresh(); }} title="End the current session">End</BlockButton>
-            <BlockButton icon onClick={refresh} title="Refresh">⟳</BlockButton>
-          </>
-        )}
-      >
-        {sessions.length === 0 ? (
-          <div style={{ color: 'var(--text-dim)', ...type.secondary, padding: 20, textAlign: 'center' }}>
-            No sessions yet. Sessions are recorded automatically when you project verses.
-          </div>
-        ) : sessions.map((s: any) => (
-          <button
-            key={s.id}
-            style={{ ...styles.sessionBtn, background: selectedSession === s.id ? 'var(--accent-dim)' : 'transparent' }}
-            onClick={() => loadSession(s.id)}
-          >
-            <strong style={{ ...type.secondary }}>{s.name}</strong>
-            <span style={{ ...type.caption, color: 'var(--text-dim)' }}>
-              {new Date(s.startedAt).toLocaleString()} — {s.entries || 0} entries
-            </span>
-          </button>
-        ))}
-      </Block>
+  const sessionOptions = sessions.length > 0
+    ? sessions.map((s) => ({
+        value: s.id,
+        label: `${s.name || 'Session'} (${new Date(s.startedAt).toLocaleDateString()})`,
+      }))
+    : [{ value: '', label: 'No saved sessions' }];
 
-      <Block
-        className="blk-fill"
-        title="Details"
-        tools={selectedSession ? (
-          <>
-            <BlockButton onClick={() => exportSession(selectedSession!, 'json')} title="Export as JSON">JSON</BlockButton>
-            <BlockButton onClick={() => exportSession(selectedSession!, 'csv')} title="Export as CSV">CSV</BlockButton>
-          </>
-        ) : undefined}
-      >
-        {sessionData ? (
-          <>
-            {(sessionData.entries || []).map((entry: any, i: number) => (
-              <div key={entry.id || i} style={styles.entry}>
-                <div style={styles.entryRef}>{entry.reference || '—'}</div>
-                <div style={styles.entryText}>{entry.text?.substring(0, 120)}</div>
-                <div style={styles.entryMeta}>
-                  {new Date(entry.timestamp).toLocaleTimeString()} · {entry.mode || entry.source} · conf: {entry.confidence?.toFixed(2) || '—'}
-                </div>
-              </div>
-            ))}
-            {(!sessionData.entries || sessionData.entries.length === 0) && (
-              <div style={{ color: 'var(--text-dim)', ...type.secondary, padding: 20, textAlign: 'center' }}>No entries in this session.</div>
-            )}
-          </>
-        ) : (
-          <div style={{ color: 'var(--text-dim)', ...type.secondary, padding: 20, textAlign: 'center' }}>Select a session to view details.</div>
+  return (
+    <Block
+      className="blk-fill"
+      title="History"
+      subtitle={status?.active ? '● Recording' : undefined}
+      tools={(
+        <>
+          <BlockButton
+            onClick={async () => { await window.BSP?.session?.start({ name: 'Session ' + new Date().toLocaleTimeString() }); refresh(); }}
+            title="Start a new session"
+          >
+            + New
+          </BlockButton>
+          {status?.active && (
+            <BlockButton
+              onClick={async () => { await window.BSP?.session?.end(); refresh(); }}
+              title="End active session"
+            >
+              End
+            </BlockButton>
+          )}
+          <BlockButton onClick={refresh} title="Refresh history">⟳</BlockButton>
+        </>
+      )}
+    >
+      {/* Session Switcher & Export Bar */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #262628' }}>
+        <CustomDropdown
+          value={selectedSession}
+          onChange={(val) => loadSession(val)}
+          options={sessionOptions}
+          buttonStyle={{ flex: 1, height: 28, fontSize: 11 }}
+          title="Select Session"
+        />
+        {selectedSession && (
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <CustomDropdown
+              value={exportFormat}
+              onChange={(val) => setExportFormat(val as 'json' | 'csv')}
+              options={[
+                { value: 'json', label: 'JSON' },
+                { value: 'csv', label: 'CSV' },
+              ]}
+              buttonStyle={{ width: 75, height: 28, fontSize: 11 }}
+              title="Select Export Format"
+            />
+            <BlockButton
+              onClick={() => exportSession(selectedSession, exportFormat)}
+              title={`Export session as ${exportFormat.toUpperCase()}`}
+              style={{ height: 28, fontSize: 11 }}
+            >
+              Export
+            </BlockButton>
+          </div>
         )}
-      </Block>
-    </div>
+      </div>
+
+      {sessionData && sessionData.entries && sessionData.entries.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '2px 0' }}>
+          {sessionData.entries.map((entry: any, i: number) => (
+            <div
+              key={entry.id || i}
+              style={{
+                padding: '8px 10px',
+                background: '#141416',
+                border: '1px solid #262628',
+                borderRadius: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 3,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#FF5500' }}>{entry.reference || 'Projection'}</span>
+                <span style={{ fontSize: 10, color: '#a1a1aa' }}>{new Date(entry.timestamp).toLocaleTimeString()}</span>
+              </div>
+              {entry.text && (
+                <div style={{ fontSize: 12, color: '#ffffff', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {entry.text}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ color: '#a1a1aa', fontSize: 12, padding: '16px 12px', textAlign: 'center' }}>
+          No session history yet. Projected scriptures will appear here automatically.
+        </div>
+      )}
+    </Block>
   );
 }
 

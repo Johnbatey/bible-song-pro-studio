@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { CustomDropdown } from './CustomDropdown';
+import { AppleToggle } from './AppleToggle';
 
 export function ThemeDesignerModal() {
   const isThemeDesignerOpen = useAppStore((s) => s.isThemeDesignerOpen);
@@ -352,15 +353,12 @@ export function ThemeDesignerModal() {
                 />
               </div>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={lockAspect}
-                  onChange={(e) => setLockAspect(e.target.checked)}
-                  style={{ accentColor: '#FF5500', width: 14, height: 14 }}
-                />
-                <span>Lock aspect ratio</span>
-              </label>
+              <AppleToggle
+                label="Lock aspect ratio"
+                checked={lockAspect}
+                onChange={setLockAspect}
+                style={{ marginTop: 8 }}
+              />
             </div>
 
             {/* Accordion 2: Scripture */}

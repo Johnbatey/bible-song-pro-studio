@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { AppleToggle } from './AppleToggle';
 import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice } from '../types';
 import { SongPacks } from './settings/SongPacks';
 
@@ -371,12 +372,7 @@ export function SettingsModal() {
                     <div style={modalStyles.rowTitle}>Original Languages word study</div>
                     <div style={modalStyles.rowSub}>Detect Greek/Hebrew root words in the sermon and show meaning on screen</div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={wordStudy}
-                    onChange={(e) => setWordStudy(e.target.checked)}
-                    style={modalStyles.toggleInput}
-                  />
+                  <AppleToggle checked={wordStudy} onChange={setWordStudy} />
                 </div>
               </div>
             )}
@@ -501,12 +497,7 @@ export function SettingsModal() {
                     <div style={modalStyles.rowTitle}>Voice commands</div>
                     <div style={modalStyles.rowSub}>Allow hands-free control during sermons</div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={voiceCommands}
-                    onChange={(e) => setVoiceCommands(e.target.checked)}
-                    style={modalStyles.toggleInput}
-                  />
+                  <AppleToggle checked={voiceCommands} onChange={setVoiceCommands} />
                 </div>
               </div>
             )}
@@ -933,12 +924,7 @@ export function SettingsModal() {
                     <div style={modalStyles.rowTitle}>Blocking issue</div>
                     <div style={modalStyles.rowSub}>The app cannot be used until this is fixed</div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={isBlocking}
-                    onChange={(e) => setIsBlocking(e.target.checked)}
-                    style={modalStyles.toggleInput}
-                  />
+                  <AppleToggle checked={isBlocking} onChange={setIsBlocking} />
                 </div>
               </div>
             )}

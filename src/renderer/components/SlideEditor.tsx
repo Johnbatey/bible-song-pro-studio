@@ -4,6 +4,7 @@ import { useAppStore } from '../stores/appStore';
 import type { PresentationDeck, PresentationSlide, Scene } from '../types';
 import { parsePptxFile, parsePdfFile } from '../utils/parsers';
 import { type, fontWeight, numeric } from '../styles/type';
+import { AppleToggle } from './AppleToggle';
 
 type SlideTransition = PresentationSlide['transition'];
 
@@ -326,10 +327,15 @@ export function SlideEditor({ onClose }: { onClose: () => void }) {
                           <label style={css.edLabel} htmlFor="slides-editor-slide-duration">Duration (seconds)</label>
                           <input id="slides-editor-slide-duration" style={css.edInput} type="number" min="0" step="1" key={currentSlide?.id + '-d'} defaultValue={currentSlide ? currentSlide.durationMs / 1000 : 0} placeholder="0" />
                         </div>
-                        <label style={css.edCheck}>
-                          <input id="slides-editor-slide-hidden" type="checkbox" key={currentSlide?.id + '-h'} defaultChecked={currentSlide?.hidden || false} />
-                          <span>Hide this slide</span>
-                        </label>
+                        <AppleToggle
+                          id="slides-editor-slide-hidden"
+                          label="Hide this slide"
+                          checked={currentSlide?.hidden || false}
+                          onChange={(checked) => {
+                            const hiddenEl = document.getElementById('slides-editor-slide-hidden') as HTMLInputElement | null;
+                            if (hiddenEl) hiddenEl.checked = checked;
+                          }}
+                        />
                       </div>
                       <div style={css.edField}>
                         <label style={css.edLabel} htmlFor="slides-editor-slide-body">Slide Body</label>

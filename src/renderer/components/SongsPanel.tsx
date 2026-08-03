@@ -4,6 +4,7 @@ import { importSongFiles, SONG_FILE_ACCEPT } from '../utils/song-import';
 import type { Scene, Song } from '../types';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton, BlockSegment } from './Block';
+import { AppleToggle } from './AppleToggle';
 
 const DEMO_SONGS: Song[] = [
   {
@@ -341,18 +342,11 @@ export function SongsPanel() {
               </BlockSegment>
             </div>
 
-            <label
-              style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', ...type.caption, color: 'var(--text-secondary)' }}
-              title="Show song title, author, and copyright credits at the bottom of output (only when Auto (Section) mode is active)"
-            >
-              <input
-                type="checkbox"
-                checked={showSongCredits}
-                onChange={(e) => setShowSongCredits(e.target.checked)}
-                style={{ accentColor: 'var(--accent)' }}
-              />
-              Display credits
-            </label>
+            <AppleToggle
+              label="Display credits"
+              checked={showSongCredits}
+              onChange={setShowSongCredits}
+            />
           </>
         ) : undefined}
       >

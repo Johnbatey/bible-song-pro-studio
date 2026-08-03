@@ -168,15 +168,27 @@ export function App() {
     return saved ? parseInt(saved, 10) : 360;
   });
 
-  const [activeDrag, setActiveDrag] = useState<'sidebar' | 'transcript' | null>(null);
+  const [programDockHeight, setProgramDockHeight] = useState<number>(() => {
+    const saved = localStorage.getItem('bsp_programDockHeight');
+    return saved ? parseInt(saved, 10) : 360;
+  });
 
-  const startResizing = (type: 'sidebar' | 'transcript', e: React.PointerEvent) => {
+  const [historyHeight, setHistoryHeight] = useState<number>(() => {
+    const saved = localStorage.getItem('bsp_historyHeight');
+    return saved ? parseInt(saved, 10) : 220;
+  });
+
+  const [activeDrag, setActiveDrag] = useState<'sidebar' | 'transcript' | 'history' | 'program' | null>(null);
+
+  const startResizing = (type: 'sidebar' | 'transcript' | 'history' | 'program', e: React.PointerEvent) => {
     e.preventDefault();
     setActiveDrag(type);
     const startX = e.clientX;
     const startY = e.clientY;
     const initialSidebarW = sidebarWidth;
     const initialTranscriptH = transcriptHeight;
+    const initialHistoryH = historyHeight;
+    const initialProgramH = programDockHeight;
 
     const onPointerMove = (moveEvent: PointerEvent) => {
       if (type === 'sidebar') {
@@ -186,9 +198,19 @@ export function App() {
         localStorage.setItem('bsp_sidebarWidth', String(nextW));
       } else if (type === 'transcript') {
         const deltaY = moveEvent.clientY - startY;
-        const nextH = Math.min(700, Math.max(180, initialTranscriptH + deltaY));
+        const nextH = Math.min(700, Math.max(120, initialTranscriptH + deltaY));
         setTranscriptHeight(nextH);
         localStorage.setItem('bsp_transcriptHeight', String(nextH));
+      } else if (type === 'history') {
+        const deltaY = startY - moveEvent.clientY;
+        const nextH = Math.min(600, Math.max(100, initialHistoryH + deltaY));
+        setHistoryHeight(nextH);
+        localStorage.setItem('bsp_historyHeight', String(nextH));
+      } else if (type === 'program') {
+        const deltaY = moveEvent.clientY - startY;
+        const nextH = Math.min(800, Math.max(140, initialProgramH + deltaY));
+        setProgramDockHeight(nextH);
+        localStorage.setItem('bsp_programDockHeight', String(nextH));
       }
     };
 
@@ -226,25 +248,38 @@ export function App() {
       <div className="app-body">
         <div className="app-main">
           <div className="operator-workspace" style={workspaceStyle}>
-            <div className="transcript-region">
-              <TranscriptPanel onOpenLiveScripture={() => setActivePanel('live')} />
-            </div>
+            <div className="left-column-region">
+              <div className="transcript-region" style={{ height: transcriptHeight }}>
+                <TranscriptPanel onOpenLiveScripture={() => setActivePanel('live')} />
+              </div>
 
-            {/* Vertical resizer between Transcript and Sidebar */}
-            <div
-              className={`resizer-handle resizer-handle-v ${activeDrag === 'transcript' ? 'is-dragging' : ''}`}
-              onPointerDown={(e) => startResizing('transcript', e)}
-              title="Drag to resize top area height"
-            />
+              {/* Vertical resizer between Live transcript and Workspace */}
+              <div
+                className={`resizer-handle resizer-handle-v ${activeDrag === 'transcript' ? 'is-dragging' : ''}`}
+                onPointerDown={(e) => startResizing('transcript', e)}
+                title="Drag to resize transcript height"
+              />
 
-            <div className="sidebar-region">
-              <Block title="Workspace" flush>
-                <Sidebar
-                  activePanel={activePanel as PanelView}
-                  onPanelChange={(p) => setActivePanel(p)}
-                  collapsed={!sidebarOpen}
-                />
-              </Block>
+              <div className="sidebar-region">
+                <Block title="Workspace" flush>
+                  <Sidebar
+                    activePanel={activePanel as PanelView}
+                    onPanelChange={(p) => setActivePanel(p)}
+                    collapsed={!sidebarOpen}
+                  />
+                </Block>
+              </div>
+
+              {/* Vertical resizer between Workspace and History */}
+              <div
+                className={`resizer-handle resizer-handle-v ${activeDrag === 'history' ? 'is-dragging' : ''}`}
+                onPointerDown={(e) => startResizing('history', e)}
+                title="Drag to resize history height"
+              />
+
+              <div className="history-region" style={{ height: historyHeight }}>
+                <SessionHistoryPanel />
+              </div>
             </div>
 
             {/* Horizontal resizer between Sidebar and Left Workspace */}
@@ -254,47 +289,53 @@ export function App() {
               title="Drag to resize Sidebar width"
             />
 
-            <main className="left-workspace">
-              <div className="app-content">
-                <div className="app-content-inner">
-                  <ErrorBoundary label="Panel">
-                  <div style={{ display: activePanel === 'scenes' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('scenes') && <ScenePanel />}
-                  </div>
-                  <div style={{ display: activePanel === 'bible' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('bible') && <BiblePanel />}
-                  </div>
-                  <div style={{ display: activePanel === 'songs' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('songs') && <SongsPanel />}
-                  </div>
-                  <div style={{ display: activePanel === 'live' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('live') && <LiveScripturePanel />}
-                  </div>
-                  <div style={{ display: activePanel === 'media' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('media') && <MediaPanel />}
-                  </div>
-                  <div style={{ display: activePanel === 'themes' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('themes') && <ThemePanel />}
-                  </div>
-                  <div style={{ display: activePanel === 'presentation' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('presentation') && <PresentationPanel />}
-                  </div>
-                  <div style={{ display: activePanel === 'settings' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('settings') && <SettingsPanel />}
-                  </div>
-                  <div style={{ display: activePanel === 'history' ? 'block' : 'none', height: '100%' }}>
-                    {visitedPanels.has('history') && <SessionHistoryPanel />}
-                  </div>
-                  </ErrorBoundary>
-                </div>
-              </div>
-            </main>
+            <div className="right-column-region">
+              <section className="program-dock" style={{ height: programDockHeight }}>
+                <ErrorBoundary label="Preview / Program">
+                  <PreviewProgramView />
+                </ErrorBoundary>
+              </section>
 
-            <section className="program-dock">
-              <ErrorBoundary label="Preview / Program">
-                <PreviewProgramView />
-              </ErrorBoundary>
-            </section>
+              {/* Vertical resizer between Main Output display and Main Workspace Panel */}
+              <div
+                className={`resizer-handle resizer-handle-v ${activeDrag === 'program' ? 'is-dragging' : ''}`}
+                onPointerDown={(e) => startResizing('program', e)}
+                title="Drag to resize display height"
+              />
+
+              <main className="left-workspace">
+                <div className="app-content">
+                  <div className="app-content-inner">
+                    <ErrorBoundary label="Panel">
+                    <div style={{ display: activePanel === 'scenes' ? 'block' : 'none', height: '100%' }}>
+                      {visitedPanels.has('scenes') && <ScenePanel />}
+                    </div>
+                    <div style={{ display: activePanel === 'bible' ? 'block' : 'none', height: '100%' }}>
+                      {visitedPanels.has('bible') && <BiblePanel />}
+                    </div>
+                    <div style={{ display: activePanel === 'songs' ? 'block' : 'none', height: '100%' }}>
+                      {visitedPanels.has('songs') && <SongsPanel />}
+                    </div>
+                    <div style={{ display: activePanel === 'live' ? 'block' : 'none', height: '100%' }}>
+                      {visitedPanels.has('live') && <LiveScripturePanel />}
+                    </div>
+                    <div style={{ display: activePanel === 'media' ? 'block' : 'none', height: '100%' }}>
+                      {visitedPanels.has('media') && <MediaPanel />}
+                    </div>
+                    <div style={{ display: activePanel === 'themes' ? 'block' : 'none', height: '100%' }}>
+                      {visitedPanels.has('themes') && <ThemePanel />}
+                    </div>
+                    <div style={{ display: activePanel === 'presentation' ? 'block' : 'none', height: '100%' }}>
+                      {visitedPanels.has('presentation') && <PresentationPanel />}
+                    </div>
+                    <div style={{ display: activePanel === 'settings' ? 'block' : 'none', height: '100%' }}>
+                      {visitedPanels.has('settings') && <SettingsPanel />}
+                    </div>
+                    </ErrorBoundary>
+                  </div>
+                </div>
+              </main>
+            </div>
           </div>
         </div>
       </div>

@@ -164,6 +164,24 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
             Outputs
           </button>
 
+          {/* Design Button (Opens Full Page Theme Designer) */}
+          <button
+            style={{
+              ...styles.toolbarBtn,
+              color: 'var(--text-secondary)',
+            }}
+            onClick={() => useAppStore.getState().openThemeDesigner()}
+            title="Open Full Page Theme Designer"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a10 10 0 0 0-10 10c0 4.42 3.58 8 8 8 1.1 0 2-.9 2-2 0-.46-.17-.88-.44-1.21-.26-.33-.44-.75-.44-1.22 0-1.1.9-2 2-2h2.8a5.2 5.2 0 0 0 5.2-5.2A10 10 0 0 0 12 2z" />
+              <circle cx="7.5" cy="11.5" r="1.5" fill="currentColor" />
+              <circle cx="12" cy="7.5" r="1.5" fill="currentColor" />
+              <circle cx="16.5" cy="11.5" r="1.5" fill="currentColor" />
+            </svg>
+            Design
+          </button>
+
           {/* Themes Button */}
           <button
             style={{
@@ -171,7 +189,7 @@ export function TitleBar({ activePanel = 'bible', onPanelChange }: TitleBarProps
               color: activePanel === 'themes' ? 'var(--accent)' : 'var(--text-secondary)',
             }}
             onClick={() => onPanelChange && onPanelChange('themes')}
-            title="Themes Designer"
+            title="Themes Library"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" />

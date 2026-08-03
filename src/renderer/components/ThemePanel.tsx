@@ -4,6 +4,7 @@ import type { Theme } from '../types';
 import { v4 as uuid } from 'uuid';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton } from './Block';
+import { AppleToggle } from './AppleToggle';
 
 const PRESET_THEMES: Theme[] = [
   {
@@ -920,20 +921,16 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
           />
         </div>
         <div style={{ flex: 1, paddingBottom: 6 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', ...type.label, color: 'var(--text-dim)' }}>
-            <input
-              type="checkbox"
-              checked={Boolean(values.syncRefColor)}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                onChange({
-                  syncRefColor: checked,
-                  referenceColor: checked ? (values.fontColor || '#ffffff') : (values.referenceColor || values.accentColor || '#C9A96E'),
-                });
-              }}
-            />
-            Sync to Verse
-          </label>
+          <AppleToggle
+            label="Sync to Verse"
+            checked={Boolean(values.syncRefColor)}
+            onChange={(checked) => {
+              onChange({
+                syncRefColor: checked,
+                referenceColor: checked ? (values.fontColor || '#ffffff') : (values.referenceColor || values.accentColor || '#C9A96E'),
+              });
+            }}
+          />
         </div>
       </div>
 
@@ -941,14 +938,11 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
       <div style={{ background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)', marginTop: 2 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: values.textShadowEnabled ? 6 : 0 }}>
           <span style={{ ...type.label, color: 'var(--text-dim)', fontWeight: 600 }}>Text Shadow</span>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', ...type.label, color: 'var(--text-dim)' }}>
-            <input
-              type="checkbox"
-              checked={Boolean(values.textShadowEnabled)}
-              onChange={(e) => onChange({ textShadowEnabled: e.target.checked })}
-            />
-            Enable Shadow
-          </label>
+          <AppleToggle
+            label="Enable Shadow"
+            checked={Boolean(values.textShadowEnabled)}
+            onChange={(checked) => onChange({ textShadowEnabled: checked })}
+          />
         </div>
 
         {values.textShadowEnabled && (
