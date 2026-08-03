@@ -62,6 +62,7 @@
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Bible Song Pro needs microphone access for live speech transcription and voice audio input.",
         "NSCameraUsageDescription": "Bible Song Pro needs camera access for video capture and live feeds.",
+        "NSCameraUseContinuityCameraDeviceType": true,
         "NSScreenCaptureUsageDescription": "Bible Song Pro needs screen capture access to project presentation displays.",
         "NSLocalNetworkUsageDescription": "Bible Song Pro uses the local network to broadcast NDI video and connect stage and remote displays.",
         "NSDesktopFolderUsageDescription": "Bible Song Pro needs access to your Desktop to import presentation media, videos, and graphics.",

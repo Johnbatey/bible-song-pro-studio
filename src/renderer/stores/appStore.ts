@@ -3,7 +3,7 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import type {
   Scene, Theme, Song, BibleVersion, BibleVerse,
   DisplayState, AIProvider, TranscriptionState, Alert, LiveScriptureState, AudioInputDevice,
-  OperatingMode, QueueItem
+  OperatingMode, QueueItem, PresentationDeck
 } from '../types';
 
 /**
@@ -137,8 +137,13 @@ interface AppState {
 
   isSlideEditorOpen: boolean;
   activePresentationId: string | null;
+  presentationDecks: PresentationDeck[];
   openSlideEditor: (id?: string) => void;
   closeSlideEditor: () => void;
+  setPresentationDecks: (decks: PresentationDeck[]) => void;
+  updatePresentationDeck: (id: string, updates: Partial<PresentationDeck>) => void;
+  addPresentationDeck: (deck: PresentationDeck) => void;
+  deletePresentationDeck: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -354,8 +359,22 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
 
   isSlideEditorOpen: false,
   activePresentationId: null,
+  presentationDecks: [],
   openSlideEditor: (id) => set({ isSlideEditorOpen: true, activePresentationId: id || null }),
   closeSlideEditor: () => set({ isSlideEditorOpen: false, activePresentationId: null }),
+  setPresentationDecks: (presentationDecks) => set({ presentationDecks }),
+  updatePresentationDeck: (id, updates) =>
+    set((s) => ({
+      presentationDecks: s.presentationDecks.map((d) => (d.id === id ? { ...d, ...updates, updatedAt: Date.now() } : d)),
+    })),
+  addPresentationDeck: (deck) =>
+    set((s) => ({
+      presentationDecks: [...s.presentationDecks.filter((d) => d.id !== deck.id), deck],
+    })),
+  deletePresentationDeck: (id) =>
+    set((s) => ({
+      presentationDecks: s.presentationDecks.filter((d) => d.id !== id),
+    })),
 }), {
   name: 'bsp-app-state',
   version: 1,

@@ -1,4 +1,5 @@
 import type { Alert, Scene, FullScreenTheme, Theme } from '../../types';
+import { memo } from 'react';
 import type React from 'react';
 import './ProgramSurface.css';
 
@@ -134,7 +135,13 @@ function contentFromScene(scene: Scene | null | undefined) {
   return scene.content || null;
 }
 
-export function ProgramSurface({ state, preview = false, assetBaseUrl = '', className = '' }: ProgramSurfaceProps) {
+/**
+ * Memoised because the operator's zoom and pan live in PreviewProgramView's
+ * state: without this, dragging the scale slider re-rendered both surfaces on
+ * every tick even though only the wrapper's transform had changed. Callers must
+ * pass a stable `state` object for this to bite.
+ */
+export const ProgramSurface = memo(function ProgramSurface({ state, preview = false, assetBaseUrl = '', className = '' }: ProgramSurfaceProps) {
   const mode = state.outputMode || state.mode || 'fullscreen';
   const themeSection = mode === 'lowerThird' ? state.theme?.lowerThird : state.theme?.fullScreen;
   const scene = state.scene || null;
@@ -295,4 +302,4 @@ export function ProgramSurface({ state, preview = false, assetBaseUrl = '', clas
       {state.blackout && <div className="program-blackout" />}
     </div>
   );
-}
+});

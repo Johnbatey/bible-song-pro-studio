@@ -45,6 +45,36 @@ export interface SongCredit {
   ccli?: string;
 }
 
+export interface SlideElement {
+  id: string;
+  type: 'text' | 'image' | 'shape';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  content: string;
+  fontSize?: number;
+  fontFamily?: string;
+  fontWeight?: string | number;
+  color?: string;
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  textShadow?: string;
+  lineHeight?: number;
+  backgroundColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  borderRadius?: number;
+  opacity?: number;
+  zIndex?: number;
+}
+
+export interface SlideBackground {
+  type: 'color' | 'gradient' | 'image' | 'video';
+  value: string;
+  overlayColor?: string;
+  overlayOpacity?: number;
+}
+
 export interface Slide {
   id: string;
   text: string;
@@ -60,6 +90,9 @@ export interface Slide {
   previewDataUrl?: string;
   thumbDataUrl?: string;
   thumbText?: string;
+  elements?: SlideElement[];
+  background?: SlideBackground;
+  aspectRatio?: '16:9' | '4:3' | 'lower-third';
 }
 
 export interface PresentationDeck {
@@ -70,6 +103,7 @@ export interface PresentationDeck {
   updatedAt: number;
   sourceType?: 'internal' | 'pptx' | 'pdf' | 'image' | 'txt' | 'md';
   sourcePath?: string;
+  aspectRatio?: '16:9' | '4:3' | 'lower-third';
 }
 
 export interface PresentationSlide {
@@ -86,6 +120,9 @@ export interface PresentationSlide {
   previewDataUrl?: string;
   thumbDataUrl?: string;
   thumbText?: string;
+  elements?: SlideElement[];
+  background?: SlideBackground;
+  aspectRatio?: '16:9' | '4:3' | 'lower-third';
 }
 
 export interface Background {

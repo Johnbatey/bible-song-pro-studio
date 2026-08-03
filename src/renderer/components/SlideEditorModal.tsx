@@ -1,421 +1,464 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
-import { CustomDropdown } from './CustomDropdown';
+import { SlideEditorRail } from './SlideEditorRail';
+import { SlideEditorCanvas } from './SlideEditorCanvas';
+import { SlideEditorInspector } from './SlideEditorInspector';
+import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
 
 export function SlideEditorModal() {
   const isSlideEditorOpen = useAppStore((s) => s.isSlideEditorOpen);
   const closeSlideEditor = useAppStore((s) => s.closeSlideEditor);
   const activePresentationId = useAppStore((s) => s.activePresentationId);
+  const presentationDecks = useAppStore((s) => s.presentationDecks);
+  const updatePresentationDeck = useAppStore((s) => s.updatePresentationDeck);
+  const addPresentationDeck = useAppStore((s) => s.addPresentationDeck);
+  const scenes = useAppStore((s) => s.scenes);
 
-  const [activePageIndex, setActivePageIndex] = useState(0);
-  const [zoomLevel, setZoomLevel] = useState(100);
-  const [pages, setPages] = useState([
-    { id: '1', title: 'Jesus said unto them', subtitle: 'Double click to edit subtitle', bg: 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)' },
-    { id: '2', title: 'Double click to edit title', subtitle: 'Double click to edit subtitle', bg: '#ffffff' },
-  ]);
-  const [bgType, setBgType] = useState<'Color' | 'Image' | 'Video' | 'Gradient'>('Color');
-  const [colorOverlay, setColorOverlay] = useState('#FF5700');
+  // Active Deck State
+  const [deck, setDeck] = useState<PresentationDeck>(() => {
+    const existing = presentationDecks.find((d) => d.id === activePresentationId);
+    if (existing) return existing;
+    return {
+      id: activePresentationId || `deck-${Date.now()}`,
+      title: 'Untitled Presentation',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      aspectRatio: '16:9',
+      slides: [
+        {
+          id: 'slide-1',
+          title: 'Welcome Presentation',
+          body: 'Double click text to edit content',
+          label: 'Slide 1',
+          notes: '',
+          transition: 'fade',
+          durationMs: 3000,
+          hidden: false,
+          buildCount: 1,
+          buildStep: 1,
+          background: { type: 'gradient', value: 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)' },
+          aspectRatio: '16:9',
+          elements: [
+            {
+              id: 'title-1',
+              type: 'text',
+              x: 120,
+              y: 220,
+              width: 1680,
+              height: 200,
+              content: 'Welcome Presentation',
+              fontSize: 64,
+              fontFamily: 'Inter',
+              fontWeight: 700,
+              color: '#ffffff',
+              textAlign: 'center',
+              zIndex: 1,
+            },
+            {
+              id: 'body-1',
+              type: 'text',
+              x: 160,
+              y: 480,
+              width: 1600,
+              height: 300,
+              content: 'Double click text to edit content',
+              fontSize: 36,
+              fontFamily: 'Inter',
+              fontWeight: 500,
+              color: 'rgba(255, 255, 255, 0.85)',
+              textAlign: 'center',
+              zIndex: 2,
+            },
+          ],
+        },
+      ],
+    };
+  });
+
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(0); // 0 = Auto Fit
+
+  // Sync state when modal opens for a specific presentation deck ID
+  useEffect(() => {
+    if (!isSlideEditorOpen) return;
+    const existing = presentationDecks.find((d) => d.id === activePresentationId);
+    if (existing && existing.slides.length > 0) {
+      setDeck(existing);
+    } else {
+      // Find scene if presentation scene exists
+      const scene = scenes.find((sc) => sc.id === activePresentationId);
+      const title = scene?.name || 'Untitled Presentation';
+      const slides = scene?.content?.slides || [];
+      if (slides.length > 0) {
+        setDeck({
+          id: activePresentationId || `deck-${Date.now()}`,
+          title,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          aspectRatio: '16:9',
+          slides: slides.map((s, idx) => ({
+            id: s.id || `slide-${idx + 1}`,
+            title: s.title || `Slide ${idx + 1}`,
+            body: s.text || '',
+            label: s.label || `Slide ${idx + 1}`,
+            notes: s.notes || '',
+            transition: 'fade',
+            durationMs: 3000,
+            hidden: false,
+            buildCount: 1,
+            buildStep: 1,
+            background: { type: 'color', value: '#18181b' },
+            aspectRatio: '16:9',
+          })),
+        });
+      }
+    }
+  }, [isSlideEditorOpen, activePresentationId, presentationDecks, scenes]);
 
   if (!isSlideEditorOpen) return null;
 
-  const activePage = pages[activePageIndex] || pages[0];
+  const slides = deck.slides.length > 0 ? deck.slides : [
+    {
+      id: 'slide-default',
+      title: 'Untitled Slide',
+      body: 'Double click to edit',
+      label: 'Slide 1',
+      notes: '',
+      transition: 'fade' as const,
+      durationMs: 3000,
+      hidden: false,
+      buildCount: 1,
+      buildStep: 1,
+      background: { type: 'color' as const, value: '#18181b' },
+      aspectRatio: '16:9' as const,
+    },
+  ];
+
+  const activeSlide = slides[activeSlideIndex] || slides[0];
+  const selectedElement = activeSlide.elements?.find((el) => el.id === selectedElementId) || null;
+
+  // Slide CRUD Actions
+  function handleAddSlide() {
+    const newSlide: PresentationSlide = {
+      id: `slide-${Date.now()}`,
+      title: 'New Slide',
+      body: 'Double click to edit body',
+      label: `Slide ${slides.length + 1}`,
+      notes: '',
+      transition: 'fade',
+      durationMs: 3000,
+      hidden: false,
+      buildCount: 1,
+      buildStep: 1,
+      background: { type: 'color', value: '#18181b' },
+      aspectRatio: deck.aspectRatio || '16:9',
+      elements: [
+        {
+          id: `title-${Date.now()}`,
+          type: 'text',
+          x: 120,
+          y: 220,
+          width: 1680,
+          height: 200,
+          content: 'New Slide Title',
+          fontSize: 64,
+          fontFamily: 'Inter',
+          fontWeight: 700,
+          color: '#ffffff',
+          textAlign: 'center',
+          zIndex: 1,
+        },
+      ],
+    };
+
+    const nextSlides = [...slides, newSlide];
+    setDeck((prev) => ({ ...prev, slides: nextSlides }));
+    setActiveSlideIndex(nextSlides.length - 1);
+  }
+
+  function handleDuplicateSlide(index: number) {
+    const target = slides[index];
+    if (!target) return;
+    const duplicated: PresentationSlide = {
+      ...target,
+      id: `slide-${Date.now()}`,
+      title: `${target.title} (Copy)`,
+      elements: target.elements?.map((el) => ({ ...el, id: `${el.id}-copy-${Date.now()}` })),
+    };
+    const nextSlides = [...slides];
+    nextSlides.splice(index + 1, 0, duplicated);
+    setDeck((prev) => ({ ...prev, slides: nextSlides }));
+    setActiveSlideIndex(index + 1);
+  }
+
+  function handleDeleteSlide(index: number) {
+    if (slides.length <= 1) return;
+    const nextSlides = slides.filter((_, i) => i !== index);
+    setDeck((prev) => ({ ...prev, slides: nextSlides }));
+    setActiveSlideIndex(Math.min(index, nextSlides.length - 1));
+  }
+
+  function handleMoveSlide(fromIndex: number, toIndex: number) {
+    if (toIndex < 0 || toIndex >= slides.length) return;
+    const nextSlides = [...slides];
+    const [moved] = nextSlides.splice(fromIndex, 1);
+    nextSlides.splice(toIndex, 0, moved);
+    setDeck((prev) => ({ ...prev, slides: nextSlides }));
+    setActiveSlideIndex(toIndex);
+  }
+
+  // Element Actions
+  function handleAddTextElement() {
+    const newElement: SlideElement = {
+      id: `text-${Date.now()}`,
+      type: 'text',
+      x: 480,
+      y: 400,
+      width: 960,
+      height: 180,
+      content: 'New Text Box',
+      fontSize: 48,
+      fontFamily: 'Inter',
+      fontWeight: 600,
+      color: '#ffffff',
+      textAlign: 'center',
+      zIndex: (activeSlide.elements?.length || 0) + 1,
+    };
+    const updatedElements = [...(activeSlide.elements || []), newElement];
+    handleUpdateSlide({ elements: updatedElements });
+    setSelectedElementId(newElement.id);
+  }
+
+  function handleAddShapeElement() {
+    const newElement: SlideElement = {
+      id: `shape-${Date.now()}`,
+      type: 'shape',
+      x: 660,
+      y: 360,
+      width: 600,
+      height: 360,
+      content: 'rectangle',
+      backgroundColor: 'rgba(255, 85, 0, 0.25)',
+      borderColor: '#FF5500',
+      borderWidth: 3,
+      borderRadius: 12,
+      zIndex: (activeSlide.elements?.length || 0) + 1,
+    };
+    const updatedElements = [...(activeSlide.elements || []), newElement];
+    handleUpdateSlide({ elements: updatedElements });
+    setSelectedElementId(newElement.id);
+  }
+
+  function handleUpdateSlide(updates: Partial<PresentationSlide>) {
+    const updatedSlides = slides.map((s, idx) => (idx === activeSlideIndex ? { ...s, ...updates } : s));
+    setDeck((prev) => ({ ...prev, slides: updatedSlides }));
+  }
+
+  function handleUpdateElement(elementId: string, updates: Partial<SlideElement>) {
+    const currentElements = activeSlide.elements || [];
+    const updatedElements = currentElements.map((el) => (el.id === elementId ? { ...el, ...updates } : el));
+    handleUpdateSlide({ elements: updatedElements });
+  }
+
+  function handleDeleteElement(elementId: string) {
+    const currentElements = activeSlide.elements || [];
+    const updatedElements = currentElements.filter((el) => el.id !== elementId);
+    handleUpdateSlide({ elements: updatedElements });
+    setSelectedElementId(null);
+  }
 
   function handleSave() {
+    addPresentationDeck(deck);
     closeSlideEditor();
   }
 
-  function handleAddPage() {
-    setPages((prev) => [
-      ...prev,
-      {
-        id: String(Date.now()),
-        title: 'Double click to edit title',
-        subtitle: 'Double click to edit subtitle',
-        bg: '#18181b',
-      },
-    ]);
-  }
-
   return (
-    <div style={styles.overlay}>
-      {/* Top Header Bar */}
-      <header style={styles.header}>
-        <div style={styles.headerTitle}>{activePresentationId ? 'Mama A song' : 'Untitled Presentation'}</div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button style={styles.saveBtn} onClick={handleSave}>
-            Save changes
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: '#0d0d0f',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: 'var(--font-ui)',
+        color: '#ffffff',
+      }}
+    >
+      {/* Top Header Toolbar */}
+      <header
+        style={{
+          height: 48,
+          background: '#161414',
+          borderBottom: '1px solid #262628',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 16px',
+          flexShrink: 0,
+        }}
+      >
+        {/* Left: Deck Title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <input
+            type="text"
+            value={deck.title}
+            onChange={(e) => setDeck((prev) => ({ ...prev, title: e.target.value }))}
+            style={{
+              background: '#232221',
+              border: '1px solid #262628',
+              borderRadius: 6,
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: 13,
+              padding: '4px 10px',
+              outline: 'none',
+              width: 220,
+            }}
+          />
+        </div>
+
+        {/* Center: Toolbar Tools (Add Text, Add Shape, Zoom) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            onClick={handleAddTextElement}
+            style={{
+              padding: '5px 12px',
+              background: '#232221',
+              border: '1px solid #262628',
+              borderRadius: 6,
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            + Text Box
           </button>
-          <button style={styles.closeBtn} onClick={closeSlideEditor} title="Close Slide Editor">
+          <button
+            type="button"
+            onClick={handleAddShapeElement}
+            style={{
+              padding: '5px 12px',
+              background: '#232221',
+              border: '1px solid #262628',
+              borderRadius: 6,
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            + Shape
+          </button>
+
+          <div style={{ width: 1, height: 20, background: '#262628' }} />
+
+          {/* Zoom Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 11, color: '#a1a1aa' }}>Zoom:</span>
+            <select
+              value={zoomLevel}
+              onChange={(e) => setZoomLevel(parseInt(e.target.value, 10))}
+              style={{
+                background: '#232221',
+                border: '1px solid #262628',
+                borderRadius: 6,
+                color: '#ffffff',
+                padding: '4px 8px',
+                fontSize: 11,
+                outline: 'none',
+              }}
+            >
+              <option value={0}>Auto Fit</option>
+              <option value={50}>50%</option>
+              <option value={75}>75%</option>
+              <option value={100}>100%</option>
+              <option value={150}>150%</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Right Actions: Save & Close */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            onClick={handleSave}
+            style={{
+              padding: '6px 16px',
+              background: '#FF5500',
+              border: 'none',
+              borderRadius: 6,
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Save Presentation
+          </button>
+          <button
+            type="button"
+            onClick={closeSlideEditor}
+            style={{
+              padding: '6px 12px',
+              background: '#232221',
+              border: '1px solid #262628',
+              borderRadius: 6,
+              color: '#a1a1aa',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
             ✕ Close
           </button>
         </div>
       </header>
 
-      {/* Main 3-Column Workspace */}
-      <div style={styles.workspace}>
-        {/* Left Column: Pages Rail */}
-        <div style={styles.leftCol}>
-          <div style={styles.pagesList}>
-            {pages.map((pg, idx) => (
-              <div key={pg.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginTop: 4 }}>{idx + 1}</span>
-                <div
-                  style={{
-                    ...styles.pageThumb,
-                    border: activePageIndex === idx ? '2px solid #FF5500' : '1px solid rgba(255, 255, 255, 0.1)',
-                    background: pg.bg,
-                  }}
-                  onClick={() => setActivePageIndex(idx)}
-                >
-                  <div style={{ fontSize: 8, fontWeight: 800, color: idx === 1 ? '#000' : '#fff', textAlign: 'center' }}>
-                    {pg.title}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Main 3-Column Studio Workspace */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+        {/* Left Column: Slide Rail */}
+        <SlideEditorRail
+          slides={slides}
+          activeSlideIndex={activeSlideIndex}
+          onSelectSlide={(idx) => {
+            setActiveSlideIndex(idx);
+            setSelectedElementId(null);
+          }}
+          onAddSlide={handleAddSlide}
+          onDuplicateSlide={handleDuplicateSlide}
+          onDeleteSlide={handleDeleteSlide}
+          onMoveSlide={handleMoveSlide}
+        />
 
-          <button style={styles.addPageBtn} onClick={handleAddPage}>
-            + Add new page
-          </button>
-        </div>
+        {/* Center Column: Interactive Scaling Canvas */}
+        <SlideEditorCanvas
+          slide={activeSlide}
+          zoomLevel={zoomLevel}
+          selectedElementId={selectedElementId}
+          onSelectElement={setSelectedElementId}
+          onUpdateElement={handleUpdateElement}
+          onUpdateSlideText={(title, body) => handleUpdateSlide({ title, body })}
+        />
 
-        {/* Center Column: Slide Canvas Stage & Toolbar */}
-        <div style={styles.centerCol}>
-          {/* Top Floating Toolbar */}
-          <div style={styles.floatingToolbarContainer}>
-            <div style={styles.toolbarLabel}>Add content</div>
-            <div style={styles.floatingToolbar}>
-              <button style={styles.addBtn}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-                <span>Text</span>
-              </button>
-              <button style={styles.addBtn}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                <span>Scripture</span>
-              </button>
-              <button style={styles.addBtn}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                <span>Shape ∨</span>
-              </button>
-              <button style={styles.addBtn}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <span>Image ∨</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Canvas Viewport Stage */}
-          <div style={styles.canvasContainer}>
-            <div
-              style={{
-                ...styles.canvasStage,
-                transform: `scale(${zoomLevel / 100})`,
-                background: activePage.bg,
-              }}
-            >
-              <div style={styles.slideTitleText}>{activePage.title}</div>
-              <div style={styles.slideSubtitleText}>{activePage.subtitle}</div>
-            </div>
-          </div>
-
-          {/* Bottom Zoom Controls */}
-          <div style={styles.zoomBar}>
-            <button style={styles.zoomBtn} onClick={() => setZoomLevel(Math.max(40, zoomLevel - 10))}>-</button>
-            <input
-              type="range"
-              min="40"
-              max="150"
-              value={zoomLevel}
-              onChange={(e) => setZoomLevel(Number(e.target.value))}
-              style={{ width: 100, accentColor: '#FF5500' }}
-            />
-            <button style={styles.zoomBtn} onClick={() => setZoomLevel(Math.min(150, zoomLevel + 10))}>+</button>
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{zoomLevel}%</span>
-          </div>
-        </div>
-
-        {/* Right Column: Page Inspector Panel */}
-        <div style={styles.rightCol}>
-          <div style={styles.inspectorHeader}>
-            <span>Page {activePageIndex + 1}</span>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          </div>
-
-          <div style={styles.inspectorBody}>
-            <div style={styles.accSection}>
-              <div style={styles.propLabel}>Background type</div>
-              <CustomDropdown
-                value={bgType}
-                options={[
-                  { value: 'Color', label: 'Color' },
-                  { value: 'Image', label: 'Image' },
-                  { value: 'Video', label: 'Video' },
-                  { value: 'Gradient', label: 'Gradient' },
-                ]}
-                onChange={(v) => setBgType(v as any)}
-                buttonStyle={{ width: '100%' }}
-              />
-            </div>
-
-            <div style={styles.accSection}>
-              <div style={styles.propLabel}>Color overlay</div>
-              <div style={styles.colorInputContainer}>
-                <input
-                  type="color"
-                  value={colorOverlay}
-                  onChange={(e) => setColorOverlay(e.target.value)}
-                  style={{ width: 22, height: 22, border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 4 }}
-                />
-                <input
-                  style={styles.propInputNoBorder}
-                  value={colorOverlay.replace('#', '').toUpperCase()}
-                  onChange={(e) => setColorOverlay(`#${e.target.value}`)}
-                />
-                <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>100%</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Right Column: Property Inspector */}
+        <SlideEditorInspector
+          slide={activeSlide}
+          selectedElement={selectedElement}
+          onUpdateSlide={handleUpdateSlide}
+          onUpdateElement={handleUpdateElement}
+          onDeleteElement={handleDeleteElement}
+        />
       </div>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed',
-    inset: 0,
-    zIndex: 2000,
-    background: 'var(--bg-primary)',
-    display: 'flex',
-    flexDirection: 'column',
-    fontFamily: 'var(--font-ui)',
-  },
-  header: {
-    height: 56,
-    padding: '0 20px',
-    background: '#141416',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexShrink: 0,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 700,
-    color: '#ffffff',
-  },
-  saveBtn: {
-    padding: '6px 16px',
-    background: '#FF5500',
-    border: 'none',
-    borderRadius: 6,
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  closeBtn: {
-    padding: '6px 14px',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: 6,
-    color: 'var(--text-secondary)',
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  workspace: {
-    flex: 1,
-    display: 'flex',
-    overflow: 'hidden',
-  },
-  leftCol: {
-    width: 220,
-    background: '#141416',
-    borderRight: '1px solid rgba(255, 255, 255, 0.08)',
-    padding: 14,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-  },
-  pagesList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 14,
-    overflowY: 'auto',
-  },
-  pageThumb: {
-    width: 170,
-    height: 100,
-    borderRadius: 8,
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 10,
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-  },
-  addPageBtn: {
-    padding: '8px',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: 6,
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-    marginTop: 14,
-  },
-  centerCol: {
-    flex: 1,
-    position: 'relative',
-    background: 'var(--bg-primary)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  floatingToolbarContainer: {
-    position: 'absolute',
-    top: 14,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 4,
-    zIndex: 10,
-  },
-  toolbarLabel: {
-    fontSize: 10,
-    color: 'var(--text-dim)',
-    fontWeight: 600,
-  },
-  floatingToolbar: {
-    display: 'flex',
-    gap: 4,
-    background: '#141416',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    padding: 4,
-  },
-  addBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '6px 12px',
-    background: 'transparent',
-    border: 'none',
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  canvasContainer: {
-    flex: 1,
-    width: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-  },
-  canvasStage: {
-    width: 720,
-    height: 405,
-    borderRadius: 12,
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    textAlign: 'center',
-  },
-  slideTitleText: {
-    fontSize: 32,
-    fontWeight: 800,
-    color: '#ffffff',
-    textShadow: '0 2px 8px rgba(0,0,0,0.6)',
-  },
-  slideSubtitleText: {
-    fontSize: 18,
-    fontWeight: 600,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 8,
-  },
-  zoomBar: {
-    position: 'absolute',
-    bottom: 14,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    background: '#141416',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: 999,
-    padding: '4px 14px',
-  },
-  zoomBtn: {
-    background: 'transparent',
-    border: 'none',
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  rightCol: {
-    width: 280,
-    background: '#141416',
-    borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
-    display: 'flex',
-    flexDirection: 'column',
-    overflowY: 'auto',
-  },
-  inspectorHeader: {
-    padding: '14px 18px',
-    fontSize: 14,
-    fontWeight: 700,
-    color: '#ffffff',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  inspectorBody: {
-    padding: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  accSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
-  propLabel: {
-    fontSize: 11,
-    color: 'var(--text-secondary)',
-    marginBottom: 4,
-  },
-  colorInputContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    height: 34,
-    padding: '0 10px',
-    background: '#202024',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: 6,
-  },
-  propInputNoBorder: {
-    flex: 1,
-    width: '100%',
-    background: 'transparent',
-    border: 'none',
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 600,
-    outline: 'none',
-  },
-};

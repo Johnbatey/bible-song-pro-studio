@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { ProgramSurface } from './display/ProgramSurface';
 import { Block, BlockButton, BlockSegment } from './Block';
@@ -40,7 +40,23 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  /* True while the view is moving. Drives will-change on the stage: the
+     compositor gets the gesture, then the layer is released so Chromium
+     re-rasterises at the resting scale instead of stretching a stale texture. */
+  const [isInteracting, setIsInteracting] = useState(false);
+  const settleTimer = useRef<number | undefined>(undefined);
   const [stageSize, setStageSize] = useState({ width: 960, height: 560, itemWidth: 474 });
+
+  /* Stable identities so the memoised surfaces are not re-rendered by every
+     zoom or pan tick — those only move the wrapper's transform. */
+  const previewSurfaceState = useMemo(
+    () => ({ scene: previewScene, outputMode, theme: activeTheme }),
+    [previewScene, outputMode, activeTheme],
+  );
+  const programSurfaceState = useMemo(
+    () => ({ scene: currentScene, outputMode, theme: activeTheme, activeAlert, transcription }),
+    [currentScene, outputMode, activeTheme, activeAlert, transcription],
+  );
 
   const isStudio = mode === 'studio';
   // Something is staged that the audience isn't seeing yet
@@ -48,11 +64,20 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
   const zoomLabel = `${Math.round(zoom * 100)}%`;
   const outputScale = stageSize.itemWidth / 1920;
 
+  const markInteracting = useCallback(() => {
+    setIsInteracting(true);
+    window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => setIsInteracting(false), 220);
+  }, []);
+
+  useLayoutEffect(() => () => window.clearTimeout(settleTimer.current), []);
+
   const updateZoom = useCallback((next: number) => {
     const nextZoom = clampZoom(next);
     zoomRef.current = nextZoom;
+    markInteracting();
     setZoom((current) => Math.abs(current - nextZoom) < 0.001 ? current : nextZoom);
-  }, []);
+  }, [markInteracting]);
 
   const measureStage = useCallback(() => {
     const viewport = viewportRef.current;
@@ -148,6 +173,7 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
         return;
       }
 
+      markInteracting();
       setPan((current) => ({
         x: current.x - event.deltaX,
         y: current.y - event.deltaY,
@@ -156,7 +182,7 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
 
     viewport.addEventListener('wheel', onNativeWheel, { passive: false });
     return () => viewport.removeEventListener('wheel', onNativeWheel);
-  }, [setZoomAround]);
+  }, [setZoomAround, markInteracting]);
 
   function onWheel(event: React.WheelEvent<HTMLDivElement>) {
     if (event.defaultPrevented) return;
@@ -181,6 +207,7 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
   function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    markInteracting();
     setPan({
       x: drag.x + event.clientX - drag.startX,
       y: drag.y + event.clientY - drag.startY,
@@ -294,6 +321,7 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
             width: stageSize.width,
             height: stageSize.height,
             transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})`,
+            willChange: isPanning || isInteracting ? 'transform' : 'auto',
           }}
         >
           {isStudio && (
@@ -303,10 +331,10 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                 Preview{hasPendingTake ? ' · ready to take' : ''}
               </div>
               <div style={{ ...styles.displayBox, borderColor: hasPendingTake ? '#f1c40f' : undefined }}>
-                <div style={{ ...styles.outputFrame, zoom: outputScale }}>
+                <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
                   <ProgramSurface
                     preview
-                    state={{ scene: previewScene, outputMode, theme: activeTheme }}
+                    state={previewSurfaceState}
                   />
                 </div>
               </div>
@@ -323,10 +351,10 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                   <div style={styles.transitionSpinner} />
                 </div>
               )}
-              <div style={{ ...styles.outputFrame, zoom: outputScale }}>
+              <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
                 <ProgramSurface
                   preview
-                  state={{ scene: currentScene, outputMode, theme: activeTheme, activeAlert, transcription }}
+                  state={programSurfaceState}
                 />
               </div>
             </div>
@@ -411,10 +439,11 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
     alignItems: 'stretch',
     transformOrigin: 'center center',
-    /* No will-change here on purpose. Promoting this to a composited layer
-       makes Chromium rasterise it once and stretch that texture as the scale
-       changes, which is what made the output blur as you zoomed in. Left
-       alone, it re-rasterises at the scale actually being shown. */
+    /* will-change is applied only while panning or zooming — see isInteracting.
+       Holding it permanently pins the raster scale and blurs the output as you
+       zoom in; never using it repaints the whole subtree on every gesture
+       frame. Toggling gives the compositor the gesture and a fresh raster once
+       the view settles. */
   },
   previewCol: {
     flex: '0 0 auto',
@@ -461,9 +490,7 @@ const styles: Record<string, React.CSSProperties> = {
     top: 0,
     width: 1920,
     height: 1080,
-    /* Scaled with `zoom` rather than a transform: zoom re-runs layout at the
-       target size so glyphs are rendered at their true pixel size, where a
-       transform would rasterise the 1920-wide design and resample it down. */
+    transformOrigin: 'top left',
   },
   transitionOverlay: {
     position: 'absolute',

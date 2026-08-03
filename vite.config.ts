@@ -63,6 +63,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: false,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
@@ -71,6 +72,18 @@ export default defineConfig({
         audienceDisplayFixture: path.resolve(__dirname, 'audience-display-fixture.html'),
         programSurfaceHarness: path.resolve(__dirname, 'program-surface-harness.html'),
         programSurfaceSingle: path.resolve(__dirname, 'program-surface-single.html'),
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('zustand')) {
+              return 'vendor-store';
+            }
+          }
+        },
       },
     },
   },
