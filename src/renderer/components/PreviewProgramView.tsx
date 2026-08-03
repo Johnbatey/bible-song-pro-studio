@@ -222,7 +222,8 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
             <button style={styles.zoomBtnWide} onClick={fitStage} title="Fit preview/program to view">FIT</button>
           </div>
 
-          {/* Centre: Studio toggle, icon and label on one line */}
+          {/* Centre: Studio with the output-mode switch beside it */}
+          <div style={styles.footerCentre}>
           <button
             style={{
               ...styles.studioBtn,
@@ -251,8 +252,6 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
             <span>Studio</span>
           </button>
 
-          {/* Right: output mode */}
-          <div style={styles.footerRight}>
             <BlockSegment>
               <BlockButton
                 active={outputMode === 'fullscreen'}
@@ -270,6 +269,9 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
               </BlockButton>
             </BlockSegment>
           </div>
+
+          {/* Empty right track, so the centre group holds the true middle. */}
+          <div style={styles.footerRight} />
         </div>
       )}
     >
@@ -347,6 +349,13 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
+    minWidth: 0,
+  },
+  footerCentre: {
+    display: 'flex',
+    alignItems: 'center',
+    /* The same gutter window blocks sit apart by. */
+    gap: 'var(--block-gap)',
     minWidth: 0,
   },
   footerRight: {

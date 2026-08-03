@@ -505,14 +505,18 @@ export function LiveScripturePanel() {
           <span>Config</span>
         </button>
 
-        <div style={styles.meter} aria-label="Mic meter">
-          <div style={{ ...styles.meterFill, width: `${Math.round(live.meter.level * 100)}%` }} />
-          <div style={{ ...styles.meterPeak, left: `${Math.round(live.meter.peak * 100)}%` }} />
-        </div>
+        {/* Level and state read as one status cluster, pushed to the far end
+            together — apart, the meter sat stranded mid-bar. */}
+        <div style={styles.statusCluster}>
+          <div style={styles.meter} aria-label="Mic meter">
+            <div style={{ ...styles.meterFill, width: `${Math.round(live.meter.level * 100)}%` }} />
+            <div style={{ ...styles.meterPeak, left: `${Math.round(live.meter.peak * 100)}%` }} />
+          </div>
 
-        <span style={{ ...type.caption, color: statusInfo.color, fontWeight: fontWeight.semibold, whiteSpace: 'nowrap', marginLeft: 'auto' }}>
-          ● {engine === 'deepgram' ? statusInfo.text : live.isActive ? 'Listening' : 'Idle'}
-        </span>
+          <span style={{ ...type.caption, color: statusInfo.color, fontWeight: fontWeight.semibold, whiteSpace: 'nowrap' }}>
+            ● {engine === 'deepgram' ? statusInfo.text : live.isActive ? 'Listening' : 'Idle'}
+          </span>
+        </div>
       </div>
 
       {deepgramUnavailable && (
@@ -852,6 +856,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 const styles: Record<string, React.CSSProperties> = {
   root: { height: '100%', minHeight: 0, overflow: 'hidden' },
   controlBar: { flexWrap: 'nowrap', minWidth: '100%' },
+  statusCluster: { display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 },
   meter: { position: 'relative', flexShrink: 0, width: 96, height: 6, background: 'rgba(255,255,255,0.10)', borderRadius: 999, overflow: 'hidden' },
   meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)', borderRadius: 999, transition: 'width 90ms linear' },
   meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: '#fff', transition: 'left 140ms ease-out' },
