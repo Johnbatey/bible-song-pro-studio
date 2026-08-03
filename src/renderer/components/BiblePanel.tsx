@@ -200,7 +200,9 @@ export function BiblePanel() {
   const [pinned, setPinned] = useState<BibleVerse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const searchTimerRef = useRef<number | null>(null);
-  const verseRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  /* Keyed by reference, not verse number: search results span books, so verse
+     numbers collide and the wrong row would be scrolled to. */
+  const verseRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const currentVersion = versions.find((v) => v.id === selectedVersion);
   const versionOptions = versions.length ? versions : [
@@ -293,9 +295,9 @@ export function BiblePanel() {
   }, [query, selectedVersion, bookOptions]);
 
   useEffect(() => {
-    if (highlightedVerse && verseRefs.current[highlightedVerse]) {
-      verseRefs.current[highlightedVerse]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    if (!highlightedVerse) return;
+    const target = chapterVerses.find((v) => v.verse === highlightedVerse);
+    if (target) verseRefs.current[target.reference]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [highlightedVerse, chapterVerses]);
 
   const selectedChapterCount = useMemo(() => {
@@ -339,6 +341,20 @@ export function BiblePanel() {
   }
 
   const visibleVerses = results.length ? results : chapterVerses;
+
+  /** Whatever the operator is on right now — live wins, else what's staged. */
+  const activeReference = currentScene?.type === 'bible'
+    ? currentScene.name
+    : previewScene?.type === 'bible'
+      ? previewScene.name
+      : '';
+
+  /* Stepping with the chevrons or the arrow keys walks past the bottom of the
+     list, so the row that just went live has to be brought back into view. */
+  useEffect(() => {
+    if (!activeReference) return;
+    verseRefs.current[activeReference]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [activeReference, visibleVerses]);
 
   function bibleSceneId(verse: BibleVerse) {
     return `bible-${verse.version}-${verse.reference}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
@@ -384,11 +400,6 @@ export function BiblePanel() {
 
   async function sendAdjacentVerse(direction: 1 | -1) {
     if (!visibleVerses.length) return;
-    const activeReference = currentScene?.type === 'bible'
-      ? currentScene.name
-      : previewScene?.type === 'bible'
-        ? previewScene.name
-        : '';
     const currentIndex = visibleVerses.findIndex((verse) => verse.reference === activeReference);
     const fallbackIndex = direction > 0 ? -1 : visibleVerses.length;
     const nextIndex = Math.max(0, Math.min(visibleVerses.length - 1, (currentIndex === -1 ? fallbackIndex : currentIndex) + direction));
@@ -630,7 +641,7 @@ export function BiblePanel() {
                 <div
                   key={`${verse.reference}-${verse.version}`}
                   className="row-hover"
-                  ref={(el) => { verseRefs.current[verse.verse] = el; }}
+                  ref={(el) => { verseRefs.current[verse.reference] = el; }}
                   onClick={() => sendVerse(verse)}
                   onDoubleClick={() => sendVerse(verse, { direct: true })}
                   style={{

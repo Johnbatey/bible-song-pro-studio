@@ -172,6 +172,7 @@ export function SongsPanel() {
     ? formattedSlides.find((s) => s.text.toLowerCase().includes(lyricTarget))?.id
     : undefined;
   const targetSlideRef = useRef<HTMLDivElement | null>(null);
+  const slideRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     if (targetSlideId) targetSlideRef.current?.scrollIntoView({ block: 'nearest' });
@@ -179,6 +180,20 @@ export function SongsPanel() {
 
   const songSceneId = (song: Song, slide: FormattedSlide) =>
     `song-${song.id}-${slide.id}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
+
+  /** Live wins over staged — the same rule the row highlight follows. */
+  const activeSceneId = currentScene?.type === 'song'
+    ? currentScene.id
+    : previewScene?.type === 'song'
+      ? previewScene.id
+      : '';
+
+  /* Prev/Next and the arrow keys can walk the song past the visible slides, so
+     the one that just went out has to be pulled back into view. */
+  useEffect(() => {
+    if (!activeSceneId) return;
+    slideRefs.current[activeSceneId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [activeSceneId, formattedSlides.length, selectedSong?.id]);
 
   const buildSongScene = (song: Song, slide: FormattedSlide): Scene => {
     const includeCredits = showSongCredits && linesPerSlide === 'auto';
@@ -453,7 +468,10 @@ export function SongsPanel() {
                     <div
                       key={slide.id}
                       className="row-hover"
-                      ref={isTarget ? targetSlideRef : undefined}
+                      ref={(el) => {
+                        slideRefs.current[sceneId] = el;
+                        if (isTarget) targetSlideRef.current = el;
+                      }}
                       style={{
                         border: borderStyle,
                         background: backgroundStyle,

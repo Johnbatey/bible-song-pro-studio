@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { Block, BlockButton } from './Block';
 
@@ -9,7 +9,19 @@ export function QueuePanel() {
   const projectScene = useAppStore((s) => s.projectScene);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
-  const mode = useAppStore((s) => s.display.mode);
+
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  /** Live wins over staged, matching how the rows colour themselves. */
+  const activeSceneId = queue.some((q) => q.scene.id === currentScene?.id)
+    ? currentScene?.id
+    : previewScene?.id;
+
+  /* A long queue scrolls the running item out of sight as it advances. */
+  useEffect(() => {
+    if (!activeSceneId) return;
+    rowRefs.current[activeSceneId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [activeSceneId, queue.length]);
 
   return (
     <Block
@@ -37,6 +49,7 @@ export function QueuePanel() {
             return (
               <div
                 key={item.id}
+                ref={(el) => { rowRefs.current[item.scene.id] = el; }}
                 onClick={() => {
                   // In Studio Mode, clicking row sends to Preview first
                   projectScene(item.scene);
