@@ -5,6 +5,7 @@ import { type, fontWeight, numeric } from '../styles/type';
 import { CustomDropdown } from './CustomDropdown';
 import { SlidingSwitch } from './SlidingSwitch';
 import { isFocusedDock } from './dock/dockFocus';
+import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { Block } from './Block';
 
 const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', 'Revelation'];
@@ -200,14 +201,7 @@ export function BiblePanel() {
   const [highlightedVerse, setHighlightedVerse] = useState<number | null>(null);
   const [pinned, setPinned] = useState<BibleVerse[]>([]);
   /** Where the control bar sits — above the verse list, or under it. */
-  const [barPosition, setBarPosition] = useState<'top' | 'bottom'>(() =>
-    localStorage.getItem('bsp_bibleBarPosition') === 'bottom' ? 'bottom' : 'top');
-
-  const moveBar = () => {
-    const next = barPosition === 'top' ? 'bottom' : 'top';
-    setBarPosition(next);
-    localStorage.setItem('bsp_bibleBarPosition', next);
-  };
+  const { position: barPosition, move: moveBar } = useBarPosition('bsp_bibleBarPosition');
   const [isLoading, setIsLoading] = useState(false);
   const searchTimerRef = useRef<number | null>(null);
   /* Keyed by reference, not verse number: search results span books, so verse
@@ -599,28 +593,12 @@ export function BiblePanel() {
           </div>
 
           {/* Send the whole bar to the other end of the panel. */}
-          <button
+          <MoveBarButton
+            position={barPosition}
+            onMove={moveBar}
+            label="Bible"
             style={styles.iconNavBtn}
-            onClick={moveBar}
-            title={barPosition === 'top'
-              ? 'Move this toolbar to the bottom of the Bible window'
-              : 'Move this toolbar back to the top of the Bible window'}
-            aria-label="Move toolbar"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              {barPosition === 'top' ? (
-                <>
-                  <path d="M12 5v14" />
-                  <path d="m19 12-7 7-7-7" />
-                </>
-              ) : (
-                <>
-                  <path d="M12 19V5" />
-                  <path d="m5 12 7-7 7 7" />
-                </>
-              )}
-            </svg>
-          </button>
+          />
         </div>
       </div>
   );

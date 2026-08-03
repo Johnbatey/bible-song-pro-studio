@@ -9,6 +9,7 @@ import { CustomDropdown } from './CustomDropdown';
 import { AppleToggle } from './AppleToggle';
 import { PanelSplitter } from './PanelSplitter';
 import { SongDeck } from './song/SongDeck';
+import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { detectSongs, type SongDetection } from '../utils/song-detection';
 
 /** Short enough to feel live, while still giving Whisper enough speech context. */
@@ -46,6 +47,7 @@ export function LiveScripturePanel() {
   const [detectionLatencyMs, setDetectionLatencyMs] = useState(0);
   const [songMatches, setSongMatches] = useState<SongDetection[]>([]);
   const [pickedSongId, setPickedSongId] = useState<string | null>(null);
+  const { position: barPosition, move: moveBar } = useBarPosition('bsp_liveBarPosition');
   const [primaryWidth, setPrimaryWidth] = useState<number>(() => {
     const saved = localStorage.getItem('bsp_livePrimaryWidth');
     return saved ? parseInt(saved, 10) : 340;
@@ -390,8 +392,9 @@ export function LiveScripturePanel() {
   const statusInfo = STATE_LABELS[sttStatus?.state || 'idle'];
   const deepgramUnavailable = engine === 'deepgram' && !keyConfigured;
 
-  return (
-    <div className="blk-col" style={styles.root}>
+  /* Built once and rendered into whichever slot is active — the same element in
+     both places, so scrolling and every control behave identically. */
+  const toolbar = (
       <div className="blk blk--bar" style={styles.controlBar}>
         <SlidingSwitch
           value={live.detectionMode === 'song' ? 'song' : 'bible'}
@@ -516,8 +519,20 @@ export function LiveScripturePanel() {
           <span style={{ ...type.caption, color: statusInfo.color, fontWeight: fontWeight.semibold, whiteSpace: 'nowrap' }}>
             ● {engine === 'deepgram' ? statusInfo.text : live.isActive ? 'Listening' : 'Idle'}
           </span>
+
+          <MoveBarButton
+            position={barPosition}
+            onMove={moveBar}
+            label="Live Scripture"
+            style={styles.moveBarBtn}
+          />
         </div>
       </div>
+  );
+
+  return (
+    <div className="blk-col" style={styles.root}>
+      {barPosition === 'top' && toolbar}
 
       {deepgramUnavailable && (
         <div style={styles.warn}>
@@ -778,6 +793,8 @@ export function LiveScripturePanel() {
           </Block>
         </div>
       )}
+
+      {barPosition === 'bottom' && toolbar}
     </div>
   );
 }
@@ -856,6 +873,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 const styles: Record<string, React.CSSProperties> = {
   root: { height: '100%', minHeight: 0, overflow: 'hidden' },
   controlBar: { flexWrap: 'nowrap', minWidth: '100%' },
+  moveBarBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, background: 'transparent', border: 'none', borderRadius: 6, color: '#ffffff', cursor: 'pointer', flexShrink: 0, padding: 0 },
   statusCluster: { display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 },
   meter: { position: 'relative', flexShrink: 0, width: 96, height: 6, background: 'rgba(255,255,255,0.10)', borderRadius: 999, overflow: 'hidden' },
   meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)', borderRadius: 999, transition: 'width 90ms linear' },

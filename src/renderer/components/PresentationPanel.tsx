@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { CustomDropdown } from './CustomDropdown';
+import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { Block } from './Block';
 
 interface SlideItem {
@@ -14,6 +15,7 @@ interface SlideItem {
 export function PresentationPanel() {
   const openSlideEditor = useAppStore((s) => s.openSlideEditor);
   const [searchQuery, setSearchQuery] = useState('');
+  const { position: barPosition, move: moveBar } = useBarPosition('bsp_slidesBarPosition');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   const [presentations, setPresentations] = useState<SlideItem[]>([
@@ -38,9 +40,9 @@ export function PresentationPanel() {
     setActiveMenuId(null);
   }
 
-  return (
-    <div className="blk-col" style={styles.container}>
-      {/* Toolbar block */}
+  /* Built once and rendered into whichever slot is active — the same element in
+     both places, so scrolling and every control behave identically. */
+  const toolbar = (
       <div className="blk blk--bar">
         <CustomDropdown
           value="create"
@@ -75,7 +77,19 @@ export function PresentationPanel() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
           </button>
         </div>
+
+        <MoveBarButton
+          position={barPosition}
+          onMove={moveBar}
+          label="Pro Slides"
+          style={styles.moveBarBtn}
+        />
       </div>
+  );
+
+  return (
+    <div className="blk-col" style={styles.container}>
+      {barPosition === 'top' && toolbar}
 
       {/* Slide Cards Grid */}
       <Block className="blk-fill" title="Slides" subtitle={`${presentations.length}`} bodyStyle={styles.gridContainer}>
@@ -111,6 +125,8 @@ export function PresentationPanel() {
             </div>
           ))}
       </Block>
+
+      {barPosition === 'bottom' && toolbar}
     </div>
   );
 }
@@ -121,6 +137,7 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 0,
     fontFamily: 'var(--font-ui)',
   },
+  moveBarBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, background: 'transparent', border: 'none', borderRadius: 6, color: '#ffffff', cursor: 'pointer', flexShrink: 0, padding: 0, marginLeft: 'auto' },
   searchBox: {
     flex: 1,
     display: 'flex',
