@@ -3,7 +3,8 @@ import { useAppStore } from '../stores/appStore';
 import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHandle } from '../services/audio-capture';
 import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection } from '../types';
 import { type, fontWeight, numeric } from '../styles/type';
-import { Block, BlockButton, BlockSegment } from './Block';
+import { Block } from './Block';
+import { SlidingSwitch } from './SlidingSwitch';
 import { CustomDropdown } from './CustomDropdown';
 import { AppleToggle } from './AppleToggle';
 
@@ -344,10 +345,35 @@ export function LiveScripturePanel() {
   return (
     <div className="blk-col" style={styles.root}>
       <div className="blk blk--bar" style={styles.controlBar}>
-        <BlockSegment>
-          <BlockButton active={live.detectionMode === 'bible'} onClick={() => setLive({ detectionMode: 'bible' })}>Bible</BlockButton>
-          <BlockButton active={live.detectionMode === 'song'} onClick={() => setLive({ detectionMode: 'song' })}>Song</BlockButton>
-        </BlockSegment>
+        <SlidingSwitch
+          value={live.detectionMode === 'song' ? 'song' : 'bible'}
+          onChange={(val) => setLive({ detectionMode: val as 'bible' | 'song' })}
+          options={[
+            {
+              value: 'bible',
+              label: 'Bible',
+              title: 'Detect scripture references in speech',
+              icon: (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+              ),
+            },
+            {
+              value: 'song',
+              label: 'Song',
+              title: 'Detect song lyrics in speech',
+              icon: (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18V5l12-2v13" />
+                  <circle cx="6" cy="18" r="3" />
+                  <circle cx="18" cy="16" r="3" />
+                </svg>
+              ),
+            },
+          ]}
+        />
 
         {/* Play (▶) / Stop (■) Button */}
         {live.isActive ? (

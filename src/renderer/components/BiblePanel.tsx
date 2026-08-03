@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import type { BibleBook, BibleSearchResult, BibleVerse, BibleVersion, Scene } from '../types';
 import { type, fontWeight, numeric } from '../styles/type';
 import { CustomDropdown } from './CustomDropdown';
+import { SlidingSwitch } from './SlidingSwitch';
 import { Block } from './Block';
 
 const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', 'Revelation'];
@@ -489,74 +490,34 @@ export function BiblePanel() {
           />
 
           {/* Segmented Pill Switcher with Smooth Sliding Animation */}
-          <div style={{ position: 'relative', display: 'flex', background: '#232221', borderRadius: 6, padding: 3, border: '1px solid #262628', flexShrink: 0, height: 38 }}>
-            <div
-              style={{
-                position: 'absolute',
-                top: 3,
-                bottom: 3,
-                left: !dualVersion ? 3 : 'calc(50% + 1.5px)',
-                width: 'calc(50% - 4.5px)',
-                background: '#2e2e30',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: 4,
-                transition: 'left 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
-                zIndex: 1,
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setDualVersion(false)}
-              style={{
-                position: 'relative',
-                zIndex: 2,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '0 12px',
-                height: '100%',
-                background: 'transparent',
-                border: 'none',
-                color: '#ffffff',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-ui)',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              </svg>
-              <span>Single Version</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDualVersion(true)}
-              style={{
-                position: 'relative',
-                zIndex: 2,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '0 12px',
-                height: '100%',
-                background: 'transparent',
-                border: 'none',
-                color: '#ffffff',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-ui)',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
-                <path d="M16 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
-              </svg>
-              <span>Dual Version</span>
-            </button>
-          </div>
+          <SlidingSwitch
+            value={dualVersion ? 'dual' : 'single'}
+            onChange={(val) => setDualVersion(val === 'dual')}
+            options={[
+              {
+                value: 'single',
+                label: 'Single Version',
+                title: 'Show one translation',
+                icon: (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                ),
+              },
+              {
+                value: 'dual',
+                label: 'Dual Version',
+                title: 'Show a parallel translation alongside',
+                icon: (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
+                    <path d="M16 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
+                  </svg>
+                ),
+              },
+            ]}
+          />
 
           {/* Secondary Version Selector when Dual Version is active */}
           {dualVersion && (
