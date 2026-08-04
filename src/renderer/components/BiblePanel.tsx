@@ -10,6 +10,15 @@ import { Block } from './Block';
 
 const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', 'Revelation'];
 
+/** Shown until the Bible service reports what it actually has. Module-level so
+    the list keeps one identity across renders. */
+const FALLBACK_VERSIONS: BibleVersion[] = [
+  { id: 'KJV', name: 'King James Version', abbreviation: 'KJV', language: 'en', books: [] },
+  { id: 'NKJV', name: 'New King James Version', abbreviation: 'NKJV', language: 'en', books: [] },
+  { id: 'NASB', name: 'New American Standard Bible', abbreviation: 'NASB', language: 'en', books: [] },
+  { id: 'NLT', name: 'New Living Translation', abbreviation: 'NLT', language: 'en', books: [] },
+];
+
 function normalizeSearchText(value: string) {
   return value
     .normalize('NFD')
@@ -209,13 +218,18 @@ export function BiblePanel() {
   const verseRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const currentVersion = versions.find((v) => v.id === selectedVersion);
-  const versionOptions = versions.length ? versions : [
-    { id: 'KJV', name: 'King James Version', abbreviation: 'KJV', language: 'en', books: [] },
-    { id: 'NKJV', name: 'New King James Version', abbreviation: 'NKJV', language: 'en', books: [] },
-    { id: 'NASB', name: 'New American Standard Bible', abbreviation: 'NASB', language: 'en', books: [] },
-    { id: 'NLT', name: 'New Living Translation', abbreviation: 'NLT', language: 'en', books: [] },
-  ];
-  const bookOptions = books.length ? books : FALLBACK_BOOKS.map((name) => ({ name, chapters: 1 }));
+  const versionOptions = useMemo(() => (versions.length ? versions : FALLBACK_VERSIONS), [versions]);
+
+  /* Memoized because it is an effect dependency. Rebuilding the fallback list
+     on every render gave it a new identity each time, so the search effect
+     below re-ran, called setResults([]) with a fresh empty array — never
+     Object.is-equal to the last one — and re-rendered, forever. The app burned
+     a core from launch until the book list arrived, and indefinitely if it
+     never did. */
+  const bookOptions = useMemo(
+    () => (books.length ? books : FALLBACK_BOOKS.map((name) => ({ name, chapters: 1 }))),
+    [books],
+  );
 
   /** The term the result rows highlight — empty while browsing a chapter. */
   const searchTerm = results.length ? normalizeSearchText(query).trim() : '';
