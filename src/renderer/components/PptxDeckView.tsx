@@ -12,8 +12,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { SlideCanvas } from './SlideCanvas';
+import { SlideSelectionLayer } from './SlideSelectionLayer';
 import { editableTextShapes, setShapeText, setRunText, shapeFullText } from '../slide-engine/edit/text';
 import { markSlideDirty } from '../slide-engine/io/save';
+import type { SelectionState } from '../slide-engine/edit/geometry';
 import type { ParsedShape, ParsedRun } from '../slide-engine/parser/slide-parser';
 import type { ParsedSlide, SlideSizeEmu } from '../slide-engine/state';
 import type { DeckPackageStatus } from '../hooks/useDeckPackage';
@@ -137,12 +139,23 @@ export function PptxDeckView({
   boardWidth,
 }: PptxDeckViewProps) {
   const active = slides[activeIndex] || null;
+  const aspect = slideSizeEmu && slideSizeEmu.cx > 0 ? slideSizeEmu.cy / slideSizeEmu.cx : 9 / 16;
+  const boardHeight = Math.round(boardWidth * aspect);
 
   /* Edits mutate the parsed records and the XML nodes behind them in place —
      that is what lets a save round-trip into the .pptx — so React needs an
      explicit nudge to repaint. */
   const [revision, bump] = useState(0);
   const repaint = useCallback(() => bump((n) => n + 1), []);
+
+  const [selection, setSelection] = useState<SelectionState | null>(null);
+  // A selection is only meaningful for the slide it was made on.
+  useEffect(() => { setSelection(null); }, [activeIndex]);
+
+  const handleGeometryCommit = useCallback(() => {
+    markSlideDirty(active);
+    repaint();
+  }, [active, repaint]);
 
   const handlePanelEdit = useCallback((shape: ParsedShape, value: string) => {
     setShapeText(shape, value);
@@ -179,7 +192,7 @@ export function PptxDeckView({
           </div>
         )}
         {!status && active && (
-          <div style={styles.canvasFrame}>
+          <div style={{ ...styles.canvasFrame, position: 'relative' }}>
             <SlideCanvas
               slide={active}
               slideSizeEmu={slideSizeEmu}
@@ -187,6 +200,14 @@ export function PptxDeckView({
               editable
               onRunEdit={handleRunEdit}
               revision={revision}
+            />
+            <SlideSelectionLayer
+              shapes={(active.shapes as ParsedShape[]) || []}
+              selection={selection}
+              onSelectionChange={setSelection}
+              onCommit={handleGeometryCommit}
+              boardWidth={boardWidth}
+              boardHeight={boardHeight}
             />
           </div>
         )}

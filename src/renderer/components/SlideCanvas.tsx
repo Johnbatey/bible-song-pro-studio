@@ -131,7 +131,7 @@ function TableShape({ shape, outerStyle }: { shape: ParsedShape; outerStyle: CSS
   const table = tableRender(shape);
   const fallback = resolveThemeColor('tx1', '#0f172a');
   return (
-    <div style={{ ...outerStyle, ...table.style }}>
+    <div data-shape-id={shape.id} style={{ ...outerStyle, ...table.style }}>
       {table.cells.map((cell) => {
         const counters: Record<number, number> = {};
         return (
@@ -291,7 +291,7 @@ function TextShape({
   const fallback = resolveThemeColor('tx1', '#f8fafc');
 
   return (
-    <div ref={ref} style={{ ...outerStyle, ...visual.style, ...textBodyStyle(shape, box, boardH) }}>
+    <div ref={ref} data-shape-id={shape.id} style={{ ...outerStyle, ...visual.style, ...textBodyStyle(shape, box, boardH) }}>
       {visual.svg ? <ShapeSvg spec={visual.svg} /> : null}
       {(shape.paragraphs || []).map((pRuns, i) => (
         <Paragraph
@@ -323,7 +323,7 @@ function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit }: { shape: 
   if (shape.kind === 'image') {
     const img = imageRender(shape);
     return (
-      <div style={{ ...outer, ...img.divStyle }}>
+      <div data-shape-id={shape.id} style={{ ...outer, ...img.divStyle }}>
         <img src={img.src} alt="" style={{ ...img.imgStyle, pointerEvents: 'none' }} />
       </div>
     );
@@ -331,14 +331,14 @@ function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit }: { shape: 
 
   if (shape.kind === 'connector') {
     return (
-      <div style={{ ...outer, overflow: 'visible' }}>
+      <div data-shape-id={shape.id} style={{ ...outer, overflow: 'visible' }}>
         <Connector shape={shape} boardH={boardH} />
       </div>
     );
   }
 
   if (shape.kind === 'imagefill') {
-    return <div style={{ ...outer, ...imageFillStyle(shape, boardH) }} />;
+    return <div data-shape-id={shape.id} style={{ ...outer, ...imageFillStyle(shape, boardH) }} />;
   }
 
   if (shape.kind === 'table') {
@@ -348,7 +348,7 @@ function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit }: { shape: 
   if (shape.kind === 'shape') {
     const visual = shapeVisual(shape, boardH);
     return (
-      <div style={{ ...outer, ...visual.style }}>
+      <div data-shape-id={shape.id} style={{ ...outer, ...visual.style }}>
         {visual.svg ? <ShapeSvg spec={visual.svg} /> : null}
       </div>
     );
