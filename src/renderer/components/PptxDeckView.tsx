@@ -128,6 +128,12 @@ export interface PptxDeckViewProps {
   status: DeckPackageStatus | null;
   /** Board width in CSS px; the canvas scales to it. */
   boardWidth: number;
+  /** Called after every edit, so history can take a snapshot. */
+  onEdited?: () => void;
+  /** Called when the active slide changes, to capture its starting state. */
+  onSlideShown?: () => void;
+  /** Bumped by an undo/redo, which rebuilds the slide's records. */
+  externalRevision?: number;
 }
 
 export function PptxDeckView({
@@ -137,6 +143,9 @@ export function PptxDeckView({
   onSelectSlide,
   status,
   boardWidth,
+  onEdited,
+  onSlideShown,
+  externalRevision = 0,
 }: PptxDeckViewProps) {
   const active = slides[activeIndex] || null;
   const aspect = slideSizeEmu && slideSizeEmu.cx > 0 ? slideSizeEmu.cy / slideSizeEmu.cx : 9 / 16;
@@ -155,19 +164,30 @@ export function PptxDeckView({
   const handleGeometryCommit = useCallback(() => {
     markSlideDirty(active);
     repaint();
-  }, [active, repaint]);
+    onEdited?.();
+  }, [active, repaint, onEdited]);
+
+  /* An undo rebuilds the slide's records from scratch, so the canvas has to
+     repaint even though nothing in this component's own state moved. */
+  const paintRevision = revision + externalRevision;
+
+  // Capture the slide's starting state the first time it is shown, so its very
+  // first edit is undoable rather than being the baseline.
+  useEffect(() => { if (active?.parsed) onSlideShown?.(); }, [active, onSlideShown]);
 
   const handlePanelEdit = useCallback((shape: ParsedShape, value: string) => {
     setShapeText(shape, value);
     markSlideDirty(active);
     repaint();
-  }, [active, repaint]);
+    onEdited?.();
+  }, [active, repaint, onEdited]);
 
   const handleRunEdit = useCallback((run: ParsedRun, value: string) => {
     setRunText(run, value);
     markSlideDirty(active);
     repaint();
-  }, [active, repaint]);
+    onEdited?.();
+  }, [active, repaint, onEdited]);
 
   return (
     <div style={styles.wrap}>
@@ -180,7 +200,7 @@ export function PptxDeckView({
             active={i === activeIndex}
             slideSizeEmu={slideSizeEmu}
             onSelect={onSelectSlide}
-            revision={i === activeIndex ? revision : 0}
+            revision={i === activeIndex ? paintRevision : 0}
           />
         ))}
       </div>
@@ -199,7 +219,7 @@ export function PptxDeckView({
               width={boardWidth}
               editable
               onRunEdit={handleRunEdit}
-              revision={revision}
+              revision={paintRevision}
             />
             <SlideSelectionLayer
               shapes={(active.shapes as ParsedShape[]) || []}
@@ -218,6 +238,9 @@ export function PptxDeckView({
 
       {!status && active?.parsed && (
         <TextPanel
+          /* Keyed by slide only. Keying on the revision too would remount the
+             fields on every keystroke and throw away focus mid-word; the
+             values are controlled, so they follow an undo without a remount. */
           key={active.filename as string}
           shapes={(active.shapes as ParsedShape[]) || []}
           onEdit={handlePanelEdit}

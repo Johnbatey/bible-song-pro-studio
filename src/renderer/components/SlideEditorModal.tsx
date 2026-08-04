@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { SlideEditorHeader } from './slide-editor/SlideEditorHeader';
 import { SlideEditorLeftRail } from './slide-editor/SlideEditorLeftRail';
@@ -7,6 +7,7 @@ import { SlideEditorCanvasBoard } from './slide-editor/SlideEditorCanvasBoard';
 import { SlideEditorRightSidebar } from './slide-editor/SlideEditorRightSidebar';
 import { PptxDeckView } from './PptxDeckView';
 import { useDeckPackage } from '../hooks/useDeckPackage';
+import { useSlideHistory } from '../hooks/useSlideHistory';
 import { deriveSlideText } from '../slide-engine/io/deck-import';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
 
@@ -92,6 +93,23 @@ export function SlideEditorModal() {
      read. The package is reopened here so the editor shows the real slides. */
   const isPptxDeck = deck.sourceType === 'pptx';
   const pkg = useDeckPackage(deck, isSlideEditorOpen && isPptxDeck);
+
+  /* Undo for an imported deck works on the slide's XML, not on the deck
+     record — the parsed records hold live XML node references and cannot be
+     cloned. So it needs its own stack, separate from the native deck history
+     above, and the header routes to whichever one applies. */
+  const [pptxRevision, setPptxRevision] = useState(0);
+  const pptxHistory = useSlideHistory(
+    pkg.activeIndex,
+    /* An undo re-parses the slide, which replaces its record with a new
+       object — so the package has to re-publish, not just bump a counter, or
+       the canvas keeps rendering the pre-undo shapes. */
+    useCallback(() => {
+      pkg.refresh();
+      setPptxRevision((n) => n + 1);
+    }, [pkg.refresh]),
+    isPptxDeck,
+  );
 
   // Sync deck when activePresentationId changes
   useEffect(() => {
@@ -523,10 +541,10 @@ export function SlideEditorModal() {
       <SlideEditorHeader
         title={deck.title}
         onUpdateTitle={(title) => updateDeckState((prev) => ({ ...prev, title }))}
-        canUndo={historyPointer > 0}
-        canRedo={historyPointer < history.length - 1}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
+        canUndo={isPptxDeck ? pptxHistory.canUndo : historyPointer > 0}
+        canRedo={isPptxDeck ? pptxHistory.canRedo : historyPointer < history.length - 1}
+        onUndo={isPptxDeck ? pptxHistory.undo : handleUndo}
+        onRedo={isPptxDeck ? pptxHistory.redo : handleRedo}
         onImportFile={handleImportFile}
         onBackToDeck={closeSlideEditor}
         onSaveToDeck={handleSaveToDeck}
@@ -543,6 +561,9 @@ export function SlideEditorModal() {
             onSelectSlide={pkg.setActiveIndex}
             status={pkg.status}
             boardWidth={960}
+            onEdited={pptxHistory.record}
+            onSlideShown={pptxHistory.ensureBaseline}
+            externalRevision={pptxRevision}
           />
         ) : (
         <>

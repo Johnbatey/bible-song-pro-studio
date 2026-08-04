@@ -33,6 +33,9 @@ export interface DeckPackage {
   /** Ticks when another slide finishes parsing. */
   version: number;
   reload: () => void;
+  /** Re-publish the engine's slides. Needed after an undo, which re-parses a
+      slide and so replaces its record with a new object React has not seen. */
+  refresh: () => void;
   /** OOXML for every slide edited this session, keyed by slide index. */
   collectEdits: () => Map<number, SavedSlideXml>;
 }
@@ -163,5 +166,10 @@ export function useDeckPackage(deck: PresentationDeck | null, enabled: boolean):
 
   const collectEdits = useCallback(() => collectEditedSlideXml(engineState.slides), []);
 
-  return { slides, slideSizeEmu, activeIndex, setActiveIndex, status, version, reload, collectEdits };
+  const refresh = useCallback(() => {
+    setSlides([...engineState.slides]);
+    setVersion((v) => v + 1);
+  }, []);
+
+  return { slides, slideSizeEmu, activeIndex, setActiveIndex, status, version, reload, collectEdits, refresh };
 }
