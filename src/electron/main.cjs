@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog, systemPreferences, session } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog, systemPreferences, session, Menu, MenuItem } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -33,6 +33,123 @@ let obsService = null;
 let displayState = { type: null, outputMode: 'fullscreen', scene: null, activeAlert: null, transcription: null, theme: null };
 let transcriptionService = null;
 let verseDetectionService = null;
+
+/**
+ * All dockable panels in display order for the native menu, grouped with
+ * separators. This mirrors DOCKS in docks.tsx but lives here so the main
+ * process doesn't need to parse the renderer bundle.
+ */
+const DOCK_DEFS = [
+  // Workspace panels — always present; no TitleBar pill for some of these,
+  // so the native menu is the primary way to re-open them.
+  { id: 'output',       label: 'Output' },
+  { id: 'transcript',   label: 'Live Transcript' },
+  { id: 'history',      label: 'History' },
+  { id: 'queue',        label: 'Queue' },
+  null, // separator
+  // Content panels — all have TitleBar pill tabs too.
+  { id: 'bible',        label: 'Bible' },
+  { id: 'songs',        label: 'Songs' },
+  { id: 'presentation', label: 'Pro Slides' },
+  { id: 'live',         label: 'Live Scripture' },
+  { id: 'media',        label: 'Media' },
+  { id: 'scenes',       label: 'Scenes' },
+  { id: 'themes',       label: 'Themes' },
+];
+
+/**
+ * Rebuilds and installs the full application Menu. Called once at startup
+ * (with an empty openIds list) and again every time the renderer pushes a
+ * `dock:syncMenu` event so checkmarks stay in sync with the dockview layout.
+ */
+function buildAppMenu(openIds) {
+  const openSet = new Set(openIds || []);
+
+  const dockItems = DOCK_DEFS.map((def) => {
+    if (def === null) return new MenuItem({ type: 'separator' });
+    return new MenuItem({
+      label: def.label,
+      type: 'checkbox',
+      checked: openSet.has(def.id),
+      click() {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('dock:toggle', def.id);
+        }
+      },
+    });
+  });
+
+  dockItems.push(new MenuItem({ type: 'separator' }));
+  dockItems.push(new MenuItem({
+    label: 'Reset Layout',
+    accelerator: process.platform === 'darwin' ? 'Cmd+Shift+R' : 'Ctrl+Shift+R',
+    click() {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('dock:resetLayout');
+      }
+    },
+  }));
+
+  const template = [
+    ...(process.platform === 'darwin'
+      ? [{
+          label: app.name,
+          submenu: [
+            { role: 'about' },
+            { type: 'separator' },
+            { role: 'services' },
+            { type: 'separator' },
+            { role: 'hide' },
+            { role: 'hideOthers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { role: 'quit' },
+          ],
+        }]
+      : []),
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Dock',
+      submenu: dockItems,
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(process.platform === 'darwin'
+          ? [{ type: 'separator' }, { role: 'front' }]
+          : [{ role: 'close' }]),
+      ],
+    },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 function broadcastDisplayState() {
   const msg = JSON.stringify({ type: 'display:update', state: displayState });
@@ -406,6 +523,14 @@ app.whenReady().then(async () => {
   setTimeout(() => { if (splash && !splash.isDestroyed()) splash.close(); }, 5000);
 
   mainWindow.on('closed', () => { mainWindow = null; ndiService?.stop(); if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close(); });
+
+  // Install the initial native menu (all docks unchecked until the renderer
+  // loads and pushes its first dock:syncMenu).
+  buildAppMenu([]);
+
+  // Renderer pushes the current open-dock id list on every layout change so
+  // the native menu checkmarks stay in sync without polling.
+  ipcMain.on('dock:syncMenu', (_, openIds) => buildAppMenu(openIds));
 
   // ── Keyboard Shortcuts ──
   globalShortcut.register('CommandOrControl+Shift+F', () => { mainWindow?.webContents.send('shortcut:fullscreen'); });

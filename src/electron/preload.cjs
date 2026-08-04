@@ -147,6 +147,34 @@ contextBridge.exposeInMainWorld('BSP', {
     },
   },
 
+  dock: {
+    /**
+     * Fire-and-forget: push the current set of open dock ids so the native
+     * menu can update its checkmarks. Called on every dockview layout change.
+     */
+    syncMenu: (openIds) => ipcRenderer.send('dock:syncMenu', openIds),
+
+    /**
+     * Subscribe to native-menu toggle events. The main process sends the dock
+     * id that was clicked. Returns an unsubscribe function.
+     */
+    onToggle: (cb) => {
+      const handler = (_, id) => cb(id);
+      ipcRenderer.on('dock:toggle', handler);
+      return () => ipcRenderer.removeListener('dock:toggle', handler);
+    },
+
+    /**
+     * Subscribe to the native-menu "Reset Layout" item. Returns an unsubscribe
+     * function.
+     */
+    onResetLayout: (cb) => {
+      const handler = () => cb();
+      ipcRenderer.on('dock:resetLayout', handler);
+      return () => ipcRenderer.removeListener('dock:resetLayout', handler);
+    },
+  },
+
   openSlideEditor: () => ipcRenderer.invoke('slide-editor:open'),
   openStageDisplay: () => ipcRenderer.invoke('stage-display:open'),
   getDisplayUrl: () => ipcRenderer.invoke('get:displayUrl'),

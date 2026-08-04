@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme } from 'dockview-react';
 import { useAppStore } from '../../stores/appStore';
 import { DOCK_COMPONENTS, DOCKS, type DockId } from './docks';
-import { getDockApi, setDockApi } from './dockController';
+import { getDockApi, setDockApi, toggleDock } from './dockController';
 import { DockTab } from './DockTab';
 
 const LAYOUT_KEY = 'bsp_dockLayout';
@@ -66,7 +66,11 @@ export function DockHost() {
   const setOpenDockIds = useAppStore((s) => s.setOpenDockIds);
 
   const syncOpenDocks = useCallback((api: DockviewApi) => {
-    setOpenDockIds(api.panels.map((p) => p.id));
+    const ids = api.panels.map((p) => p.id);
+    setOpenDockIds(ids);
+    // Keep the native Electron menu checkmarks in sync. Guarded so the
+    // web-browser dev fallback (no BSP bridge) is a silent no-op.
+    window.BSP?.dock?.syncMenu(ids);
   }, [setOpenDockIds]);
 
   const onReady = useCallback((event: DockviewReadyEvent) => {
@@ -119,6 +123,22 @@ export function DockHost() {
   }, [syncOpenDocks]);
 
   useEffect(() => () => setDockApi(null), []);
+
+  // Subscribe to native-menu events. The main process sends a dock id when
+  // the user clicks a Dock menu item, and a reset signal for Reset Layout.
+  // Returns are cleanup functions so React removes the listeners on unmount.
+  useEffect(() => {
+    const unsubToggle = window.BSP?.dock?.onToggle((id: string) => {
+      toggleDock(id as DockId);
+    });
+    const unsubReset = window.BSP?.dock?.onResetLayout(() => {
+      resetDockLayout();
+    });
+    return () => {
+      unsubToggle?.();
+      unsubReset?.();
+    };
+  }, []);
 
   return (
     <DockviewReact

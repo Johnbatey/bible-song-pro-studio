@@ -602,6 +602,23 @@ declare global {
       };
       openSlideEditor: () => Promise<boolean>;
       openStageDisplay: () => Promise<boolean>;
+      dock?: {
+        /**
+         * Push the current set of open dock ids to the main process so the
+         * native Electron menu can update its checkmarks. Fire-and-forget.
+         */
+        syncMenu: (openIds: string[]) => void;
+        /**
+         * Subscribe to native-menu "Dock › <panel>" click events. The callback
+         * receives the dock id that was toggled. Returns an unsubscribe function.
+         */
+        onToggle: (cb: (id: string) => void) => () => void;
+        /**
+         * Subscribe to native-menu "Dock › Reset Layout" click events. Returns
+         * an unsubscribe function.
+         */
+        onResetLayout: (cb: () => void) => () => void;
+      };
     };
   }
 }
