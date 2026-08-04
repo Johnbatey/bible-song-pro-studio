@@ -1,10 +1,11 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { SlideEditorHeader } from './slide-editor/SlideEditorHeader';
 import { SlideEditorLeftRail } from './slide-editor/SlideEditorLeftRail';
 import { SlideEditorQuickToolbar, type ActiveTool } from './slide-editor/SlideEditorQuickToolbar';
 import { SlideEditorCanvasBoard } from './slide-editor/SlideEditorCanvasBoard';
-import { SlideEditorRightSidebar } from './slide-editor/SlideEditorRightSidebar';
+import { SlideEditorRightSidebar, type PptxInspector } from './slide-editor/SlideEditorRightSidebar';
+import type { LayerRow } from './slide-editor/LayerList';
 import { PptxDeckView } from './PptxDeckView';
 import { SlideCanvas } from './SlideCanvas';
 import type { ParsedShape } from '../slide-engine/parser/slide-parser';
@@ -15,6 +16,11 @@ import { useDeckPackage } from '../hooks/useDeckPackage';
 import { useSlideHistory } from '../hooks/useSlideHistory';
 import { deriveSlideText } from '../slide-engine/io/deck-import';
 import { buildDeckFromPptx } from '../hooks/usePptxImport';
+import { markSlideDirty } from '../slide-engine/io/save';
+import { setShapeText } from '../slide-engine/edit/text';
+import { deleteShapes, reorderShapes, setShapesFill, setShapesStroke, setShapesTextColor } from '../slide-engine/edit/style';
+import { groupShapes, layerUnits, moveLayerUnit, selectionHasGroup, ungroupShapes } from '../slide-engine/edit/grouping';
+import type { SelectionState } from '../slide-engine/edit/geometry';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
 
 export function SlideEditorModal() {
@@ -108,11 +114,16 @@ export function SlideEditorModal() {
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
 
+  /* Edits mutate the parsed records and the XML nodes behind them in place —
+     that is what lets a save round-trip into the .pptx — so React needs an
+     explicit nudge to repaint, and everything derived from the shapes has to
+     hang off this rather than off object identity. */
   const [pptxRevision, setPptxRevision] = useState(0);
   /* Lifted out of the deck view so the chrome's Design and Layer tabs act on
      the same selection the canvas shows. */
-  const [pptxSelected, setPptxSelected] = useState<ParsedShape[]>([]);
-  const setPptxSelection = useCallback((shapes: ParsedShape[]) => setPptxSelected(shapes), []);
+  const [pptxSelection, setPptxSelection] = useState<SelectionState | null>(null);
+  // A selection is only meaningful for the slide it was made on.
+  useEffect(() => { setPptxSelection(null); }, [pkg.activeIndex]);
 
   /* The rail draws PowerPoint slides with the same canvas as the board, so a
      thumbnail cannot drift from what it is a thumbnail of. */
@@ -125,22 +136,179 @@ export function SlideEditorModal() {
         slideSizeEmu={pkg.slideSizeEmu}
         width={RAIL_THUMB_W}
         dynamicAutofit={false}
-        revision={pptxRevision}
+        /* Only the slide being edited can have changed, and the revision ticks
+           per keystroke — handing it to all of them would redraw the whole rail
+           on every character typed. */
+        revision={index === pkg.activeIndex ? pptxRevision : 0}
       />
     );
-  }, [pkg.slides, pkg.slideSizeEmu, pptxRevision]);
+  }, [pkg.slides, pkg.slideSizeEmu, pkg.activeIndex, pptxRevision]);
 
   const pptxHistory = useSlideHistory(
     pkg.activeIndex,
     /* An undo re-parses the slide, which replaces its record with a new
        object — so the package has to re-publish, not just bump a counter, or
-       the canvas keeps rendering the pre-undo shapes. */
+       the canvas keeps rendering the pre-undo shapes. The selection goes with
+       them: it names shapes that no longer exist, and a stale one leaves the
+       canvas showing a selection box around nothing it can act on. */
     useCallback(() => {
       pkg.refresh();
+      setPptxSelection(null);
       setPptxRevision((n) => n + 1);
     }, [pkg.refresh]),
     isPptxDeck,
   );
+
+  /* ---- PowerPoint editing -------------------------------------------------
+     The engine that does the work sits below; these are the wires from the
+     chrome's tabs and toolbar to it. They live here rather than in the deck
+     view because the inspector, the layer list and the toolbar are all outside
+     that view now, and every one of them acts on the same selection. */
+
+  const pptxSlide = isPptxDeck ? pkg.slides[pkg.activeIndex] || null : null;
+  const pptxShapes = (pptxSlide?.shapes as ParsedShape[]) || [];
+  const pptxSelected = pptxSelection
+    ? pptxShapes.filter((s) => pptxSelection.ids.includes(s.id))
+    : [];
+
+  /** An edit landed: snapshot it for undo and repaint from the new records. */
+  const handlePptxEdited = useCallback(() => {
+    pptxHistory.record();
+    setPptxRevision((n) => n + 1);
+  }, [pptxHistory]);
+
+  const commitStyle = useCallback((fn: () => void) => {
+    fn();
+    markSlideDirty(pptxSlide);
+    handlePptxEdited();
+  }, [pptxSlide, handlePptxEdited]);
+
+  const handlePptxReorder = useCallback((toFront: boolean) => {
+    if (!pptxSlide || !pptxSelection) return;
+    commitStyle(() => {
+      pptxSlide.shapes = reorderShapes(pptxShapes, pptxSelection.ids, toFront);
+    });
+  }, [pptxSlide, pptxShapes, pptxSelection, commitStyle]);
+
+  const handlePptxDelete = useCallback(() => {
+    if (!pptxSlide || !pptxSelection) return;
+    commitStyle(() => {
+      pptxSlide.shapes = deleteShapes(pptxShapes, pptxSelection.ids, pptxSelection.groupNode);
+    });
+    setPptxSelection(null);
+  }, [pptxSlide, pptxShapes, pptxSelection, commitStyle]);
+
+  const handlePptxTextEdit = useCallback((shape: ParsedShape, value: string) => {
+    setShapeText(shape, value);
+    markSlideDirty(pptxSlide);
+    handlePptxEdited();
+  }, [pptxSlide, handlePptxEdited]);
+
+  /* Grouping is records-level and writes no XML, so there is nothing for the
+     slide's undo stack to snapshot — only the repaint is needed. Marking the
+     slide dirty here would also make an untouched deck look edited on save. */
+  const handlePptxGroup = useCallback(() => {
+    if (!pptxSelection) return;
+    const next = groupShapes(pptxShapes, pptxSelection.ids);
+    if (!next) return;
+    setPptxSelection(next);
+    setPptxRevision((n) => n + 1);
+  }, [pptxShapes, pptxSelection]);
+
+  const handlePptxUngroup = useCallback(() => {
+    if (!pptxSelection) return;
+    if (ungroupShapes(pptxShapes, pptxSelection.ids) === 0) return;
+    setPptxSelection({ ids: pptxSelection.ids, groupId: null, groupNode: null });
+    setPptxRevision((n) => n + 1);
+  }, [pptxShapes, pptxSelection]);
+
+  /* The slide's stack, bottom entry first. Rebuilt whenever the records change
+     — they mutate in place, so the revision is what marks them as changed. */
+  const pptxLayers = useMemo(
+    () => layerUnits(pptxShapes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pptxSlide, pptxRevision],
+  );
+
+  /** Layer rows read top first; `layerUnits` counts up from the bottom. */
+  const pptxLayerRows: LayerRow[] = pptxLayers
+    .map((unit) => ({
+      id: unit.key,
+      label: unit.label,
+      kind: unit.kind,
+      selected: !!pptxSelection && unit.ids.some((id) => pptxSelection.ids.includes(id)),
+    }))
+    .reverse();
+
+  const handleSelectLayer = useCallback((key: string, additive: boolean) => {
+    const unit = pptxLayers.find((u) => u.key === key);
+    if (!unit) return;
+    if (additive) {
+      const current = pptxSelection?.ids || [];
+      const already = unit.ids.every((id) => current.includes(id));
+      const ids = already
+        ? current.filter((id) => !unit.ids.includes(id))
+        : [...new Set([...current, ...unit.ids])];
+      setPptxSelection(ids.length ? { ids, groupId: null, groupNode: null } : null);
+      return;
+    }
+    /* Match what a click on the canvas produces, so the two ways of selecting
+       a group behave identically — including drilling into it afterwards. */
+    const first = pptxShapes.find((s) => s.id === unit.ids[0]) || null;
+    const grouped = unit.ids.length > 1 || unit.kind === 'group';
+    setPptxSelection({
+      ids: unit.ids,
+      groupId: grouped ? ((first?.groupId as string) || null) : null,
+      groupNode: grouped ? ((first?.groupNode as Element) || null) : null,
+    });
+  }, [pptxLayers, pptxShapes, pptxSelection]);
+
+  const handleReorderLayer = useCallback((fromRow: number, toRow: number) => {
+    if (!pptxSlide) return;
+    // Row indices run top-down, unit indices bottom-up; both lists lose the
+    // dragged entry before the drop lands, so the flip is the same either side.
+    const n = pptxLayers.length;
+    commitStyle(() => {
+      pptxSlide.shapes = moveLayerUnit(pptxShapes, pptxLayers, n - 1 - fromRow, n - 1 - toRow);
+    });
+  }, [pptxSlide, pptxShapes, pptxLayers, commitStyle]);
+
+  const handleDeleteLayer = useCallback((key: string) => {
+    const unit = pptxLayers.find((u) => u.key === key);
+    if (!unit || !pptxSlide) return;
+    /* A real PowerPoint group goes as one <p:grpSp>, rather than each child
+       being unhooked and an empty group left in the file. A records-level
+       group is several spTree children and has to go one at a time. */
+    const groupNode = unit.nodes.length === 1 && unit.nodes[0].localName === 'grpSp'
+      ? unit.nodes[0]
+      : null;
+    commitStyle(() => {
+      pptxSlide.shapes = deleteShapes(pptxShapes, unit.ids, groupNode);
+    });
+    setPptxSelection((sel) =>
+      sel && sel.ids.some((id) => unit.ids.includes(id)) ? null : sel);
+  }, [pptxLayers, pptxSlide, pptxShapes, commitStyle]);
+
+  const pptxInspector: PptxInspector | null = isPptxDeck && !pkg.status && pptxSlide?.parsed
+    ? {
+        selected: pptxSelected,
+        shapes: pptxShapes,
+        layers: pptxLayerRows,
+        onSelectLayer: handleSelectLayer,
+        onReorderLayer: handleReorderLayer,
+        onDeleteLayer: handleDeleteLayer,
+        onFill: (hex) => commitStyle(() => setShapesFill(pptxSelected, hex)),
+        onStroke: (hex, w) => commitStyle(() => setShapesStroke(pptxSelected, hex, w)),
+        onTextColor: (hex) => commitStyle(() => setShapesTextColor(pptxSelected, hex)),
+        onReorder: handlePptxReorder,
+        onDelete: handlePptxDelete,
+        onEditText: handlePptxTextEdit,
+        onGroup: handlePptxGroup,
+        onUngroup: handlePptxUngroup,
+        canGroup: pptxSelected.length > 1,
+        canUngroup: selectionHasGroup(pptxSelected),
+      }
+    : null;
 
   // Sync deck when activePresentationId changes
   useEffect(() => {
@@ -609,14 +777,12 @@ export function SlideEditorModal() {
             slides={pkg.slides}
             slideSizeEmu={pkg.slideSizeEmu}
             activeIndex={pkg.activeIndex}
-            onSelectSlide={pkg.setActiveIndex}
             status={pkg.status}
-            onEdited={pptxHistory.record}
-            onSlideShown={pptxHistory.ensureBaseline}
-            externalRevision={pptxRevision}
+            selection={pptxSelection}
             onSelectionChange={setPptxSelection}
-            showRail={false}
-            showInspector={false}
+            onEdited={handlePptxEdited}
+            onSlideShown={pptxHistory.ensureBaseline}
+            revision={pptxRevision}
           />
         ) : (
         <SlideEditorCanvasBoard
@@ -636,6 +802,15 @@ export function SlideEditorModal() {
           onSelectTool={handleSelectTool}
           smartSnap={smartSnap}
           onToggleSmartSnap={() => setSmartSnap(!smartSnap)}
+          pptx={pptxInspector && {
+            canGroup: pptxInspector.canGroup,
+            canUngroup: pptxInspector.canUngroup,
+            hasSelection: pptxSelected.length > 0,
+            onGroup: handlePptxGroup,
+            onUngroup: handlePptxUngroup,
+            onReorder: handlePptxReorder,
+            onDelete: handlePptxDelete,
+          }}
         />
 
         {/* Right Inspector Sidebar */}
@@ -645,6 +820,9 @@ export function SlideEditorModal() {
           onUpdateSlide={handleUpdateSlide}
           onUpdateElement={handleUpdateElement}
           onDeleteElement={handleDeleteElement}
+          onSelectElement={setSelectedElementId}
+          onReorderElements={handleUpdateSlideElements}
+          pptx={pptxInspector}
         />
         </>
       </div>

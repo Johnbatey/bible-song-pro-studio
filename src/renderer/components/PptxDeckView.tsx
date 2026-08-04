@@ -1,163 +1,54 @@
 /* =========================================================================
-   <PptxDeckView> — an imported PowerPoint deck on the editor canvas
+   <PptxDeckView> — an imported PowerPoint deck on the editor board
    -------------------------------------------------------------------------
-   Slide rail on the left, the active slide on the board. Both are the same
-   <SlideCanvas>, so a thumbnail is the slide, not a separate approximation of
-   it — nothing can drift between the two.
+   The centre of the editor, and only the centre: the rail, the inspector and
+   the toolbar around it are the editor chrome's, shared with native decks, so
+   a PowerPoint deck gets the same window rather than a parallel one.
 
-   Slides arrive progressively: slide 1 parses immediately so the deck opens at
-   once, and the rest fill from an idle queue. A rail entry that has not been
-   reached yet shows its number and parses on demand the moment it is selected.
+   Selection is owned by the chrome for the same reason — the Design and Layer
+   tabs act on it, and two copies of "what is selected" would be two things to
+   keep in step.
    ========================================================================= */
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { SlideCanvas } from './SlideCanvas';
 import { SlideSelectionLayer } from './SlideSelectionLayer';
-import { ShapeInspector } from './ShapeInspector';
-import { editableTextShapes, setShapeText, setRunText, shapeFullText } from '../slide-engine/edit/text';
+import { setRunText } from '../slide-engine/edit/text';
 import { markSlideDirty } from '../slide-engine/io/save';
-import { deleteShapes, reorderShapes, setShapesFill, setShapesStroke, setShapesTextColor } from '../slide-engine/edit/style';
 import type { SelectionState } from '../slide-engine/edit/geometry';
 import type { ParsedShape, ParsedRun } from '../slide-engine/parser/slide-parser';
 import type { ParsedSlide, SlideSizeEmu } from '../slide-engine/state';
 import type { DeckPackageStatus } from '../hooks/useDeckPackage';
 
-const RAIL_THUMB_W = 168;
-
-interface RailItemProps {
-  slide: ParsedSlide;
-  index: number;
-  active: boolean;
-  slideSizeEmu: SlideSizeEmu | null;
-  onSelect: (index: number) => void;
-  /* Edits mutate the slide record in place, so its identity never changes and
-     memo would hold a stale thumbnail. Only the active slide can be edited, so
-     only it needs a revision to break through. */
-  revision: number;
-}
-
-const RailItem = memo(function RailItem({ slide, index, active, slideSizeEmu, onSelect, revision }: RailItemProps) {
-  const ref = useRef<HTMLButtonElement>(null);
-
-  // Keep the selected slide visible when navigating with the rail collapsed
-  // past the fold.
-  useEffect(() => {
-    if (active) ref.current?.scrollIntoView({ block: 'nearest' });
-  }, [active]);
-
-  const aspect = slideSizeEmu && slideSizeEmu.cx > 0 ? slideSizeEmu.cy / slideSizeEmu.cx : 9 / 16;
-
-  return (
-    <button
-      ref={ref}
-      onClick={() => onSelect(index)}
-      style={{
-        ...styles.railItem,
-        borderColor: active ? 'var(--accent, #f97316)' : 'rgba(255,255,255,0.08)',
-      }}
-      title={`Slide ${index + 1}`}
-    >
-      <span style={styles.railNumber}>{index + 1}</span>
-      <div style={{ ...styles.railThumb, height: Math.round(RAIL_THUMB_W * aspect) }}>
-        {slide.parsed ? (
-          <SlideCanvas
-            slide={slide}
-            slideSizeEmu={slideSizeEmu}
-            width={RAIL_THUMB_W}
-            dynamicAutofit={false}
-            revision={revision}
-          />
-        ) : (
-          <span style={styles.railPending}>…</span>
-        )}
-      </div>
-    </button>
-  );
-});
-
-/**
- * One field per real text box — PowerPoint's own unit — never one per split
- * run. Decorative custGeom art carries a throwaway txBody and is skipped, or a
- * single illustration slide would list hundreds of empty fields.
- */
-function TextPanel({
-  shapes,
-  onEdit,
-}: {
-  shapes: ParsedShape[];
-  onEdit: (shape: ParsedShape, value: string) => void;
-}) {
-  const boxes = editableTextShapes(shapes);
-
-  if (boxes.length === 0) {
-    return <div style={styles.sectionEmpty}>No editable text on this slide.</div>;
-  }
-
-  return (
-    <div style={styles.section}>
-      <div style={styles.panelHead}>
-        {boxes.length} text box{boxes.length === 1 ? '' : 'es'}
-      </div>
-      {boxes.map((shape, i) => {
-        const label = shape.paragraphs[0].map((r) => r.text).join('').trim().slice(0, 28) || `Text box ${i + 1}`;
-        return (
-          <label key={shape.id} style={styles.field}>
-            <span style={styles.fieldLabel}>{label}</span>
-            <textarea
-              /* Controlled, so editing a run on the canvas is reflected here
-                 too. Uncontrolled would go stale, and the next keystroke in
-                 this field would then write the old text back over the canvas
-                 edit. onEdit writes through synchronously and bumps the
-                 revision, so the value is always what the box actually says. */
-              value={shapeFullText(shape)}
-              rows={Math.min(4, shape.paragraphs.length)}
-              onChange={(e) => onEdit(shape, e.target.value)}
-              style={styles.textarea}
-              spellCheck={false}
-            />
-          </label>
-        );
-      })}
-    </div>
-  );
-}
-
 export interface PptxDeckViewProps {
   slides: ParsedSlide[];
   slideSizeEmu: SlideSizeEmu | null;
   activeIndex: number;
-  onSelectSlide: (index: number) => void;
   status: DeckPackageStatus | null;
   /** Board width in CSS px. Omit to fit the space the chrome leaves. */
   boardWidth?: number;
-  /** Called after every edit, so history can take a snapshot. */
-  onEdited?: () => void;
+  selection: SelectionState | null;
+  onSelectionChange: (selection: SelectionState | null) => void;
+  /** Called after every edit, so history can take a snapshot and the canvas
+      can repaint from the committed records. */
+  onEdited: () => void;
   /** Called when the active slide changes, to capture its starting state. */
   onSlideShown?: () => void;
-  /** Bumped by an undo/redo, which rebuilds the slide's records. */
-  externalRevision?: number;
-  /* The editor chrome hosts the rail and the inspector, so this renders just
-     the board inside it. Standalone (both true) is kept for testing the view
-     on its own. */
-  showRail?: boolean;
-  showInspector?: boolean;
-  /** Lifted so the chrome's Design and Layer tabs act on the same selection. */
-  onSelectionChange?: (selected: ParsedShape[], selection: SelectionState | null) => void;
+  /** Bumped by an edit or an undo, either of which rebuilds what is painted. */
+  revision: number;
 }
 
 export function PptxDeckView({
   slides,
   slideSizeEmu,
   activeIndex,
-  onSelectSlide,
   status,
   boardWidth,
+  selection,
+  onSelectionChange,
   onEdited,
   onSlideShown,
-  externalRevision = 0,
-  showRail = true,
-  showInspector = true,
-  onSelectionChange,
+  revision,
 }: PptxDeckViewProps) {
   const active = slides[activeIndex] || null;
   const aspect = slideSizeEmu && slideSizeEmu.cx > 0 ? slideSizeEmu.cy / slideSizeEmu.cx : 9 / 16;
@@ -187,186 +78,56 @@ export function PptxDeckView({
   const boardPx = fitWidth;
   const boardHeight = Math.round(boardPx * aspect);
 
-  /* Edits mutate the parsed records and the XML nodes behind them in place —
-     that is what lets a save round-trip into the .pptx — so React needs an
-     explicit nudge to repaint. */
-  const [revision, bump] = useState(0);
-  const repaint = useCallback(() => bump((n) => n + 1), []);
-
-  const [selection, setSelection] = useState<SelectionState | null>(null);
-  // A selection is only meaningful for the slide it was made on.
-  useEffect(() => { setSelection(null); }, [activeIndex]);
-
   const handleGeometryCommit = useCallback(() => {
     markSlideDirty(active);
-    repaint();
-    onEdited?.();
-  }, [active, repaint, onEdited]);
+    onEdited();
+  }, [active, onEdited]);
 
-  const selectedShapes = selection && active
-    ? ((active.shapes as ParsedShape[]) || []).filter((s) => selection.ids.includes(s.id))
-    : [];
-
-
-  const commitStyle = useCallback((fn: () => void) => {
-    fn();
+  const handleRunEdit = useCallback((run: ParsedRun, value: string) => {
+    setRunText(run, value);
     markSlideDirty(active);
-    repaint();
-    onEdited?.();
-  }, [active, repaint, onEdited]);
-
-  const handleReorder = useCallback((toFront: boolean) => {
-    if (!active || !selection) return;
-    commitStyle(() => {
-      active.shapes = reorderShapes((active.shapes as ParsedShape[]) || [], selection.ids, toFront);
-    });
-  }, [active, selection, commitStyle]);
-
-  const handleDelete = useCallback(() => {
-    if (!active || !selection) return;
-    commitStyle(() => {
-      active.shapes = deleteShapes((active.shapes as ParsedShape[]) || [], selection.ids, selection.groupNode);
-    });
-    setSelection(null);
-  }, [active, selection, commitStyle]);
-
-  /* An undo rebuilds the slide's records from scratch, so the canvas has to
-     repaint even though nothing in this component's own state moved. */
-  const paintRevision = revision + externalRevision;
-
-  useEffect(() => {
-    onSelectionChange?.(selectedShapes, selection);
-    // selectedShapes is derived from the two below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, paintRevision, onSelectionChange]);
+    onEdited();
+  }, [active, onEdited]);
 
   // Capture the slide's starting state the first time it is shown, so its very
   // first edit is undoable rather than being the baseline.
   useEffect(() => { if (active?.parsed) onSlideShown?.(); }, [active, onSlideShown]);
 
-  const handlePanelEdit = useCallback((shape: ParsedShape, value: string) => {
-    setShapeText(shape, value);
-    markSlideDirty(active);
-    repaint();
-    onEdited?.();
-  }, [active, repaint, onEdited]);
-
-  const handleRunEdit = useCallback((run: ParsedRun, value: string) => {
-    setRunText(run, value);
-    markSlideDirty(active);
-    repaint();
-    onEdited?.();
-  }, [active, repaint, onEdited]);
-
   return (
-    <div style={styles.wrap}>
-      {showRail && (
-      <div style={styles.rail}>
-        {slides.map((slide, i) => (
-          <RailItem
-            key={slide.filename || i}
-            slide={slide}
-            index={i}
-            active={i === activeIndex}
-            slideSizeEmu={slideSizeEmu}
-            onSelect={onSelectSlide}
-            revision={i === activeIndex ? paintRevision : 0}
-          />
-        ))}
-      </div>
+    <div ref={boardAreaRef} style={styles.board}>
+      {status && (
+        <div style={{ ...styles.status, color: status.level === 'error' ? '#f87171' : 'rgba(255,255,255,0.6)' }}>
+          {status.text}
+        </div>
       )}
-
-      <div ref={boardAreaRef} style={styles.board}>
-        {status && (
-          <div style={{ ...styles.status, color: status.level === 'error' ? '#f87171' : 'rgba(255,255,255,0.6)' }}>
-            {status.text}
-          </div>
-        )}
-        {!status && active && (
-          <div style={{ ...styles.canvasFrame, position: 'relative' }}>
-            <SlideCanvas
-              slide={active}
-              slideSizeEmu={slideSizeEmu}
-              width={boardPx}
-              editable
-              onRunEdit={handleRunEdit}
-              revision={paintRevision}
-            />
-            <SlideSelectionLayer
-              shapes={(active.shapes as ParsedShape[]) || []}
-              selection={selection}
-              onSelectionChange={setSelection}
-              onCommit={handleGeometryCommit}
-              boardWidth={boardPx}
-              boardHeight={boardHeight}
-            />
-          </div>
-        )}
-        {!status && !active && (
-          <div style={styles.status}>No slides in this deck.</div>
-        )}
-      </div>
-
-      {showInspector && !status && active?.parsed && (
-        <div style={styles.panel}>
-          <ShapeInspector
-            selected={selectedShapes}
-            onFill={(hex) => commitStyle(() => setShapesFill(selectedShapes, hex))}
-            onStroke={(hex, w) => commitStyle(() => setShapesStroke(selectedShapes, hex, w))}
-            onTextColor={(hex) => commitStyle(() => setShapesTextColor(selectedShapes, hex))}
-            onReorder={handleReorder}
-            onDelete={handleDelete}
+      {!status && active && (
+        <div style={{ ...styles.canvasFrame, position: 'relative' }}>
+          <SlideCanvas
+            slide={active}
+            slideSizeEmu={slideSizeEmu}
+            width={boardPx}
+            editable
+            onRunEdit={handleRunEdit}
+            revision={revision}
           />
-          <TextPanel
-          /* Keyed by slide only. Keying on the revision too would remount the
-             fields on every keystroke and throw away focus mid-word; the
-             values are controlled, so they follow an undo without a remount. */
-            key={active.filename as string}
+          <SlideSelectionLayer
             shapes={(active.shapes as ParsedShape[]) || []}
-            onEdit={handlePanelEdit}
+            selection={selection}
+            onSelectionChange={onSelectionChange}
+            onCommit={handleGeometryCommit}
+            boardWidth={boardPx}
+            boardHeight={boardHeight}
           />
         </div>
+      )}
+      {!status && !active && (
+        <div style={styles.status}>No slides in this deck.</div>
       )}
     </div>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
-  wrap: { flex: 1, display: 'flex', minHeight: 0, minWidth: 0 },
-  rail: {
-    width: RAIL_THUMB_W + 32,
-    flexShrink: 0,
-    overflowY: 'auto',
-    padding: 8,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    background: '#0e1117',
-    borderRight: '1px solid rgba(255,255,255,0.08)',
-  },
-  railItem: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 6,
-    padding: 4,
-    background: 'transparent',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 6,
-    cursor: 'pointer',
-    textAlign: 'left',
-  },
-  railNumber: { fontSize: 10, color: 'rgba(255,255,255,0.45)', width: 16, flexShrink: 0, paddingTop: 2 },
-  railThumb: {
-    width: RAIL_THUMB_W,
-    overflow: 'hidden',
-    borderRadius: 3,
-    background: '#000',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  railPending: { fontSize: 16, color: 'rgba(255,255,255,0.3)' },
   board: {
     flex: 1,
     minWidth: 0,
@@ -382,45 +143,6 @@ const styles: Record<string, CSSProperties> = {
     flexShrink: 0,
   },
   status: { fontSize: 13, color: 'rgba(255,255,255,0.6)' },
-  panel: {
-    width: 280,
-    flexShrink: 0,
-    overflowY: 'auto',
-    padding: 12,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-    background: '#0e1117',
-    borderLeft: '1px solid rgba(255,255,255,0.08)',
-  },
-  section: { display: 'flex', flexDirection: 'column', gap: 10 },
-  sectionEmpty: { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
-  panelHead: {
-    fontSize: 10,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.45)',
-  },
-  field: { display: 'flex', flexDirection: 'column', gap: 4 },
-  fieldLabel: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.55)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  textarea: {
-    width: '100%',
-    resize: 'vertical',
-    background: '#16191f',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 5,
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'inherit',
-    padding: '6px 8px',
-    outline: 'none',
-  },
 };
 
 export default PptxDeckView;
