@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { CustomDropdown } from './CustomDropdown';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
+import { usePptxImport } from '../hooks/usePptxImport';
 import { Block } from './Block';
 
 /** Card-shaped view of a deck. The grid never sees the deck record itself. */
@@ -28,6 +29,7 @@ export function PresentationPanel() {
   const [searchQuery, setSearchQuery] = useState('');
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_slidesBarPosition');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const { inputRef, pick: pickPptx, onInputChange, status, clearStatus } = usePptxImport();
 
   /* Reads the deck store rather than holding its own list — the grid used to be
      three hardcoded demo cards, which meant nothing imported or saved could ever
@@ -45,6 +47,9 @@ export function PresentationPanel() {
   function handleCreateNew(val: string) {
     if (val === 'manual') {
       openSlideEditor();
+    } else if (val === 'import') {
+      clearStatus();
+      pickPptx();
     }
   }
 
@@ -72,6 +77,13 @@ export function PresentationPanel() {
           ]}
           onChange={handleCreateNew}
           buttonStyle={{ background: '#202024', height: 34, padding: '0 14px', borderRadius: 6, fontWeight: 700 }}
+        />
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pptx"
+          onChange={onInputChange}
+          style={{ display: 'none' }}
         />
 
         <div style={styles.searchBox}>
@@ -111,6 +123,17 @@ export function PresentationPanel() {
 
       {/* Slide Cards Grid */}
       <Block className="blk-fill" title="Slides" subtitle={`${presentations.length}`} bodyStyle={styles.gridContainer}>
+        {status && (
+          <div
+            style={{
+              ...styles.importStatus,
+              color: status.level === 'error' ? '#f87171' : status.level === 'done' ? '#4ade80' : 'var(--text-dim)',
+            }}
+            onClick={clearStatus}
+          >
+            {status.text}
+          </div>
+        )}
         {presentations.length === 0 && (
           <div style={styles.emptyState}>
             No decks yet. Use <strong>+ Create new</strong> to build one, or import a presentation.
@@ -161,6 +184,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-ui)',
   },
   moveBarBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, background: 'transparent', border: 'none', borderRadius: 6, color: '#ffffff', cursor: 'pointer', flexShrink: 0, padding: 0, marginLeft: 'auto' },
+  importStatus: {
+    gridColumn: '1 / -1',
+    padding: '8px 12px',
+    fontSize: 12,
+    background: 'var(--block-active)',
+    border: '1px solid var(--block-line)',
+    borderRadius: 6,
+    cursor: 'pointer',
+  },
   emptyState: {
     gridColumn: '1 / -1',
     padding: '32px 16px',
