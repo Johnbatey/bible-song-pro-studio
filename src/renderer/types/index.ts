@@ -548,6 +548,13 @@ declare global {
         importFile: (payload: { filePath: string }) => Promise<SongImportResult>;
         importText: (payload: { text: string }) => Promise<SongImportResult>;
       };
+      deck: {
+        /** Reads a .pptx back from disk. Only the path is persisted with a deck. */
+        read: (filePath: string) => Promise<{ ok: boolean; data?: Uint8Array; name?: string; size?: number; error?: string }>;
+        pick: () => Promise<{ ok: boolean; filePath?: string; canceled?: boolean }>;
+        /** Electron 32+ removed File.path; this is the sanctioned replacement. */
+        pathForFile: (file: File) => string;
+      };
       store: {
         load: () => Promise<{ ok: boolean; state: string | null; error?: string }>;
         save: (value: string) => Promise<{ ok: boolean }>;

@@ -5,6 +5,8 @@ import { SlideEditorLeftRail } from './slide-editor/SlideEditorLeftRail';
 import { SlideEditorQuickToolbar, type ActiveTool } from './slide-editor/SlideEditorQuickToolbar';
 import { SlideEditorCanvasBoard } from './slide-editor/SlideEditorCanvasBoard';
 import { SlideEditorRightSidebar } from './slide-editor/SlideEditorRightSidebar';
+import { PptxDeckView } from './PptxDeckView';
+import { useDeckPackage } from '../hooks/useDeckPackage';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
 
 export function SlideEditorModal() {
@@ -83,6 +85,12 @@ export function SlideEditorModal() {
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [smartSnap, setSmartSnap] = useState(true);
+
+  /* An imported PowerPoint deck is rendered from its own package, not from the
+     stored title/body pair — those are only what the library grid and search
+     read. The package is reopened here so the editor shows the real slides. */
+  const isPptxDeck = deck.sourceType === 'pptx';
+  const pkg = useDeckPackage(deck, isSlideEditorOpen && isPptxDeck);
 
   // Sync deck when activePresentationId changes
   useEffect(() => {
@@ -498,6 +506,17 @@ export function SlideEditorModal() {
 
       {/* Main Studio Body Workspace */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+        {isPptxDeck ? (
+          <PptxDeckView
+            slides={pkg.slides}
+            slideSizeEmu={pkg.slideSizeEmu}
+            activeIndex={pkg.activeIndex}
+            onSelectSlide={pkg.setActiveIndex}
+            status={pkg.status}
+            boardWidth={960}
+          />
+        ) : (
+        <>
         {/* Left Rail */}
         <SlideEditorLeftRail
           slides={slides}
@@ -540,6 +559,8 @@ export function SlideEditorModal() {
           onUpdateElement={handleUpdateElement}
           onDeleteElement={handleDeleteElement}
         />
+        </>
+        )}
       </div>
     </div>
   );

@@ -350,9 +350,9 @@ function SlideCanvasImpl({
   const boardH = boardHeight(slideSizeEmu);
   const scale = (width ?? BOARD_W) / BOARD_W;
 
-  return (
+  const board = (
     <div
-      className={className}
+      className={scale === 1 ? className : undefined}
       style={{
         position: 'relative',
         width: `${BOARD_W}px`,
@@ -361,7 +361,7 @@ function SlideCanvasImpl({
         transformOrigin: 'top left',
         overflow: 'hidden',
         ...slideBackgroundStyle(slide?.backgroundColor),
-        ...style,
+        ...(scale === 1 ? style : null),
       }}
     >
       {slide?.parsed
@@ -369,6 +369,27 @@ function SlideCanvasImpl({
           <Shape key={shape.id} shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} />
         ))
         : null}
+    </div>
+  );
+
+  if (scale === 1) return board;
+
+  /* A scaled board still LAYS OUT at 1280 wide — transform does not affect flow
+     — so it must sit in a wrapper of its true visual size. Without this a
+     thumbnail inside a centring flex parent gets pushed hundreds of pixels left
+     and renders as an empty box. */
+  return (
+    <div
+      className={className}
+      style={{
+        width: `${BOARD_W * scale}px`,
+        height: `${boardH * scale}px`,
+        overflow: 'hidden',
+        flexShrink: 0,
+        ...style,
+      }}
+    >
+      {board}
     </div>
   );
 }

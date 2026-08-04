@@ -135,6 +135,18 @@ contextBridge.exposeInMainWorld('BSP', {
     },
   },
 
+  deck: {
+    // Reads a .pptx back from disk so the editor can reopen an imported deck.
+    // Only the path is persisted; the package itself never enters app state.
+    read: (filePath) => ipcRenderer.invoke('deck:read', { filePath }),
+    pick: () => ipcRenderer.invoke('deck:pick'),
+    // Electron 32+ removed File.path; webUtils must be called here, in the
+    // preload, with the real File object.
+    pathForFile: (file) => {
+      try { return webUtils.getPathForFile(file); } catch { return ''; }
+    },
+  },
+
   openSlideEditor: () => ipcRenderer.invoke('slide-editor:open'),
   openStageDisplay: () => ipcRenderer.invoke('stage-display:open'),
   getDisplayUrl: () => ipcRenderer.invoke('get:displayUrl'),

@@ -77,9 +77,11 @@ export function usePptxImport() {
       createdAt: now,
       updatedAt: now,
       sourceType: 'pptx',
-      // Electron gives a real path here; a plain browser does not, and the
-      // deck still lists — it just cannot be reopened from source.
-      sourcePath: (file as File & { path?: string }).path || undefined,
+      /* The path is what lets the editor reopen the package later. Electron 32+
+         removed File.path, so it has to come from the preload's webUtils
+         bridge; in a plain browser there is none and the deck still lists, it
+         just cannot be reopened from source. */
+      sourcePath: window.BSP?.deck?.pathForFile?.(file) || undefined,
       aspectRatio: ASPECTS[result.deck.aspectRatio] || '16:9',
     };
 

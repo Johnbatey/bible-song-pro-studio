@@ -561,6 +561,38 @@ app.whenReady().then(async () => {
     return mediaService?.importPaths(result.filePaths) || { ok: false, items: [], errors: [] };
   });
 
+  /* Presentation packages. An imported deck keeps only its source path — a
+     .pptx is far too large to hold in the persisted renderer state — so
+     reopening one in the editor means reading the file back here.
+     Reads are confined to .pptx by extension and capped, so a renderer bug
+     cannot turn this into a general file-read for the whole disk. */
+  const MAX_DECK_BYTES = 200 * 1024 * 1024;
+  ipcMain.handle('deck:read', async (_, p) => {
+    const filePath = String(p?.filePath || '');
+    if (!filePath || !/\.pptx$/i.test(filePath)) {
+      return { ok: false, error: 'not-a-pptx' };
+    }
+    try {
+      const stat = await fs.promises.stat(filePath);
+      if (!stat.isFile()) return { ok: false, error: 'not-a-file' };
+      if (stat.size > MAX_DECK_BYTES) return { ok: false, error: 'too-large' };
+      const buf = await fs.promises.readFile(filePath);
+      return { ok: true, data: buf, name: path.basename(filePath), size: stat.size };
+    } catch (err) {
+      return { ok: false, error: String(err?.code || err?.message || err) };
+    }
+  });
+
+  ipcMain.handle('deck:pick', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Presentation',
+      properties: ['openFile'],
+      filters: [{ name: 'PowerPoint', extensions: ['pptx'] }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true };
+    return { ok: true, filePath: result.filePaths[0] };
+  });
+
   // Persisted renderer state IPC
   ipcMain.handle('store:load', () => appStoreService?.load() || { ok: false, state: null });
   ipcMain.handle('store:save', (_, p) => appStoreService?.save(p?.value) || { ok: false });
