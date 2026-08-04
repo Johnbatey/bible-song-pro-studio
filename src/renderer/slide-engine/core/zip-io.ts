@@ -182,7 +182,7 @@ export async function readChartTextFromRelationship(zip: any, slideFilename: str
 
 export async function updatePptxSlideSizeFromZip(zip: any): Promise<void> {
   state.pptxSlideSizeEmu = { cx: 12192000, cy: 6858000 };
-  state.pptxDefaultTextStyle = null;
+  state.presentationDefaultTextStyleNodes = null;
 
   const presentationFile = zip.file('ppt/presentation.xml');
   if (!presentationFile) return;
@@ -195,11 +195,11 @@ export async function updatePptxSlideSizeFromZip(zip: any): Promise<void> {
     // (non-placeholder) text boxes.
     const defaultTextStyle = doc.getElementsByTagNameNS('*', 'defaultTextStyle')[0];
     if (defaultTextStyle) {
-      const levels: Record<string, Element | null> = {};
+      const levels: (Element | null)[] = [];
       for (let l = 0; l < 9; l++) {
-        levels[`lvl${l + 1}pPr`] = getElementByLocalName(defaultTextStyle, `lvl${l + 1}pPr`);
+        levels.push(getElementByLocalName(defaultTextStyle, `lvl${l + 1}pPr`));
       }
-      state.pptxDefaultTextStyle = levels;
+      state.presentationDefaultTextStyleNodes = levels;
     }
 
     const sldSz = doc.getElementsByTagNameNS('*', 'sldSz')[0];

@@ -89,6 +89,35 @@ through it.
 
 Roughly 7,500 assertions, **0 failures**.
 
+### Placeholder inheritance (parser/placeholders.ts)
+
+Run over slideLayouts, slideMasters and slides from all four decks — 60 parts in
+total. The lookup maps are compared entry-by-entry after sorting, and the
+`lstStyle` map is compared by **node identity**, since a structurally equal but
+different `<a:lstStyle>` element would resolve the wrong level chain later.
+
+| Checked | Count |
+|---|---|
+| `<p:ph>` identities (`sp` / `pic` / `graphicFrame`) | 1,211 |
+| Geometry map entries | 215 |
+| Run-style map entries | 395 |
+| `lstStyle` map entries (node identity) | 395 |
+| Level chains (10 types x 3 idx x 3 levels) | 360 |
+| Paragraph- and text-body-layout maps, master-chained | 120 maps |
+
+The paragraph and text-body maps were built the way `presentation.ts` will use
+them — master first, then layout passing the master map as `baseMap` — so the
+inheritance path itself is under test, not just the extraction.
+
+**0 failures.**
+
+This also caught a divergence introduced earlier: the reference stores
+`presentationDefaultTextStyleNodes` as an array indexed by level, and
+`getPlaceholderLevelChain` reads `defNodes[lvl]`. It had been ported as a record
+keyed `lvl1pPr`…`lvl9pPr`, which would have silently never matched — plain text
+boxes would have lost their presentation-level defaults with no error anywhere.
+Fixed in `state.ts` and `zip-io.ts`.
+
 ## What this does not yet cover
 
 `slide-parser.ts` is the module that matters most and is not ported yet. When it

@@ -42,7 +42,8 @@ export interface SlideEngineState {
 
   /** Default is a 16:9 deck at 13.333in x 7.5in. */
   pptxSlideSizeEmu: SlideSizeEmu;
-  pptxDefaultTextStyle: Record<string, Element | null> | null;
+  /** lvl1..lvl9 pPr nodes from presentation.xml, indexed by level. */
+  presentationDefaultTextStyleNodes: (Element | null)[] | null;
 
   pptxThemeColorMap: Map<string, string>;
   pptxThemeAliasMap: Map<string, string>;
@@ -75,7 +76,7 @@ export const state: SlideEngineState = {
   originalPptxFileName: 'presentation.pptx',
 
   pptxSlideSizeEmu: { cx: 12192000, cy: 6858000 },
-  pptxDefaultTextStyle: null,
+  presentationDefaultTextStyleNodes: null,
 
   pptxThemeColorMap: new Map(),
   pptxThemeAliasMap: freshAliasMap(),
