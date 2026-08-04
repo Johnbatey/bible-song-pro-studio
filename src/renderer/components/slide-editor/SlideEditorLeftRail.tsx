@@ -10,6 +10,13 @@ interface SlideEditorLeftRailProps {
   onDeleteSlide: (index: number) => void;
   onMoveSlide: (fromIndex: number, toIndex: number) => void;
   onApplyTemplate: (templateType: string) => void;
+  /* Supplied by the PowerPoint path, whose slides are parsed OOXML rather than
+     the native element model — the rail draws whatever this returns in place
+     of its own background-and-title preview. */
+  renderThumb?: (index: number) => React.ReactNode;
+  /* PowerPoint decks have a fixed slide list: adding, duplicating, deleting
+     and reordering would have to rewrite the package, which is not ported. */
+  readOnlyDeck?: boolean;
 }
 
 export function SlideEditorLeftRail({
@@ -21,6 +28,8 @@ export function SlideEditorLeftRail({
   onDeleteSlide,
   onMoveSlide,
   onApplyTemplate,
+  renderThumb,
+  readOnlyDeck = false,
 }: SlideEditorLeftRailProps) {
   const [activeTab, setActiveTab] = useState<'slides' | 'templates'>('slides');
 
@@ -127,6 +136,7 @@ export function SlideEditorLeftRail({
             <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)', textTransform: 'uppercase' }}>
               Slides Deck
             </span>
+            {!readOnlyDeck && (
             <button
               type="button"
               onClick={onAddSlide}
@@ -148,6 +158,7 @@ export function SlideEditorLeftRail({
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </button>
+            )}
           </div>
 
           {/* Slides List */}
@@ -191,6 +202,11 @@ export function SlideEditorLeftRail({
                       position: 'relative',
                     }}
                   >
+                    {renderThumb ? (
+                      <div style={{ width: '100%', overflow: 'hidden', background: '#000', display: 'flex' }}>
+                        {renderThumb(idx)}
+                      </div>
+                    ) : (
                     <div
                       style={{
                         width: '100%',
@@ -229,6 +245,7 @@ export function SlideEditorLeftRail({
                         {slide.title || `Slide ${idx + 1}`}
                       </div>
                     </div>
+                    )}
 
                     <div
                       style={{
@@ -243,6 +260,7 @@ export function SlideEditorLeftRail({
                       <span style={{ fontSize: 9, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', fontWeight: 600 }}>
                         {slide.transition || 'fade'}
                       </span>
+                      {!readOnlyDeck && (
                       <div style={{ display: 'flex', gap: 4 }}>
                         {idx > 0 && (
                           <button
@@ -295,6 +313,7 @@ export function SlideEditorLeftRail({
                           </button>
                         )}
                       </div>
+                      )}
                     </div>
                   </div>
                 </div>

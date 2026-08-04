@@ -128,14 +128,21 @@ export interface PptxDeckViewProps {
   activeIndex: number;
   onSelectSlide: (index: number) => void;
   status: DeckPackageStatus | null;
-  /** Board width in CSS px; the canvas scales to it. */
-  boardWidth: number;
+  /** Board width in CSS px. Omit to fit the space the chrome leaves. */
+  boardWidth?: number;
   /** Called after every edit, so history can take a snapshot. */
   onEdited?: () => void;
   /** Called when the active slide changes, to capture its starting state. */
   onSlideShown?: () => void;
   /** Bumped by an undo/redo, which rebuilds the slide's records. */
   externalRevision?: number;
+  /* The editor chrome hosts the rail and the inspector, so this renders just
+     the board inside it. Standalone (both true) is kept for testing the view
+     on its own. */
+  showRail?: boolean;
+  showInspector?: boolean;
+  /** Lifted so the chrome's Design and Layer tabs act on the same selection. */
+  onSelectionChange?: (selected: ParsedShape[], selection: SelectionState | null) => void;
 }
 
 export function PptxDeckView({
@@ -148,10 +155,37 @@ export function PptxDeckView({
   onEdited,
   onSlideShown,
   externalRevision = 0,
+  showRail = true,
+  showInspector = true,
+  onSelectionChange,
 }: PptxDeckViewProps) {
   const active = slides[activeIndex] || null;
   const aspect = slideSizeEmu && slideSizeEmu.cx > 0 ? slideSizeEmu.cy / slideSizeEmu.cx : 9 / 16;
-  const boardHeight = Math.round(boardWidth * aspect);
+
+  /* Measured, not assumed: the rail and inspector are the chrome's now, and
+     their widths change with the window, so a fixed board width clips the
+     slide on a narrow editor and wastes space on a wide one. */
+  const boardAreaRef = useRef<HTMLDivElement>(null);
+  const [fitWidth, setFitWidth] = useState(boardWidth ?? 960);
+  useEffect(() => {
+    if (boardWidth) { setFitWidth(boardWidth); return; }
+    const node = boardAreaRef.current;
+    if (!node) return;
+    const measure = () => {
+      const r = node.getBoundingClientRect();
+      const pad = 32;
+      const byWidth = Math.max(160, r.width - pad);
+      const byHeight = Math.max(160, (r.height - pad) / aspect);
+      setFitWidth(Math.floor(Math.min(byWidth, byHeight)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [boardWidth, aspect]);
+
+  const boardPx = fitWidth;
+  const boardHeight = Math.round(boardPx * aspect);
 
   /* Edits mutate the parsed records and the XML nodes behind them in place —
      that is what lets a save round-trip into the .pptx — so React needs an
@@ -172,6 +206,7 @@ export function PptxDeckView({
   const selectedShapes = selection && active
     ? ((active.shapes as ParsedShape[]) || []).filter((s) => selection.ids.includes(s.id))
     : [];
+
 
   const commitStyle = useCallback((fn: () => void) => {
     fn();
@@ -199,6 +234,12 @@ export function PptxDeckView({
      repaint even though nothing in this component's own state moved. */
   const paintRevision = revision + externalRevision;
 
+  useEffect(() => {
+    onSelectionChange?.(selectedShapes, selection);
+    // selectedShapes is derived from the two below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection, paintRevision, onSelectionChange]);
+
   // Capture the slide's starting state the first time it is shown, so its very
   // first edit is undoable rather than being the baseline.
   useEffect(() => { if (active?.parsed) onSlideShown?.(); }, [active, onSlideShown]);
@@ -219,6 +260,7 @@ export function PptxDeckView({
 
   return (
     <div style={styles.wrap}>
+      {showRail && (
       <div style={styles.rail}>
         {slides.map((slide, i) => (
           <RailItem
@@ -232,8 +274,9 @@ export function PptxDeckView({
           />
         ))}
       </div>
+      )}
 
-      <div style={styles.board}>
+      <div ref={boardAreaRef} style={styles.board}>
         {status && (
           <div style={{ ...styles.status, color: status.level === 'error' ? '#f87171' : 'rgba(255,255,255,0.6)' }}>
             {status.text}
@@ -244,7 +287,7 @@ export function PptxDeckView({
             <SlideCanvas
               slide={active}
               slideSizeEmu={slideSizeEmu}
-              width={boardWidth}
+              width={boardPx}
               editable
               onRunEdit={handleRunEdit}
               revision={paintRevision}
@@ -254,7 +297,7 @@ export function PptxDeckView({
               selection={selection}
               onSelectionChange={setSelection}
               onCommit={handleGeometryCommit}
-              boardWidth={boardWidth}
+              boardWidth={boardPx}
               boardHeight={boardHeight}
             />
           </div>
@@ -264,7 +307,7 @@ export function PptxDeckView({
         )}
       </div>
 
-      {!status && active?.parsed && (
+      {showInspector && !status && active?.parsed && (
         <div style={styles.panel}>
           <ShapeInspector
             selected={selectedShapes}

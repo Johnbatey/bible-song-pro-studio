@@ -6,6 +6,11 @@ import { SlideEditorQuickToolbar, type ActiveTool } from './slide-editor/SlideEd
 import { SlideEditorCanvasBoard } from './slide-editor/SlideEditorCanvasBoard';
 import { SlideEditorRightSidebar } from './slide-editor/SlideEditorRightSidebar';
 import { PptxDeckView } from './PptxDeckView';
+import { SlideCanvas } from './SlideCanvas';
+import type { ParsedShape } from '../slide-engine/parser/slide-parser';
+
+/** Width the rail draws PowerPoint thumbnails at. */
+const RAIL_THUMB_W = 150;
 import { useDeckPackage } from '../hooks/useDeckPackage';
 import { useSlideHistory } from '../hooks/useSlideHistory';
 import { deriveSlideText } from '../slide-engine/io/deck-import';
@@ -101,7 +106,30 @@ export function SlideEditorModal() {
      cloned. So it needs its own stack, separate from the native deck history
      above, and the header routes to whichever one applies. */
   const [importStatus, setImportStatus] = useState<string | null>(null);
+
+
   const [pptxRevision, setPptxRevision] = useState(0);
+  /* Lifted out of the deck view so the chrome's Design and Layer tabs act on
+     the same selection the canvas shows. */
+  const [pptxSelected, setPptxSelected] = useState<ParsedShape[]>([]);
+  const setPptxSelection = useCallback((shapes: ParsedShape[]) => setPptxSelected(shapes), []);
+
+  /* The rail draws PowerPoint slides with the same canvas as the board, so a
+     thumbnail cannot drift from what it is a thumbnail of. */
+  const renderPptxThumb = useCallback((index: number) => {
+    const slide = pkg.slides[index];
+    if (!slide?.parsed) return <div style={{ height: 90, width: '100%' }} />;
+    return (
+      <SlideCanvas
+        slide={slide}
+        slideSizeEmu={pkg.slideSizeEmu}
+        width={RAIL_THUMB_W}
+        dynamicAutofit={false}
+        revision={pptxRevision}
+      />
+    );
+  }, [pkg.slides, pkg.slideSizeEmu, pptxRevision]);
+
   const pptxHistory = useSlideHistory(
     pkg.activeIndex,
     /* An undo re-parses the slide, which replaces its record with a new
@@ -556,28 +584,18 @@ export function SlideEditorModal() {
 
       {/* Main Studio Body Workspace */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
-        {isPptxDeck ? (
-          <PptxDeckView
-            slides={pkg.slides}
-            slideSizeEmu={pkg.slideSizeEmu}
-            activeIndex={pkg.activeIndex}
-            onSelectSlide={pkg.setActiveIndex}
-            status={pkg.status}
-            boardWidth={960}
-            onEdited={pptxHistory.record}
-            onSlideShown={pptxHistory.ensureBaseline}
-            externalRevision={pptxRevision}
-          />
-        ) : (
         <>
         {/* Left Rail */}
         <SlideEditorLeftRail
-          slides={slides}
-          activeSlideIndex={activeSlideIndex}
+          slides={isPptxDeck ? deck.slides : slides}
+          activeSlideIndex={isPptxDeck ? pkg.activeIndex : activeSlideIndex}
           onSelectSlide={(idx) => {
+            if (isPptxDeck) { pkg.setActiveIndex(idx); return; }
             setActiveSlideIndex(idx);
             setSelectedElementId(null);
           }}
+          renderThumb={isPptxDeck ? renderPptxThumb : undefined}
+          readOnlyDeck={isPptxDeck}
           onAddSlide={handleAddSlide}
           onDuplicateSlide={handleDuplicateSlide}
           onDeleteSlide={handleDeleteSlide}
@@ -586,6 +604,21 @@ export function SlideEditorModal() {
         />
 
         {/* Center Freeboard Viewport */}
+        {isPptxDeck ? (
+          <PptxDeckView
+            slides={pkg.slides}
+            slideSizeEmu={pkg.slideSizeEmu}
+            activeIndex={pkg.activeIndex}
+            onSelectSlide={pkg.setActiveIndex}
+            status={pkg.status}
+            onEdited={pptxHistory.record}
+            onSlideShown={pptxHistory.ensureBaseline}
+            externalRevision={pptxRevision}
+            onSelectionChange={setPptxSelection}
+            showRail={false}
+            showInspector={false}
+          />
+        ) : (
         <SlideEditorCanvasBoard
           slide={activeSlide}
           activeTool={activeTool}
@@ -595,6 +628,7 @@ export function SlideEditorModal() {
           onUpdateSlideText={(title, body) => handleUpdateSlide({ title, body })}
           smartSnap={smartSnap}
         />
+        )}
 
         {/* Bottom Floating Quick Toolbar */}
         <SlideEditorQuickToolbar
@@ -613,7 +647,6 @@ export function SlideEditorModal() {
           onDeleteElement={handleDeleteElement}
         />
         </>
-        )}
       </div>
     </div>
   );
