@@ -37,6 +37,9 @@ import type { SlideSizeEmu } from '../slide-engine/state';
 
 const WRAP: CSSProperties = { overflowWrap: 'break-word', whiteSpace: 'pre-wrap' };
 const P_BASE: CSSProperties = { margin: 0, lineHeight: 1.2 };
+/* Caret affordance only. No padding or border — PowerPoint's box is the exact
+   box, and inflating a run would reflow the line the moment you hover it. */
+const EDITABLE_RUN: CSSProperties = { outline: 'none', cursor: 'text' };
 
 function ShapeSvg({ spec }: { spec: ShapeSvgSpec }) {
   return (
@@ -69,19 +72,28 @@ function ShapeSvg({ spec }: { spec: ShapeSvgSpec }) {
 
 /** One paragraph: bullet span (if any) then the runs, each keeping its own
     styling. `counters` is threaded through so auto-numbered lists count across
-    paragraphs and reset when the level gets shallower. */
+    paragraphs and reset when the level gets shallower.
+
+    When `editable`, runs backed by an XML node become contentEditable and
+    commit on blur. React must not re-render them while they have focus or it
+    would fight the caret — which it does not, because nothing sets state until
+    blur, and by then the DOM text already matches what React will produce. */
 function Paragraph({
   pRuns,
   counters,
   fallbackColor,
   wrapNone,
   counterFlip,
+  editable,
+  onRunEdit,
 }: {
   pRuns: ParsedRun[];
   counters: Record<number, number>;
   fallbackColor: string;
   wrapNone: boolean;
   counterFlip?: string;
+  editable?: boolean;
+  onRunEdit?: (run: ParsedRun, value: string) => void;
 }) {
   const firstRun = pRuns.find((run) => run && run.text !== '\n');
   const pStyle: CSSProperties = {
@@ -96,9 +108,21 @@ function Paragraph({
   return (
     <p style={pStyle}>
       {bullet ? <span style={bullet.style}>{bullet.glyph}</span> : null}
-      {pRuns.map((run, i) => (
-        <span key={i} style={runStyle(run, fallbackColor)}>{run.text}</span>
-      ))}
+      {pRuns.map((run, i) => {
+        const canEdit = !!editable && !!run.nodeRef;
+        return (
+          <span
+            key={i}
+            style={canEdit ? { ...runStyle(run, fallbackColor), ...EDITABLE_RUN } : runStyle(run, fallbackColor)}
+            contentEditable={canEdit || undefined}
+            suppressContentEditableWarning={canEdit}
+            spellCheck={canEdit ? false : undefined}
+            onBlur={canEdit ? (e) => onRunEdit?.(run, e.currentTarget.textContent || '') : undefined}
+          >
+            {run.text}
+          </span>
+        );
+      })}
     </p>
   );
 }
@@ -247,11 +271,15 @@ function TextShape({
   boardH,
   dynamicAutofit,
   outerStyle,
+  editable,
+  onRunEdit,
 }: {
   shape: ParsedShape;
   boardH: number;
   dynamicAutofit: boolean;
   outerStyle: CSSProperties;
+  editable?: boolean;
+  onRunEdit?: (run: ParsedRun, value: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const box = (shape.textBoxLayout as TextBodyLayout | undefined) || ({} as TextBodyLayout);
@@ -273,13 +301,15 @@ function TextShape({
           fallbackColor={fallback}
           wrapNone={box.wrap === 'none'}
           counterFlip={flip}
+          editable={editable && shape.editable !== false}
+          onRunEdit={onRunEdit}
         />
       ))}
     </div>
   );
 }
 
-function Shape({ shape, boardH, dynamicAutofit }: { shape: ParsedShape; boardH: number; dynamicAutofit: boolean }) {
+function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit }: { shape: ParsedShape; boardH: number; dynamicAutofit: boolean; editable?: boolean; onRunEdit?: (run: ParsedRun, value: string) => void }) {
   const outer: CSSProperties = {
     position: 'absolute',
     left: `${shape.left}%`,
@@ -324,7 +354,7 @@ function Shape({ shape, boardH, dynamicAutofit }: { shape: ParsedShape; boardH: 
     );
   }
 
-  return <TextShape shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} outerStyle={outer} />;
+  return <TextShape shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} outerStyle={outer} editable={editable} onRunEdit={onRunEdit} />;
 }
 
 export interface SlideCanvasProps {
@@ -335,6 +365,14 @@ export interface SlideCanvasProps {
   width?: number;
   /** Off for thumbnails: measuring autofit per thumbnail is not worth it. */
   dynamicAutofit?: boolean;
+  /** Makes XML-backed text runs contentEditable. Off everywhere by default. */
+  editable?: boolean;
+  /** Fires on blur with the run's new text. Write it back with edit/text. */
+  onRunEdit?: (run: ParsedRun, value: string) => void;
+  /* Edits mutate the parsed slide in place — that is what lets a save
+     round-trip into the .pptx — so the slide's identity never changes and this
+     memo would hold a stale picture. Bump this to force a repaint. */
+  revision?: number;
   className?: string;
   style?: CSSProperties;
 }
@@ -344,6 +382,8 @@ function SlideCanvasImpl({
   slideSizeEmu,
   width,
   dynamicAutofit = true,
+  editable = false,
+  onRunEdit,
   className,
   style,
 }: SlideCanvasProps) {
@@ -366,7 +406,7 @@ function SlideCanvasImpl({
     >
       {slide?.parsed
         ? ((slide.shapes as ParsedShape[]) || []).map((shape) => (
-          <Shape key={shape.id} shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} />
+          <Shape key={shape.id} shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} editable={editable} onRunEdit={onRunEdit} />
         ))
         : null}
     </div>
