@@ -9,6 +9,7 @@ import { PptxDeckView } from './PptxDeckView';
 import { useDeckPackage } from '../hooks/useDeckPackage';
 import { useSlideHistory } from '../hooks/useSlideHistory';
 import { deriveSlideText } from '../slide-engine/io/deck-import';
+import { buildDeckFromPptx } from '../hooks/usePptxImport';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
 
 export function SlideEditorModal() {
@@ -18,6 +19,7 @@ export function SlideEditorModal() {
   const presentationDecks = useAppStore((s) => s.presentationDecks);
   const addPresentationDeck = useAppStore((s) => s.addPresentationDeck);
   const scenes = useAppStore((s) => s.scenes);
+  const openSlideEditor = useAppStore((s) => s.openSlideEditor);
 
   // Deck State
   const [deck, setDeck] = useState<PresentationDeck>(() => {
@@ -98,6 +100,7 @@ export function SlideEditorModal() {
      record — the parsed records hold live XML node references and cannot be
      cloned. So it needs its own stack, separate from the native deck history
      above, and the header routes to whichever one applies. */
+  const [importStatus, setImportStatus] = useState<string | null>(null);
   const [pptxRevision, setPptxRevision] = useState(0);
   const pptxHistory = useSlideHistory(
     pkg.activeIndex,
@@ -270,41 +273,25 @@ export function SlideEditorModal() {
         setActiveSlideIndex(slides.length);
       };
       reader.readAsDataURL(file);
+    } else if (ext === 'pptx') {
+      /* The real engine, the same one the Slides page uses. This branch used
+         to discard the file's bytes and fabricate a blue-gradient slide named
+         after it, which looked like an import and was not one. */
+      setImportStatus(`Reading ${file.name}…`);
+      const result = await buildDeckFromPptx(file, (done, total) => {
+        setImportStatus(`Parsing slide ${done} of ${total}…`);
+      });
+      if ('error' in result) {
+        setImportStatus(result.error);
+        return;
+      }
+      // A PowerPoint deck is its own deck, not slides appended to this one:
+      // it carries its own masters, theme and slide size.
+      addPresentationDeck(result.deck);
+      setImportStatus(null);
+      openSlideEditor(result.deck.id);
     } else {
-      // PPTX / PDF import fallback
-      const newSlide: PresentationSlide = {
-        id: `pptx-slide-${Date.now()}`,
-        title: file.name.replace(/\.[^/.]+$/, ''),
-        body: 'Imported presentation slide deck',
-        label: `Slide ${slides.length + 1}`,
-        notes: '',
-        transition: 'fade',
-        durationMs: 3000,
-        hidden: false,
-        buildCount: 1,
-        buildStep: 1,
-        background: { type: 'gradient', value: 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)' },
-        aspectRatio: '16:9',
-        elements: [
-          {
-            id: `pptx-title-${Date.now()}`,
-            type: 'text',
-            x: 10,
-            y: 30,
-            width: 80,
-            height: 40,
-            content: file.name.replace(/\.[^/.]+$/, ''),
-            fontSize: 56,
-            fontFamily: 'Inter',
-            fontWeight: 700,
-            color: '#ffffff',
-            textAlign: 'center',
-            zIndex: 1,
-          },
-        ],
-      };
-      updateDeckState((prev) => ({ ...prev, slides: [...slides, newSlide] }));
-      setActiveSlideIndex(slides.length);
+      setImportStatus(`${ext ? ext.toUpperCase() : 'That file type'} import is not supported yet — PowerPoint (.pptx), JSON, TXT, MD and images are.`);
     }
   };
 
@@ -550,6 +537,22 @@ export function SlideEditorModal() {
         onSaveToDeck={handleSaveToDeck}
         onSaveExport={handleSaveToDeck}
       />
+
+      {importStatus && (
+        <div
+          onClick={() => setImportStatus(null)}
+          style={{
+            padding: '8px 16px',
+            fontSize: 12,
+            color: 'rgba(255,255,255,0.75)',
+            background: '#16191f',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            cursor: 'pointer',
+          }}
+        >
+          {importStatus}
+        </div>
+      )}
 
       {/* Main Studio Body Workspace */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', position: 'relative' }}>

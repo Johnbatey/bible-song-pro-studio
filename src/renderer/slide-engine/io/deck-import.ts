@@ -23,6 +23,7 @@ import { updatePptxSlideSizeFromZip, getSlideKeysInPresentationOrder } from '../
 import { updatePptxThemeFromZip } from '../parser/theme';
 import { parseModifierSlide } from '../parser/presentation';
 import { state, type ParsedSlide, type SlideSizeEmu } from '../state';
+import { withEngineLock } from '../engine-lock';
 import type { ParsedShape } from '../parser/slide-parser';
 
 export interface DeckSlideRecord {
@@ -204,7 +205,14 @@ export function aspectRatioFromEmu(size: SlideSizeEmu | null): string {
 }
 
 /** Parse a .pptx into deck-shaped slide structure. */
-export async function importDeckStructure(
+export function importDeckStructure(
+  bytes: ArrayBuffer | Uint8Array,
+  options?: ImportDeckOptions,
+): Promise<{ ok: boolean; error?: string; deck?: DeckStructure }> {
+  return withEngineLock(() => importDeckStructureLocked(bytes, options));
+}
+
+async function importDeckStructureLocked(
   bytes: ArrayBuffer | Uint8Array,
   options?: ImportDeckOptions,
 ): Promise<{ ok: boolean; error?: string; deck?: DeckStructure }> {

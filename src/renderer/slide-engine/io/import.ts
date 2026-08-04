@@ -28,6 +28,7 @@ import { updatePptxSlideSizeFromZip, getSlideKeysInPresentationOrder } from '../
 import { updatePptxThemeFromZip } from '../parser/theme';
 import { parseModifierSlide, ensureModifierSlideParsed } from '../parser/presentation';
 import { state } from '../state';
+import { withEngineLock } from '../engine-lock';
 
 export type ImportStatusLevel = 'loading' | 'info' | 'success' | 'error';
 
@@ -154,7 +155,13 @@ function byteLengthOf(buffer: ArrayBuffer | Blob | null): number {
  * @param fileBuffer  raw .pptx package bytes
  * @param fileName    used for export naming and the UI label
  */
-export async function openDeckFromBytes(fileBuffer: ArrayBuffer, fileName: string, hooks: ImportHooks = {}): Promise<OpenDeckResult> {
+export function openDeckFromBytes(fileBuffer: ArrayBuffer, fileName: string, hooks: ImportHooks = {}): Promise<OpenDeckResult> {
+  /* Takes the same lock the scoped parses use: an open replaces the whole deck
+     context, so it must not land in the middle of one. */
+  return withEngineLock(() => openDeckFromBytesLocked(fileBuffer, fileName, hooks));
+}
+
+async function openDeckFromBytesLocked(fileBuffer: ArrayBuffer, fileName: string, hooks: ImportHooks): Promise<OpenDeckResult> {
   importHooks = hooks;
 
   if (state.pptxImportJob && !state.pptxImportJob.cancelled) {

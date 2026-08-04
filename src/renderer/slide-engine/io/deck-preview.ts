@@ -17,6 +17,7 @@ import { updatePptxSlideSizeFromZip, getSlideKeysInPresentationOrder } from '../
 import { updatePptxThemeFromZip } from '../parser/theme';
 import { parseModifierSlide } from '../parser/presentation';
 import { state, type ParsedSlide, type SlideSizeEmu } from '../state';
+import { withEngineLock } from '../engine-lock';
 
 export interface DeckPreview {
   slide: ParsedSlide;
@@ -83,9 +84,20 @@ function beginScopedParse(): void {
  * @param savedXml  the deck record's stored edit for that slide, if any, so a
  *                  card shows the edited version rather than the imported one
  */
-export async function parseDeckPreview(
+export function parseDeckPreview(
   bytes: ArrayBuffer,
   slideIndex = 0,
+  savedXml?: string | null,
+): Promise<DeckPreview | null> {
+  /* The whole capture/parse/restore has to be one section. Without the lock a
+     preview that started before an editor open would restore the pre-open
+     state over it. */
+  return withEngineLock(() => parseDeckPreviewLocked(bytes, slideIndex, savedXml));
+}
+
+async function parseDeckPreviewLocked(
+  bytes: ArrayBuffer,
+  slideIndex: number,
   savedXml?: string | null,
 ): Promise<DeckPreview | null> {
   const saved = capture();

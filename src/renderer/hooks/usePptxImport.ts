@@ -25,52 +25,45 @@ const ASPECTS: Record<string, PresentationDeck['aspectRatio']> = {
   '4:3': '4:3',
 };
 
-export function usePptxImport() {
-  const addPresentationDeck = useAppStore((s) => s.addPresentationDeck);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<ImportStatus | null>(null);
+/**
+ * Parse a .pptx into a deck record. Shared by the Slides page and the editor's
+ * own Import button so there is exactly one import in the app — the editor
+ * used to have a second one that discarded the bytes and fabricated a slide
+ * from the filename.
+ */
+export async function buildDeckFromPptx(
+  file: File,
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ deck: PresentationDeck } | { error: string }> {
+  if (!/\.pptx$/i.test(file.name)) return { error: 'Only .pptx files can be imported.' };
 
-  const pick = useCallback(() => {
-    inputRef.current?.click();
-  }, []);
+  const result = await importDeckStructure(await file.arrayBuffer(), {
+    fileName: file.name,
+    deckId: `deck_${Date.now()}`,
+    onProgress: ({ done, total }) => onProgress?.(done, total),
+  });
 
-  const handleFile = useCallback(async (file: File) => {
-    if (!/\.pptx$/i.test(file.name)) {
-      setStatus({ level: 'error', text: 'Only .pptx files can be imported.' });
-      return;
-    }
+  if (!result.ok || !result.deck) {
+    return { error: `Could not read that deck (${result.error || 'unknown error'}).` };
+  }
 
-    setStatus({ level: 'working', text: `Reading ${file.name}…` });
+  const now = Date.now();
+  const slides: PresentationSlide[] = result.deck.slides.map((s) => ({
+    id: s.id,
+    title: s.title,
+    body: s.body,
+    label: s.label,
+    notes: '',
+    transition: 'fade',
+    durationMs: 0,
+    hidden: false,
+    buildCount: 0,
+    buildStep: 0,
+    thumbText: s.thumbText,
+  }));
 
-    const result = await importDeckStructure(await file.arrayBuffer(), {
-      fileName: file.name,
-      deckId: `deck_${Date.now()}`,
-      onProgress: ({ done, total }) => {
-        setStatus({ level: 'working', text: `Parsing slide ${done} of ${total}…` });
-      },
-    });
-
-    if (!result.ok || !result.deck) {
-      setStatus({ level: 'error', text: `Could not read that deck (${result.error || 'unknown error'}).` });
-      return;
-    }
-
-    const now = Date.now();
-    const slides: PresentationSlide[] = result.deck.slides.map((s) => ({
-      id: s.id,
-      title: s.title,
-      body: s.body,
-      label: s.label,
-      notes: '',
-      transition: 'fade',
-      durationMs: 0,
-      hidden: false,
-      buildCount: 0,
-      buildStep: 0,
-      thumbText: s.thumbText,
-    }));
-
-    const deck: PresentationDeck = {
+  return {
+    deck: {
       id: result.deck.deckId,
       title: result.deck.title,
       slides,
@@ -83,10 +76,34 @@ export function usePptxImport() {
          just cannot be reopened from source. */
       sourcePath: window.BSP?.deck?.pathForFile?.(file) || undefined,
       aspectRatio: ASPECTS[result.deck.aspectRatio] || '16:9',
-    };
+    },
+  };
+}
 
-    addPresentationDeck(deck);
-    setStatus({ level: 'done', text: `Imported ${deck.title} — ${slides.length} slide${slides.length === 1 ? '' : 's'}.` });
+export function usePptxImport() {
+  const addPresentationDeck = useAppStore((s) => s.addPresentationDeck);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<ImportStatus | null>(null);
+
+  const pick = useCallback(() => {
+    inputRef.current?.click();
+  }, []);
+
+  const handleFile = useCallback(async (file: File) => {
+    setStatus({ level: 'working', text: `Reading ${file.name}…` });
+
+    const result = await buildDeckFromPptx(file, (done, total) => {
+      setStatus({ level: 'working', text: `Parsing slide ${done} of ${total}…` });
+    });
+
+    if ('error' in result) {
+      setStatus({ level: 'error', text: result.error });
+      return;
+    }
+
+    addPresentationDeck(result.deck);
+    const n = result.deck.slides.length;
+    setStatus({ level: 'done', text: `Imported ${result.deck.title} — ${n} slide${n === 1 ? '' : 's'}.` });
   }, [addPresentationDeck]);
 
   const onInputChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
