@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { SlideCanvas } from './SlideCanvas';
+import { useDeckPreview } from '../hooks/useDeckPreview';
+import type { PresentationDeck } from '../types';
 import { CustomDropdown } from './CustomDropdown';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { usePptxImport } from '../hooks/usePptxImport';
@@ -14,13 +17,59 @@ interface SlideItem {
   subtitle?: string;
 }
 
-/** Cycles so a grid of decks does not come out one flat colour. */
+/** Until the card has been measured. The thumbnail then follows the card's
+    real width and sets its own height from the deck's aspect, so a 4:3 deck
+    stays 4:3 rather than being letterboxed into a 16:9 slot. */
+const CARD_THUMB_W = 200;
+
+/** Cycles so a grid of decks without previews does not come out one flat colour. */
 const CARD_BACKGROUNDS = [
   'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)',
   'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
   'linear-gradient(135deg, #065f46 0%, #022c22 100%)',
   'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)',
 ];
+
+/** Card thumbnail: the deck's actual first slide once it scrolls into view,
+    the tinted placeholder until then and for decks with no package. */
+function CardThumb({ deck, fallback, caption }: { deck?: PresentationDeck; fallback: string; caption?: string }) {
+  const { ref, preview } = useDeckPreview(deck);
+  const [width, setWidth] = useState(CARD_THUMB_W);
+
+  // The grid is auto-fill, so a card's width depends on the panel's — measured
+  // rather than assumed, and re-measured when the dock is resized.
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const measure = () => {
+      const w = Math.round(node.getBoundingClientRect().width);
+      if (w > 0) setWidth(w);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [ref]);
+
+  return (
+    <div ref={ref} style={{ ...styles.cardThumb, background: preview ? '#000' : fallback }}>
+      {preview ? (
+        <SlideCanvas
+          slide={preview.slide}
+          slideSizeEmu={preview.slideSizeEmu}
+          width={width}
+          /* Measured autofit, unlike the editor's rail. The reference keeps it
+             off for minis because a 48-slide rail would measure 48 times; a
+             library shows a handful of cards, and without it a title that
+             PowerPoint shrinks to fit overflows its box and gets clipped. */
+          dynamicAutofit
+        />
+      ) : (
+        <div style={styles.cardTitleOverlay}>{caption}</div>
+      )}
+    </div>
+  );
+}
 
 export function PresentationPanel() {
   const openSlideEditor = useAppStore((s) => s.openSlideEditor);
@@ -143,9 +192,11 @@ export function PresentationPanel() {
           .filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()))
           .map((item) => (
             <div key={item.id} style={styles.card} onDoubleClick={() => handleEditSlide(item.id)}>
-              <div style={{ ...styles.cardThumb, background: item.bg }}>
-                <div style={styles.cardTitleOverlay}>{item.subtitle}</div>
-              </div>
+              <CardThumb
+                deck={presentationDecks.find((d) => d.id === item.id)}
+                fallback={item.bg}
+                caption={item.subtitle}
+              />
 
               <div style={styles.cardFooter}>
                 <div>
@@ -246,12 +297,12 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   cardThumb: {
-    height: 110,
-    padding: 10,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     textAlign: 'center',
+    minHeight: 110,
+    overflow: 'hidden',
   },
   cardTitleOverlay: {
     fontSize: 11,
