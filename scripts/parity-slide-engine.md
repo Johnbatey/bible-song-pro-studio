@@ -118,9 +118,47 @@ keyed `lvl1pPr`…`lvl9pPr`, which would have silently never matched — plain t
 boxes would have lost their presentation-level defaults with no error anywhere.
 Fixed in `state.ts` and `zip-io.ts`.
 
+### Whole-slide parity (parser/slide-parser.ts + parser/presentation.ts)
+
+The one that matters. `parseModifierSlide` is run end to end on **every slide of
+all four decks** — 55 slides — and the resulting shape lists are compared
+element by element, in order, with every field on every record.
+
+Comparison notes that make this a real test rather than a tautology:
+
+- **Each side gets its own JSZip *and* its own parsed Documents.** Beyond the
+  caches, the parser stamps `__bspGroupId` onto group nodes; sharing a document
+  would let whichever ran first hand the other its group ids.
+- **DOM references are compared by structural path**, not identity — `srcNode`,
+  `groupNode` and each run's `nodeRef` are replaced by their child-index chain
+  from the document root. A shape pointing at the *wrong* node fails; pointing at
+  the equivalent node in the other side's document passes.
+- **`slideNum` varies per slide**, so the `grp_<slideNum>_<n>` id counter and the
+  `shape_<slideNum>_<tag><n>` ids are under test too, not just their shape.
+- Image data URLs are compared by length plus their last 24 bytes, so a 3 MB
+  JPEG doesn't have to be diffed in full to catch the wrong image.
+
+| Compared | Count |
+|---|---|
+| Slides parsed end to end | 55 |
+| Shape records (every field) | 13,685 |
+| Paragraphs | 13,456 |
+| Runs | 13,646 |
+| Shapes inside groups (group transform chain) | 11,917 |
+| `custGeom` shapes | 12,394 |
+| Rotated / flipped shapes | 186 / 216 |
+| Connectors | 265 |
+| Tables (cells, spans, insets, borders) | 7 |
+| Images / image-fills | 13 / 4 |
+
+**0 failures.**
+
 ## What this does not yet cover
 
-`slide-parser.ts` is the module that matters most and is not ported yet. When it
-lands, compare `parsePptxSlideXmlDoc` shape-by-shape: `left/top/width/height`,
-`rotationDeg`, `flipH/flipV`, `fillColor`, `fillGradientCss`, `strokeColor`,
-`shapeType`, and each paragraph's runs (text, colour, size, bold/italic).
+Two shape-level branches these four decks never take: no shape resolves to a
+`fillGradientCss`, and none carries a `boxShadowCss`. Both parsers agree on every
+slide, but that agreement is vacuous for those two fields here — the gradient and
+effect code itself was covered directly in the `core/color.ts` checks above
+(linear and radial gradients, effect lists), just not through a whole slide.
+
+`io/import.ts` and the renderer are still to come.
