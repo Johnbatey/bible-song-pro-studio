@@ -58,8 +58,15 @@ export interface SlideEngineState {
 
   slides: ParsedSlide[];
   activeSlideIndex: number;
+  selectedElementId: string | null;
 
+  /** Bumped to invalidate an in-flight background parse queue. */
+  modifierBackgroundParseToken: number;
   pptxImportJob: { id: number; cancelled: boolean; timeoutId: number | undefined } | null;
+
+  /** Kept for the desktop render engine, which renders from the file path/bytes. */
+  loadedPptxFile: File | null;
+  loadedPptxPath: string | null;
 }
 
 function freshAliasMap(): Map<string, string> {
@@ -90,8 +97,13 @@ export const state: SlideEngineState = {
 
   slides: [],
   activeSlideIndex: 0,
+  selectedElementId: null,
 
+  modifierBackgroundParseToken: 0,
   pptxImportJob: null,
+
+  loadedPptxFile: null,
+  loadedPptxPath: null,
 };
 
 /** Clears every per-deck cache. Called before opening a new package. */

@@ -153,6 +153,37 @@ Comparison notes that make this a real test rather than a tautology:
 
 **0 failures.**
 
+### Import pipeline (io/import.ts)
+
+`openDeckFromBytes` run end to end on each deck, then compared against a fresh
+oracle parse of every slide it produced.
+
+| Deck | Slides | Open | Sync-parsed at open | Background | Shapes checked | Mismatched |
+|---|---|---|---|---|---|---|
+| feature-test | 4 | 65 ms | 1 | 3, in order | 16 | 0 |
+| test presentation 1 | 2 | 38 ms | 1 | 1 | 4 | 0 |
+| Presentation test | 1 | 109 ms | 1 | — | 7 | 0 |
+| slidesgo | 48 | — | 1 (223 shapes, matches) | in order, no gaps | — | 0 |
+
+Also asserted per deck: shell records built for every slide before any parsing,
+in `getSlideKeysInPresentationOrder` order; `activeSlideIndex` 0 and
+`selectedElementId` null after open; the import job cleared and the running flag
+back to false; history reset fired exactly once; and the status messages emitted
+in the reference's order (unzipping → parsing slide 1 of N → opened).
+
+Background parsing is deliberately `requestIdleCallback`-scheduled, as in the
+reference. With the browser pane hidden the browser throttles that to roughly
+one slide every 25 seconds, so the 48-slide deck's queue was not drained here —
+all 48 of its slides are already compared shape-by-shape in the whole-slide
+sweep above, and the queue was confirmed to fill strictly in order with no gaps.
+
+**A note on running these in the console.** Vite appends an HMR timestamp query
+to a module's imports after that file is edited, so
+`import('/src/renderer/slide-engine/state.ts')` from the console can resolve to a
+*different instance* than the one the pipeline writes to — the import reports
+success while `state.slides` reads as empty. Restart the dev server before an
+end-to-end run.
+
 ## What this does not yet cover
 
 Two shape-level branches these four decks never take: no shape resolves to a
