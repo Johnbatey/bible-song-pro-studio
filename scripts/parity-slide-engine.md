@@ -72,6 +72,23 @@ falls into.
 
 All 0 failures.
 
+### Style resolution (parser/shape-style.ts)
+
+Run over slides **and** slideLayouts/slideMasters from all four decks — the
+layouts and masters matter most, since that is where the inheritance chain
+lives. Both sides had the same theme loaded first, because run colour resolves
+through it.
+
+| Checked | Count |
+|---|---|
+| `<a:rPr>` run properties | 340 |
+| Paragraphs (layout + align + default run style each) | 1,453 |
+| `<a:bodyPr>` text-body layouts | 1,354 |
+| Backgrounds (`bg` + slide-background fallback) | 51 |
+| `txStyles` sets (node identity, not just shape) | 51 |
+
+Roughly 7,500 assertions, **0 failures**.
+
 ## What this does not yet cover
 
 `slide-parser.ts` is the module that matters most and is not ported yet. When it
