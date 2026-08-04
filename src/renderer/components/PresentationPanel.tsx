@@ -4,6 +4,7 @@ import { CustomDropdown } from './CustomDropdown';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { Block } from './Block';
 
+/** Card-shaped view of a deck. The grid never sees the deck record itself. */
 interface SlideItem {
   id: string;
   title: string;
@@ -12,17 +13,34 @@ interface SlideItem {
   subtitle?: string;
 }
 
+/** Cycles so a grid of decks does not come out one flat colour. */
+const CARD_BACKGROUNDS = [
+  'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)',
+  'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+  'linear-gradient(135deg, #065f46 0%, #022c22 100%)',
+  'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)',
+];
+
 export function PresentationPanel() {
   const openSlideEditor = useAppStore((s) => s.openSlideEditor);
+  const presentationDecks = useAppStore((s) => s.presentationDecks);
+  const deletePresentationDeck = useAppStore((s) => s.deletePresentationDeck);
   const [searchQuery, setSearchQuery] = useState('');
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_slidesBarPosition');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
-  const [presentations, setPresentations] = useState<SlideItem[]>([
-    { id: '1', title: 'Mama A song', pagesCount: 2, bg: 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)', subtitle: 'Jesus said unto them' },
-    { id: '2', title: 'Master Room Love Wat', pagesCount: 1, bg: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)', subtitle: 'Click to add heading' },
-    { id: '3', title: 'Worship Service Intro', pagesCount: 3, bg: 'linear-gradient(135deg, #065f46 0%, #022c22 100%)', subtitle: 'Click to add heading' },
-  ]);
+  /* Reads the deck store rather than holding its own list — the grid used to be
+     three hardcoded demo cards, which meant nothing imported or saved could ever
+     appear here. */
+  const presentations: SlideItem[] = presentationDecks.map((deck, index) => ({
+    id: deck.id,
+    title: deck.title || 'Untitled deck',
+    pagesCount: deck.slides?.length ?? 0,
+    bg: deck.slides?.[0]?.background?.type === 'color' || deck.slides?.[0]?.background?.type === 'gradient'
+      ? String(deck.slides[0].background?.value || CARD_BACKGROUNDS[index % CARD_BACKGROUNDS.length])
+      : CARD_BACKGROUNDS[index % CARD_BACKGROUNDS.length],
+    subtitle: deck.slides?.[0]?.title || deck.slides?.[0]?.body || '',
+  }));
 
   function handleCreateNew(val: string) {
     if (val === 'manual') {
@@ -36,7 +54,7 @@ export function PresentationPanel() {
   }
 
   function handleDeleteSlide(id: string) {
-    setPresentations((prev) => prev.filter((item) => item.id !== id));
+    deletePresentationDeck(id);
     setActiveMenuId(null);
   }
 
@@ -93,6 +111,11 @@ export function PresentationPanel() {
 
       {/* Slide Cards Grid */}
       <Block className="blk-fill" title="Slides" subtitle={`${presentations.length}`} bodyStyle={styles.gridContainer}>
+        {presentations.length === 0 && (
+          <div style={styles.emptyState}>
+            No decks yet. Use <strong>+ Create new</strong> to build one, or import a presentation.
+          </div>
+        )}
         {presentations
           .filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()))
           .map((item) => (
@@ -138,6 +161,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-ui)',
   },
   moveBarBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, background: 'transparent', border: 'none', borderRadius: 6, color: '#ffffff', cursor: 'pointer', flexShrink: 0, padding: 0, marginLeft: 'auto' },
+  emptyState: {
+    gridColumn: '1 / -1',
+    padding: '32px 16px',
+    textAlign: 'center',
+    color: 'var(--text-dim)',
+    fontSize: 13,
+  },
   searchBox: {
     flex: 1,
     display: 'flex',

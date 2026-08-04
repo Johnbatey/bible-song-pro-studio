@@ -384,6 +384,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   // (current/preview scene, output status, active alert, meter) is deliberately transient.
   partialize: (state) => ({
     scenes: state.scenes,
+    presentationDecks: state.presentationDecks,
+    songLinesPerSlide: state.songLinesPerSlide,
     songs: state.songs,
     themes: state.themes,
     activeTheme: state.activeTheme,
@@ -409,6 +411,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     return {
       ...current,
       scenes: saved.scenes ?? current.scenes,
+      presentationDecks: saved.presentationDecks ?? current.presentationDecks,
+      songLinesPerSlide: saved.songLinesPerSlide ?? current.songLinesPerSlide,
       songs: saved.songs ?? current.songs,
       themes: saved.themes ?? current.themes,
       activeTheme: saved.activeTheme ?? current.activeTheme,
@@ -431,6 +435,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
 
 interface PersistedState {
   scenes: Scene[];
+  presentationDecks: PresentationDeck[];
+  songLinesPerSlide: number | 'auto';
   songs: Song[];
   themes: Theme[];
   activeTheme: Theme | null;
