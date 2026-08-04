@@ -7,6 +7,7 @@ import { SlideEditorCanvasBoard } from './slide-editor/SlideEditorCanvasBoard';
 import { SlideEditorRightSidebar } from './slide-editor/SlideEditorRightSidebar';
 import { PptxDeckView } from './PptxDeckView';
 import { useDeckPackage } from '../hooks/useDeckPackage';
+import { deriveSlideText } from '../slide-engine/io/deck-import';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
 
 export function SlideEditorModal() {
@@ -473,8 +474,36 @@ export function SlideEditorModal() {
   }
 
   function handleSaveToDeck() {
-    addPresentationDeck(deck);
+    addPresentationDeck(isPptxDeck ? deckWithPptxEdits() : deck);
     closeSlideEditor();
+  }
+
+  /**
+   * Fold this session's slide edits into the deck record.
+   *
+   * The OOXML goes on the slide as `editor`, which is what gets written back
+   * into the package on reopen. The title and body are re-derived from the
+   * edited shapes by the same reader the import used, so the library grid and
+   * search see the new wording rather than the wording at import time.
+   */
+  function deckWithPptxEdits(): PresentationDeck {
+    const edits = pkg.collectEdits();
+    if (edits.size === 0) return deck;
+
+    const slides = deck.slides.map((slide, index) => {
+      const edit = edits.get(index);
+      if (!edit) return slide;
+      const parsed = pkg.slides[index];
+      const text = parsed ? deriveSlideText(parsed, index) : null;
+      return {
+        ...slide,
+        title: text ? text.title : slide.title,
+        body: text ? text.body : slide.body,
+        editor: edit,
+      };
+    });
+
+    return { ...deck, slides, updatedAt: Date.now() };
   }
 
   return (

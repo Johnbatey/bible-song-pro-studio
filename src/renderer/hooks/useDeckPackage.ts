@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { openDeckFromBytes } from '../slide-engine/io/import';
 import { ensureModifierSlideParsed } from '../slide-engine/parser/presentation';
+import { applySavedSlideXml, collectEditedSlideXml, type SavedSlideXml } from '../slide-engine/io/save';
 import { state as engineState, type ParsedSlide, type SlideSizeEmu } from '../slide-engine/state';
 import type { PresentationDeck } from '../types';
 
@@ -32,6 +33,8 @@ export interface DeckPackage {
   /** Ticks when another slide finishes parsing. */
   version: number;
   reload: () => void;
+  /** OOXML for every slide edited this session, keyed by slide index. */
+  collectEdits: () => Map<number, SavedSlideXml>;
 }
 
 export function useDeckPackage(deck: PresentationDeck | null, enabled: boolean): DeckPackage {
@@ -98,10 +101,11 @@ export function useDeckPackage(deck: PresentationDeck | null, enabled: boolean):
         },
         onDeckOpened: () => {
           if (cancelled || token !== openToken.current) return;
-          setSlides([...engineState.slides]);
           setSlideSizeEmu({ ...engineState.pptxSlideSizeEmu });
           setActiveIndexRaw(0);
           setStatus(null);
+          // Slides are published after saved edits are restored, below, so the
+          // first paint is never the unedited version.
         },
         onSlideParsed: () => {
           if (cancelled || token !== openToken.current) return;
@@ -113,7 +117,26 @@ export function useDeckPackage(deck: PresentationDeck | null, enabled: boolean):
       if (cancelled || token !== openToken.current) return;
       if (!result.ok && result.error !== 'cancelled') {
         setStatus({ level: 'error', text: `Could not open the package (${result.error}).` });
+        return;
       }
+
+      /* Saved edits live as OOXML on the deck record. Put those parts back
+         into the package and let the affected slides re-parse from them, so an
+         edited slide goes through exactly the same pipeline as an untouched
+         one — no separate "edited" render path to drift. */
+      const saved = deck.slides.map((s) => s.editor || null);
+      if (saved.some(Boolean)) {
+        const restored = await applySavedSlideXml(engineState.loadedPptxZip, engineState.slides, saved);
+        if (cancelled || token !== openToken.current) return;
+        // Re-parse whatever is on screen now; the rest come back lazily.
+        if (restored.includes(0)) {
+          await ensureModifierSlideParsed(0).catch((err) => console.warn('Restore parse failed', err));
+        }
+        if (cancelled || token !== openToken.current) return;
+      }
+
+      setSlides([...engineState.slides]);
+      setVersion((v) => v + 1);
     })();
 
     return () => { cancelled = true; };
@@ -138,5 +161,7 @@ export function useDeckPackage(deck: PresentationDeck | null, enabled: boolean):
 
   const reload = useCallback(() => setReloadToken((t) => t + 1), []);
 
-  return { slides, slideSizeEmu, activeIndex, setActiveIndex, status, version, reload };
+  const collectEdits = useCallback(() => collectEditedSlideXml(engineState.slides), []);
+
+  return { slides, slideSizeEmu, activeIndex, setActiveIndex, status, version, reload, collectEdits };
 }

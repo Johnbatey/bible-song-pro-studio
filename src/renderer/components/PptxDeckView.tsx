@@ -13,6 +13,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { SlideCanvas } from './SlideCanvas';
 import { editableTextShapes, setShapeText, setRunText, shapeFullText } from '../slide-engine/edit/text';
+import { markSlideDirty } from '../slide-engine/io/save';
 import type { ParsedShape, ParsedRun } from '../slide-engine/parser/slide-parser';
 import type { ParsedSlide, SlideSizeEmu } from '../slide-engine/state';
 import type { DeckPackageStatus } from '../hooks/useDeckPackage';
@@ -145,13 +146,15 @@ export function PptxDeckView({
 
   const handlePanelEdit = useCallback((shape: ParsedShape, value: string) => {
     setShapeText(shape, value);
+    markSlideDirty(active);
     repaint();
-  }, [repaint]);
+  }, [active, repaint]);
 
   const handleRunEdit = useCallback((run: ParsedRun, value: string) => {
     setRunText(run, value);
+    markSlideDirty(active);
     repaint();
-  }, [repaint]);
+  }, [active, repaint]);
 
   return (
     <div style={styles.wrap}>

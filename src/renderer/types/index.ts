@@ -123,6 +123,11 @@ export interface PresentationSlide {
   elements?: SlideElement[];
   background?: SlideBackground;
   aspectRatio?: '16:9' | '4:3' | 'lower-third';
+  /* Edits to an imported PowerPoint slide, kept as the slide part's OOXML.
+     Written back into the package when the deck is reopened, so an edited
+     slide re-parses through the same pipeline as an untouched one. Only
+     slides actually edited carry this. */
+  editor?: { filename: string; xml: string };
 }
 
 export interface Background {
