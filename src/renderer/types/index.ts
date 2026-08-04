@@ -48,6 +48,10 @@ export interface SongCredit {
 export interface SlideElement {
   id: string;
   type: 'text' | 'image' | 'shape';
+  /* Geometry is PERCENT of the slide, not pixels — the canvas writes these
+     straight into left/top/width/height as `%`, and dragging converts pointer
+     pixels back through the board size. Passing pixel values here puts the
+     element somewhere off the board with no error anywhere. */
   x: number;
   y: number;
   width: number;
