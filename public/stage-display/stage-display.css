@@ -44,6 +44,16 @@ body {
   overflow: hidden;
 }
 
+/* ---- Embedded operator monitor (dock panel iframe) ----
+   When loaded with ?embeddedPreview=1 the page receives the .embedded class.
+   All HUD chrome is hidden — the dock panel's own footer bar is the operator
+   surface. The standalone stage window (audience-facing) is unaffected. */
+.stage-display.embedded .stage-watermark,
+.stage-display.embedded .stage-picker,
+.stage-display.embedded .stage-context-menu {
+  display: none !important;
+}
+
 /* ---- Program output surface ---- */
 .program-surface {
   position: absolute;

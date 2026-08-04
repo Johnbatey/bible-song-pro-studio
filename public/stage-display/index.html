@@ -88,6 +88,17 @@
         }, 200);
       })();
     </script>
+    <script>
+      /* When loaded inside the operator dock panel, strip the HUD chrome so the
+         settings/watermark footer stays off the preview iframe. The standalone
+         stage window (no embeddedPreview param) is unaffected. */
+      (function() {
+        if (new URLSearchParams(window.location.search).get('embeddedPreview') === '1') {
+          var el = document.getElementById('stage-display');
+          if (el) el.classList.add('embedded');
+        }
+      })();
+    </script>
     <script src="stage-display.js"></script>
     <script>
       (function() {

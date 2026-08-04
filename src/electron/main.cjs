@@ -53,6 +53,7 @@ const DOCK_DEFS = [
   { id: 'presentation', label: 'Pro Slides' },
   { id: 'live',         label: 'Live Scripture' },
   { id: 'media',        label: 'Media' },
+  { id: 'stage',        label: 'Stage Display' },
   { id: 'scenes',       label: 'Scenes' },
   { id: 'themes',       label: 'Themes' },
 ];

@@ -10,6 +10,7 @@ import { MediaPanel } from '../MediaPanel';
 import { ScenePanel } from '../ScenePanel';
 import { PresentationPanel } from '../PresentationPanel';
 import { ThemePanel } from '../ThemePanel';
+import { StagePanel } from '../StagePanel';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { openDock } from './dockController';
 import { DockedContext } from './DockedContext';
@@ -39,6 +40,7 @@ export const DOCKS = [
   { id: 'presentation', title: 'Pro Slides', nav: true },
   { id: 'live', title: 'Live', nav: true },
   { id: 'media', title: 'Media', nav: true },
+  { id: 'stage', title: 'Stage', nav: true },
   { id: 'scenes', title: 'Scenes', nav: false },
   { id: 'themes', title: 'Themes', nav: false },
 ] as const satisfies readonly DockDef[];
@@ -79,6 +81,7 @@ export const DOCK_COMPONENTS: Record<string, React.FunctionComponent<IDockviewPa
   presentation: panel('Pro Slides', () => <PresentationPanel />),
   live: panel('Live Scripture', () => <LiveScripturePanel />),
   media: panel('Media', () => <MediaPanel />, true),
+  stage: panel('Stage Display', () => <StagePanel />, true),
   scenes: panel('Scenes', () => <ScenePanel />, true),
   themes: panel('Themes', () => <ThemePanel />, true),
 };
