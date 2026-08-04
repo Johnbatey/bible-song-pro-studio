@@ -57,6 +57,21 @@ fonts, and slide 1's relationship table.
 a white outline that the reference calls out as the trap a naive deep search
 falls into.
 
+### Geometry (core/preset-geometry.ts)
+
+- 72 preset checks — all 20 generators plus rect/roundRect/ellipse/unknown,
+  each with no adjustments, a single `adj`, and an `adj1`/`adj2` pair.
+- **800 real `<a:custGeom>` nodes** pulled from Slidesgo slides 1, 5, 12, 23 and
+  40, covering **6,318 cubic bezier commands** — parsed geometry and the emitted
+  path `d` string both compared.
+- Those decks contain no `arcTo`, so that branch was exercised synthetically: a
+  90-degree clockwise arc, a 270-degree sweep (the large-arc flag), a negative
+  sweep with unequal radii, plus a quadratic path with no declared `w`/`h`
+  (bounds fallback), a two-subpath shape with `fill="none" stroke="0"`, an empty
+  `pathLst`, and a missing `pathLst`.
+
+All 0 failures.
+
 ## What this does not yet cover
 
 `slide-parser.ts` is the module that matters most and is not ported yet. When it
