@@ -13,8 +13,10 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { SlideCanvas } from './SlideCanvas';
 import { SlideSelectionLayer } from './SlideSelectionLayer';
+import { ShapeInspector } from './ShapeInspector';
 import { editableTextShapes, setShapeText, setRunText, shapeFullText } from '../slide-engine/edit/text';
 import { markSlideDirty } from '../slide-engine/io/save';
+import { deleteShapes, reorderShapes, setShapesFill, setShapesStroke, setShapesTextColor } from '../slide-engine/edit/style';
 import type { SelectionState } from '../slide-engine/edit/geometry';
 import type { ParsedShape, ParsedRun } from '../slide-engine/parser/slide-parser';
 import type { ParsedSlide, SlideSizeEmu } from '../slide-engine/state';
@@ -88,11 +90,11 @@ function TextPanel({
   const boxes = editableTextShapes(shapes);
 
   if (boxes.length === 0) {
-    return <div style={styles.panelEmpty}>No editable text on this slide.</div>;
+    return <div style={styles.sectionEmpty}>No editable text on this slide.</div>;
   }
 
   return (
-    <div style={styles.panel}>
+    <div style={styles.section}>
       <div style={styles.panelHead}>
         {boxes.length} text box{boxes.length === 1 ? '' : 'es'}
       </div>
@@ -167,6 +169,32 @@ export function PptxDeckView({
     onEdited?.();
   }, [active, repaint, onEdited]);
 
+  const selectedShapes = selection && active
+    ? ((active.shapes as ParsedShape[]) || []).filter((s) => selection.ids.includes(s.id))
+    : [];
+
+  const commitStyle = useCallback((fn: () => void) => {
+    fn();
+    markSlideDirty(active);
+    repaint();
+    onEdited?.();
+  }, [active, repaint, onEdited]);
+
+  const handleReorder = useCallback((toFront: boolean) => {
+    if (!active || !selection) return;
+    commitStyle(() => {
+      active.shapes = reorderShapes((active.shapes as ParsedShape[]) || [], selection.ids, toFront);
+    });
+  }, [active, selection, commitStyle]);
+
+  const handleDelete = useCallback(() => {
+    if (!active || !selection) return;
+    commitStyle(() => {
+      active.shapes = deleteShapes((active.shapes as ParsedShape[]) || [], selection.ids, selection.groupNode);
+    });
+    setSelection(null);
+  }, [active, selection, commitStyle]);
+
   /* An undo rebuilds the slide's records from scratch, so the canvas has to
      repaint even though nothing in this component's own state moved. */
   const paintRevision = revision + externalRevision;
@@ -237,14 +265,24 @@ export function PptxDeckView({
       </div>
 
       {!status && active?.parsed && (
-        <TextPanel
+        <div style={styles.panel}>
+          <ShapeInspector
+            selected={selectedShapes}
+            onFill={(hex) => commitStyle(() => setShapesFill(selectedShapes, hex))}
+            onStroke={(hex, w) => commitStyle(() => setShapesStroke(selectedShapes, hex, w))}
+            onTextColor={(hex) => commitStyle(() => setShapesTextColor(selectedShapes, hex))}
+            onReorder={handleReorder}
+            onDelete={handleDelete}
+          />
+          <TextPanel
           /* Keyed by slide only. Keying on the revision too would remount the
              fields on every keystroke and throw away focus mid-word; the
              values are controlled, so they follow an undo without a remount. */
-          key={active.filename as string}
-          shapes={(active.shapes as ParsedShape[]) || []}
-          onEdit={handlePanelEdit}
-        />
+            key={active.filename as string}
+            shapes={(active.shapes as ParsedShape[]) || []}
+            onEdit={handlePanelEdit}
+          />
+        </div>
       )}
     </div>
   );
@@ -312,15 +350,8 @@ const styles: Record<string, CSSProperties> = {
     background: '#0e1117',
     borderLeft: '1px solid rgba(255,255,255,0.08)',
   },
-  panelEmpty: {
-    width: 280,
-    flexShrink: 0,
-    padding: 16,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
-    background: '#0e1117',
-    borderLeft: '1px solid rgba(255,255,255,0.08)',
-  },
+  section: { display: 'flex', flexDirection: 'column', gap: 10 },
+  sectionEmpty: { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
   panelHead: {
     fontSize: 10,
     letterSpacing: 0.6,
