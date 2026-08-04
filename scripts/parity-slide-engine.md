@@ -184,6 +184,32 @@ to a module's imports after that file is edited, so
 success while `state.slides` reads as empty. Restart the dev server before an
 end-to-end run.
 
+### Headless deck import (io/deck-import.ts)
+
+`importDeckStructure` compared field for field against the oracle's, over all
+four decks — every slide, including the 48-slide one (this path parses
+synchronously, so nothing is idle-scheduled).
+
+| Deck | Slides | Aspect | Title chars | Body chars | Max text boxes | Max shapes |
+|---|---|---|---|---|---|---|
+| feature-test | 4 | 16:9 | 96 | 158 | 3 | 9 |
+| test presentation 1 | 2 | 16:9 | 21 | 125 | 2 | 2 |
+| Presentation test | 1 | 16:9 | 5 | 23 | 2 | 7 |
+| slidesgo | 48 | 16:9 | 765 | 7,290 | 19 | 6,232 |
+
+**0 failures**, and the scoped-state contract holds: after each import the slide
+size, theme map, alias map, zip handle and XML cache are the exact objects they
+were before, so importing never disturbs an open deck.
+
+That last row is the point of the module. A slide with **6,232 shapes** yields
+**19 text boxes** — the decorative `custGeom` art each carries a throwaway
+`txBody` whose runs are empty or zero-width, and it is filtered on visible
+characters rather than on being a text shape at all. A regex over `<a:t>` returns
+the noise.
+
+To run the oracle side, its vendor bridge has to be handed JSZip:
+`BSPSlideEditor.bridge.vendor.resolve = (k) => k === 'jszip' ? window.JSZip : …`.
+
 ## What this does not yet cover
 
 Two shape-level branches these four decks never take: no shape resolves to a
