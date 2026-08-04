@@ -210,6 +210,59 @@ the noise.
 To run the oracle side, its vendor bridge has to be handed JSZip:
 `BSPSlideEditor.bridge.vendor.resolve = (k) => k === 'jszip' ? window.JSZip : …`.
 
+### Rendering (`<SlideCanvas>`)
+
+This is the half that cannot be a literal copy — the reference paints by
+mutating DOM nodes, React builds a tree. So it is verified on what a viewer
+would actually see rather than on code shape.
+
+`scripts/slide-canvas-parity.tsx` renders the same parsed slide twice into two
+1280-wide boards — the reference's own `renderMiniSlide` into one, `<SlideCanvas>`
+into the other — then walks both trees in parallel and compares, for every shape
+box and every text run:
+
+- its rectangle relative to the board (x, y, w, h, to 0.01px), and
+- 35 computed style properties: backgrounds, borders, radius, shadow,
+  `clip-path`, transform, colour, font size/family/weight/style, decoration,
+  alignment, line height, direction, indent, margins, padding, display, flex,
+  white-space, grid templates, and
+- every SVG path's `d`, fill, stroke, width and dash array, and
+- each `<img>`'s rect and source length.
+
+| Compared | Count |
+|---|---|
+| Slides rendered in both | 55 |
+| Shape boxes | 13,685 |
+| Text runs (including bullet spans) | 13,790 |
+
+**0 differences.**
+
+The run count exceeds the parser's 13,646 by exactly the 144 bullet spans, which
+both renderers emit and which matched glyph-for-glyph — so auto-numbering,
+Wingdings mapping and hanging-indent widths are covered too.
+
+Run it from the console:
+
+```js
+const h = await import('/scripts/slide-canvas-parity.tsx');
+await h.run('slidesgo.pptx', 0, { keepOpen: true });   // side-by-side, on screen
+await h.runDeck('feature-test.pptx');                  // measured, all slides
+```
+
+It lives in `scripts/` rather than `src/`: Vite serves it in dev, and since
+nothing imports it, it never reaches a production build.
+
+**What this caught.** The first run reported 23 differences on one slide, all on
+the same shape: our text shapes put fill, border, radius, insets and the flex
+column on a *child* of the positioned box instead of on the box itself. The
+border would have been clipped by the parent's `overflow: hidden`, and autofit
+would have measured the wrong element. Fixed by flattening to a single div.
+
+Two harness details worth keeping: use `setTimeout`, not `requestAnimationFrame`,
+to wait for React to commit — a backgrounded tab pauses rAF and the run hangs
+forever. And the oracle needs its `state.activeKind()` stubbed to `"pptx"`, or
+its board height falls back to 720 and every percentage lands in the wrong place.
+
 ## What this does not yet cover
 
 Two shape-level branches these four decks never take: no shape resolves to a
