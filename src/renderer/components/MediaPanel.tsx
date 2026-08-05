@@ -46,6 +46,8 @@ export function MediaPanel() {
     refresh();
   }, [refresh]);
 
+  /* For this panel's own <img>/<video> thumbnails, which need a real origin
+     now. What gets stored on a scene is the relative path — see below. */
   const absoluteUrl = (item: MediaItem) => `${baseUrl}${item.url}`;
 
   const applyImportResult = (result: { ok: boolean; items: MediaItem[]; errors: string[]; canceled?: boolean } | null) => {
@@ -96,7 +98,11 @@ export function MediaPanel() {
       content: { text: '' },
       background: {
         type: item.type,
-        mediaUrl: absoluteUrl(item),
+        /* Server-relative on purpose. This is persisted with the scene, and
+           an absolute URL would pin the saved library to whatever port the
+           server happened to hold the day it was added. Whoever renders the
+           scene supplies the origin. */
+        mediaUrl: item.url,
         mediaType: item.type,
         fit: 'cover',
         loop: true,

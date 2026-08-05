@@ -15,6 +15,7 @@ const deckService = require('./deck-service.cjs');
 const { createSettingsService } = require('./settings-service.cjs');
 const { createDeepgramService } = require('./deepgram-service.cjs');
 const { createObsService } = require('./obs-service.cjs');
+const { listenWithFallback } = require('./listen-with-fallback.cjs');
 
 const isDev = !app.isPackaged && !fs.existsSync(path.join(__dirname, '../../dist/index.html'));
 let mainWindow = null;
@@ -23,7 +24,13 @@ let displayWindow = null;
    confidence monitor on more than one screen, and each needs both feeds. */
 const stageWindows = new Set();
 let wss = null;
-let displayPort = 8942;
+/* The asset server's port. Not a constant: a conflict walks up the range, and
+   everything that builds a URL reads this rather than the base. */
+const HTTP_PORT_BASE = 8942;
+const HTTP_PORT_ATTEMPTS = 8;
+let displayPort = HTTP_PORT_BASE;
+/** Set when the server could not bind at all, so the UI can say why. */
+let httpServerError = null;
 let activeDisplayId = null;
 let ndiService = null;
 let sessionHistory = null;
@@ -382,7 +389,22 @@ function startHttpServer() {
     res.writeHead(404); res.end('Not Found');
   });
 
-  server.listen(displayPort, '0.0.0.0', () => console.log(`BSP Server: http://0.0.0.0:${displayPort}/display.html | Remote: http://0.0.0.0:${displayPort}/remote.html`));
+  /* A port conflict costs a port number, not the app. If the whole range is
+     taken the app still runs — without the phone remote and browser output —
+     and display:getStatus says why. */
+  listenWithFallback(server, {
+    basePort: HTTP_PORT_BASE,
+    attempts: HTTP_PORT_ATTEMPTS,
+    onListening: (port) => {
+      displayPort = port;
+      httpServerError = null;
+      console.log(`BSP Server: http://0.0.0.0:${port}/display.html | Remote: http://0.0.0.0:${port}/remote.html`);
+    },
+    onError: (message) => {
+      httpServerError = message;
+      console.error(`BSP Server: ${message}`);
+    },
+  });
 
   wss = new WebSocketServer({ server });
   wss.on('connection', (ws) => {
@@ -394,8 +416,6 @@ function startHttpServer() {
       wss.clients.forEach((c) => { if (c !== ws && c.readyState === 1) c.send(text); });
     });
   });
-
-  return displayPort;
 }
 
 function createSplashWindow() {
@@ -567,7 +587,7 @@ app.whenReady().then(async () => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('obs:event', event);
     },
   });
-  displayPort = startHttpServer();
+  startHttpServer();
   sessionHistory.startSession('BSP Session');
 
   // Build the verse search index off the critical path so the first live detection
@@ -632,10 +652,15 @@ app.whenReady().then(async () => {
   ipcMain.handle('display:getStatus', () => ({
     isOpen: !!(displayWindow && !displayWindow.isDestroyed()),
     url: 'Electron IPC display',
-    browserUrl: `http://localhost:${displayPort}/display.html`,
+    // Null rather than a plausible-looking URL when nothing is listening —
+    // the projector is unaffected by this, but the remote genuinely is not
+    // reachable and an address that refuses the connection is worse than none.
+    browserUrl: httpServerError ? null : `http://localhost:${displayPort}/display.html`,
+    remoteUrl: httpServerError ? null : `http://localhost:${displayPort}/remote.html`,
+    port: httpServerError ? null : displayPort,
+    serverError: httpServerError,
     clients: wss ? wss.clients.size : 0,
     updatedAt: displayState.updatedAt || 0,
-    remoteUrl: `http://localhost:${displayPort}/remote.html`,
   }));
   ipcMain.on('display:message', (_, msg) => { if (msg && msg.type === 'display:update') setDisplayState(msg.state || msg); });
 

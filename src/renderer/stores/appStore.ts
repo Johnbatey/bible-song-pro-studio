@@ -34,6 +34,30 @@ const bspStorage: StateStorage = {
   },
 };
 
+/* Older builds stored a scene's media as a fully-qualified
+   http://localhost:8942/media/… URL, which pinned the saved library to whatever
+   port the asset server happened to hold that day. The port can now move when
+   one is taken, so those are rewritten back to the server-relative form on load
+   and resolved against the live origin at render time.
+
+   127.0.0.1 as well as localhost, because the operator window and the display
+   windows have not always agreed on which one they used. */
+const PINNED_MEDIA_ORIGIN = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?=\/)/i;
+
+function unpinSceneMedia(scenes: Scene[] | undefined): Scene[] | undefined {
+  if (!scenes) return scenes;
+  let changed = false;
+  const next = scenes.map((scene) => {
+    const url = scene.background?.mediaUrl;
+    if (!url || !PINNED_MEDIA_ORIGIN.test(url)) return scene;
+    changed = true;
+    return { ...scene, background: { ...scene.background!, mediaUrl: url.replace(PINNED_MEDIA_ORIGIN, '') } };
+  });
+  // Same array when nothing matched, so a library with no imported media is
+  // not needlessly replaced on every start.
+  return changed ? next : scenes;
+}
+
 interface AppState {
   // App state
   isLoaded: boolean;
@@ -379,6 +403,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   name: 'bsp-app-state',
   version: 1,
   storage: createJSONStorage(() => bspStorage),
+  // See unpinSceneMedia below — applied in `merge`.
 
   // Only library content and user preferences survive a restart. Live display state
   // (current/preview scene, output status, active alert, meter) is deliberately transient.
@@ -410,7 +435,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     const saved = (persisted || {}) as Partial<PersistedState>;
     return {
       ...current,
-      scenes: saved.scenes ?? current.scenes,
+      scenes: unpinSceneMedia(saved.scenes) ?? current.scenes,
       presentationDecks: saved.presentationDecks ?? current.presentationDecks,
       songLinesPerSlide: saved.songLinesPerSlide ?? current.songLinesPerSlide,
       songs: saved.songs ?? current.songs,

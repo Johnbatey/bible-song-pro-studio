@@ -5,6 +5,7 @@ import { useAppStore } from '../stores/appStore';
 import { CustomDropdown } from './CustomDropdown';
 import { StageSettingsPopover } from './StageSettingsPopover';
 import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
+import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { publishStage, useStageState } from '../services/stage-bus';
 import { formatTime, timerSeconds } from '../../stage/stage-state';
 import { StageSurface } from '../../stage/StageSurface';
@@ -63,6 +64,7 @@ export function StagePanel() {
      renders, driven by the same state — not a picture of it. */
   const stage = useStageState();
   const program = useProgramSurfaceState();
+  const assetBaseUrl = useAssetBaseUrl();
   const activeLayout = stage.layout.id as LayoutId;
 
   /* ── box size — measured from the viewport ── */
@@ -291,7 +293,7 @@ export function StagePanel() {
                 mounts, reading the same state, so the preview cannot drift
                 from what it is a preview of. */}
             <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
-              <StageSurface state={stage} program={program} chrome={false} />
+              <StageSurface state={stage} program={program} chrome={false} assetBaseUrl={assetBaseUrl} />
             </div>
           </div>
         </div>

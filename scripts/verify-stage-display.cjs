@@ -9,6 +9,7 @@
  *   - the program pane is a real component, not an <iframe> onto some origin
  *   - operator state arrives over IPC and reaches the screen
  *   - a window opened mid-service catches up from the retained snapshot
+ *   - nothing the page loads is blocked by its own CSP
  *
  * Usage: electron scripts/verify-stage-display.cjs   (after `vite build`)
  */
@@ -63,6 +64,18 @@ async function main() {
     },
   });
 
+  /* Record CSP violations from the moment the document exists. font-src was
+     too narrow for the @font-face set the page installs from the asset server,
+     so themed fonts fell back to system ones with nothing reported anywhere. */
+  win.webContents.on('did-start-loading', () => {
+    win.webContents.executeJavaScript(`
+      window.__cspViolations = [];
+      document.addEventListener('securitypolicyviolation', (e) => {
+        window.__cspViolations.push(e.violatedDirective + ' <- ' + e.blockedURI);
+      });
+    `).catch(() => {});
+  });
+
   await win.loadURL(`file://${distEntry}`);
   await new Promise((resolve) => setTimeout(resolve, 800));
 
@@ -90,14 +103,18 @@ async function main() {
   const after = await win.webContents.executeJavaScript('document.body.innerText');
   assert(after.includes('For God so loved the world'), 'Live stage:message did not reach the screen');
 
-  // 4. It is not a black rectangle.
+  // 4. Nothing the page asked for was refused by its own policy.
+  const violations = await win.webContents.executeJavaScript('window.__cspViolations || []');
+  assert(violations.length === 0, `CSP blocked ${violations.length}: ${violations.join(', ')}`);
+
+  // 5. It is not a black rectangle.
   const image = await win.webContents.capturePage();
   const pngPath = path.join(outDir, 'stage.png');
   fs.writeFileSync(pngPath, image.toPNG());
   const luma = averageLuma(nativeImage.createFromBuffer(image.toPNG()).resize({ width: 64, height: 64 }).toBitmap());
   assert(Number.isFinite(luma) && luma > 1, `Stage appears blank; average luma=${luma}`);
 
-  console.log(`Stage display verified: no iframes, ProgramSurface mounted, IPC snapshot + live update rendered, luma ${luma.toFixed(2)}, screenshot ${pngPath}`);
+  console.log(`Stage display verified: no iframes, ProgramSurface mounted, IPC snapshot + live update rendered, no CSP violations, luma ${luma.toFixed(2)}, screenshot ${pngPath}`);
   win.destroy();
   app.quit();
 }

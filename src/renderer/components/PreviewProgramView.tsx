@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
+import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { ProgramSurface } from './display/ProgramSurface';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { type, fontWeight } from '../styles/type';
@@ -57,6 +58,9 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
   /* Shared with the stage display's program pane — both are claims about what
      the congregation is seeing, so neither derives it privately. */
   const programSurfaceState = useProgramSurfaceState();
+  /* Scenes store media relative, so these panes have to resolve it — without
+     this an imported image or video renders as nothing here. */
+  const assetBaseUrl = useAssetBaseUrl();
 
   const isStudio = mode === 'studio';
   // Something is staged that the audience isn't seeing yet
@@ -335,6 +339,7 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                   <ProgramSurface
                     preview
                     state={previewSurfaceState}
+                    assetBaseUrl={assetBaseUrl}
                   />
                 </div>
               </div>
@@ -355,6 +360,7 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                 <ProgramSurface
                   preview
                   state={programSurfaceState}
+                  assetBaseUrl={assetBaseUrl}
                 />
               </div>
             </div>
