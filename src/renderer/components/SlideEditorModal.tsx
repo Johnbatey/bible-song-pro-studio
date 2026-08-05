@@ -217,10 +217,14 @@ export function SlideEditorModal() {
 
   const handlePptxUngroup = useCallback(() => {
     if (!pptxSelection) return;
-    if (ungroupShapes(pptxShapes, pptxSelection.ids) === 0) return;
+    let released = 0;
+    commitStyle(() => {
+      released = ungroupShapes(pptxShapes, pptxSelection.ids);
+    });
+    if (released === 0) return;
     setPptxSelection({ ids: pptxSelection.ids, groupId: null, groupNode: null });
     setPptxRevision((n) => n + 1);
-  }, [pptxShapes, pptxSelection]);
+  }, [pptxShapes, pptxSelection, commitStyle]);
 
   /* The slide's stack, bottom entry first. Rebuilt whenever the records change
      — they mutate in place, so the revision is what marks them as changed. */

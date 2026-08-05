@@ -20,7 +20,7 @@
    edit/modifier-shapes.js; the layer stack is new.
    ========================================================================= */
 import type { ParsedShape } from '../parser/slide-parser';
-import type { SelectionState } from './geometry';
+import { ancestorAffineEmu, type SelectionState } from './geometry';
 
 /** Distinguishes a records-level group from a parsed <p:grpSp> (`grp_*`). */
 let recordsGroupSeq = 0;
@@ -48,32 +48,141 @@ export function groupShapes(shapes: ParsedShape[], ids: string[]): SelectionStat
   return { ids: members.map((s) => s.id), groupId, groupNode: null };
 }
 
+function byLocal(parent: Element | null, name: string): Element | null {
+  if (!parent) return null;
+  for (let i = 0; i < parent.childNodes.length; i++) {
+    const child = parent.childNodes[i];
+    if (child.nodeType === 1 && (child as Element).localName === name) {
+      return child as Element;
+    }
+  }
+  return null;
+}
+
 /**
- * Break every group the selection touches, so each piece becomes independently
- * selectable, movable and re-colourable.
+ * Break every group the selection touches (both records-level `groupId`s and
+ * DrawingML `<p:grpSp>` XML groups), so each piece becomes independently
+ * selectable, movable and re-colourable as its own individual layer.
  *
  * Returns how many shapes were released, which is what the caller reports.
  */
 export function ungroupShapes(shapes: ParsedShape[], ids: string[]): number {
   const idset = new Set(ids);
-  const groupIds = new Set(
-    shapes.filter((s) => idset.has(s.id)).map((s) => s.groupId).filter(Boolean),
+  const selectedShapes = shapes.filter((s) => idset.has(s.id));
+  if (selectedShapes.length === 0) return 0;
+
+  // 1. Collect records-level groupIds
+  const recordGroupIds = new Set(
+    selectedShapes.map((s) => s.groupId).filter(Boolean) as string[],
   );
-  if (groupIds.size === 0) return 0;
+
+  // 2. Collect XML <p:grpSp> container nodes touching the selection
+  const xmlGroupNodes = new Set<Element>();
+  selectedShapes.forEach((s) => {
+    const srcNode = (s.srcNode as Element | null) || null;
+    if (srcNode) {
+      let cursor: Element | null = srcNode.parentNode as Element | null;
+      while (cursor && cursor.nodeType === 1 && cursor.localName !== 'spTree') {
+        if (cursor.localName === 'grpSp') {
+          xmlGroupNodes.add(cursor);
+        }
+        cursor = cursor.parentNode as Element | null;
+      }
+    }
+  });
+
+  if (recordGroupIds.size === 0 && xmlGroupNodes.size === 0) return 0;
 
   let released = 0;
-  shapes.forEach((s) => {
-    if (!s.groupId || !groupIds.has(s.groupId)) return;
-    s.groupId = null;
-    s.groupNode = null;
-    released++;
+
+  // Release records-level groups
+  if (recordGroupIds.size > 0) {
+    shapes.forEach((s) => {
+      if (s.groupId && recordGroupIds.has(String(s.groupId))) {
+        s.groupId = null;
+        s.groupNode = null;
+        released++;
+      }
+    });
+  }
+
+  // Release XML <p:grpSp> groups
+  xmlGroupNodes.forEach((grpNode) => {
+    const spTree = grpNode.parentNode;
+    if (!spTree) return;
+
+    // All shapes in the slide that are inside this grpNode
+    const memberShapes = shapes.filter((s) => {
+      const srcNode = (s.srcNode as Element | null) || null;
+      if (!srcNode) return false;
+      let p: Node | null = srcNode.parentNode;
+      while (p) {
+        if (p === grpNode) return true;
+        p = p.parentNode;
+      }
+      return false;
+    });
+
+    memberShapes.forEach((s) => {
+      const srcNode = (s.srcNode as Element | null) || null;
+      if (!srcNode) return;
+
+      // Compute absolute transform before un-parenting
+      const affine = ancestorAffineEmu(srcNode);
+
+      const spPr = byLocal(srcNode, 'spPr') || byLocal(srcNode, 'grpSpPr');
+      if (spPr) {
+        const xfrm = byLocal(spPr, 'xfrm');
+        if (xfrm) {
+          const off = byLocal(xfrm, 'off');
+          const ext = byLocal(xfrm, 'ext');
+          if (off && ext) {
+            const curOx = +(off.getAttribute('x') || 0);
+            const curOy = +(off.getAttribute('y') || 0);
+            const curCx = +(ext.getAttribute('cx') || 0);
+            const curCy = +(ext.getAttribute('cy') || 0);
+
+            const absOx = Math.round(curOx * affine.sx + affine.tx);
+            const absOy = Math.round(curOy * affine.sy + affine.ty);
+            const absCx = Math.round(curCx * affine.sx);
+            const absCy = Math.round(curCy * affine.sy);
+
+            off.setAttribute('x', `${absOx}`);
+            off.setAttribute('y', `${absOy}`);
+            ext.setAttribute('cx', `${absCx}`);
+            ext.setAttribute('cy', `${absCy}`);
+          }
+        }
+      }
+
+      // Move node directly into spTree before grpNode
+      spTree.insertBefore(srcNode, grpNode);
+
+      s.groupNode = null;
+      s.groupId = null;
+      released++;
+    });
+
+    // Remove empty grpNode from spTree
+    try {
+      spTree.removeChild(grpNode);
+    } catch {
+      /* Safe if already unparented */
+    }
   });
+
   return released;
 }
 
 /** Is any of this selection part of a group, so Ungroup would do something? */
 export function selectionHasGroup(members: ParsedShape[]): boolean {
-  return members.some((s) => !!s.groupId);
+  return members.some((s) => {
+    if (s.groupId) return true;
+    const srcNode = (s.srcNode as Element | null) || null;
+    if (!srcNode) return false;
+    const top = topLevelNodeOf(srcNode);
+    return top !== srcNode || top.localName === 'grpSp' || (srcNode.parentNode && (srcNode.parentNode as Element).localName === 'grpSp');
+  });
 }
 
 /* ---- the layer stack --------------------------------------------------- */
