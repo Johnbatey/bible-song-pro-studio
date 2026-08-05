@@ -771,15 +771,22 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ffffff',
     cursor: 'pointer',
   },
+  /* gridAutoRows is max-content, not auto: the cards clip their own overflow,
+     so an auto row has a zero automatic minimum and Chromium squeezes every
+     row to fit the scroller's height the moment the grid is taller than the
+     body — which stacks the cards on top of one another. max-content pins each
+     row to the card it holds and lets the body scroll instead. */
   gridContainer: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+    gridAutoRows: 'max-content',
     gap: 14,
     alignContent: 'start',
   },
   projectSlidesGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+    gridAutoRows: 'max-content',
     gap: 14,
     alignContent: 'start',
   },
@@ -861,6 +868,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--block-bg)',
     border: '1px solid var(--block-line)',
     borderRadius: 6,
+    /* The .card class carries 16px of padding for text cards. These hold a
+       thumbnail that runs edge to edge, so it has to go. */
+    padding: 0,
     overflow: 'hidden',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
