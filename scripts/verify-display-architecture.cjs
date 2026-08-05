@@ -27,6 +27,15 @@ assert.match(audienceEntry, /<ProgramSurface/, 'audience display entry must rend
 assert.doesNotMatch(audienceEntry, /new\s+WebSocket|WebSocket\(/, 'audience display entry must not use WebSocket');
 
 assert.match(legacyDisplay, /new\s+WebSocket|WebSocket\(/, 'legacy display.html remains the optional browser-output WebSocket client');
-assert.match(main, /browserUrl:\s*`http:\/\/localhost:\$\{displayPort\}\/display\.html`/, 'display status should expose legacy browserUrl separately from internal IPC display');
+
+/* Matched against the handler body rather than the whole file, so this keeps
+   asserting the intent — the legacy browser URL is reported separately from
+   the internal IPC display — without breaking every time the expression around
+   it changes shape. It reads displayPort, not a literal, because the port moves
+   when one is taken. */
+const statusBody = main.match(/ipcMain\.handle\('display:getStatus'[\s\S]*?\}\)\);/)?.[0] || '';
+assert.match(statusBody, /browserUrl:/, 'display status should expose legacy browserUrl separately from internal IPC display');
+assert.match(statusBody, /`http:\/\/localhost:\$\{displayPort\}\/display\.html`/, 'legacy browserUrl must follow the port actually bound, not a hardcoded one');
+assert.match(statusBody, /serverError/, 'display status should report why the local server is unavailable when it did not bind');
 
 console.log('Display architecture verified: internal audience display uses bundled IPC ProgramSurface; legacy display.html remains browser output only.');
