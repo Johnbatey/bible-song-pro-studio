@@ -337,3 +337,35 @@
   min-height: 0;
   border-radius: 4px;
 }
+
+/* ---- The Slide layout's full-view zone ---- */
+/* Between slides the zone is an ordinary text cell, so it keeps a margin the
+   words can breathe in — 4px of it at 100% width would read as text jammed
+   against the bezel. */
+.stage-display .zone-slide .zone-inner {
+  padding: 3% 5%;
+}
+
+/* With a slide up, every inset goes: the deck is the picture, and a rounded
+   corner or a few pixels of letterbox around it is this app drawing a frame
+   the designer did not put there. */
+.stage-display .zone-slide-full .zone-inner {
+  padding: 0;
+}
+
+.stage-display .zone-slide-full .zone-slide-stage {
+  border-radius: 0;
+}
+
+/* Hybrid dresses zones as vibrancy cards floating over the output. A slide
+   that covers the whole stage is not floating over anything, and the card's
+   blur, border and padding would inset and round the very picture this layout
+   exists to show whole. */
+.stage-display.mode-hybrid .stage-zones .zone-slide-full {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}

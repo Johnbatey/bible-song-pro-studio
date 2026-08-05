@@ -9,6 +9,7 @@ import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { publishStage, useStageState } from '../services/stage-bus';
 import { formatTime, timerSeconds } from '../../stage/stage-state';
 import { StageSurface } from '../../stage/StageSurface';
+import { LAYOUTS, LAYOUT_IDS } from '../../stage/layouts';
 import type { StageTheme } from '../../stage/theme';
 import type { StageTimer } from '../../stage/stage-state';
 
@@ -18,14 +19,13 @@ const ZOOM_STEP = 0.05;
 const STAGE_ASPECT = 16 / 9;
 const SAFE_PAD = 48;
 
-const LAYOUT_OPTIONS = [
-  { value: 'default', label: 'Default' },
-  { value: 'band',    label: 'Band / Lyrics' },
-  { value: 'sermon',  label: 'Sermon Notes' },
-  { value: 'minimal', label: 'Minimal' },
-] as const;
+/* Read off the preset table rather than typed out again. The hand-kept copy
+   that used to live here was a second list of the same four layouts, and the
+   only thing it could ever do was disagree with the first — a preset added to
+   LAYOUTS was a preset the operator had no way to pick. */
+const LAYOUT_OPTIONS = LAYOUT_IDS.map((id) => ({ value: id, label: LAYOUTS[id].name }));
 
-type LayoutId = (typeof LAYOUT_OPTIONS)[number]['value'];
+type LayoutId = string;
 
 /** The stage's elapsed timer, ticking, for the operator's own footer. */
 function TimerReadout({ timer }: { timer: StageTimer }) {
@@ -241,7 +241,7 @@ export function StagePanel() {
             <span style={styles.footerLabel}>LAYOUT</span>
             <CustomDropdown
               value={activeLayout}
-              options={LAYOUT_OPTIONS as unknown as { value: string; label: string }[]}
+              options={LAYOUT_OPTIONS}
               onChange={(v) => applyLayout(v as LayoutId)}
               title="Switch stage layout"
               buttonStyle={{ height: 26, padding: '0 10px', fontSize: 12, fontWeight: fontWeight.semibold }}

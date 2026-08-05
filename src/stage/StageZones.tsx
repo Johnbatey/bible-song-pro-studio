@@ -121,20 +121,32 @@ export function StageZones({
         const align = zone.textAlign || 'left';
         const key = zone.id;
 
-        if (zone.type === 'current-text') {
+        if (zone.type === 'current-text' || zone.type === 'slide') {
           /* The reference sits directly above the verse and is sized as a
              percentage of it, so the pair scales together. */
           const refScale = Number.isFinite(Number(zone.referenceFontScale))
             ? Number(zone.referenceFontScale)
             : 42;
           const base = zone.fontSize || 48;
+          /* A slide zone is a window onto the deck rather than a text cell that
+             can hold a picture: when a slide is live it takes the cell whole,
+             and the reference line and notes that frame verse text stand down.
+             With nothing projected the zone falls back to the same text a
+             current-text zone draws, so the Slide layout is not a blank screen
+             the moment the service moves off the deck. */
+          const fullBleed = zone.type === 'slide' && !!currentSlide;
+          const classes = [
+            'zone',
+            zone.type === 'slide' ? 'zone-slide' : 'zone-current-text',
+            fullBleed ? 'zone-slide-full' : '',
+          ].filter(Boolean).join(' ');
           return (
-            <div key={key} className="zone zone-current-text" data-zone="current-text" style={frame}>
+            <div key={key} className={classes} data-zone={zone.type} style={frame}>
               <div className="zone-inner">
                 <div
                   className="zone-title zone-reference"
                   style={{
-                    display: current?.title ? undefined : 'none',
+                    display: !fullBleed && current?.title ? undefined : 'none',
                     fontSize: `${Math.max(16, Math.round(base * (refScale / 100) * scale))}px`,
                     fontWeight: 700,
                     textAlign: zone.textAlign || 'center',
@@ -160,7 +172,7 @@ export function StageZones({
                     }}
                   />
                 )}
-                <div className="zone-notes">{current?.notes || ''}</div>
+                {!fullBleed && <div className="zone-notes">{current?.notes || ''}</div>}
               </div>
             </div>
           );

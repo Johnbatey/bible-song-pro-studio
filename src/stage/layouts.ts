@@ -19,7 +19,10 @@ export type ZoneType =
   | 'current-text'
   | 'next-item'
   | 'timer'
-  | 'messages';
+  | 'messages'
+  /** Like current-text, but a live slide fills the whole cell instead of
+      sharing it with the reference line and the notes. */
+  | 'slide';
 
 /** Semantic colour tokens resolve against the operator's theme; any other
     string is passed through as a literal CSS colour. */
@@ -99,6 +102,20 @@ export const LAYOUTS: Record<string, StageLayout> = {
     zones: [
       { id: 'z-current', type: 'current-text', x: 6, y: 18, w: 88, h: 64, fontSize: 72, fontWeight: 800, color: 'text', textAlign: 'center', visible: true },
       { id: 'z-timer', type: 'timer', x: 70, y: 4, w: 26, h: 8, fontSize: 30, fontWeight: 800, color: 'accent', textAlign: 'right', visible: true },
+    ],
+  },
+  /* One zone edge to edge, and deliberately nothing else. A presentation deck
+     is a designed picture; a clock in its corner and a reference line above it
+     are furniture drawn on top of someone else's artwork. This is the stage's
+     answer to the Program view — the same slide, at the same size, on the
+     musicians' monitor. The type sizes below only ever apply to the fallback
+     text shown between slides. */
+  slide: {
+    id: 'slide',
+    name: 'Slide',
+    bgColor: '#000000',
+    zones: [
+      { id: 'z-slide', type: 'slide', x: 0, y: 0, w: 100, h: 100, fontSize: 56, fontWeight: 700, color: 'text', textAlign: 'center', visible: true },
     ],
   },
 };
