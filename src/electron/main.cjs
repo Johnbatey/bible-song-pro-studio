@@ -652,12 +652,6 @@ app.whenReady().then(async () => {
   ipcMain.handle('get:platform', () => process.platform);
   ipcMain.handle('get:userDataPath', () => app.getPath('userData'));
   ipcMain.handle('get:displayUrl', () => `http://localhost:${displayPort}/display.html`);
-  // Returns the file:// path used by the stage display window so the operator
-  // dock panel can load the same file — preserving same-origin for BroadcastChannel.
-  ipcMain.handle('get:stageDisplayFileUrl', () => isDev
-    ? `http://localhost:5173/stage-display/index.html`
-    : `file://${path.join(__dirname, '../../dist/stage-display/index.html')}`);
-
 
   ipcMain.handle('bible:getVersions', () => bibleService.getVersions());
   ipcMain.handle('bible:getBooks', (_, v) => bibleService.getBooks(v));

@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
 import { ProgramSurface } from './display/ProgramSurface';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { type, fontWeight } from '../styles/type';
@@ -53,10 +54,9 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
     () => ({ scene: previewScene, outputMode, theme: activeTheme }),
     [previewScene, outputMode, activeTheme],
   );
-  const programSurfaceState = useMemo(
-    () => ({ scene: currentScene, outputMode, theme: activeTheme, activeAlert, transcription }),
-    [currentScene, outputMode, activeTheme, activeAlert, transcription],
-  );
+  /* Shared with the stage display's program pane — both are claims about what
+     the congregation is seeing, so neither derives it privately. */
+  const programSurfaceState = useProgramSurfaceState();
 
   const isStudio = mode === 'studio';
   // Something is staged that the audience isn't seeing yet

@@ -5,11 +5,10 @@
    point: the projector and the stage now boot the same way, render the same
    ProgramSurface, and resolve media against the same origin.
 
-   Two feeds arrive here. The program output comes from the main process over
-   IPC, the same `display:message` the audience window listens to. The stage's
-   own state — layout, theme, current and next, timer, messages — still arrives
-   on the BroadcastChannel the operator already publishes to; moving that onto
-   IPC as well is the next step, and is deliberately not mixed into this one.
+   Two feeds arrive here, both over IPC from the main process: `display:message`
+   for the program output, the same one the audience window listens to, and
+   `stage:message` for the stage's own state. Neither is origin-scoped, which
+   matters for a window living on a second screen.
    ========================================================================= */
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -21,15 +20,7 @@ import { persistLayoutId } from './theme';
 import { clearStageContent, initialStageState, reduceStage, type StageState } from './stage-state';
 import './stage-page.css';
 
-const CHANNEL_NAME = 'bsp-display-sync';
 const DEFAULT_ASSET_BASE = 'http://localhost:8942';
-
-/** The operator publishes stage messages wrapped in one of these envelopes. */
-interface SyncEnvelope {
-  __bspDisplayState?: boolean;
-  __bspStageDisplayState?: boolean;
-  payload?: unknown;
-}
 
 type StageAction =
   | { type: 'message'; payload: unknown }
@@ -96,28 +87,6 @@ function StageHost() {
       })
       .catch(() => {});
     return () => { unsubscribe?.(); };
-  }, []);
-
-  /* Stage state from the operator's BroadcastChannel. Still here because the
-     operator publishes on both while the old page is being retired; it is a
-     no-op in a window that only ever receives the IPC feed. */
-  useEffect(() => {
-    let channel: BroadcastChannel;
-    try {
-      channel = new BroadcastChannel(CHANNEL_NAME);
-    } catch {
-      return; // no channel in this context; the stage still renders the program
-    }
-    const onMessage = (event: MessageEvent<SyncEnvelope>) => {
-      const data = event.data;
-      if (!data || (!data.__bspDisplayState && !data.__bspStageDisplayState)) return;
-      dispatch({ type: 'message', payload: data.payload });
-    };
-    channel.addEventListener('message', onMessage);
-    return () => {
-      channel.removeEventListener('message', onMessage);
-      channel.close();
-    };
   }, []);
 
   /* L cycles the layout, Esc clears content. P is deliberately unbound — it

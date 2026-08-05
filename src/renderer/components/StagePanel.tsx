@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Block } from './Block';
 import { fontWeight } from '../styles/type';
 import { useAppStore } from '../stores/appStore';
 import { CustomDropdown } from './CustomDropdown';
+import { StageSettingsPopover } from './StageSettingsPopover';
+import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
+import { publishStage, useStageState } from '../services/stage-bus';
+import { StageSurface } from '../../stage/StageSurface';
+import type { StageTheme } from '../../stage/theme';
 
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 2;
@@ -27,7 +32,6 @@ function clampZoom(v: number) {
 export function StagePanel() {
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
 
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; ox: number; oy: number } | null>(null);
   const zoomRef = useRef(1);
@@ -38,20 +42,15 @@ export function StagePanel() {
   const [isPanning, setIsPanning] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [boxSize, setBoxSize] = useState({ w: 800, h: 450 });
-  const [activeLayout, setActiveLayout] = useState<LayoutId>('default');
-  const [stageUrl, setStageUrl] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  /* ── Resolve stage URL — must use file:// (same origin as main renderer)
-     so BroadcastChannel state updates from broadcast-channel-sync.ts reach
-     the iframe. http://localhost:8942 is a different origin so BroadcastChannel
-     is silently isolated. */
-  useEffect(() => {
-    if (window.BSP?.getStageDisplayFileUrl) {
-      window.BSP.getStageDisplayFileUrl()
-        .then((url) => setStageUrl(`${url}?embeddedPreview=1`))
-        .catch(() => setStageUrl(null));
-    }
-  }, []);
+  /* The stage's state and the live program state, both read from where they
+     already live. The preview is the same <StageSurface> the stage window
+     renders, driven by the same state — not a picture of it. */
+  const stage = useStageState();
+  const program = useProgramSurfaceState();
+  const activeLayout = stage.layout.id as LayoutId;
 
   /* ── box size — measured from the viewport ── */
   const measureBox = useCallback(() => {
@@ -144,34 +143,14 @@ export function StagePanel() {
     if (dragRef.current?.pointerId === e.pointerId) { dragRef.current = null; setIsPanning(false); }
   }
 
-  /* postMessage helpers */
-  const postState = useCallback((payload: Record<string, unknown>) => {
-    try { iframeRef.current?.contentWindow?.postMessage({ __bspStageDisplayState: true, payload }, '*'); }
-    catch { /* cross-origin on dev — ignore */ }
-  }, []);
+  /* Operator controls publish a message rather than setting local state: the
+     stage windows have to receive the same one, and the preview below is
+     rendered from the result of applying it. */
+  const applyLayout = useCallback((id: LayoutId) => publishStage({ layout: id }), []);
+  const applyTheme = useCallback((patch: Partial<StageTheme>) => publishStage({ theme: patch }), []);
 
-  const postCmd = useCallback((cmd: string) => {
-    try { iframeRef.current?.contentWindow?.postMessage({ __bspOperatorCmd: true, cmd }, '*'); }
-    catch { /* ignore */ }
-  }, []);
-
-  /* ── Push current state when iframe first loads ── */
-  const onIframeLoad = useCallback(() => {
-    window.BSP?.display?.getState?.().then((state: Record<string, unknown> | null) => {
-      if (state) postState(state);
-    }).catch(() => {});
-  }, [postState]);
-
-  const applyLayout = useCallback((id: LayoutId) => {
-    setActiveLayout(id);
-    postState({ layout: id });
-  }, [postState]);
-
-  const openSettings = useCallback(() => {
-    postCmd('toggle-picker');
-  }, [postCmd]);
-
-  /* Scale the 1920×1080 iframe to fit inside boxSize */
+  /* The surface is authored against a 1920x1080 stage and scaled into the box,
+     so the preview is geometrically the stage rather than a reflow of it. */
   const outputScale = boxSize.w / 1920;
   const zoomLabel = `${Math.round(zoom * 100)}%`;
 
@@ -217,8 +196,16 @@ export function StagePanel() {
             <button style={styles.wideBtn} onClick={fitStage} title="Fit to view">FIT</button>
           </div>
 
-          {/* Right: layout dropdown + settings */}
+          {/* Right: layout dropdown + appearance settings */}
           <div style={styles.footerRight}>
+            {settingsOpen && (
+              <StageSettingsPopover
+                theme={stage.theme}
+                onChange={applyTheme}
+                onClose={() => setSettingsOpen(false)}
+                anchorRef={settingsBtnRef}
+              />
+            )}
             <span style={styles.footerLabel}>LAYOUT</span>
             <CustomDropdown
               value={activeLayout}
@@ -231,9 +218,10 @@ export function StagePanel() {
             <div style={styles.divider} />
 
             <button
+              ref={settingsBtnRef}
               style={styles.settingsBtn}
-              onClick={openSettings}
-              title="Open stage display settings"
+              onClick={() => setSettingsOpen((open) => !open)}
+              title="Stage display appearance"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3" />
@@ -266,38 +254,15 @@ export function StagePanel() {
           }}
         >
           <div style={styles.displayBox}>
-            {stageUrl ? (
-              <iframe
-                ref={iframeRef}
-                src={stageUrl}
-                title="Stage Display operator monitor"
-                onLoad={onIframeLoad}
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  width: 1920,
-                  height: 1080,
-                  border: 'none',
-                  transformOrigin: 'top left',
-                  transform: `scale(${outputScale})`,
-                  background: '#000',
-                  /* pointerEvents none prevents the iframe from swallowing
-                     viewport drag events. Settings button works via postMessage. */
-                  pointerEvents: 'none',
-                }}
-                allow="autoplay"
-              />
-            ) : (
-              <div style={styles.placeholder}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5">
-                  <rect x="2" y="3" width="20" height="14" rx="2" />
-                  <line x1="8" y1="21" x2="16" y2="21" />
-                  <line x1="12" y1="17" x2="12" y2="21" />
-                </svg>
-                <span style={styles.placeholderText}>Connecting to stage display…</span>
-              </div>
-            )}
+            {/* The stage itself, in-process. This was an <iframe> onto the
+                legacy display page on http://localhost:8942 — a second
+                renderer that could disagree with the stage screen and the
+                projector both. Now it is the same component the stage window
+                mounts, reading the same state, so the preview cannot drift
+                from what it is a preview of. */}
+            <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
+              <StageSurface state={stage} program={program} chrome={false} />
+            </div>
           </div>
         </div>
       </div>
@@ -359,16 +324,17 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative', flex: 1, minWidth: 0, minHeight: 0,
     overflow: 'hidden', background: 'var(--bg-primary)', touchAction: 'none',
   },
+  outputFrame: {
+    position: 'absolute', left: 0, top: 0, width: 1920, height: 1080,
+    transformOrigin: 'top left',
+    /* The surface owns pointer events for nothing; letting them through here
+       would swallow the viewport's drag-to-pan. */
+    pointerEvents: 'none',
+  },
   displayBox: {
     position: 'relative', width: '100%', height: '100%',
     borderRadius: 6, overflow: 'hidden', background: '#000',
     border: '1px solid rgba(255,255,255,0.1)',
     boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
   },
-  placeholder: {
-    position: 'absolute', inset: 0,
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    gap: 12, background: '#050709',
-  },
-  placeholderText: { fontSize: 13, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.02em' },
 };

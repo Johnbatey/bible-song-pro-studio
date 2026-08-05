@@ -6,6 +6,7 @@ import {
   sendBroadcastState,
   stopBroadcastChannelSync,
 } from '../services/broadcast-channel-sync';
+import { publishStage } from '../services/stage-bus';
 
 export function useBroadcastSync() {
   const prevSceneRef = useRef<string | null>(null);
@@ -67,7 +68,7 @@ export function useBroadcastSync() {
     prevSceneRef.current = sceneId;
     if (!scene) return;
 
-    sendBroadcastState({
+    const content = {
       kind: 'content',
       current: {
         id: scene.id,
@@ -75,6 +76,13 @@ export function useBroadcastSync() {
         body: scene.content?.text || '',
         html: scene.content?.html || '',
       },
-    });
+    };
+
+    /* Through the stage bus, not straight onto the channel: the bus is what
+       the dock panel's preview reads, and it forwards to the stage windows
+       over IPC. A BroadcastChannel never delivers to the context that posted,
+       so publishing only there would leave this window's own preview blank. */
+    publishStage(content);
+    sendBroadcastState(content);
   }, [currentScene]);
 }

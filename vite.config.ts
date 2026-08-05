@@ -28,12 +28,6 @@ export default defineConfig({
           cpSync(slideEditorDir, distSlideEditor, { recursive: true });
           console.log('Copied slide-editor/ to dist/');
         }
-        const stageDisplayDir = path.resolve(__dirname, 'public/stage-display');
-        const distStageDisplay = path.join(distDir, 'stage-display');
-        if (existsSync(stageDisplayDir)) {
-          cpSync(stageDisplayDir, distStageDisplay, { recursive: true });
-          console.log('Copied stage-display/ to dist/');
-        }
         // Copy assets/bibles for bible service access at runtime
         const biblesSrc = path.resolve(__dirname, 'assets/bibles');
         const biblesDest = path.join(distDir, 'assets/bibles');
