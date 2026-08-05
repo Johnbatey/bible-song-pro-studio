@@ -11,11 +11,12 @@
    16:9 screen is the projector's problem, not the theme's, and a coloured bar
    down each side reads as a rendering fault.
    ========================================================================= */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { SlideCanvas } from '../SlideCanvas';
 import { NativeSlideBoard, NATIVE_BOARD_W } from '../NativeSlideBoard';
 import type { ParsedSlide } from '../../slide-engine/state';
 import type { SlideProjection } from '../../types';
+import './SlideStage.css';
 
 /** Board height at 1:1 for a projection's aspect. 16:9 unless told otherwise. */
 function boardHeightFor(projection: SlideProjection): number {
@@ -30,23 +31,37 @@ export function SlideStage({ projection, className = '' }: { projection: SlidePr
   const ref = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
 
-  useEffect(() => {
+  /* offsetWidth, not getBoundingClientRect: the Program pane paints its surface
+     at full size and scales it down with a CSS transform to fit the operator's
+     window. A bounding rect there reports the scaled-down size, and fitting the
+     board to it renders the slide a second time smaller — a postage stamp in
+     the middle of the pane. Offset sizes are layout pixels and ignore the
+     transform, which is the space the board lays out in anyway. */
+  const measure = () => {
     const node = ref.current;
     if (!node) return;
-    /* offsetWidth, not getBoundingClientRect: the Program pane paints its
-       surface at full size and scales it down with a CSS transform to fit the
-       operator's window. A bounding rect there reports the scaled-down size,
-       and fitting the board to it renders the slide a second time smaller —
-       a postage stamp in the middle of the pane. Offset sizes are layout
-       pixels and ignore the transform, which is the space the board lays out
-       in anyway. */
-    const measure = () => {
-      setBox({ width: node.offsetWidth, height: node.offsetHeight });
-    };
-    measure();
+    const width = node.offsetWidth;
+    const height = node.offsetHeight;
+    setBox((current) => (current.width === width && current.height === height ? current : { width, height }));
+  };
+
+  /* Measured after every commit, not once on mount. The box a stage sits in is
+     not always settled when the stage first mounts — on the stage display the
+     zone's reference line arrives in a later commit and takes 21px off the
+     cell — and a stage that measured once would keep fitting the board to a
+     height that no longer exists. Re-measuring converges in one extra pass and
+     then stops, because an unchanged size returns the same state object. */
+  useLayoutEffect(measure);
+
+  /* And an observer for the resizes no render of ours is involved in: the
+     operator dragging a dock divider, or a display window changing screens. */
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const boardH = boardHeightFor(projection);

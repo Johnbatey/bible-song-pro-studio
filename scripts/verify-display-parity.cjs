@@ -16,6 +16,11 @@ const fixtures = [
   'Transparent Background',
   'Image Background',
   'Video Background',
+  // A projected slide has to reach the audience window looking like the board
+  // the operator saw. This is the case that fails if the projection stops
+  // travelling: the direct render would draw the slide and the audience window
+  // would fall back to centred text, which no threshold here would forgive.
+  'Projected PowerPoint Slide',
 ];
 
 app.on('window-all-closed', (event) => {

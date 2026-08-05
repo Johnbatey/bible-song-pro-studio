@@ -18,6 +18,8 @@ import type { CSSProperties } from 'react';
 import type { StageLayout, StageZone } from './layouts';
 import { resolveColor, type StageTheme } from './theme';
 import { formatTime, timerSeconds, type StageContent, type StageMessage, type StageTimer } from './stage-state';
+import { SlideStage } from '../renderer/components/display/SlideStage';
+import type { SlideProjection } from '../renderer/types';
 
 /** The most messages that fit before the block starts covering the lyrics. */
 const MAX_MESSAGES = 3;
@@ -26,6 +28,9 @@ export interface StageZonesProps {
   layout: StageLayout;
   theme: StageTheme;
   current: StageContent | null;
+  /** The live slide, when what is on screen is a projected slide rather than
+      text. The current-text zone draws it in place of the body. */
+  currentSlide?: SlideProjection | null;
   next: StageContent | null;
   songTitle: string;
   songSubtitle: string;
@@ -98,6 +103,7 @@ export function StageZones({
   layout,
   theme,
   current,
+  currentSlide,
   next,
   songTitle,
   songSubtitle,
@@ -137,15 +143,23 @@ export function StageZones({
                 >
                   {current?.title || ''}
                 </div>
-                <BodyText
-                  content={current}
-                  style={{
-                    fontSize: px(base),
-                    fontWeight: zone.fontWeight || 600,
-                    textAlign: zone.textAlign || 'center',
-                    color: resolveColor(zone.color || 'text', theme),
-                  }}
-                />
+                {/* A slide is a picture, and the runs scraped out of it are not
+                    it: a text-only stage told the musicians what the slide said
+                    while the room was looking at its design. When one is live
+                    the zone draws the slide, fitted to the cell. */}
+                {currentSlide ? (
+                  <SlideStage projection={currentSlide} className="zone-slide-stage" />
+                ) : (
+                  <BodyText
+                    content={current}
+                    style={{
+                      fontSize: px(base),
+                      fontWeight: zone.fontWeight || 600,
+                      textAlign: zone.textAlign || 'center',
+                      color: resolveColor(zone.color || 'text', theme),
+                    }}
+                  />
+                )}
                 <div className="zone-notes">{current?.notes || ''}</div>
               </div>
             </div>

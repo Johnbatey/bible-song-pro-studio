@@ -324,3 +324,16 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
+
+/* A projected slide fills the current-text zone in place of the body text.
+   The reference line above it keeps its space; the slide takes what is left,
+   which is why this flexes rather than claiming a height of its own. */
+.stage-display .zone-slide-stage {
+  /* Basis 0, not auto: the board inside is sized from this box, so letting the
+     box take its basis from its content puts the two in a loop and leaves the
+     board a few pixels taller than the cell that measured it. */
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+  border-radius: 4px;
+}

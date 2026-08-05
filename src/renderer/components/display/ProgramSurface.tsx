@@ -272,7 +272,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           sits this one out. Lower third keeps the text — a whole slide crammed
           into a strap across the bottom is nobody's intent. */}
       {scene && mode === 'fullscreen' && content?.slide && (
-        <SlideStage projection={content.slide} />
+        <SlideStage projection={content.slide} className="program-slide-stage" />
       )}
 
       {scene && mode === 'fullscreen' && !content?.slide && (

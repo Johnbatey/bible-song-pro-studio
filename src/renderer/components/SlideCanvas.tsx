@@ -13,6 +13,7 @@
 import { memo, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { resolveThemeColor } from '../slide-engine/core/color';
+import { fontFamilyFor } from '../slide-engine/render/fonts';
 import type { ParsedSlide } from '../slide-engine/state';
 import type { ParsedShape, ParsedRun } from '../slide-engine/parser/slide-parser';
 import type { TextBodyLayout } from '../slide-engine/parser/shape-style';
@@ -408,6 +409,13 @@ function SlideCanvasImpl({
         transform: scale === 1 ? undefined : `scale(${scale})`,
         transformOrigin: 'top left',
         overflow: 'hidden',
+        /* The board states its own base face rather than inheriting one. A run
+           that names no typeface would otherwise take the host page's — the
+           operator's app font in the panel, the display page's on the
+           projector, the stage page's on the monitor — so one slide would come
+           out in three faces on three screens. This is the same answer
+           fontFamilyFor gives for a run with no face of its own. */
+        fontFamily: fontFamilyFor(null),
         ...slideBackgroundStyle(slide?.backgroundColor),
         ...(scale === 1 ? style : null),
       }}

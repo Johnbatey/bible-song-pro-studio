@@ -1,0 +1,21 @@
+/* <SlideStage> — centre a slide board in whatever box the caller gives it.
+
+   Placement is deliberately not here. The program surface wants the stage
+   covering the whole output; a stage-display zone wants it filling one cell of
+   a percentage grid. Both want the same board, centred, on black — so that is
+   all this owns, and each caller adds its own placement class. */
+.slide-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  /* The bars beside a deck whose aspect does not match the screen are black,
+     the way a projector's own letterbox is. A coloured bar down each side
+     reads as a rendering fault. */
+  background: #000;
+}
+
+.slide-stage-preview {
+  object-fit: contain;
+}

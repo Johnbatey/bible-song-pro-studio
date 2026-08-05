@@ -44,10 +44,19 @@ export function StageSurface({
 }: StageSurfaceProps) {
   const { theme, layout } = state;
   const cue = [state.songTitle, state.songSubtitle].filter(Boolean).join(' — ');
+
+  /* A projected slide is read off the program feed rather than the stage's own
+     message vocabulary. Both feeds carry the same live scene — the stage bus
+     publishes `current` from it and the display bus sends the whole thing — so
+     asking the stage side to carry the slide as well would put a second copy
+     of every embedded image on the wire to say what the program pane was
+     already told. */
+  const currentSlide = program.scene?.content?.slide || null;
+
   const hasContent = !!(
     state.current?.title || state.current?.body ||
     state.next?.title || state.next?.body ||
-    cue
+    currentSlide || cue
   );
 
   const rootStyle = {
@@ -84,6 +93,7 @@ export function StageSurface({
           layout={layout}
           theme={theme}
           current={state.current}
+          currentSlide={currentSlide}
           next={state.next}
           songTitle={state.songTitle}
           songSubtitle={state.songSubtitle}
