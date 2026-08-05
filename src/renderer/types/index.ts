@@ -30,6 +30,37 @@ export interface SceneContent {
   secondaryVerse?: SecondaryVerse;
   /** Shown as a small footer on song scenes — required by most CCLI licences. */
   songCredit?: SongCredit;
+  /** The slide itself, for scenes that project a designed slide rather than
+      text. Every surface paints this instead of `text` when it is present. */
+  slide?: SlideProjection;
+}
+
+/**
+ * A slide, packed so it survives the trip to a display.
+ *
+ * The Program pane, the audience window and the web display are three separate
+ * documents; a scene reaches the last two through structured clone over IPC and
+ * through JSON over the wire. Neither carries a live XML node, so a projection
+ * holds only data — a parsed PowerPoint slide with its DOM references stripped,
+ * or a native slide's elements — and the board that paints it is the same
+ * component in all three.
+ */
+export interface SlideProjection {
+  kind: 'pptx' | 'native';
+  /** Board aspect. Absent means 16:9. */
+  sizeEmu?: { cx: number; cy: number };
+  /** kind 'pptx': the parsed slide, stripped of xmlDoc and run node refs. */
+  parsed?: Record<string, unknown>;
+  /** kind 'pptx': the deck theme's tx1, resolved while the package was open.
+      The display never parsed the package, so it cannot look this up itself,
+      and guessing it wrong puts white text on a white slide. */
+  textFallbackColor?: string;
+  /** kind 'pptx': a rendered preview, for slides that failed to parse. */
+  previewDataUrl?: string;
+  /** kind 'native': the slide's own layers, in percent-of-board geometry. */
+  elements?: SlideElement[];
+  /** kind 'native': the slide's background. */
+  background?: SlideBackground;
 }
 
 export interface SecondaryVerse {

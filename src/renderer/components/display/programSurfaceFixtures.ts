@@ -148,6 +148,70 @@ export const programSurfaceFixtures: Array<{ name: string; state: ProgramSurface
     },
   },
   {
+    /* A projected slide paints its own design edge to edge: no theme font, no
+       reference row, no background from the theme. If this case ever comes
+       back as centred white text on the theme's fill, the projection stopped
+       reaching the surface. */
+    name: 'Projected PowerPoint Slide',
+    state: {
+      outputMode: 'fullscreen',
+      bgFill: '#10131a',
+      scene: {
+        id: 'fixture-projected-slide',
+        name: 'Deck — Slide 1',
+        type: 'presentation',
+        content: {
+          text: 'Our Mission\nReaching the city, one street at a time',
+          reference: 'Fixture Deck',
+          slide: {
+            kind: 'pptx',
+            sizeEmu: { cx: 12192000, cy: 6858000 },
+            textFallbackColor: '#1f2937',
+            parsed: {
+              id: 1,
+              kind: 'pptx',
+              parsed: true,
+              backgroundColor: '#f8f5ef',
+              shapes: [
+                {
+                  id: 'fixture-shape-title',
+                  kind: 'text',
+                  left: 8,
+                  top: 18,
+                  width: 84,
+                  height: 22,
+                  paragraphs: [[{ text: 'Our Mission', bold: true, fontSize: 54, color: '#b3400f' }]],
+                },
+                {
+                  id: 'fixture-shape-body',
+                  kind: 'text',
+                  left: 8,
+                  top: 46,
+                  width: 84,
+                  height: 30,
+                  paragraphs: [
+                    [{ text: 'Reaching the city, one street at a time', fontSize: 28 }],
+                    [{ text: 'Every week, every door', fontSize: 28, italic: true }],
+                  ],
+                },
+                {
+                  id: 'fixture-shape-rule',
+                  kind: 'shape',
+                  left: 8,
+                  top: 41,
+                  width: 20,
+                  height: 1,
+                  paragraphs: [],
+                  fillColor: '#b3400f',
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  },
+  {
     name: 'Video Background',
     state: {
       outputMode: 'fullscreen',

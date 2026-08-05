@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import type { PresentationSlide, SlideElement } from '../../types';
+import { slideElementsFor } from '../NativeSlideBoard';
 import type { ActiveTool } from './SlideEditorQuickToolbar';
 
 interface SlideEditorCanvasBoardProps {
@@ -155,38 +156,9 @@ export function SlideEditorCanvasBoard({
     };
   }, [dragState, scale, smartSnap, onUpdateElement]);
 
-  const elements: SlideElement[] = slide.elements && slide.elements.length > 0 ? slide.elements : [
-    {
-      id: 'title-el',
-      type: 'text',
-      x: 10,
-      y: 20,
-      width: 80,
-      height: 25,
-      content: slide.title || 'Click to edit Title',
-      fontSize: 54,
-      fontFamily: 'Inter',
-      fontWeight: 700,
-      color: '#ffffff',
-      textAlign: 'center',
-      zIndex: 1,
-    },
-    {
-      id: 'body-el',
-      type: 'text',
-      x: 15,
-      y: 50,
-      width: 70,
-      height: 35,
-      content: slide.body || 'Click to edit Body content',
-      fontSize: 32,
-      fontFamily: 'Inter',
-      fontWeight: 500,
-      color: 'rgba(255, 255, 255, 0.85)',
-      textAlign: 'center',
-      zIndex: 2,
-    },
-  ];
+  /* Shared with the projected board and the deck cards: an untouched slide has
+     to show the same two layers wherever it is drawn. */
+  const elements: SlideElement[] = slideElementsFor(slide);
 
   const bgValue = slide.background?.value || '#18181b';
   const bgType = slide.background?.type || 'color';

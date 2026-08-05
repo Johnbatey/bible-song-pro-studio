@@ -1,6 +1,7 @@
 import type { Alert, Scene, FullScreenTheme, Theme } from '../../types';
 import { memo } from 'react';
 import type React from 'react';
+import { SlideStage } from './SlideStage';
 import './ProgramSurface.css';
 
 export interface ProgramSurfaceState {
@@ -266,7 +267,15 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
         </div>
       )}
 
-      {scene && mode === 'fullscreen' && (
+      {/* A designed slide is the whole picture: it carries its own background,
+          type and layout, so it goes edge to edge and the theme's text styling
+          sits this one out. Lower third keeps the text — a whole slide crammed
+          into a strap across the bottom is nobody's intent. */}
+      {scene && mode === 'fullscreen' && content?.slide && (
+        <SlideStage projection={content.slide} />
+      )}
+
+      {scene && mode === 'fullscreen' && !content?.slide && (
         <div className="program-fullscreen-content" style={fullscreenStyle}>
           {content?.html ? (
             <div className="program-slide-html" dangerouslySetInnerHTML={{ __html: content.html }} />

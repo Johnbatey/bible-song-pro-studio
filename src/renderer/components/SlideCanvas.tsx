@@ -127,9 +127,9 @@ function Paragraph({
   );
 }
 
-function TableShape({ shape, outerStyle }: { shape: ParsedShape; outerStyle: CSSProperties }) {
+function TableShape({ shape, outerStyle, textFallbackColor }: { shape: ParsedShape; outerStyle: CSSProperties; textFallbackColor?: string }) {
   const table = tableRender(shape);
-  const fallback = resolveThemeColor('tx1', '#0f172a');
+  const fallback = textFallbackColor || resolveThemeColor('tx1', '#0f172a');
   return (
     <div data-shape-id={shape.id} style={{ ...outerStyle, ...table.style }}>
       {table.cells.map((cell) => {
@@ -273,6 +273,7 @@ function TextShape({
   outerStyle,
   editable,
   onRunEdit,
+  textFallbackColor,
 }: {
   shape: ParsedShape;
   boardH: number;
@@ -280,6 +281,7 @@ function TextShape({
   outerStyle: CSSProperties;
   editable?: boolean;
   onRunEdit?: (run: ParsedRun, value: string) => void;
+  textFallbackColor?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const box = (shape.textBoxLayout as TextBodyLayout | undefined) || ({} as TextBodyLayout);
@@ -288,7 +290,7 @@ function TextShape({
   const visual = shapeVisual(shape, boardH);
   const counters: Record<number, number> = {};
   const flip = textCounterFlip(shape);
-  const fallback = resolveThemeColor('tx1', '#f8fafc');
+  const fallback = textFallbackColor || resolveThemeColor('tx1', '#f8fafc');
 
   return (
     <div ref={ref} data-shape-id={shape.id} style={{ ...outerStyle, ...visual.style, ...textBodyStyle(shape, box, boardH) }}>
@@ -309,7 +311,7 @@ function TextShape({
   );
 }
 
-function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit }: { shape: ParsedShape; boardH: number; dynamicAutofit: boolean; editable?: boolean; onRunEdit?: (run: ParsedRun, value: string) => void }) {
+function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit, textFallbackColor }: { shape: ParsedShape; boardH: number; dynamicAutofit: boolean; editable?: boolean; onRunEdit?: (run: ParsedRun, value: string) => void; textFallbackColor?: string }) {
   const outer: CSSProperties = {
     position: 'absolute',
     left: `${shape.left}%`,
@@ -342,7 +344,7 @@ function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit }: { shape: 
   }
 
   if (shape.kind === 'table') {
-    return <TableShape shape={shape} outerStyle={outer} />;
+    return <TableShape shape={shape} outerStyle={outer} textFallbackColor={textFallbackColor} />;
   }
 
   if (shape.kind === 'shape') {
@@ -354,7 +356,7 @@ function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit }: { shape: 
     );
   }
 
-  return <TextShape shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} outerStyle={outer} editable={editable} onRunEdit={onRunEdit} />;
+  return <TextShape shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} outerStyle={outer} editable={editable} onRunEdit={onRunEdit} textFallbackColor={textFallbackColor} />;
 }
 
 export interface SlideCanvasProps {
@@ -365,6 +367,11 @@ export interface SlideCanvasProps {
   width?: number;
   /** Off for thumbnails: measuring autofit per thumbnail is not worth it. */
   dynamicAutofit?: boolean;
+  /* The colour a run with no colour of its own falls back to — the deck
+     theme's tx1. Resolving it needs the open package's theme map, which only
+     the window that parsed the deck has, so a projected slide carries the
+     answer with it instead of letting the display guess. */
+  textFallbackColor?: string;
   /** Makes XML-backed text runs contentEditable. Off everywhere by default. */
   editable?: boolean;
   /** Fires on blur with the run's new text. Write it back with edit/text. */
@@ -384,6 +391,7 @@ function SlideCanvasImpl({
   dynamicAutofit = true,
   editable = false,
   onRunEdit,
+  textFallbackColor,
   className,
   style,
 }: SlideCanvasProps) {
@@ -406,7 +414,7 @@ function SlideCanvasImpl({
     >
       {slide?.parsed
         ? ((slide.shapes as ParsedShape[]) || []).map((shape) => (
-          <Shape key={shape.id} shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} editable={editable} onRunEdit={onRunEdit} />
+          <Shape key={shape.id} shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} editable={editable} onRunEdit={onRunEdit} textFallbackColor={textFallbackColor} />
         ))
         : null}
     </div>

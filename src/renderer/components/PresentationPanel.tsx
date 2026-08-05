@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { SlideCanvas } from './SlideCanvas';
+import { NativeSlideBoard, NATIVE_BOARD_W, slideElementsFor } from './NativeSlideBoard';
 import { useDeckPreview } from '../hooks/useDeckPreview';
 import { useDeckPackage } from '../hooks/useDeckPackage';
-import type { PresentationDeck, PresentationSlide, Scene, SlideBackground } from '../types';
+import { projectNativeSlide, projectParsedSlide } from '../utils/slide-projection';
+import type { PresentationDeck, PresentationSlide, Scene, SlideBackground, SlideProjection } from '../types';
 import type { ParsedSlide, SlideSizeEmu } from '../slide-engine/state';
 import type { ParsedShape } from '../slide-engine/parser/slide-parser';
 import { CustomDropdown } from './CustomDropdown';
@@ -62,6 +64,7 @@ function ProjectSlideThumb({
   const aspect = slideSizeEmu && slideSizeEmu.cx > 0 ? slideSizeEmu.cy / slideSizeEmu.cx : 9 / 16;
   const height = Math.max(90, Math.round(width * aspect));
   const isParsed = 'parsed' in slide && (slide as ParsedSlide).parsed;
+  const isNative = !isParsed && 'body' in slide;
 
   return (
     <div
@@ -84,6 +87,16 @@ function ProjectSlideThumb({
           slideSizeEmu={slideSizeEmu}
           width={width}
           dynamicAutofit
+        />
+      ) : isNative ? (
+        /* The same board the editor draws and the display projects, shrunk to
+           the card. A card that showed its own summary of the slide would go
+           on disagreeing with both. */
+        <NativeSlideBoard
+          elements={slideElementsFor(slide as PresentationSlide)}
+          background={(slide as PresentationSlide).background}
+          width={width}
+          boardHeight={Math.round(NATIVE_BOARD_W * aspect)}
         />
       ) : (
         <div
@@ -272,10 +285,16 @@ export function PresentationPanel() {
     const sceneId = `deck-${selectedDeck.id}-slide-${index}`;
     let text = '';
     let bg: Scene['background'];
+    /* The slide itself travels with the scene, so the output paints the design
+       rather than a transcript of it. `text` is still filled in below: the
+       stage display, the queue and the session history all read a scene as a
+       line of text, and none of them has a slide to paint. */
+    let projection: SlideProjection;
 
     if ('body' in slide) {
       const pSlide = slide as PresentationSlide;
       text = pSlide.body || pSlide.title || pSlide.label || `Slide ${index + 1}`;
+      projection = projectNativeSlide(pSlide, selectedDeck);
       if (pSlide.background) {
         const b = pSlide.background as SlideBackground;
         bg = {
@@ -297,8 +316,10 @@ export function PresentationPanel() {
         });
       });
       text = runs.join('\n') || `Slide ${index + 1}`;
+      projection = projectParsedSlide(pSlide, pkg.slideSizeEmu);
     } else {
       text = `Slide ${index + 1}`;
+      projection = { kind: 'native', elements: [] };
     }
 
     const scene: Scene = {
@@ -307,6 +328,7 @@ export function PresentationPanel() {
       type: 'presentation',
       content: {
         text,
+        slide: projection,
         reference: selectedDeck.title,
         slideId: String(index),
         slides: selectedDeck.slides?.map((s, idx) => ({

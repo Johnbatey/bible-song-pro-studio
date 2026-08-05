@@ -167,3 +167,23 @@
   z-index: 999;
   background: #000;
 }
+
+/* ── Projected slide ──
+   A slide brings its own background and layout, so the stage covers the whole
+   surface and sits above the theme's background layer. The bars beside a deck
+   whose aspect does not match the screen are black, the way a projector's own
+   letterbox is. */
+.slide-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+
+.slide-stage-preview {
+  object-fit: contain;
+}

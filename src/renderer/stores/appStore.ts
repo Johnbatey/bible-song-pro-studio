@@ -58,6 +58,19 @@ function unpinSceneMedia(scenes: Scene[] | undefined): Scene[] | undefined {
   return changed ? next : scenes;
 }
 
+/* A projected slide travels with its scene so every display can paint the
+   design, which for an imported PowerPoint slide means every image on it as a
+   base64 data URL. That is fine in memory and over IPC, and ruinous in
+   localStorage: a service's worth of scenes would blow the quota and take the
+   whole library down with it. The saved scene keeps its text; re-firing one
+   after a restart projects the text, and reopening the deck projects the
+   slide again. */
+function sceneWithoutSlide(scene: Scene): Scene {
+  if (!scene.content?.slide) return scene;
+  const { slide: _slide, ...content } = scene.content;
+  return { ...scene, content };
+}
+
 interface AppState {
   // App state
   isLoaded: boolean;
@@ -408,7 +421,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   // Only library content and user preferences survive a restart. Live display state
   // (current/preview scene, output status, active alert, meter) is deliberately transient.
   partialize: (state) => ({
-    scenes: state.scenes,
+    scenes: state.scenes.map(sceneWithoutSlide),
     presentationDecks: state.presentationDecks,
     songLinesPerSlide: state.songLinesPerSlide,
     songs: state.songs,
