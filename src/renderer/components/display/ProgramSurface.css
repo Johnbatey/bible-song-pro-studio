@@ -37,7 +37,6 @@
   justify-content: center;
   gap: 12px;
   text-align: center;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, .8);
 }
 
 .program-surface-standby-title {
@@ -76,7 +75,6 @@
   line-height: 1.24;
   white-space: pre-line;
   text-wrap: balance;
-  text-shadow: 0 4px 24px rgba(0, 0, 0, .52);
 }
 
 .program-slide-html {
@@ -86,7 +84,6 @@
   font-size: clamp(24px, 4vw, 76px);
   line-height: 1.25;
   text-align: center;
-  text-shadow: 0 4px 24px rgba(0, 0, 0, .52);
 }
 
 .program-compare {
@@ -126,7 +123,6 @@
 .program-lt-text {
   line-height: 1.22;
   white-space: pre-line;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, .35);
 }
 
 .program-lt-ref,
@@ -143,7 +139,6 @@
   line-height: 1.45;
   opacity: .72;
   text-align: center;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
 }
 
 .program-lower-third .program-song-credit {
