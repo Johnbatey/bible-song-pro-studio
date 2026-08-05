@@ -8,6 +8,7 @@ import { SlideEditorModal } from './components/SlideEditorModal';
 import { AnimatedAlert } from './components/AnimatedAlert';
 import { StatusBar } from './components/StatusBar';
 import { useBroadcastSync } from './hooks/useBroadcastSync';
+import { useStageSync } from './hooks/useStageSync';
 import type { Scene, Theme } from './types';
 
 /**
@@ -104,6 +105,8 @@ export function App() {
   }, []);
 
   useBroadcastSync();
+  // Feeds the stage display's zones: current, next, song cue and messages.
+  useStageSync();
 
   useEffect(() => {
     if (!window.BSP?.display?.sendState) return;

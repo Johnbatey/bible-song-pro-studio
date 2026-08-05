@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Block } from './Block';
 import { fontWeight } from '../styles/type';
 import { useAppStore } from '../stores/appStore';
@@ -6,8 +6,10 @@ import { CustomDropdown } from './CustomDropdown';
 import { StageSettingsPopover } from './StageSettingsPopover';
 import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
 import { publishStage, useStageState } from '../services/stage-bus';
+import { formatTime, timerSeconds } from '../../stage/stage-state';
 import { StageSurface } from '../../stage/StageSurface';
 import type { StageTheme } from '../../stage/theme';
+import type { StageTimer } from '../../stage/stage-state';
 
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 2;
@@ -23,6 +25,17 @@ const LAYOUT_OPTIONS = [
 ] as const;
 
 type LayoutId = (typeof LAYOUT_OPTIONS)[number]['value'];
+
+/** The stage's elapsed timer, ticking, for the operator's own footer. */
+function TimerReadout({ timer }: { timer: StageTimer }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!timer.running) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 500);
+    return () => window.clearInterval(id);
+  }, [timer.running]);
+  return <span style={styles.timerValue}>{formatTime(timerSeconds(timer))}</span>;
+}
 
 function clampZoom(v: number) {
   if (!Number.isFinite(v)) return 1;
@@ -148,6 +161,10 @@ export function StagePanel() {
      rendered from the result of applying it. */
   const applyLayout = useCallback((id: LayoutId) => publishStage({ layout: id }), []);
   const applyTheme = useCallback((patch: Partial<StageTheme>) => publishStage({ theme: patch }), []);
+  const timerCommand = useCallback(
+    (command: 'start' | 'stop' | 'reset') => publishStage({ kind: 'timer-command', command, atMs: Date.now() }),
+    [],
+  );
 
   /* The surface is authored against a 1920x1080 stage and scaled into the box,
      so the preview is geometrically the stage rather than a reflow of it. */
@@ -179,6 +196,19 @@ export function StagePanel() {
               }} />
               STAGE
             </div>
+
+            {/* The stage's service timer. The zone has always been on the
+                default layout; until now nothing in the app could start it. */}
+            <div style={styles.divider} />
+            <TimerReadout timer={stage.timer} />
+            <button
+              style={styles.iconBtn}
+              onClick={() => timerCommand(stage.timer.running ? 'stop' : 'start')}
+              title={stage.timer.running ? 'Pause stage timer' : 'Start stage timer'}
+            >
+              {stage.timer.running ? '❙❙' : '▶'}
+            </button>
+            <button style={styles.iconBtn} onClick={() => timerCommand('reset')} title="Reset stage timer">↺</button>
           </div>
 
           {/* Centre: view scale controls */}
@@ -313,6 +343,10 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 5, background: 'var(--block-active)', color: 'var(--text-primary)',
     cursor: 'pointer', fontSize: 12, fontWeight: fontWeight.semibold,
     fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
+  },
+  timerValue: {
+    minWidth: 42, textAlign: 'center', color: 'var(--text-secondary)',
+    fontSize: 11, fontWeight: fontWeight.bold, fontVariantNumeric: 'tabular-nums',
   },
   zoomValue: {
     width: 38, textAlign: 'center', color: 'var(--text-secondary)',
