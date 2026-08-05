@@ -35,6 +35,7 @@
     "verify:display-stack": "node scripts/verify-display-stack.cjs",
     "verify:deck-read": "node scripts/verify-deck-read.cjs",
     "verify:deck-ipc": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-deck-ipc.cjs",
+    "verify:stage-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-stage-display.cjs",
     "verify:dist-audience-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-dist-audience-display.cjs",
     "verify:display-all": "npm run typecheck && npm run verify:display-architecture && npm run verify:window-resizing && npm run verify:display-stack && npm run verify:dist-audience-display",
     "verify:all": "npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all"

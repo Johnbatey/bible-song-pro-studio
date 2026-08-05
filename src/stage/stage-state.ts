@@ -213,6 +213,10 @@ export function reduceStage(state: StageState, payload: unknown): StageState {
     });
   }
 
+  /* Also reachable bare, not only as {kind:'timer'}: the main process replays a
+     late-opening window one accumulated value object, and the timer has to
+     survive that trip like everything else. */
+  if ('timer' in value) set({ timer: { ...next.timer, ...(value.timer as Partial<StageTimer> || {}) } });
   if (msg.kind === 'content' || 'current' in value) set({ current: (value.current as StageContent) || null });
   if (msg.kind === 'content' || 'next' in value) set({ next: (value.next as StageContent) || null });
   if ('songTitle' in value) set({ songTitle: String(value.songTitle || '') });

@@ -85,7 +85,22 @@ function StageHost() {
     return () => { unsubscribe?.(); };
   }, []);
 
-  // Stage state, from the operator's BroadcastChannel.
+  // Stage state over IPC — the feed that works for a window on another screen,
+  // where BroadcastChannel's same-origin scoping does not reach.
+  useEffect(() => {
+    const api = window.BSP?.stage;
+    const unsubscribe = api?.onMessage?.((message) => dispatch({ type: 'message', payload: message }));
+    api?.getState?.()
+      .then((snapshot) => {
+        if (snapshot && Object.keys(snapshot).length > 0) dispatch({ type: 'message', payload: snapshot });
+      })
+      .catch(() => {});
+    return () => { unsubscribe?.(); };
+  }, []);
+
+  /* Stage state from the operator's BroadcastChannel. Still here because the
+     operator publishes on both while the old page is being retired; it is a
+     no-op in a window that only ever receives the IPC feed. */
   useEffect(() => {
     let channel: BroadcastChannel;
     try {

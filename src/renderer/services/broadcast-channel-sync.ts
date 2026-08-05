@@ -37,6 +37,15 @@ export function onBroadcastMessage(handler: SyncHandler) {
 }
 
 export function sendBroadcastState(payload: Record<string, unknown>) {
+  /* Two transports on purpose. BroadcastChannel is origin-scoped and reaches
+     same-origin windows in this process; the stage display is a separate
+     BrowserWindow that also has to work when opened on another screen, and it
+     receives the same payload over IPC. The main process retains the last one
+     so a stage window opened mid-service can catch up. */
+  window.BSP?.stage?.sendState?.(payload).catch(() => {
+    /* not the desktop app, or no stage window yet */
+  });
+
   if (!channel) return;
   try {
     const msg = { __bspDisplayState: true, payload, atMs: Date.now() };

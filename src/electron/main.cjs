@@ -19,6 +19,9 @@ const { createObsService } = require('./obs-service.cjs');
 const isDev = !app.isPackaged && !fs.existsSync(path.join(__dirname, '../../dist/index.html'));
 let mainWindow = null;
 let displayWindow = null;
+/* Stage windows are a set, not a single handle: the operator can put a
+   confidence monitor on more than one screen, and each needs both feeds. */
+const stageWindows = new Set();
 let wss = null;
 let displayPort = 8942;
 let activeDisplayId = null;
@@ -31,6 +34,11 @@ let settingsService = null;
 let deepgramService = null;
 let obsService = null;
 let displayState = { type: null, outputMode: 'fullscreen', scene: null, activeAlert: null, transcription: null, theme: null };
+/* The stage's own state, kept here for the same reason displayState is: a
+   window opened halfway through a service has to be able to ask what is
+   currently on it rather than wait for the next change. Its shape is the
+   operator message vocabulary in src/stage/stage-state.ts. */
+let stageState = {};
 let transcriptionService = null;
 let verseDetectionService = null;
 
@@ -152,16 +160,59 @@ function buildAppMenu(openIds) {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+/** Every live stage window, pruned of any that have since closed. */
+function liveStageWindows() {
+  for (const win of stageWindows) if (win.isDestroyed()) stageWindows.delete(win);
+  return stageWindows;
+}
+
 function broadcastDisplayState() {
   const msg = JSON.stringify({ type: 'display:update', state: displayState });
   if (wss) wss.clients.forEach((c) => { if (c.readyState === 1) c.send(msg); });
-  if (displayWindow && !displayWindow.isDestroyed()) displayWindow.webContents.send('display:message', { type: 'display:update', state: displayState });
+  const payload = { type: 'display:update', state: displayState };
+  if (displayWindow && !displayWindow.isDestroyed()) displayWindow.webContents.send('display:message', payload);
+  /* The stage renders the program output with the same component the projector
+     does, so it needs the same state — that is the whole point of the stage no
+     longer embedding the legacy display page to get it. */
+  for (const win of liveStageWindows()) win.webContents.send('display:message', payload);
 }
 
 function setDisplayState(next) {
   displayState = { ...displayState, ...(next || {}), updatedAt: Date.now() };
   broadcastDisplayState();
   return displayState;
+}
+
+function broadcastStageState(message) {
+  for (const win of liveStageWindows()) win.webContents.send('stage:message', message);
+}
+
+/* Kinds that are events rather than state, and so are passed on but never
+   retained. Replaying "start the timer" to a window opened twenty minutes
+   later would start it twenty minutes late, and a broadcast message the
+   operator has long since taken down would reappear on a fresh screen. */
+const STAGE_TRANSIENT_KINDS = new Set(['timer-command', 'program-output', 'message']);
+
+/**
+ * Pass an operator message to the stage windows, retaining what a window
+ * opened later would need to catch up.
+ *
+ * The snapshot is accumulated as a plain value object — the envelope's `kind`
+ * is stripped and a `config` is unwrapped — because that is exactly the shape
+ * the stage's own reducer treats as "here is some state". Replaying it is then
+ * a single ordinary message through the same code path as a live one, with no
+ * second interpretation of the vocabulary living up here in the main process.
+ */
+function setStageState(message) {
+  if (!message || typeof message !== 'object') return stageState;
+  if (!STAGE_TRANSIENT_KINDS.has(message.kind)) {
+    const value = message.kind === 'config' ? (message.config || {}) : message;
+    const { kind, ...rest } = value;
+    void kind;
+    stageState = { ...stageState, ...rest, updatedAt: Date.now() };
+  }
+  broadcastStageState(message);
+  return stageState;
 }
 
 function serveStatic(dirName) {
@@ -446,8 +497,23 @@ function createDisplayWindow(bounds) {
 }
 
 function createStageDisplayWindow() {
-  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#000000', title: 'BSP Stage Display', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
-  win.loadURL(isDev ? 'http://localhost:5173/stage-display/index.html' : `file://${path.join(__dirname, '../../dist/stage-display/index.html')}`);
+  /* webSecurity is on, unlike the page this replaced. It was off only so a
+     file:// stage page could embed http://localhost:8942/display.html in an
+     iframe for its program pane; the pane is a React component now, so there
+     is nothing cross-origin left to allow. */
+  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#000000', title: 'BSP Stage Display', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true } });
+  win.loadURL(isDev ? 'http://localhost:5173/stage-display.html' : `file://${path.join(__dirname, '../../dist/stage-display.html')}`);
+
+  stageWindows.add(win);
+  win.on('closed', () => stageWindows.delete(win));
+
+  // Catch the window up on both feeds the moment it can receive them, so one
+  // opened mid-service shows the service rather than an idle screen.
+  win.webContents.once('did-finish-load', () => {
+    win.webContents.send('display:message', { type: 'display:update', state: displayState });
+    if (Object.keys(stageState).length > 0) win.webContents.send('stage:message', stageState);
+  });
+
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
   return win;
 }
@@ -575,6 +641,13 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('slide-editor:open', () => { createSlideEditorWindow(); return true; });
   ipcMain.handle('stage-display:open', () => { createStageDisplayWindow(); return true; });
+
+  /* The stage's own feed, alongside display:* — same shape, same reasons. The
+     renderer publishes; every stage window receives; a window that opens late
+     asks for the retained snapshot. */
+  ipcMain.handle('stage:sendState', (_, message) => setStageState(message));
+  ipcMain.handle('stage:getState', () => stageState);
+  ipcMain.on('stage:message', (_, message) => setStageState(message));
 
   ipcMain.handle('get:platform', () => process.platform);
   ipcMain.handle('get:userDataPath', () => app.getPath('userData'));

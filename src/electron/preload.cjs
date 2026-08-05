@@ -34,6 +34,19 @@ contextBridge.exposeInMainWorld('BSP', {
     },
   },
 
+  /* The stage display's own feed. Deliberately the same shape as `display`
+     above: the two windows are siblings, and an operator message reaches the
+     stage the same way program state reaches the projector. */
+  stage: {
+    sendState: (message) => ipcRenderer.invoke('stage:sendState', message),
+    getState: () => ipcRenderer.invoke('stage:getState'),
+    onMessage: (cb) => {
+      const handler = (_, msg) => cb(msg);
+      ipcRenderer.on('stage:message', handler);
+      return () => ipcRenderer.removeListener('stage:message', handler);
+    },
+  },
+
   bible: {
     getVersions: () => ipcRenderer.invoke('bible:getVersions'),
     getBooks: (versionId) => ipcRenderer.invoke('bible:getBooks', versionId),

@@ -514,6 +514,13 @@ declare global {
         getStatus: () => Promise<{ isOpen: boolean; url: string; browserUrl?: string; remoteUrl?: string; clients: number; updatedAt: number }>;
         onMessage: (cb: (message: any) => void) => () => void;
       };
+      /** The stage display's feed — the operator message vocabulary in
+          src/stage/stage-state.ts, carried the same way display state is. */
+      stage: {
+        sendState: (message: Record<string, unknown>) => Promise<Record<string, unknown>>;
+        getState: () => Promise<Record<string, unknown>>;
+        onMessage: (cb: (message: unknown) => void) => () => void;
+      };
       bible: {
         getVersions: () => Promise<BibleVersion[]>;
         getBooks: (versionId: string) => Promise<BibleBook[]>;
