@@ -1,0 +1,326 @@
+/* =========================================================================
+   Stage display — component styles
+   -------------------------------------------------------------------------
+   Everything here is scoped under .stage-display, because the same component
+   now renders in two places: the standalone stage window, where it owns the
+   page, and the operator's dock panel, where it is one element among many and
+   must not touch anything around it. The page-level reset lives in
+   stage-page.css, which only the window entry imports.
+
+   Ported from public/stage-display/stage-display.css. The custom properties
+   moved off :root onto .stage-display for the same scoping reason; the surface
+   overwrites the themed ones inline.
+
+   Deliberately not carried across, because the things they styled are gone
+   with the <iframe>: .program-surface iframe, .program-loading and
+   .stage-fallback — there is no embedded page left to load slowly or fail.
+   ========================================================================= */
+
+.stage-display {
+  --stage-bg: #000000;
+  --stage-text: #ffffff;
+  --stage-muted: rgba(255, 255, 255, 0.42);
+  --stage-faint: rgba(255, 255, 255, 0.28);
+  --stage-fainter: rgba(255, 255, 255, 0.15);
+  --stage-accent: #fbbf24;
+  --stage-live: #22c55e;
+  --stage-danger: #ef4444;
+  --stage-glow: 0 0 40px rgba(255, 255, 255, 0.1);
+  --stage-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  --stage-font: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --stage-font-scale: 1;
+  --stage-radius: 16px;
+  --stage-card: rgba(255, 255, 255, 0.06);
+  --stage-card-border: rgba(255, 255, 255, 0.1);
+  --stage-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --stage-transition: 320ms;
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--stage-bg);
+  color: var(--stage-text);
+  font-family: var(--stage-font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.stage-display *,
+.stage-display *::before,
+.stage-display *::after {
+  box-sizing: border-box;
+}
+
+/* ---- Program output surface ---- */
+.stage-display .stage-program {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: #000;
+}
+
+/* ---- Stage / confidence view ---- */
+.stage-display .stage-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  background: var(--stage-bg);
+}
+
+.stage-display .stage-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.stage-display .stage-zones {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* ---- Zone wrapper (100x100 grid) ---- */
+.stage-display .zone {
+  position: absolute;
+  overflow: hidden;
+  display: flex;
+  border-radius: 0;
+}
+
+.stage-display .zone-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.stage-display .section-label {
+  color: var(--stage-faint);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.stage-display .zone-title {
+  margin: 0;
+  font-weight: 800;
+  line-height: 1.04;
+  color: var(--stage-text);
+  text-shadow: var(--stage-glow);
+  animation: stage-msg-in 0.4s ease both;
+  white-space: pre-wrap;
+}
+
+/* Scripture reference line shown directly above the verse. */
+.stage-display .zone-reference {
+  letter-spacing: 0.04em;
+  opacity: 0.95;
+}
+
+.stage-display .zone-body {
+  overflow: hidden;
+  color: var(--stage-text);
+  font-weight: 500;
+  line-height: 1.34;
+  white-space: pre-wrap;
+  text-shadow: var(--stage-shadow);
+}
+
+/* Verse numbers rendered as superscripts within the body text. */
+.stage-display .zone-body .stage-verse-num {
+  font-size: 0.62em;
+  font-weight: 700;
+  line-height: 0;
+  vertical-align: super;
+  margin-right: 0.18em;
+  opacity: 0.82;
+  color: var(--stage-accent, var(--stage-text));
+}
+
+.stage-display .zone-notes {
+  overflow: hidden;
+  color: var(--stage-muted);
+  font-style: italic;
+  line-height: 1.3;
+}
+
+/* ---- Clock / timer zones ---- */
+.stage-display .zone-clock .zone-inner,
+.stage-display .zone-timer .zone-inner {
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.stage-display .zone-clock .zone-value,
+.stage-display .zone-timer .zone-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* ---- Playlist / cue zone ---- */
+.stage-display .zone-playlist .zone-inner {
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.stage-display .zone-cue {
+  color: var(--stage-accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Messages (broadcast pills) ---- */
+.stage-display .zone-messages {
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.stage-display .stage-message {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--stage-danger);
+  color: #fff;
+  font-weight: 700;
+  line-height: 1.3;
+  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.35);
+  animation: stage-msg-in 0.35s ease both;
+  text-align: left;
+  overflow: hidden;
+}
+
+/* ---- Idle "Stage Ready" state ---- */
+.stage-display .stage-idle {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.stage-display .idle-ring {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stage-display .idle-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--stage-live);
+  animation: stage-pulse 2s ease-in-out infinite;
+}
+
+.stage-display .idle-label {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  font-size: 14px;
+  color: var(--stage-faint);
+}
+
+.stage-display.has-content .stage-idle {
+  display: none;
+}
+
+/* ---- Footer watermark ---- */
+.stage-display .stage-watermark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 24px 6px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--stage-fainter);
+}
+
+/* ---- Mode visibility (crossfade, never blanks confidence) ---- */
+.stage-display .stage-stage,
+.stage-display .stage-program {
+  transition: opacity var(--stage-transition) var(--stage-ease);
+}
+
+.stage-display.mode-confidence .stage-program,
+.stage-display.mode-program .stage-stage {
+  display: none;
+}
+
+.stage-display.mode-program .stage-program {
+  display: block;
+}
+
+.stage-display.mode-hybrid .stage-stage {
+  display: block;
+}
+
+/* Hybrid floats the zones over the output on vibrancy cards. */
+.stage-display.mode-hybrid .stage-zones .zone {
+  background: var(--stage-card);
+  border: 1px solid var(--stage-card-border);
+  border-radius: var(--stage-radius);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  padding: 14px 18px;
+}
+
+/* Operator visibility toggles, driven by the theme. */
+.stage-display.hide-clock [data-zone='clock'],
+.stage-display.hide-timer [data-zone='timer'] {
+  display: none;
+}
+
+.stage-display.hide-labels .section-label {
+  display: none;
+}
+
+/* The old page toggled a .reduced-motion class from a matchMedia listener in
+   JS. The media query says the same thing without the listener. */
+@media (prefers-reduced-motion: reduce) {
+  .stage-display *,
+  .stage-display *::before,
+  .stage-display *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---- Animations ---- */
+@keyframes stage-msg-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes stage-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}

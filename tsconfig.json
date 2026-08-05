@@ -18,6 +18,6 @@
       "@shared/*": ["src/shared/*"]
     }
   },
-  "include": ["src/renderer/**/*", "src/display/**/*", "src/shared/**/*"],
+  "include": ["src/renderer/**/*", "src/display/**/*", "src/stage/**/*", "src/shared/**/*"],
   "exclude": ["node_modules", "dist"]
 }
