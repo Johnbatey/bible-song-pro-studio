@@ -101,7 +101,12 @@
     </script>
     <script src="stage-display.js"></script>
     <script>
+      /* The Settings button in the watermark footer is ONLY for the standalone
+         stage window — never for the embedded operator dock preview. The dock
+         has its own Settings button in the chrome bar that posts a message to
+         the iframe instead. */
       (function() {
+        if (new URLSearchParams(window.location.search).get('embeddedPreview') === '1') return;
         var settingsBtn = document.getElementById('stage-settings-btn');
         var rightWatermark = document.getElementById('stage-watermark-right');
         if (settingsBtn && rightWatermark) {

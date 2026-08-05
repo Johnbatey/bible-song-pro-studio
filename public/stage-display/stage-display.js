@@ -1049,6 +1049,16 @@
       handleStateUpdate(event.data.payload);
       return;
     }
+    // Operator commands sent from the dock chrome bar (e.g. Settings button)
+    if (
+      EMBEDDED_PREVIEW &&
+      event.source === window.parent &&
+      event.data &&
+      event.data.__bspOperatorCmd === true
+    ) {
+      if (event.data.cmd === 'toggle-picker') togglePicker();
+      return;
+    }
     handleProgramWindowMessage(event);
   });
   if (window.matchMedia) {
@@ -1069,9 +1079,11 @@
   renderZones();
   render();
 
-  if (!EMBEDDED_PREVIEW && window.BSPDesktop && typeof window.BSPDesktop.onStageDisplayState === 'function') {
+  if (window.BSPDesktop && typeof window.BSPDesktop.onStageDisplayState === 'function') {
     window.BSPDesktop.onStageDisplayState(handleStateUpdate);
-    if (typeof window.BSPDesktop.sendStageDisplayState === 'function') {
+    // renderer-ready ping only needed for the standalone window — in embedded
+    // mode the dock panel's onLoad handler calls display.getState() instead.
+    if (!EMBEDDED_PREVIEW && typeof window.BSPDesktop.sendStageDisplayState === 'function') {
       window.BSPDesktop.sendStageDisplayState({ kind: 'renderer-ready', atMs: Date.now() });
     }
   }

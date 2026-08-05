@@ -493,6 +493,7 @@ declare global {
       platform: () => Promise<string>;
       userDataPath: () => Promise<string>;
       getDisplayUrl: () => Promise<string>;
+      getStageDisplayFileUrl: () => Promise<string>;
       window: {
         minimize: () => Promise<void>;
         maximize: () => Promise<void>;

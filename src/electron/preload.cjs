@@ -178,6 +178,7 @@ contextBridge.exposeInMainWorld('BSP', {
   openSlideEditor: () => ipcRenderer.invoke('slide-editor:open'),
   openStageDisplay: () => ipcRenderer.invoke('stage-display:open'),
   getDisplayUrl: () => ipcRenderer.invoke('get:displayUrl'),
+  getStageDisplayFileUrl: () => ipcRenderer.invoke('get:stageDisplayFileUrl'),
   onDisplayMessage: (cb) => {
     const handler = (_, msg) => cb(msg);
     ipcRenderer.on('display:message', handler);

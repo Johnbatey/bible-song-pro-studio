@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Block, BlockButton, BlockSegment } from './Block';
+import { Block } from './Block';
 import { fontWeight } from '../styles/type';
 import { useAppStore } from '../stores/appStore';
+import { CustomDropdown } from './CustomDropdown';
 
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 2;
@@ -9,12 +10,14 @@ const ZOOM_STEP = 0.05;
 const STAGE_ASPECT = 16 / 9;
 const SAFE_PAD = 48;
 
-const PRESET_LAYOUTS = [
-  { id: 'default',  label: 'Default' },
-  { id: 'band',     label: 'Band' },
-  { id: 'sermon',   label: 'Sermon' },
-  { id: 'minimal',  label: 'Minimal' },
-];
+const LAYOUT_OPTIONS = [
+  { value: 'default', label: 'Default' },
+  { value: 'band',    label: 'Band / Lyrics' },
+  { value: 'sermon',  label: 'Sermon Notes' },
+  { value: 'minimal', label: 'Minimal' },
+] as const;
+
+type LayoutId = (typeof LAYOUT_OPTIONS)[number]['value'];
 
 function clampZoom(v: number) {
   if (!Number.isFinite(v)) return 1;
@@ -35,22 +38,18 @@ export function StagePanel() {
   const [isPanning, setIsPanning] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [boxSize, setBoxSize] = useState({ w: 800, h: 450 });
-  const [fontScale, setFontScale] = useState(1);
-  const [activeLayout, setActiveLayout] = useState('default');
+  const [activeLayout, setActiveLayout] = useState<LayoutId>('default');
   const [stageUrl, setStageUrl] = useState<string | null>(null);
 
-  /* Resolve the local HTTP server base to build the stage URL. */
+  /* ── Resolve stage URL — must use file:// (same origin as main renderer)
+     so BroadcastChannel state updates from broadcast-channel-sync.ts reach
+     the iframe. http://localhost:8942 is a different origin so BroadcastChannel
+     is silently isolated. */
   useEffect(() => {
-    const fallback = 'http://localhost:8942/stage-display/index.html?embeddedPreview=1';
-    if (window.BSP?.getDisplayUrl) {
-      window.BSP.getDisplayUrl()
-        .then((url) => {
-          const base = url.replace(/\/display\.html.*$/, '');
-          setStageUrl(`${base}/stage-display/index.html?embeddedPreview=1`);
-        })
-        .catch(() => setStageUrl(fallback));
-    } else {
-      setStageUrl(fallback);
+    if (window.BSP?.getStageDisplayFileUrl) {
+      window.BSP.getStageDisplayFileUrl()
+        .then((url) => setStageUrl(`${url}?embeddedPreview=1`))
+        .catch(() => setStageUrl(null));
     }
   }, []);
 
@@ -145,30 +144,34 @@ export function StagePanel() {
     if (dragRef.current?.pointerId === e.pointerId) { dragRef.current = null; setIsPanning(false); }
   }
 
-  /* postMessage into the embedded stage iframe */
-  const postToStage = useCallback((payload: Record<string, unknown>) => {
-    try {
-      iframeRef.current?.contentWindow?.postMessage(
-        { __bspStageDisplayState: true, payload },
-        '*',
-      );
-    } catch { /* cross-origin on dev fallback — ignore */ }
+  /* postMessage helpers */
+  const postState = useCallback((payload: Record<string, unknown>) => {
+    try { iframeRef.current?.contentWindow?.postMessage({ __bspStageDisplayState: true, payload }, '*'); }
+    catch { /* cross-origin on dev — ignore */ }
   }, []);
 
-  const applyFontScale = useCallback((scale: number) => {
-    const clamped = Math.max(0.5, Math.min(2, scale));
-    setFontScale(clamped);
-    // stage-display.js handleStateUpdate reads value.theme at line ~928
-    postToStage({ theme: { fontScale: clamped } });
-  }, [postToStage]);
+  const postCmd = useCallback((cmd: string) => {
+    try { iframeRef.current?.contentWindow?.postMessage({ __bspOperatorCmd: true, cmd }, '*'); }
+    catch { /* ignore */ }
+  }, []);
 
-  const applyLayout = useCallback((id: string) => {
+  /* ── Push current state when iframe first loads ── */
+  const onIframeLoad = useCallback(() => {
+    window.BSP?.display?.getState?.().then((state: Record<string, unknown> | null) => {
+      if (state) postState(state);
+    }).catch(() => {});
+  }, [postState]);
+
+  const applyLayout = useCallback((id: LayoutId) => {
     setActiveLayout(id);
-    // stage-display.js handleStateUpdate reads value.layout at line ~909
-    postToStage({ layout: id });
-  }, [postToStage]);
+    postState({ layout: id });
+  }, [postState]);
 
-  /* Scale the 1920×1080 iframe down to fit inside boxSize */
+  const openSettings = useCallback(() => {
+    postCmd('toggle-picker');
+  }, [postCmd]);
+
+  /* Scale the 1920×1080 iframe to fit inside boxSize */
   const outputScale = boxSize.w / 1920;
   const zoomLabel = `${Math.round(zoom * 100)}%`;
 
@@ -214,41 +217,30 @@ export function StagePanel() {
             <button style={styles.wideBtn} onClick={fitStage} title="Fit to view">FIT</button>
           </div>
 
-          {/* Right: operator controls */}
+          {/* Right: layout dropdown + settings */}
           <div style={styles.footerRight}>
-            <span style={styles.footerLabel}>TEXT</span>
-            <button
-              style={styles.iconBtn}
-              onClick={() => applyFontScale(parseFloat((fontScale - 0.1).toFixed(1)))}
-              title="Smaller text"
-            >−</button>
-            <span style={styles.zoomValue}>{Math.round(fontScale * 100)}%</span>
-            <input
-              style={{ ...styles.zoomSlider, width: 72 }}
-              type="range" min={0.5} max={2} step={0.1} value={fontScale}
-              onChange={(e) => applyFontScale(Number(e.currentTarget.value))}
-              title="Stage text scale"
+            <span style={styles.footerLabel}>LAYOUT</span>
+            <CustomDropdown
+              value={activeLayout}
+              options={LAYOUT_OPTIONS as unknown as { value: string; label: string }[]}
+              onChange={(v) => applyLayout(v as LayoutId)}
+              title="Switch stage layout"
+              buttonStyle={{ height: 26, padding: '0 10px', fontSize: 12, fontWeight: fontWeight.semibold }}
             />
-            <button
-              style={styles.iconBtn}
-              onClick={() => applyFontScale(parseFloat((fontScale + 0.1).toFixed(1)))}
-              title="Larger text"
-            >+</button>
 
             <div style={styles.divider} />
 
-            <BlockSegment>
-              {PRESET_LAYOUTS.map((l) => (
-                <BlockButton
-                  key={l.id}
-                  active={activeLayout === l.id}
-                  onClick={() => applyLayout(l.id)}
-                  title={`Switch to ${l.label} layout`}
-                >
-                  {l.label}
-                </BlockButton>
-              ))}
-            </BlockSegment>
+            <button
+              style={styles.settingsBtn}
+              onClick={openSettings}
+              title="Open stage display settings"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              Settings
+            </button>
           </div>
         </div>
       )}
@@ -279,6 +271,7 @@ export function StagePanel() {
                 ref={iframeRef}
                 src={stageUrl}
                 title="Stage Display operator monitor"
+                onLoad={onIframeLoad}
                 style={{
                   position: 'absolute',
                   left: 0,
@@ -289,8 +282,8 @@ export function StagePanel() {
                   transformOrigin: 'top left',
                   transform: `scale(${outputScale})`,
                   background: '#000',
-                  /* Prevent iframe from eating pointer events so the viewport
-                     drag still works when the cursor is over the stage preview. */
+                  /* pointerEvents none prevents the iframe from swallowing
+                     viewport drag events. Settings button works via postMessage. */
                   pointerEvents: 'none',
                 }}
                 allow="autoplay"
@@ -324,49 +317,42 @@ const styles: Record<string, React.CSSProperties> = {
   footerCentre: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   footerRight: { display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' },
   stagePill: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 5,
-    padding: '3px 10px',
-    borderRadius: 6,
-    border: '1px solid',
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    color: '#ffffff',
-    userSelect: 'none',
-    transition: 'background 0.2s ease, border-color 0.2s ease',
+    display: 'flex', alignItems: 'center', gap: 5,
+    padding: '3px 10px', borderRadius: 6, border: '1px solid',
+    fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: '#ffffff',
+    userSelect: 'none', transition: 'background 0.2s ease, border-color 0.2s ease',
   },
-  pillDot: { width: 6, height: 6, borderRadius: '50%', transition: 'background 0.2s ease, box-shadow 0.2s ease' },
-  footerLabel: { fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-dim)', userSelect: 'none' },
+  pillDot: {
+    width: 6, height: 6, borderRadius: '50%',
+    transition: 'background 0.2s ease, box-shadow 0.2s ease',
+  },
+  footerLabel: {
+    fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+    color: 'var(--text-dim)', userSelect: 'none',
+  },
   iconBtn: {
-    width: 24, height: 24,
-    border: '1px solid var(--block-line)',
-    borderRadius: 5,
-    background: 'var(--block-active)',
-    color: 'var(--text-primary)',
-    cursor: 'pointer',
-    fontWeight: fontWeight.semibold,
-    fontSize: 14,
-    lineHeight: '1',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontFamily: 'var(--font-ui)',
+    width: 24, height: 24, border: '1px solid var(--block-line)',
+    borderRadius: 5, background: 'var(--block-active)', color: 'var(--text-primary)',
+    cursor: 'pointer', fontWeight: fontWeight.semibold, fontSize: 14,
+    lineHeight: '1', fontFamily: 'var(--font-ui)',
   },
   wideBtn: {
-    height: 24, padding: '0 8px',
-    border: '1px solid var(--block-line)',
-    borderRadius: 5,
-    background: 'var(--block-active)',
-    color: 'var(--text-primary)',
-    cursor: 'pointer',
-    fontSize: 10,
-    fontWeight: fontWeight.bold,
-    letterSpacing: '0.06em',
-    fontFamily: 'var(--font-ui)',
+    height: 24, padding: '0 8px', border: '1px solid var(--block-line)',
+    borderRadius: 5, background: 'var(--block-active)', color: 'var(--text-primary)',
+    cursor: 'pointer', fontSize: 10, fontWeight: fontWeight.bold,
+    letterSpacing: '0.06em', fontFamily: 'var(--font-ui)',
   },
-  zoomValue: { width: 38, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 11, fontWeight: fontWeight.bold },
+  settingsBtn: {
+    display: 'flex', alignItems: 'center', gap: 5,
+    height: 26, padding: '0 10px', border: '1px solid var(--block-line)',
+    borderRadius: 5, background: 'var(--block-active)', color: 'var(--text-primary)',
+    cursor: 'pointer', fontSize: 12, fontWeight: fontWeight.semibold,
+    fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
+  },
+  zoomValue: {
+    width: 38, textAlign: 'center', color: 'var(--text-secondary)',
+    fontSize: 11, fontWeight: fontWeight.bold,
+  },
   zoomSlider: { width: 88, accentColor: 'var(--chrome-control-active)' },
   divider: { width: 1, height: 18, background: 'var(--block-line)', margin: '0 2px' },
   viewport: {
