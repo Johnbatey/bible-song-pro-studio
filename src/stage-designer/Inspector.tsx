@@ -276,7 +276,10 @@ export function Inspector({
             className="dz-color"
             title="A literal colour — stops following the theme"
             value={/^#[0-9a-f]{6}$/i.test(zone.color || '') ? (zone.color as string) : '#ffffff'}
-            onChange={(event) => onChange({ color: event.currentTarget.value }, `color:${zone.id}`)}
+            onChange={(event) => {
+              const val = event.target.value;
+              onChange({ color: val }, `color:${zone.id}`);
+            }}
           />
         </div>
         {/^#/.test(zone.color || '') && (
@@ -293,7 +296,10 @@ export function Inspector({
             type="color"
             className="dz-color"
             value={/^#[0-9a-f]{6}$/i.test(zone.bgColor || '') ? (zone.bgColor as string) : '#000000'}
-            onChange={(event) => onChange({ bgColor: event.currentTarget.value }, `bg:${zone.id}`)}
+            onChange={(event) => {
+              const val = event.target.value;
+              onChange({ bgColor: val }, `bg:${zone.id}`);
+            }}
           />
           <button type="button" onClick={() => onChange({ bgColor: undefined })}>Clear</button>
           <span className="dz-swatch-note">{zone.bgColor || 'transparent'}</span>

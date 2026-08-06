@@ -134,7 +134,8 @@ export function StageZones({
              With nothing projected the zone falls back to the same text a
              current-text zone draws, so the Slide layout is not a blank screen
              the moment the service moves off the deck. */
-          const fullBleed = zone.type === 'slide' && !!currentSlide;
+          const activeSlide = currentSlide || current?.slide || null;
+          const fullBleed = (zone.type === 'slide' || (zone.type === 'current-text' && !!activeSlide)) && !!activeSlide;
           const classes = [
             'zone',
             zone.type === 'slide' ? 'zone-slide' : 'zone-current-text',
@@ -155,12 +156,9 @@ export function StageZones({
                 >
                   {current?.title || ''}
                 </div>
-                {/* A slide is a picture, and the runs scraped out of it are not
-                    it: a text-only stage told the musicians what the slide said
-                    while the room was looking at its design. When one is live
-                    the zone draws the slide, fitted to the cell. */}
-                {currentSlide ? (
-                  <SlideStage projection={currentSlide} className="zone-slide-stage" />
+                {/* When a slide projection is active, draw the full graphical slide board fitted to the cell */}
+                {activeSlide ? (
+                  <SlideStage projection={activeSlide} className="zone-slide-stage" />
                 ) : (
                   <BodyText
                     content={current}

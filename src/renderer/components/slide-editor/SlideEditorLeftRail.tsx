@@ -400,25 +400,15 @@ export function SlideEditorLeftRail({
                 borderRadius: 8,
                 overflow: 'hidden',
                 cursor: 'pointer',
+                padding: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                transition: 'border-color 0.15s ease',
               }}
             >
-              <div
-                style={{
-                  height: 70,
-                  background: tpl.bg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 8,
-                  textAlign: 'center',
-                  color: '#ffffff',
-                  fontSize: 10,
-                  fontWeight: 600,
-                }}
-              >
-                {tpl.text}
-              </div>
-              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600, color: '#ffffff' }}>
+              <TemplateCardThumb id={tpl.id} bg={tpl.bg} name={tpl.name} />
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#ffffff', padding: '0 2px' }}>
                 {tpl.name}
               </div>
             </div>
@@ -426,5 +416,109 @@ export function SlideEditorLeftRail({
         </div>
       )}
     </aside>
+  );
+}
+
+function TemplateCardThumb({
+  id,
+  bg,
+  name,
+}: {
+  id: string;
+  bg: string;
+  name: string;
+}) {
+  const isLowerThird = id === 'lower-third';
+  const isTransparent = isLowerThird || bg === 'transparent';
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        aspectRatio: '16/9',
+        borderRadius: 6,
+        overflow: 'hidden',
+        position: 'relative',
+        background: isTransparent
+          ? 'repeating-conic-gradient(#262628 0% 25%, #161414 0% 50%) 50% / 12px 12px'
+          : bg,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+      }}
+    >
+      {id === 'worship' && (
+        <div style={{ textAlign: 'center', padding: '0 12px' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Sing Unto The Lord
+          </div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+            A new song of praise and worship
+          </div>
+        </div>
+      )}
+
+      {id === 'sermon' && (
+        <div style={{ width: '85%', height: '70%', background: 'rgba(35, 34, 33, 0.75)', border: '1px solid rgba(255,85,0,0.4)', borderRadius: 6, padding: 6, boxSizing: 'border-box', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ width: 16, height: 16, borderRadius: 3, background: '#f4621f', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>01</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 8, fontWeight: 700, color: '#ffffff' }}>FAITH OVER FEAR</div>
+            <div style={{ fontSize: 6, color: '#a1a1aa', marginTop: 1 }}>• Trusting God in trials</div>
+          </div>
+        </div>
+      )}
+
+      {id === 'scripture' && (
+        <div style={{ width: '85%', textAlign: 'center' }}>
+          <div style={{ fontSize: 8, fontWeight: 600, color: '#ffffff', fontStyle: 'italic' }}>
+            &ldquo;For God so loved the world...&rdquo;
+          </div>
+          <div style={{ fontSize: 7, fontWeight: 700, color: '#f4621f', marginTop: 3 }}>
+            JOHN 3:16 (KJV)
+          </div>
+        </div>
+      )}
+
+      {id === 'lower-third' && (
+        <div style={{ position: 'absolute', bottom: 6, left: 10, right: 10, height: 28, background: 'rgba(22, 20, 20, 0.92)', border: '1px solid #f4621f', borderRadius: 5, padding: '3px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ fontSize: 8, fontWeight: 800, color: '#ffffff' }}>PASTOR DAVID E. JOHNSON</div>
+          <div style={{ fontSize: 6, fontWeight: 600, color: '#f4621f' }}>Senior Pastor &bull; Grace Community</div>
+        </div>
+      )}
+
+      {id === 'announcement' && (
+        <div style={{ textAlign: 'center', padding: '0 10px' }}>
+          <div style={{ display: 'inline-block', background: '#f4621f', borderRadius: 8, padding: '1px 6px', fontSize: 6, fontWeight: 800, color: '#fff', marginBottom: 2 }}>
+            UPCOMING EVENT
+          </div>
+          <div style={{ fontSize: 9, fontWeight: 800, color: '#ffffff' }}>NIGHT OF WORSHIP</div>
+        </div>
+      )}
+
+      {id === 'welcome' && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#ffffff' }}>WELCOME</div>
+          <div style={{ fontSize: 7, fontWeight: 600, color: '#f4621f', marginTop: 1 }}>We are so glad you are here</div>
+        </div>
+      )}
+
+      {id === 'offering' && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#ffffff' }}>TITHE &amp; OFFERING</div>
+          <div style={{ fontSize: 6, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>www.church.org/give</div>
+        </div>
+      )}
+
+      {id === 'benediction' && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#ffffff' }}>GO IN PEACE</div>
+          <div style={{ fontSize: 7, color: '#f4621f', marginTop: 1 }}>The LORD bless you and keep you</div>
+        </div>
+      )}
+    </div>
   );
 }

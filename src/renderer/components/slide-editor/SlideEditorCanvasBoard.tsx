@@ -55,8 +55,8 @@ export function SlideEditorCanvasBoard({
     const fit = Math.min((rect.width - margin) / BOARD_WIDTH, (rect.height - margin) / BOARD_HEIGHT);
     const clampedScale = Math.min(Math.max(fit, 0.2), 2.0);
     setScale(clampedScale);
-    setPanX((rect.width - BOARD_WIDTH * clampedScale) / 2);
-    setPanY((rect.height - BOARD_HEIGHT * clampedScale) / 2);
+    setPanX((rect.width - BOARD_WIDTH) / 2);
+    setPanY((rect.height - BOARD_HEIGHT) / 2);
   };
 
   useEffect(() => {
@@ -312,8 +312,15 @@ export function SlideEditorCanvasBoard({
           left: 0,
           top: 0,
           transform: `translate(${panX}px, ${panY}px) scale(${scale})`,
-          transformOrigin: '0 0',
-          background: bgType === 'gradient' ? bgValue : bgType === 'color' ? bgValue : '#18181b',
+          transformOrigin: 'center center',
+          background:
+            bgType === 'gradient'
+              ? bgValue
+              : bgType === 'color' && bgValue === 'transparent'
+              ? 'repeating-conic-gradient(#262628 0% 25%, #161414 0% 50%) 50% / 24px 24px'
+              : bgType === 'color'
+              ? bgValue
+              : '#18181b',
           borderRadius: 4,
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.12)',
         }}
@@ -397,7 +404,9 @@ export function SlideEditorCanvasBoard({
                 height: `${el.height}%`,
                 zIndex: el.zIndex || 1,
                 cursor: isEditing ? 'text' : 'move',
-                border: isSelected ? '2px dashed #f4621f' : '1px transparent solid',
+                border: isSelected ? '1.5px solid rgba(255, 255, 255, 0.7)' : '1px transparent solid',
+                boxShadow: isSelected ? '0 0 0 3px rgba(255, 255, 255, 0.15), 0 4px 16px rgba(0, 0, 0, 0.4)' : undefined,
+                borderRadius: isSelected ? 4 : undefined,
                 boxSizing: 'border-box',
               }}
             >

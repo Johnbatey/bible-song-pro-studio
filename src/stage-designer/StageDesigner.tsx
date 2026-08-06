@@ -556,7 +556,10 @@ export function StageDesigner() {
             className="dz-name"
             value={layout.name}
             spellCheck={false}
-            onChange={(event) => setLayout((current) => ({ ...current, name: event.currentTarget.value }), { coalesceKey: 'name' })}
+            onChange={(event) => {
+              const nameVal = event.target.value;
+              setLayout((current) => ({ ...current, name: nameVal }), { coalesceKey: 'name' });
+            }}
             aria-label="Layout name"
           />
           <span className="dz-dirty" data-on={(dirty || isUnsaved) || undefined}>
@@ -775,10 +778,13 @@ export function StageDesigner() {
                   type="color"
                   className="dz-color"
                   value={/^#[0-9a-f]{6}$/i.test(layout.bgColor) ? layout.bgColor : '#000000'}
-                  onChange={(event) => setLayout(
-                    (current) => ({ ...current, bgColor: event.currentTarget.value }),
-                    { coalesceKey: 'bgColor' },
-                  )}
+                  onChange={(event) => {
+                    const nextColor = event.target.value;
+                    setLayout(
+                      (current) => ({ ...current, bgColor: nextColor }),
+                      { coalesceKey: 'bgColor' },
+                    );
+                  }}
                 />
                 <span>Stage</span>
               </label>

@@ -19,6 +19,7 @@ export interface StageContent {
   /** Verse-number superscripts only — see isSafeVerseMarkup in StageZones. */
   bodyHtml?: string;
   notes?: string;
+  slide?: import('../renderer/types').SlideProjection;
 }
 
 export interface StageMessage {

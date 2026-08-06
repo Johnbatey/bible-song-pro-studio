@@ -173,43 +173,70 @@ export function SlideEditorRightSidebar({
               </div>
             </div>
 
-            {/* Background Style */}
+            {/* Background Style & Off Toggle */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)', textTransform: 'uppercase' }}>
-                Canvas Background
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)', textTransform: 'uppercase' }}>
+                  Canvas Background
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateSlide({
+                      background: {
+                        type: 'color',
+                        value: bgValue === 'transparent' ? '#18181b' : 'transparent',
+                      },
+                    })
+                  }
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    border: 'none',
+                    background: bgValue === 'transparent' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                    color: bgValue === 'transparent' ? '#f87171' : '#4ade80',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {bgValue === 'transparent' ? 'Background: OFF' : 'Background: ON'}
+                </button>
+              </div>
               <div style={{ display: 'flex', gap: 4, background: 'rgba(0, 0, 0, 0.3)', padding: 3, borderRadius: 6 }}>
-                {(['color', 'gradient', 'image'] as const).map((type) => (
+                {(['color', 'gradient', 'image', 'none'] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
                     onClick={() =>
                       onUpdateSlide({
                         background: {
-                          type,
+                          type: type === 'none' ? 'color' : type,
                           value:
-                            type === 'gradient'
+                            type === 'none'
+                              ? 'transparent'
+                              : type === 'gradient'
                               ? 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)'
                               : type === 'color'
-                              ? '#18181b'
+                              ? bgValue === 'transparent' ? '#18181b' : bgValue
                               : '',
                         },
                       })
                     }
                     style={{
                       flex: 1,
-                      padding: '5px 6px',
-                      background: bgType === type ? '#f4621f' : 'transparent',
+                      padding: '5px 4px',
+                      background: (type === 'none' && bgValue === 'transparent') || (type !== 'none' && bgType === type && bgValue !== 'transparent') ? '#f4621f' : 'transparent',
                       border: 'none',
                       borderRadius: 4,
                       color: '#ffffff',
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: 600,
                       cursor: 'pointer',
                       textTransform: 'capitalize',
                     }}
                   >
-                    {type}
+                    {type === 'none' ? 'Off / Trans' : type}
                   </button>
                 ))}
               </div>
