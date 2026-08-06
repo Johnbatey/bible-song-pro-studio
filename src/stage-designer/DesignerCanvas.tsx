@@ -117,9 +117,15 @@ export function DesignerCanvas({
   const measure = useCallback(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
-    const pad = 56;
-    const availableW = Math.max(240, viewport.clientWidth - pad);
-    const availableH = Math.max(160, viewport.clientHeight - pad);
+    /* Read the padding rather than assume it. The viewport is inset unevenly —
+       more at the top for the floating toolbar, more at the bottom for the
+       zoom bar — and clientHeight includes all of it. A hardcoded number here
+       fits the stage to space the toolbar is standing in. */
+    const style = getComputedStyle(viewport);
+    const padX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    const padY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const availableW = Math.max(240, viewport.clientWidth - padX);
+    const availableH = Math.max(160, viewport.clientHeight - padY);
     const next = Math.min(availableW / STAGE_W, availableH / STAGE_H);
     setFitScale((current) => (Math.abs(current - next) < 0.0005 ? current : next));
   }, []);

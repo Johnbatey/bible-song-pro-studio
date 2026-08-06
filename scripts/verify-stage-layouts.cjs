@@ -102,6 +102,21 @@ assert.doesNotMatch(designerWindow, /nodeIntegration:\s*true/, 'the designer win
 assert.match(designerWindow, /stage-designer\.html/, 'createStageDesignerWindow must load the designer entry');
 assert.match(designerWindow, /existing\.focus\(\)/, 'a second open must focus the existing designer, not open a rival editor on the same layouts');
 assert.match(designerWindow, /dirtyDesigners/, 'closing a designer with unsaved work must be guarded');
+assert.match(main, /ipcMain\.handle\('stage-designer:close'/, 'the designer needs a way back to the app');
+
+/* Two ways the close path can take the whole app down with it, both found the
+   hard way. `win.webContents` is gone by the time `closed` fires, so reaching
+   through it there throws — and an uncaught throw in the main process puts up
+   Electron's own modal error box, which blocks the projector and the stage
+   along with everything else. And showMessageBoxSync blocks the main process
+   by design, which is the same freeze arrived at deliberately. */
+assert.match(designerWindow, /const contentsId = win\.webContents\.id;/, 'the designer window must capture its webContents id while it still has one');
+assert.doesNotMatch(
+  designerWindow.replace(/const contentsId = win\.webContents\.id;/, ''),
+  /win\.webContents\.id/,
+  'the designer close path must use the captured id, never reach through a destroyed webContents',
+);
+assert.doesNotMatch(main, /showMessageBoxSync/, 'a modal that blocks the main process also blocks the projector and the stage — ask asynchronously');
 
 // The feed is a bus: everyone who renders stage state receives it, and the
 // sender never receives its own message back.

@@ -608,23 +608,45 @@ function createStageDesignerWindow() {
   win.setMenuBarVisibility(false);
 
   stageDesignerWindows.add(win);
-  win.on('closed', () => { stageDesignerWindows.delete(win); dirtyDesigners.delete(win.webContents.id); });
+
+  /* Captured now, not read later. By the time `closed` fires the window is
+     destroyed and `win.webContents` is gone, so reaching through it there
+     throws — and an uncaught throw in the main process puts up Electron's
+     own modal error box, which blocks the projector and the stage along with
+     everything else. The id is a number; hold the number. */
+  const contentsId = win.webContents.id;
+  win.on('closed', () => {
+    stageDesignerWindows.delete(win);
+    dirtyDesigners.delete(contentsId);
+  });
 
   /* An hour of layout work is not something to lose to a stray Cmd+W. The
      renderer keeps this flag current; the check has to live up here because a
-     renderer cannot hold a window open long enough to ask a question. */
+     renderer cannot hold a window open long enough to ask a question.
+
+     Asked asynchronously, and that is not a style preference.
+     showMessageBoxSync blocks the main process — every timer, every IPC hop,
+     the projector feed and the stage feed with it — for as long as the prompt
+     is on screen. A confirmation about one window is not worth freezing the
+     service running on the other two, so the close is cancelled, the question
+     is asked, and the window closes again on the answer. */
+  let closeConfirmed = false;
   win.on('close', (event) => {
-    if (!dirtyDesigners.get(win.webContents.id)) return;
-    const choice = dialog.showMessageBoxSync(win, {
+    if (closeConfirmed || !dirtyDesigners.get(contentsId)) return;
+    event.preventDefault();
+    dialog.showMessageBox(win, {
       type: 'warning',
       buttons: ['Cancel', 'Discard changes'],
       defaultId: 0,
       cancelId: 0,
       message: 'This layout has unsaved changes.',
       detail: 'Closing the designer now will discard them.',
-    });
-    if (choice === 0) event.preventDefault();
-    else dirtyDesigners.delete(win.webContents.id);
+    }).then(({ response }) => {
+      if (response !== 1 || win.isDestroyed()) return;
+      closeConfirmed = true;
+      dirtyDesigners.delete(contentsId);
+      win.close();
+    }).catch(() => { /* the window went away while we were asking */ });
   });
 
   /* The designer draws the real stage, so it needs the real feeds — the same
@@ -780,6 +802,26 @@ app.whenReady().then(async () => {
   ipcMain.handle('stage-display:open', () => { createStageDisplayWindow(); return true; });
   ipcMain.handle('stage-designer:open', () => { createStageDesignerWindow(); return true; });
   ipcMain.on('stage-designer:dirty', (event, dirty) => dirtyDesigners.set(event.sender.id, !!dirty));
+
+  /* Back to the app. `close` rather than `hide` so the unsaved-work guard on
+     the window runs — Back and the red button must ask the same question. The
+     operator window comes forward, because a designer that vanished and left
+     whatever happened to be behind it is a designer that lost the operator. */
+  ipcMain.handle('stage-designer:close', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    /* Deferred out of the handler. The reply to this invoke has to travel back
+       to the very webContents the close destroys, and tearing that down inside
+       the handler leaves the renderer's promise with nowhere to land.
+       Returning first and closing on the next tick costs a tick. */
+    setImmediate(() => {
+      if (win && !win.isDestroyed()) win.close();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+      }
+    });
+    return true;
+  });
 
   /* The stage's own feed, alongside display:* — same shape, same reasons.
      Anyone on the bus may publish; everyone else receives; a window that opens

@@ -652,6 +652,7 @@ declare global {
       openStageDesigner: () => Promise<boolean>;
       stageDesigner: {
         setDirty: (dirty: boolean) => void;
+        close: () => Promise<boolean>;
       };
       dock?: {
         /**

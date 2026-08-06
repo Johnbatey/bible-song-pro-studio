@@ -211,6 +211,7 @@ contextBridge.exposeInMainWorld('BSP', {
      only the main process can stop a window closing long enough to ask. */
   stageDesigner: {
     setDirty: (dirty) => ipcRenderer.send('stage-designer:dirty', !!dirty),
+    close: () => ipcRenderer.invoke('stage-designer:close'),
   },
   getDisplayUrl: () => ipcRenderer.invoke('get:displayUrl'),
   onDisplayMessage: (cb) => {

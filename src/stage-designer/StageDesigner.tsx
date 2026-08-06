@@ -39,7 +39,8 @@ import { Inspector } from './Inspector';
 import { LayerList } from './LayerList';
 import { useStageFeeds } from './useStageFeeds';
 import { isTypingTarget } from './keyboard';
-import { Redo, Undo } from './icons';
+import { Menu, MenuItem } from './Menu';
+import { Back, Plus, Redo, Undo, ZONE_ICONS } from './icons';
 import { sampleContent, sampleProgramState, SAMPLE_LABELS, type SampleKind } from './sample-content';
 import type { StageMode } from '../stage/stage-state';
 import './designer.css';
@@ -47,6 +48,24 @@ import './designer.css';
 const GRID_STEPS = [0, 1, 2.5, 5, 10];
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4;
+
+const MODE_LABELS: Record<StageMode, string> = {
+  confidence: 'Zones only',
+  hybrid: 'Over output',
+  program: 'Output only',
+};
+
+const MODE_HINTS: Record<StageMode, string> = {
+  confidence: 'The layout on its own background.',
+  hybrid: 'The zones floating over the program output.',
+  program: 'The program output alone, no zones.',
+};
+
+const SAMPLE_HINTS: Record<SampleKind, string> = {
+  scripture: 'A long verse, to see where the text stops fitting.',
+  song: 'A lyric stanza with a section title.',
+  slide: 'A projected slide, for the Slide zone.',
+};
 
 /** How long edits settle before they go out on the wire with Live on. Long
     enough that a drag is one message rather than sixty, short enough that
@@ -284,17 +303,25 @@ export function StageDesigner() {
     setSelection([]);
   }, [selection, setLayout]);
 
-  const reorder = useCallback((id: string, direction: 1 | -1) => {
+  /** Move a zone to a new index in the paint order. Both indices are into the
+      zones array, so the layer list's display order is its own business. */
+  const moveZone = useCallback((from: number, to: number) => {
     setLayout((current) => {
-      const index = current.zones.findIndex((zone) => zone.id === id);
-      const target = index + direction;
-      if (index === -1 || target < 0 || target >= current.zones.length) return current;
+      if (from === to || from < 0 || from >= current.zones.length) return current;
+      const target = clamp(to, 0, current.zones.length - 1);
       const zones = current.zones.slice();
-      const [moved] = zones.splice(index, 1);
+      const [moved] = zones.splice(from, 1);
       zones.splice(target, 0, moved);
       return { ...current, zones };
     });
   }, [setLayout]);
+
+  /** Cmd+] and Cmd+[ — one step, for when the pointer is already elsewhere. */
+  const nudgeOrder = useCallback((id: string, direction: 1 | -1) => {
+    const index = layout.zones.findIndex((zone) => zone.id === id);
+    if (index === -1) return;
+    moveZone(index, index + direction);
+  }, [layout.zones, moveZone]);
 
   const toggleZoneFlag = useCallback((id: string, key: 'visible' | 'locked') => {
     setLayout((current) => ({
@@ -456,7 +483,7 @@ export function StageDesigner() {
       }
       if (meta && (event.key === ']' || event.key === '[')) {
         event.preventDefault();
-        if (selection.length === 1) reorder(selection[0], event.key === ']' ? 1 : -1);
+        if (selection.length === 1) nudgeOrder(selection[0], event.key === ']' ? 1 : -1);
         return;
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -478,7 +505,7 @@ export function StageDesigner() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [history, duplicateSelection, deleteSelection, layout.zones, selection, reorder, grid, nudge, commit]);
+  }, [history, duplicateSelection, deleteSelection, layout.zones, selection, nudgeOrder, grid, nudge, commit]);
 
   /* Status messages are progress reports, not a log — one at a time, and gone
      before the operator has to wonder whether it still applies. */
@@ -510,6 +537,20 @@ export function StageDesigner() {
     <div className="dz-app">
       <header className="dz-topbar">
         <div className="dz-topbar-left">
+          {/* The way out, in the same place and with the same words as the
+              slide editor's. The main process closes the window rather than
+              hiding it, so Back and the red button ask the same question about
+              unsaved work. */}
+          <button
+            type="button"
+            className="dz-back"
+            title="Close the designer and return to Bible Song Pro"
+            onClick={() => { void window.BSP?.stageDesigner?.close?.(); }}
+          >
+            <Back />
+            Back to app
+          </button>
+          <span className="dz-sep" />
           <span className="dz-brand">Stage Layout</span>
           <input
             className="dz-name"
@@ -618,97 +659,129 @@ export function StageDesigner() {
                 : selection.includes(id) ? selection.filter((item) => item !== id) : [...selection, id],
             )}
             onToggle={toggleZoneFlag}
-            onRaise={(id) => reorder(id, 1)}
-            onLower={(id) => reorder(id, -1)}
+            onReorder={moveZone}
           />
         </aside>
 
         <main className="dz-main">
-          <div className="dz-toolbar">
-            <div className="dz-toolbar-group">
-              <span className="dz-toolbar-label">Add</span>
-              {ZONE_TYPES.map((type) => (
-                <button key={type} type="button" onClick={() => addZone(type)} title={ZONE_HINTS[type]}>
-                  {ZONE_LABELS[type]}
-                </button>
-              ))}
-            </div>
+          {/* Floating over the canvas rather than stacked above it. Two rows of
+              fifteen bare buttons showed the operator everything and told them
+              nothing; four menus put the same choices one click away and give
+              the canvas back the space. */}
+          <div className="dz-floatbar">
+            <span className="dz-floatbar-label">Add to layout</span>
+            <div className="dz-floatbar-card">
+              <Menu
+                label="Add layer"
+                icon={<Plus />}
+                title="Place a new zone on the stage"
+                width={268}
+              >
+                {(close) => ZONE_TYPES.map((type) => {
+                  const Icon = ZONE_ICONS[type];
+                  return (
+                    <MenuItem
+                      key={type}
+                      icon={Icon ? <Icon /> : null}
+                      label={ZONE_LABELS[type]}
+                      hint={ZONE_HINTS[type]}
+                      onClick={() => { addZone(type); close(); }}
+                    />
+                  );
+                })}
+              </Menu>
 
-            <div className="dz-toolbar-group">
-              <span className="dz-toolbar-label">Stage bg</span>
-              <input
-                type="color"
-                className="dz-color"
-                value={/^#[0-9a-f]{6}$/i.test(layout.bgColor) ? layout.bgColor : '#000000'}
-                onChange={(event) => setLayout(
-                  (current) => ({ ...current, bgColor: event.currentTarget.value }),
-                  { coalesceKey: 'bgColor' },
+              <span className="dz-floatbar-sep" />
+
+              <Menu label="View" value={MODE_LABELS[mode]} title="What the canvas draws">
+                {(close) => (['confidence', 'hybrid', 'program'] as StageMode[]).map((item) => (
+                  <MenuItem
+                    key={item}
+                    label={MODE_LABELS[item]}
+                    hint={MODE_HINTS[item]}
+                    selected={mode === item}
+                    onClick={() => { setMode(item); close(); }}
+                  />
+                ))}
+              </Menu>
+
+              <Menu
+                label="Content"
+                value={usingSample ? SAMPLE_LABELS[sampleKind] : 'Live'}
+                title="What the zones are filled with while you design"
+              >
+                {(close) => (
+                  <>
+                    <MenuItem
+                      label="Live"
+                      hint={stageIsIdle ? 'Nothing is on the stage right now' : 'Draw what is actually on the stage'}
+                      selected={!usingSample}
+                      onClick={() => { if (!stageIsIdle) { setForceSample(false); close(); } }}
+                    />
+                    <div className="dz-menu-sep" />
+                    {(Object.keys(SAMPLE_LABELS) as SampleKind[]).map((kind) => (
+                      <MenuItem
+                        key={kind}
+                        label={SAMPLE_LABELS[kind]}
+                        hint={SAMPLE_HINTS[kind]}
+                        selected={usingSample && sampleKind === kind}
+                        onClick={() => { setSampleKind(kind); setForceSample(true); close(); }}
+                      />
+                    ))}
+                  </>
                 )}
-                title="The colour behind the zones"
-              />
-            </div>
-          </div>
+              </Menu>
 
-          <div className="dz-toolbar dz-toolbar-secondary">
-            <div className="dz-toolbar-group">
-              <span className="dz-toolbar-label">View</span>
-              <div className="dz-segmented">
-                {(['confidence', 'hybrid', 'program'] as StageMode[]).map((item) => (
-                  <button key={item} type="button" data-active={mode === item || undefined} onClick={() => setMode(item)}>
-                    {item === 'confidence' ? 'Zones' : item === 'hybrid' ? 'Over output' : 'Output only'}
-                  </button>
-                ))}
-              </div>
-            </div>
+              {/* The trigger reports snapping only when it is *off*. Lighting
+                  up the default state teaches the eye to ignore the light. */}
+              <Menu
+                label="Grid"
+                value={`${grid === 0 ? 'Off' : `${grid}%`}${snapEnabled ? '' : ' · no snap'}`}
+                title="Grid size, and whether things snap to it"
+                active={!snapEnabled}
+              >
+                {() => (
+                  <>
+                    <div className="dz-menu-head">Grid size</div>
+                    <div className="dz-menu-chips">
+                      {GRID_STEPS.map((step) => (
+                        <button
+                          key={step}
+                          type="button"
+                          data-active={grid === step || undefined}
+                          onClick={() => setGrid(step)}
+                        >
+                          {step === 0 ? 'Off' : `${step}%`}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="dz-menu-sep" />
+                    <label className="dz-menu-check">
+                      <input type="checkbox" checked={showGrid} onChange={(event) => setShowGrid(event.currentTarget.checked)} />
+                      <span>Show the grid</span>
+                    </label>
+                    <label className="dz-menu-check" title="Hold Alt while dragging to bypass">
+                      <input type="checkbox" checked={snapEnabled} onChange={(event) => setSnapEnabled(event.currentTarget.checked)} />
+                      <span>Snap to grid and edges</span>
+                    </label>
+                  </>
+                )}
+              </Menu>
 
-            <div className="dz-toolbar-group">
-              <span className="dz-toolbar-label">Content</span>
-              <div className="dz-segmented">
-                {(Object.keys(SAMPLE_LABELS) as SampleKind[]).map((kind) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    data-active={(usingSample && sampleKind === kind) || undefined}
-                    onClick={() => { setSampleKind(kind); setForceSample(true); }}
-                  >
-                    {SAMPLE_LABELS[kind]}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  data-active={!usingSample || undefined}
-                  disabled={stageIsIdle}
-                  title={stageIsIdle ? 'Nothing is live on the stage right now' : 'Draw what is actually on the stage'}
-                  onClick={() => setForceSample(false)}
-                >
-                  Live
-                </button>
-              </div>
-            </div>
+              <span className="dz-floatbar-sep" />
 
-            <div className="dz-toolbar-group">
-              <span className="dz-toolbar-label">Grid</span>
-              <select value={grid} onChange={(event) => setGrid(Number(event.currentTarget.value))}>
-                {GRID_STEPS.map((step) => (
-                  <option key={step} value={step}>{step === 0 ? 'Off' : `${step}%`}</option>
-                ))}
-              </select>
-              <label className="dz-toggle">
-                <input type="checkbox" checked={showGrid} onChange={(event) => setShowGrid(event.currentTarget.checked)} />
-                <span>Show</span>
+              <label className="dz-floatbar-swatch" title="The colour behind the zones">
+                <input
+                  type="color"
+                  className="dz-color"
+                  value={/^#[0-9a-f]{6}$/i.test(layout.bgColor) ? layout.bgColor : '#000000'}
+                  onChange={(event) => setLayout(
+                    (current) => ({ ...current, bgColor: event.currentTarget.value }),
+                    { coalesceKey: 'bgColor' },
+                  )}
+                />
+                <span>Stage</span>
               </label>
-              <label className="dz-toggle" title="Hold Alt while dragging to bypass">
-                <input type="checkbox" checked={snapEnabled} onChange={(event) => setSnapEnabled(event.currentTarget.checked)} />
-                <span>Snap</span>
-              </label>
-            </div>
-
-            <div className="dz-toolbar-group dz-toolbar-end">
-              <span className="dz-toolbar-label">Zoom</span>
-              <button type="button" onClick={() => setZoom((z) => clamp(z - 0.1, ZOOM_MIN, ZOOM_MAX))}>−</button>
-              <span className="dz-zoom">{Math.round(zoom * 100)}%</span>
-              <button type="button" onClick={() => setZoom((z) => clamp(z + 0.1, ZOOM_MIN, ZOOM_MAX))}>+</button>
-              <button type="button" onClick={() => setZoom(1)}>Fit</button>
             </div>
           </div>
 
@@ -729,6 +802,23 @@ export function StageDesigner() {
             onZoomChange={setZoom}
             hiddenTypes={hiddenTypes}
           />
+
+          {/* Bottom-centre, where every canvas tool puts it. */}
+          <div className="dz-zoombar">
+            <button type="button" onClick={() => setZoom((z) => clamp(z - 0.1, ZOOM_MIN, ZOOM_MAX))} title="Zoom out">−</button>
+            <input
+              type="range"
+              min={ZOOM_MIN}
+              max={ZOOM_MAX}
+              step={0.01}
+              value={zoom}
+              onChange={(event) => setZoom(Number(event.currentTarget.value))}
+              title="Canvas zoom"
+            />
+            <button type="button" onClick={() => setZoom((z) => clamp(z + 0.1, ZOOM_MIN, ZOOM_MAX))} title="Zoom in">+</button>
+            <span className="dz-zoom">{Math.round(zoom * 100)}%</span>
+            <button type="button" onClick={() => setZoom(1)} title="Fit the stage to the window">Fit</button>
+          </div>
 
           <footer className="dz-statusbar">
             <span className={status?.tone === 'warn' ? 'dz-status dz-warn' : 'dz-status'}>

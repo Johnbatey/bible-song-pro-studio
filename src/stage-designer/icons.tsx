@@ -40,9 +40,6 @@ export const AlignTop = () => <Svg><path d="M3 4h18" /><rect x="6" y="8" width="
 export const AlignBottom = () => <Svg><path d="M3 20h18" /><rect x="6" y="4" width="4" height="12" /><rect x="14" y="8" width="4" height="8" /></Svg>;
 export const AlignVMiddle = () => <Svg><path d="M3 12h18" /><rect x="6" y="4" width="4" height="16" /><rect x="14" y="7" width="4" height="10" /></Svg>;
 
-export const ArrowUp = () => <Svg><path d="M12 19V5M5 12l7-7 7 7" /></Svg>;
-export const ArrowDown = () => <Svg><path d="M12 5v14M19 12l-7 7-7-7" /></Svg>;
-
 export const Undo = () => <Svg><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10H9" /></Svg>;
 export const Redo = () => <Svg><path d="m15 14 5-5-5-5" /><path d="M20 9H9a5 5 0 0 0 0 10h6" /></Svg>;
 
@@ -60,3 +57,35 @@ export const Unlocked = () => <Svg size={12}><rect x="4" y="10" width="16" heigh
 
 /** Marks a zone the operator's theme is currently suppressing. */
 export const ThemeHidden = () => <Svg size={11}><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></Svg>;
+
+export const Back = () => <Svg><path d="M19 12H5M12 19l-7-7 7-7" /></Svg>;
+export const Plus = () => <Svg><path d="M12 5v14M5 12h14" /></Svg>;
+/** The six-dot handle every list in every app uses to say "drag me". */
+export const GripDots = () => (
+  <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true" focusable="false">
+    <circle cx="2.5" cy="2" r="1.2" /><circle cx="7.5" cy="2" r="1.2" />
+    <circle cx="2.5" cy="7" r="1.2" /><circle cx="7.5" cy="7" r="1.2" />
+    <circle cx="2.5" cy="12" r="1.2" /><circle cx="7.5" cy="12" r="1.2" />
+  </svg>
+);
+
+/* One per zone type, for the Add-layer menu and the layer rows. Each says what
+   the zone draws rather than decorating it: the current-text mark is lines of
+   body under a short reference, the slide mark is a picture frame. */
+export const ZoneCurrentText = () => <Svg size={15}><path d="M4 6h7" /><path d="M4 11h16M4 15h16M4 19h10" /></Svg>;
+export const ZoneSlide = () => <Svg size={15}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m21 16-5-5-11 9" /></Svg>;
+export const ZoneNextItem = () => <Svg size={15}><path d="M4 7h9" /><path d="M4 12h9M4 17h6" /><path d="m17 9 3 3-3 3" /></Svg>;
+export const ZonePlaylist = () => <Svg size={15}><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></Svg>;
+export const ZoneClock = () => <Svg size={15}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>;
+export const ZoneTimer = () => <Svg size={15}><path d="M10 2h4" /><path d="M12 14v-4" /><circle cx="12" cy="14" r="8" /></Svg>;
+export const ZoneMessages = () => <Svg size={15}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></Svg>;
+
+export const ZONE_ICONS: Record<string, () => ReactElement> = {
+  'current-text': ZoneCurrentText,
+  slide: ZoneSlide,
+  'next-item': ZoneNextItem,
+  playlist: ZonePlaylist,
+  clock: ZoneClock,
+  timer: ZoneTimer,
+  messages: ZoneMessages,
+};

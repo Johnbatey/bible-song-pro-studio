@@ -129,6 +129,12 @@
   border-bottom: 1px solid var(--dz-line);
 }
 .dz-topbar-left, .dz-topbar-right { display: flex; align-items: center; gap: 8px; }
+.dz-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 9px;
+}
 .dz-brand {
   font-size: 11px;
   font-weight: 800;
@@ -164,7 +170,8 @@
 .dz-rail-left { width: 236px; border-right: 1px solid var(--dz-line); }
 .dz-rail-right { width: 268px; border-left: 1px solid var(--dz-line); }
 
-.dz-main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+/* Positioned, because the toolbar and the zoom bar float inside it. */
+.dz-main { position: relative; flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
 .dz-panel-title {
   display: flex;
@@ -236,7 +243,13 @@
 /* ---- layers ------------------------------------------------------------- */
 .dz-layers { padding-bottom: 12px; }
 .dz-layer-list { list-style: none; margin: 0; padding: 0 8px; display: flex; flex-direction: column; gap: 2px; }
+/* While a row is being dragged the whole list stops trying to be helpful:
+   no hover states chasing the pointer, no text selection following it. */
+.dz-layer-list[data-dragging] { user-select: none; }
+.dz-layer-list[data-dragging] .dz-layer:hover { background: none; }
+
 .dz-layer {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -244,18 +257,61 @@
   border-radius: 5px;
   padding: 1px;
 }
+.dz-layer:hover { background: rgba(255, 255, 255, 0.04); }
 .dz-layer[data-selected] { background: rgba(59, 157, 255, 0.16); border-color: rgba(59, 157, 255, 0.45); }
 .dz-layer[data-invisible] .dz-layer-title { opacity: 0.45; text-decoration: line-through; }
+/* The row being carried fades in place, so the list keeps its shape and the
+   drop line is the only thing saying where it will land. */
+.dz-layer[data-dragged] { opacity: 0.4; }
+
+/* The drop indicator, drawn in the gap rather than on a row — a highlighted
+   row says "this one", and a line between rows says "here", which is the
+   question a reorder is actually asking. */
+.dz-layer[data-drop-before]::before,
+.dz-layer[data-drop-after]::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--dz-accent);
+  box-shadow: 0 0 6px rgba(244, 98, 31, 0.7);
+}
+.dz-layer[data-drop-before]::before { top: -3px; }
+.dz-layer[data-drop-after]::after { bottom: -3px; }
+
+.dz-layer-grip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  align-self: stretch;
+  color: var(--dz-faint);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  touch-action: none;
+}
+.dz-layer:hover .dz-layer-grip,
+.dz-layer[data-selected] .dz-layer-grip,
+.dz-layer[data-dragged] .dz-layer-grip { opacity: 1; }
+.dz-layer-grip:active { cursor: grabbing; }
+
+.dz-layer-icon { flex: 0 0 auto; display: flex; color: var(--dz-faint); }
+.dz-layer[data-selected] .dz-layer-icon { color: var(--dz-select); }
+.dz-layer-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
 .dz-layer-name {
   flex: 1 1 auto;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  align-items: flex-start;
+  align-items: center;
+  gap: 8px;
   text-align: left;
   background: transparent;
   border-color: transparent;
-  padding: 4px 6px;
+  padding: 5px 4px;
   overflow: hidden;
   min-width: 0;
 }
@@ -275,30 +331,152 @@
 .dz-layer-actions button:hover:not(:disabled) { color: var(--dz-text); background: var(--dz-raised); }
 .dz-layer-actions button[data-active] { color: var(--dz-accent); background: transparent; }
 
-/* ---- toolbars ----------------------------------------------------------- */
-.dz-toolbar {
-  flex: 0 0 auto;
+/* ---- floating toolbar --------------------------------------------------- */
+/* Over the canvas, not above it. Modelled on the theme designer's
+   Add-content bar so the two look like the same product. */
+.dz-floatbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.dz-floatbar-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.5);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+.dz-floatbar-card {
+  pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 8px 12px;
-  background: var(--dz-panel);
-  border-bottom: 1px solid var(--dz-line);
+  gap: 3px;
+  padding: 4px;
+  background: #141416;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
 }
-.dz-toolbar-secondary { background: #0f121a; }
-.dz-toolbar-group { display: flex; align-items: center; gap: 5px; }
-.dz-toolbar-end { margin-left: auto; }
-.dz-toolbar-label {
+.dz-floatbar-sep { width: 1px; align-self: stretch; margin: 2px 3px; background: rgba(255, 255, 255, 0.1); }
+.dz-floatbar-swatch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dz-dim);
+  cursor: pointer;
+}
+.dz-floatbar-swatch:hover { background: rgba(255, 255, 255, 0.07); color: var(--dz-text); }
+
+.dz-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--dz-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dz-menu-trigger:hover { background: rgba(255, 255, 255, 0.08); }
+.dz-menu-trigger[data-open] { background: rgba(255, 255, 255, 0.12); }
+/* Amber, not accent: this marks a setting turned off, which is a thing to
+   notice rather than a thing that is going well. */
+.dz-menu-trigger[data-active] { border-color: rgba(255, 179, 122, 0.45); }
+.dz-menu-trigger[data-active] .dz-menu-value { color: #ffb37a; }
+.dz-menu-label { color: inherit; }
+.dz-menu-value { color: var(--dz-dim); font-weight: 500; }
+.dz-menu-caret { opacity: 0.55; margin-left: -2px; }
+
+.dz-menu-panel {
+  position: fixed;
+  z-index: 2000;
+  padding: 5px;
+  background: #16181e;
+  border: 1px solid var(--dz-line-strong);
+  border-radius: 9px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  max-height: 72vh;
+  overflow-y: auto;
+}
+.dz-menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  white-space: normal;
+}
+.dz-menu-item:hover { background: rgba(255, 255, 255, 0.07); }
+.dz-menu-item[data-selected] { background: rgba(244, 98, 31, 0.16); }
+.dz-menu-item-icon { flex: 0 0 auto; display: flex; margin-top: 1px; color: var(--dz-dim); }
+.dz-menu-item[data-selected] .dz-menu-item-icon { color: var(--dz-accent); }
+.dz-menu-item-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dz-menu-item-label { font-size: 12px; font-weight: 600; color: var(--dz-text); }
+.dz-menu-item-hint { font-size: 11px; line-height: 1.35; color: var(--dz-faint); }
+.dz-menu-sep { height: 1px; margin: 4px 2px; background: var(--dz-line); }
+.dz-menu-head {
+  padding: 6px 8px 3px;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--dz-faint);
 }
-.dz-toolbar select { width: auto; }
+.dz-menu-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 6px 4px; }
+.dz-menu-chips button { flex: 1 1 auto; }
+.dz-menu-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dz-text);
+  cursor: pointer;
+}
+.dz-menu-check:hover { background: rgba(255, 255, 255, 0.07); }
+.dz-menu-check input { accent-color: var(--dz-accent); cursor: pointer; }
+
+/* ---- zoom bar ----------------------------------------------------------- */
+.dz-zoombar {
+  position: absolute;
+  bottom: 38px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #141416;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.dz-zoombar input[type='range'] { width: 104px; accent-color: var(--dz-accent); }
 .dz-zoom {
-  min-width: 44px;
+  min-width: 42px;
   text-align: center;
   font-size: 11px;
   font-weight: 700;
@@ -307,6 +485,10 @@
 }
 
 /* ---- canvas ------------------------------------------------------------- */
+/* The board grid, lifted from the slide editor's #canvas-viewport so the two
+   design surfaces in this app read as the same kind of place. It also does
+   real work: a stage is a black rectangle on a dark background, and without
+   something behind it there is no way to see where the screen ends. */
 .dz-viewport {
   flex: 1 1 auto;
   min-height: 0;
@@ -314,10 +496,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 28px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.03), transparent 60%),
-    #08090d;
+  /* Room at the top for the floating toolbar and at the bottom for the zoom
+     bar, so neither ever sits on top of the stage. */
+  padding: 76px 28px 64px;
+  background-color: #2c2c2e;
+  background-image:
+    linear-gradient(rgba(128, 128, 128, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(128, 128, 128, 0.14) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 .dz-viewport[data-panning] { cursor: grab; }
 
