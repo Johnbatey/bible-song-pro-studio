@@ -735,15 +735,11 @@ app.whenReady().then(async () => {
     }
   }, 1500);
 
-  let splash = createSplashWindow();
-  await new Promise((r) => setTimeout(r, 3500));
-  mainWindow = createMainWindow();
-
-  mainWindow.webContents.on('did-finish-load', () => { if (splash && !splash.isDestroyed()) { splash.close(); splash = null; } });
-  mainWindow.webContents.on('did-fail-load', (e, c, d) => console.error('Load fail:', c, d));
-  setTimeout(() => { if (splash && !splash.isDestroyed()) splash.close(); }, 5000);
-
-  mainWindow.on('closed', () => { mainWindow = null; ndiService?.stop(); if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close(); });
+  /* Every ipcMain handler below is registered before the first window exists.
+     The splash sits on an await, so a window opened while that await is
+     pending would have a preload whose invokes land on a main process that has
+     not registered anything yet — "No handler registered for ..." — which is
+     why the bring-up now happens at the very bottom of this block. */
 
   // Install the initial native menu (all docks unchecked until the renderer
   // loads and pushes its first dock:syncMenu).
@@ -845,7 +841,15 @@ app.whenReady().then(async () => {
     if (result.ok) broadcastStageLayouts();
     return result;
   });
-  ipcMain.handle('stage-layouts:setActive', (_, id) => stageLayoutsService.setActive(typeof id === 'string' ? id : id?.id));
+  ipcMain.handle('stage-layouts:setActive', (_, id) => {
+    const result = stageLayoutsService.setActive(typeof id === 'string' ? id : id?.id);
+    /* The active id travels in the same payload as the list, so a window that
+       missed this change would show the wrong layout ticked. The designer's
+       save fires its own broadcast before this call, carrying the id that was
+       active a moment ago — without this one, that stale id is the last word. */
+    if (result.ok) broadcastStageLayouts();
+    return result;
+  });
 
   ipcMain.handle('get:platform', () => process.platform);
   ipcMain.handle('get:userDataPath', () => app.getPath('userData'));
@@ -997,6 +1001,20 @@ app.whenReady().then(async () => {
     broadcastDisplayList();
   });
   screen.on('display-metrics-changed', () => broadcastDisplayList());
+
+  /* ── Bring-up ───────────────────────────────────────────────────────────
+     Last, so that every handler above is in place before a renderer can call
+     one. The splash holds the screen for its own animation; the operator
+     window is only built once that wait is over. */
+  let splash = createSplashWindow();
+  await new Promise((r) => setTimeout(r, 3500));
+  mainWindow = createMainWindow();
+
+  mainWindow.webContents.on('did-finish-load', () => { if (splash && !splash.isDestroyed()) { splash.close(); splash = null; } });
+  mainWindow.webContents.on('did-fail-load', (e, c, d) => console.error('Load fail:', c, d));
+  setTimeout(() => { if (splash && !splash.isDestroyed()) splash.close(); }, 5000);
+
+  mainWindow.on('closed', () => { mainWindow = null; ndiService?.stop(); if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close(); });
 
   // Fullscreen events
   mainWindow.on('enter-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', true));
