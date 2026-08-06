@@ -113,14 +113,15 @@ body.slide-editor-active #left-workspace {
   top: 0;
   z-index: 40;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--se-gap-lg);
-  padding: var(--se-gap-md) var(--se-gap-lg);
+  height: 54px;
+  padding: 0 var(--se-gap-lg);
   border-bottom: 1px solid var(--se-border);
   background: var(--se-surface);
   backdrop-filter: saturate(180%) blur(20px);
+  box-sizing: border-box;
 }
 
 .se-header-group {
@@ -442,15 +443,22 @@ body.slide-editor-active #left-workspace {
 .se-float-tr { top: var(--se-gap-lg); right: 20px; padding: 4px; }
 
 .se-float-toolbar {
-  bottom: 20px;
+  top: 54px;
+  bottom: auto;
   left: 50%;
   transform: translateX(-50%);
-  gap: var(--se-gap-xs);
-  padding: 6px;
-  border-radius: var(--se-r-xl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px 6px;
+  background: rgba(20, 20, 22, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
   flex-wrap: nowrap;
   white-space: nowrap;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(20px);
 }
 
 /* Live-mode dot on the workspace indicator. */

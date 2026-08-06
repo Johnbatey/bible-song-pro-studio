@@ -124,7 +124,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 14px;
+  height: 54px;
+  padding: 0 16px;
+  box-sizing: border-box;
   background: var(--dz-panel);
   border-bottom: 1px solid var(--dz-line);
 }

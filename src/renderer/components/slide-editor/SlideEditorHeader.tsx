@@ -34,12 +34,12 @@ export function SlideEditorHeader({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '10px 16px',
+        padding: '0 16px',
         borderBottom: '1px solid var(--block-line, #262628)',
         background: 'var(--bg-surface, #161414)',
         backdropFilter: 'saturate(180%) blur(20px)',
         userSelect: 'none',
-        height: 52,
+        height: 54,
         boxSizing: 'border-box',
       }}
     >

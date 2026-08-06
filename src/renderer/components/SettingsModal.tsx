@@ -1057,7 +1057,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   contentHeader: {
-    height: 56,
+    height: 54,
     padding: '0 24px',
     display: 'flex',
     alignItems: 'center',

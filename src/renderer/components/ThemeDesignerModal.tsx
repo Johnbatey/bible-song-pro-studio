@@ -507,7 +507,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-ui)',
   },
   header: {
-    height: 56,
+    height: 54,
     padding: '0 20px',
     background: '#141416',
     borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
