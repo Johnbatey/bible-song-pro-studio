@@ -15,7 +15,10 @@
  *     whatever the operator had on the stage.
  *   - Drag, snap and undo actually work, including the snap landing a zone's
  *     centre exactly on the stage's centre rather than near it.
- *   - Saving round-trips through the layout store and reaches the stage.
+ *   - A marquee selects, and a group move shifts every selected zone by the
+ *     same amount — a layout that was aligned must survive being dragged.
+ *   - Saving round-trips through the layout store, and the real stage window
+ *     then draws what the designer sent it.
  *   - Nothing the page loads is blocked by its own CSP.
  *
  * Usage: electron scripts/verify-stage-designer.cjs   (after `vite build`)
@@ -238,6 +241,51 @@ async function main() {
     return el ? el.style.left : null;
   })()`);
   assert(undone === '4%', `Undo did not restore the zone; left is now ${undone}`);
+
+  /* 4b. Marquee across the bottom of the stage, then move the pair together.
+     Group move is not "move each of them": the whole selection snaps as one
+     box, so both zones must shift by exactly the same amount or a layout the
+     operator had aligned comes apart the first time they drag it. */
+  const group = await win.webContents.executeJavaScript(`(async () => {
+    const { at, ev, settle } = window.__dz;
+    const overlay = document.querySelector('.dz-overlay');
+    overlay.dispatchEvent(ev('pointerdown', at(0.5, 70), 1));
+    for (const t of [0.5, 1]) {
+      window.dispatchEvent(ev('pointermove', at(0.5 + 99 * t, 70 + 29 * t), 1));
+      await settle();
+    }
+    const drawn = !!document.querySelector('.dz-marquee');
+    window.dispatchEvent(ev('pointerup', at(99.5, 99), 0));
+    await settle();
+    const picked = [...document.querySelectorAll('.dz-zone[data-selected]')];
+    const before = picked.map((z) => z.style.left + ',' + z.style.top);
+    if (picked.length < 2) return { drawn, count: picked.length, before, after: [] };
+    picked[0].dispatchEvent(ev('pointerdown', at(20, 82), 1));
+    window.dispatchEvent(ev('pointermove', at(27, 82), 1));
+    await settle();
+    window.dispatchEvent(ev('pointerup', at(27, 82), 0));
+    await settle();
+    const after = [...document.querySelectorAll('.dz-zone[data-selected]')].map((z) => z.style.left + ',' + z.style.top);
+    const cleared = !document.querySelector('.dz-marquee');
+    return { drawn, cleared, count: picked.length, before, after };
+  })()`);
+  assert(group.drawn, 'No marquee rectangle appeared while dragging on empty stage');
+  assert(group.cleared, 'The marquee rectangle survived the end of the drag');
+  assert(group.count >= 2, `Marquee selected ${group.count} zones; expected at least 2`);
+  const deltas = group.before.map((from, i) => {
+    const [x0, y0] = from.split(',').map(parseFloat);
+    const [x1, y1] = group.after[i].split(',').map(parseFloat);
+    return `${(x1 - x0).toFixed(2)},${(y1 - y0).toFixed(2)}`;
+  });
+  assert(new Set(deltas).size === 1, `A group move shifted its zones by different amounts: ${deltas.join(' | ')}`);
+  assert(deltas[0] !== '0.00,0.00', 'A group move did not move anything');
+
+  // Undo the group move, so what gets saved below is the layout as designed.
+  await win.webContents.executeJavaScript(`(async () => {
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));
+    await window.__dz.settle();
+    return 'restored';
+  })()`);
 
   // 5. Save round-trips through the store and reaches the stage.
   const saved = await win.webContents.executeJavaScript(`(async () => {

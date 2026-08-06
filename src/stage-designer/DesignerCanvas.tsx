@@ -101,6 +101,16 @@ export function DesignerCanvas({
   const [fitScale, setFitScale] = useState(0.4);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [marquee, setMarquee] = useState<Rect | null>(null);
+  /* The pointerup handler needs the marquee, and it is registered once — so it
+     would otherwise close over whatever the rect was at registration. The ref
+     is written alongside the state rather than during render: assigning a ref
+     while rendering is a side effect in the one place React promises not to
+     have any, and it is not needed when both writes can happen together. */
+  const marqueeRef = useRef<Rect | null>(null);
+  const updateMarquee = useCallback((rect: Rect | null) => {
+    marqueeRef.current = rect;
+    setMarquee(rect);
+  }, []);
   const [spaceHeld, setSpaceHeld] = useState(false);
 
   /* ---- fit ---------------------------------------------------------------- */
@@ -230,9 +240,9 @@ export function DesignerCanvas({
       const additive = event.shiftKey || event.metaKey || event.ctrlKey;
       if (!additive) onSelectionChange([]);
       dragRef.current = { kind: 'marquee', startX: point.x, startY: point.y, additive };
-      setMarquee({ x: point.x, y: point.y, w: 0, h: 0 });
+      updateMarquee({ x: point.x, y: point.y, w: 0, h: 0 });
     },
-    [onSelectionChange, toPercent, spaceHeld],
+    [onSelectionChange, toPercent, spaceHeld, updateMarquee],
   );
 
   useEffect(() => {
@@ -252,7 +262,7 @@ export function DesignerCanvas({
       const noSnap = !snapEnabled || event.altKey;
 
       if (drag.kind === 'marquee') {
-        setMarquee({
+        updateMarquee({
           x: Math.min(drag.startX, point.x),
           y: Math.min(drag.startY, point.y),
           w: Math.abs(point.x - drag.startX),
@@ -349,8 +359,8 @@ export function DesignerCanvas({
       if (!drag) return;
 
       if (drag.kind === 'marquee') {
-        setMarquee(null);
         const box = marqueeRef.current;
+        updateMarquee(null);
         if (box && (box.w > 0.4 || box.h > 0.4)) {
           const hit = layout.zones
             .filter((zone) => !zone.locked && zone.visible !== false && rectsIntersect(box, zoneRect(zone)))
@@ -374,12 +384,7 @@ export function DesignerCanvas({
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
     };
-  }, [grid, layout.zones, onChange, onEnd, onSelectionChange, selection, snapEnabled, threshold, toPercent]);
-
-  /* The marquee rect is needed by the pointerup handler, which is registered
-     once and would otherwise close over the rect as it was at registration. */
-  const marqueeRef = useRef<Rect | null>(null);
-  marqueeRef.current = marquee;
+  }, [grid, layout.zones, onChange, onEnd, onSelectionChange, selection, snapEnabled, threshold, toPercent, updateMarquee]);
 
   /* ---- space to pan, wheel to zoom --------------------------------------- */
   useEffect(() => {

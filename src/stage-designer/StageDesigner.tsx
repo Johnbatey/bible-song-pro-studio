@@ -157,10 +157,15 @@ export function StageDesigner() {
   }, [live, layout, pushLayout]);
 
   /* Tell the main process whether closing this window would lose work, so the
-     close button can ask rather than the operator finding out afterwards. */
+     close button can ask rather than the operator finding out afterwards.
+
+     Only real edits count. An untouched draft is also technically unsaved —
+     the designer opens onto a copy of a preset when the library is empty — but
+     prompting about work nobody did trains people to dismiss the prompt, and
+     then it is not there when it matters. */
   useEffect(() => {
-    window.BSP?.stageDesigner?.setDirty?.(dirty || (isUnsaved && layout.zones.length > 0));
-  }, [dirty, isUnsaved, layout.zones.length]);
+    window.BSP?.stageDesigner?.setDirty?.(dirty);
+  }, [dirty]);
 
   /* ---- opening things ----------------------------------------------------- */
   /**
