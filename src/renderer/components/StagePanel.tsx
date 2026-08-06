@@ -15,11 +15,12 @@ import { isPresetId } from '../../stage/layout-model';
 import type { StageTheme } from '../../stage/theme';
 import type { StageTimer } from '../../stage/stage-state';
 
-const ZOOM_MIN = 0.3;
+const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
 const ZOOM_STEP = 0.05;
 const STAGE_ASPECT = 16 / 9;
-const SAFE_PAD = 48;
+const SAFE_PAD = 76;
+const STAGE_LABEL_HEIGHT = 20;
 
 /* Read off the preset table rather than typed out again. The hand-kept copy
    that used to live here was a second list of the same four layouts, and the
@@ -85,7 +86,7 @@ export function StagePanel() {
     if (!vp) return;
     const r = vp.getBoundingClientRect();
     const availW = Math.max(240, r.width - SAFE_PAD);
-    const availH = Math.max(160, r.height - SAFE_PAD);
+    const availH = Math.max(160, r.height - SAFE_PAD - STAGE_LABEL_HEIGHT);
     const h = Math.min(availH, availW / STAGE_ASPECT);
     const w = Math.round(h * STAGE_ASPECT);
     setBoxSize((c) => Math.abs(c.w - w) < 1 && Math.abs(c.h - h) < 1 ? c : { w, h: Math.round(h) });

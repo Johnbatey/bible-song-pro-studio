@@ -61,7 +61,10 @@ export function defaultSlideElements(slide: Pick<PresentationSlide, 'title' | 'b
 
 /** The elements a slide actually paints with. */
 export function slideElementsFor(slide: Pick<PresentationSlide, 'title' | 'body' | 'elements'>): SlideElement[] {
-  return slide.elements && slide.elements.length > 0 ? slide.elements : defaultSlideElements(slide);
+  if (Array.isArray(slide.elements)) {
+    return slide.elements;
+  }
+  return defaultSlideElements(slide);
 }
 
 /** The board's own fill, before any element is drawn over it. */
