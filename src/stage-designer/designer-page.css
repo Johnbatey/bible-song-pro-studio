@@ -1,0 +1,12 @@
+/* Page-level reset for the designer window. Kept out of designer.css for the
+   same reason stage-page.css is kept out of stage.css: only a window entry may
+   reach html/body, and the designer's own styles have to stay scoped in case
+   any of this ever renders inside the operator window. */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+body {
+  background: #0b0d12;
+  color: #e8eaf0;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

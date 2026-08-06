@@ -195,7 +195,11 @@ export function reduceStage(state: StageState, payload: unknown): StageState {
   const custom = value.customLayout as Payload | undefined;
   if (custom && Array.isArray(custom.zones)) {
     const layout: StageLayout = {
-      id: 'custom',
+      /* The layout's own id, not the literal 'custom'. Everything downstream
+         needs to know *which* saved layout is live — the operator's picker has
+         to show it selected, and the designer has to open onto it — and an id
+         that says only "some custom one" cannot answer either. */
+      id: String(custom.id || 'custom'),
       name: String(custom.name || 'Custom'),
       bgColor: String(custom.bgColor || '#000000'),
       zones: custom.zones as StageLayout['zones'],

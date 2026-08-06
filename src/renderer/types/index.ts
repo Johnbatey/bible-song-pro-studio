@@ -551,6 +551,15 @@ declare global {
         getState: () => Promise<Record<string, unknown>>;
         onMessage: (cb: (message: unknown) => void) => () => void;
       };
+      /** The operator's saved stage layouts, in userData rather than renderer
+          storage — the designer window and the panel share one library. */
+      stageLayouts: {
+        list: () => Promise<{ ok: boolean; layouts: unknown[]; activeId: string | null }>;
+        save: (layout: unknown) => Promise<{ ok: boolean; layout?: unknown; error?: string }>;
+        delete: (id: string) => Promise<{ ok: boolean; error?: string }>;
+        setActive: (id: string | null) => Promise<{ ok: boolean; activeId: string | null }>;
+        onChanged: (cb: (payload: { layouts: unknown[]; activeId: string | null }) => void) => () => void;
+      };
       bible: {
         getVersions: () => Promise<BibleVersion[]>;
         getBooks: (versionId: string) => Promise<BibleBook[]>;
@@ -640,6 +649,10 @@ declare global {
       };
       openSlideEditor: () => Promise<boolean>;
       openStageDisplay: () => Promise<boolean>;
+      openStageDesigner: () => Promise<boolean>;
+      stageDesigner: {
+        setDirty: (dirty: boolean) => void;
+      };
       dock?: {
         /**
          * Push the current set of open dock ids to the main process so the

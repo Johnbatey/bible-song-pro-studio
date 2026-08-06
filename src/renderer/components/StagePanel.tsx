@@ -10,6 +10,8 @@ import { publishStage, useStageState } from '../services/stage-bus';
 import { formatTime, timerSeconds } from '../../stage/stage-state';
 import { StageSurface } from '../../stage/StageSurface';
 import { LAYOUTS, LAYOUT_IDS } from '../../stage/layouts';
+import { useLayoutLibrary } from '../../stage/layout-library';
+import { isPresetId } from '../../stage/layout-model';
 import type { StageTheme } from '../../stage/theme';
 import type { StageTimer } from '../../stage/stage-state';
 
@@ -23,7 +25,7 @@ const SAFE_PAD = 48;
    that used to live here was a second list of the same four layouts, and the
    only thing it could ever do was disagree with the first — a preset added to
    LAYOUTS was a preset the operator had no way to pick. */
-const LAYOUT_OPTIONS = LAYOUT_IDS.map((id) => ({ value: id, label: LAYOUTS[id].name }));
+const PRESET_OPTIONS = LAYOUT_IDS.map((id) => ({ value: id, label: LAYOUTS[id].name, sublabel: 'Preset' }));
 
 type LayoutId = string;
 
@@ -65,7 +67,17 @@ export function StagePanel() {
   const stage = useStageState();
   const program = useProgramSurfaceState();
   const assetBaseUrl = useAssetBaseUrl();
+  const library = useLayoutLibrary();
   const activeLayout = stage.layout.id as LayoutId;
+
+  /* Presets first, then whatever the operator built in the designer. One list,
+     because from the desk they are the same decision — the difference between
+     "shipped with the app" and "I made this" belongs in the sublabel, not in
+     two separate controls. */
+  const layoutOptions = [
+    ...PRESET_OPTIONS,
+    ...library.layouts.map((item) => ({ value: item.id, label: item.name, sublabel: 'Saved' })),
+  ];
 
   /* ── box size — measured from the viewport ── */
   const measureBox = useCallback(() => {
@@ -161,7 +173,22 @@ export function StagePanel() {
   /* Operator controls publish a message rather than setting local state: the
      stage windows have to receive the same one, and the preview below is
      rendered from the result of applying it. */
-  const applyLayout = useCallback((id: LayoutId) => publishStage({ layout: id }), []);
+  /* A preset travels as its id — the stage has the table and can look it up.
+     An operator's layout has to travel whole, because nothing on the stage
+     side has ever heard of it. Either way the choice is recorded so the next
+     launch comes back to it. */
+  const applyLayout = useCallback((id: LayoutId) => {
+    if (isPresetId(id)) {
+      publishStage({ layout: id });
+    } else {
+      const saved = library.layouts.find((item) => item.id === id);
+      if (!saved) return;
+      publishStage({
+        customLayout: { id: saved.id, name: saved.name, bgColor: saved.bgColor, zones: saved.zones },
+      });
+    }
+    void library.setActive(id);
+  }, [library]);
   const applyTheme = useCallback((patch: Partial<StageTheme>) => publishStage({ theme: patch }), []);
   const timerCommand = useCallback(
     (command: 'start' | 'stop' | 'reset') => publishStage({ kind: 'timer-command', command, atMs: Date.now() }),
@@ -241,11 +268,23 @@ export function StagePanel() {
             <span style={styles.footerLabel}>LAYOUT</span>
             <CustomDropdown
               value={activeLayout}
-              options={LAYOUT_OPTIONS}
+              options={layoutOptions}
               onChange={(v) => applyLayout(v as LayoutId)}
               title="Switch stage layout"
               buttonStyle={{ height: 26, padding: '0 10px', fontSize: 12, fontWeight: fontWeight.semibold }}
             />
+
+            <button
+              style={styles.settingsBtn}
+              onClick={() => { void window.BSP?.openStageDesigner?.(); }}
+              title="Open the Stage Layout Designer in its own window"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M3 10h18M10 10v10" />
+              </svg>
+              Design
+            </button>
 
             <div style={styles.divider} />
 

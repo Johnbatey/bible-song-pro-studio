@@ -47,6 +47,21 @@ contextBridge.exposeInMainWorld('BSP', {
     },
   },
 
+  /* The operator's own saved layouts. Kept in a file rather than in the
+     renderer's storage because the Stage Layout Designer is a separate window
+     and has to read and write the same library the operator panel does. */
+  stageLayouts: {
+    list: () => ipcRenderer.invoke('stage-layouts:list'),
+    save: (layout) => ipcRenderer.invoke('stage-layouts:save', layout),
+    delete: (id) => ipcRenderer.invoke('stage-layouts:delete', id),
+    setActive: (id) => ipcRenderer.invoke('stage-layouts:setActive', id),
+    onChanged: (cb) => {
+      const handler = (_, payload) => cb(payload);
+      ipcRenderer.on('stage-layouts:changed', handler);
+      return () => ipcRenderer.removeListener('stage-layouts:changed', handler);
+    },
+  },
+
   bible: {
     getVersions: () => ipcRenderer.invoke('bible:getVersions'),
     getBooks: (versionId) => ipcRenderer.invoke('bible:getBooks', versionId),
@@ -190,6 +205,13 @@ contextBridge.exposeInMainWorld('BSP', {
 
   openSlideEditor: () => ipcRenderer.invoke('slide-editor:open'),
   openStageDisplay: () => ipcRenderer.invoke('stage-display:open'),
+  openStageDesigner: () => ipcRenderer.invoke('stage-designer:open'),
+
+  /* The designer tells the main process when it holds unsaved work, because
+     only the main process can stop a window closing long enough to ask. */
+  stageDesigner: {
+    setDirty: (dirty) => ipcRenderer.send('stage-designer:dirty', !!dirty),
+  },
   getDisplayUrl: () => ipcRenderer.invoke('get:displayUrl'),
   onDisplayMessage: (cb) => {
     const handler = (_, msg) => cb(msg);

@@ -1,0 +1,475 @@
+/* =========================================================================
+   Stage Layout Designer — styles
+   -------------------------------------------------------------------------
+   Everything is scoped under .dz-app. The designer shares a bundle with
+   StageSurface and its whole chain of display components, all of which carry
+   their own stylesheets; a bare `button {}` here would restyle the program
+   output the canvas is supposed to be showing faithfully.
+
+   The palette is the operator app's dark chrome rather than a fresh one — the
+   designer is a room in the same building.
+   ========================================================================= */
+
+.dz-app {
+  --dz-bg: #0b0d12;
+  --dz-panel: #12151d;
+  --dz-raised: #1a1e28;
+  --dz-line: rgba(255, 255, 255, 0.09);
+  --dz-line-strong: rgba(255, 255, 255, 0.16);
+  --dz-text: #e8eaf0;
+  --dz-dim: rgba(232, 234, 240, 0.55);
+  --dz-faint: rgba(232, 234, 240, 0.34);
+  --dz-accent: #f4621f;
+  --dz-select: #3b9dff;
+  --dz-guide: #ff3ba7;
+  --dz-danger: #ef4444;
+  --dz-radius: 7px;
+
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--dz-bg);
+  color: var(--dz-text);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.dz-app *, .dz-app *::before, .dz-app *::after { box-sizing: border-box; }
+
+/* ---- shared controls ---------------------------------------------------- */
+.dz-app button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dz-text);
+  background: var(--dz-raised);
+  border: 1px solid var(--dz-line);
+  border-radius: 5px;
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+.dz-app button:hover:not(:disabled) { background: #232838; border-color: var(--dz-line-strong); }
+.dz-app button:disabled { opacity: 0.35; cursor: default; }
+.dz-app button[data-active] { background: rgba(244, 98, 31, 0.2); border-color: var(--dz-accent); }
+.dz-app button.dz-primary { background: var(--dz-accent); border-color: var(--dz-accent); color: #fff; }
+.dz-app button.dz-primary:hover:not(:disabled) { background: #ff7434; }
+.dz-app button.dz-danger { color: #ff8f8f; border-color: rgba(239, 68, 68, 0.4); }
+.dz-app button.dz-danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.16); }
+
+.dz-app input[type='text'],
+.dz-app input[type='number'],
+.dz-app select {
+  font: inherit;
+  font-size: 12px;
+  color: var(--dz-text);
+  background: #0e1118;
+  border: 1px solid var(--dz-line);
+  border-radius: 5px;
+  padding: 4px 7px;
+  width: 100%;
+  min-width: 0;
+}
+.dz-app input:focus, .dz-app select:focus {
+  outline: none;
+  border-color: var(--dz-accent);
+  box-shadow: 0 0 0 2px rgba(244, 98, 31, 0.18);
+}
+.dz-app select { cursor: pointer; }
+
+.dz-app input[type='color'].dz-color {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--dz-line-strong);
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.dz-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dz-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.dz-toggle input { accent-color: var(--dz-accent); cursor: pointer; }
+.dz-toggle:hover { color: var(--dz-text); }
+
+.dz-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: #0e1118;
+  border: 1px solid var(--dz-line);
+  border-radius: 6px;
+}
+.dz-segmented-wrap { flex-wrap: wrap; }
+.dz-segmented button { border-color: transparent; background: transparent; }
+.dz-segmented button[data-active] { background: rgba(244, 98, 31, 0.22); border-color: transparent; color: #fff; }
+
+.dz-sep { width: 1px; height: 20px; background: var(--dz-line); }
+
+/* ---- top bar ------------------------------------------------------------ */
+.dz-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  background: var(--dz-panel);
+  border-bottom: 1px solid var(--dz-line);
+}
+.dz-topbar-left, .dz-topbar-right { display: flex; align-items: center; gap: 8px; }
+.dz-brand {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dz-faint);
+}
+.dz-name { width: 240px; font-weight: 600 !important; }
+.dz-dirty {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dz-faint);
+  padding: 3px 7px;
+  border: 1px solid var(--dz-line);
+  border-radius: 4px;
+}
+.dz-dirty[data-on] { color: #ffca7a; border-color: rgba(255, 202, 122, 0.4); }
+
+/* ---- frame -------------------------------------------------------------- */
+.dz-body { flex: 1 1 auto; display: flex; min-height: 0; }
+
+.dz-rail {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--dz-panel);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.dz-rail-left { width: 236px; border-right: 1px solid var(--dz-line); }
+.dz-rail-right { width: 268px; border-left: 1px solid var(--dz-line); }
+
+.dz-main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+.dz-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 11px 12px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dz-faint);
+}
+.dz-panel-count {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--dz-faint);
+  background: var(--dz-raised);
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+.dz-section-title {
+  margin: 14px 0 2px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dz-faint);
+  border-top: 1px solid var(--dz-line);
+  padding-top: 12px;
+}
+.dz-note {
+  margin: 0;
+  padding: 0 12px 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--dz-faint);
+}
+.dz-note-tight { padding: 0 0 4px; }
+.dz-warn { color: #ffb37a; }
+
+/* ---- library ------------------------------------------------------------ */
+.dz-library { padding-bottom: 8px; border-bottom: 1px solid var(--dz-line); }
+.dz-library-list { list-style: none; margin: 0; padding: 0 8px; display: flex; flex-direction: column; gap: 2px; }
+.dz-library-list li { display: flex; align-items: stretch; gap: 3px; }
+.dz-library-item {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+  padding: 6px 8px;
+  overflow: hidden;
+}
+.dz-library-item > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dz-library-item[data-active] { background: rgba(244, 98, 31, 0.16); border-color: rgba(244, 98, 31, 0.4); }
+.dz-library-meta { flex: 0 0 auto; font-size: 10px; font-weight: 600; color: var(--dz-faint); }
+.dz-library-delete { background: transparent; border-color: transparent; color: var(--dz-faint); padding: 4px 6px; }
+.dz-library-delete:hover { color: #ff8f8f; background: rgba(239, 68, 68, 0.14); }
+
+/* ---- layers ------------------------------------------------------------- */
+.dz-layers { padding-bottom: 12px; }
+.dz-layer-list { list-style: none; margin: 0; padding: 0 8px; display: flex; flex-direction: column; gap: 2px; }
+.dz-layer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 1px;
+}
+.dz-layer[data-selected] { background: rgba(59, 157, 255, 0.16); border-color: rgba(59, 157, 255, 0.45); }
+.dz-layer[data-invisible] .dz-layer-title { opacity: 0.45; text-decoration: line-through; }
+.dz-layer-name {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+  padding: 4px 6px;
+  overflow: hidden;
+  min-width: 0;
+}
+.dz-layer-title { font-size: 12px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dz-layer-type { font-size: 10px; font-weight: 500; color: var(--dz-faint); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dz-layer-actions { display: flex; gap: 1px; flex: 0 0 auto; }
+.dz-layer-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-color: transparent;
+  padding: 3px 4px;
+  line-height: 1;
+  color: var(--dz-faint);
+}
+.dz-layer-actions button:hover:not(:disabled) { color: var(--dz-text); background: var(--dz-raised); }
+.dz-layer-actions button[data-active] { color: var(--dz-accent); background: transparent; }
+
+/* ---- toolbars ----------------------------------------------------------- */
+.dz-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: var(--dz-panel);
+  border-bottom: 1px solid var(--dz-line);
+}
+.dz-toolbar-secondary { background: #0f121a; }
+.dz-toolbar-group { display: flex; align-items: center; gap: 5px; }
+.dz-toolbar-end { margin-left: auto; }
+.dz-toolbar-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--dz-faint);
+}
+.dz-toolbar select { width: auto; }
+.dz-zoom {
+  min-width: 44px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--dz-dim);
+}
+
+/* ---- canvas ------------------------------------------------------------- */
+.dz-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.03), transparent 60%),
+    #08090d;
+}
+.dz-viewport[data-panning] { cursor: grab; }
+
+.dz-canvas {
+  position: relative;
+  flex: 0 0 auto;
+  margin: auto;
+  background: #000;
+  border-radius: 4px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* The stage is authored at 1920x1080 and scaled as a whole, so the preview is
+   geometrically the stage rather than a reflow of it — the same trick the
+   operator's dock preview uses, for the same reason. */
+.dz-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: top left;
+  overflow: hidden;
+  /* The surface below must never see a pointer event: it would swallow the
+     drags that are the entire point of the layer above it. */
+  pointer-events: none;
+}
+
+.dz-overlay { position: absolute; inset: 0; overflow: hidden; }
+
+.dz-centre {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.13);
+  pointer-events: none;
+}
+.dz-centre-v { left: 50%; top: 0; bottom: 0; width: 1px; }
+.dz-centre-h { top: 50%; left: 0; right: 0; height: 1px; }
+
+.dz-zone {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 2px;
+  cursor: move;
+  transition: border-color 0.1s ease, background 0.1s ease;
+}
+.dz-zone:hover { border-color: rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.03); }
+.dz-zone[data-selected] {
+  border-color: var(--dz-select);
+  box-shadow: 0 0 0 1px var(--dz-select), 0 0 22px rgba(59, 157, 255, 0.22) inset;
+  background: rgba(59, 157, 255, 0.05);
+}
+.dz-zone[data-locked] { cursor: default; border-style: dashed; border-color: rgba(255, 255, 255, 0.2); }
+.dz-zone[data-invisible] { border-style: dotted; opacity: 0.6; }
+.dz-zone[data-theme-hidden] { border-color: rgba(255, 179, 122, 0.5); }
+
+.dz-zone-tag {
+  position: absolute;
+  left: -1px;
+  top: -18px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% + 2px);
+  padding: 1px 5px;
+  border-radius: 3px 3px 0 0;
+  background: rgba(20, 24, 34, 0.92);
+  color: var(--dz-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.dz-zone[data-selected] .dz-zone-tag { background: var(--dz-select); color: #061426; }
+.dz-tag-icon { display: inline-flex; align-items: center; opacity: 0.85; }
+
+/* A zone against the top of the stage wears its tag on the inside — the
+   overlay clips its overflow, so the usual position would put it nowhere. */
+.dz-zone[data-tag-inside] .dz-zone-tag { top: 0; left: 0; border-radius: 0 0 3px 0; }
+
+.dz-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  border: 1px solid var(--dz-select);
+  border-radius: 2px;
+  z-index: 2;
+}
+.dz-handle-nw { left: -5px; top: -5px; }
+.dz-handle-n { left: calc(50% - 5px); top: -5px; }
+.dz-handle-ne { right: -5px; top: -5px; }
+.dz-handle-e { right: -5px; top: calc(50% - 5px); }
+.dz-handle-se { right: -5px; bottom: -5px; }
+.dz-handle-s { left: calc(50% - 5px); bottom: -5px; }
+.dz-handle-sw { left: -5px; bottom: -5px; }
+.dz-handle-w { left: -5px; top: calc(50% - 5px); }
+
+.dz-guide { position: absolute; background: var(--dz-guide); pointer-events: none; z-index: 3; }
+.dz-guide-x { width: 1px; }
+.dz-guide-y { height: 1px; }
+
+.dz-marquee {
+  position: absolute;
+  border: 1px solid var(--dz-select);
+  background: rgba(59, 157, 255, 0.12);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* ---- status bar --------------------------------------------------------- */
+.dz-statusbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 12px;
+  background: var(--dz-panel);
+  border-top: 1px solid var(--dz-line);
+  font-size: 11px;
+}
+.dz-status { font-weight: 600; color: var(--dz-dim); font-variant-numeric: tabular-nums; }
+.dz-hints { color: var(--dz-faint); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- inspector ---------------------------------------------------------- */
+.dz-inspector { padding: 0 12px 20px; display: flex; flex-direction: column; }
+.dz-inspector .dz-panel-title { padding-left: 0; padding-right: 0; }
+.dz-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; min-width: 0; }
+.dz-field-inline { margin-bottom: 0; }
+.dz-field-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dz-faint);
+}
+.dz-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.dz-input-suffix { position: relative; display: flex; align-items: center; }
+.dz-input-suffix input { padding-right: 34px; }
+.dz-input-suffix em {
+  position: absolute;
+  right: 7px;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--dz-faint);
+  pointer-events: none;
+}
+.dz-btn-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+/* Icon-only buttons get a square face so six of them read as one control
+   strip rather than six differently-sized boxes. */
+.dz-icon-row button { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 5px 0; }
+.dz-btn-row-end { margin-top: 14px; border-top: 1px solid var(--dz-line); padding-top: 12px; }
+.dz-swatch-note { font-size: 10px; font-weight: 600; color: var(--dz-faint); font-variant-numeric: tabular-nums; }

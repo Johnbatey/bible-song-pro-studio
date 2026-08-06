@@ -49,6 +49,11 @@ export interface StageZone {
   referenceFontScale?: number;
   label?: string;
   visible?: boolean;
+  /** Designer-only: the canvas will not select or drag a locked zone. The
+      renderer neither reads nor cares about it, which is the point — a flag
+      that changed what the stage draws would be a layout property wearing a
+      tool's name. */
+  locked?: boolean;
 }
 
 export interface StageLayout {

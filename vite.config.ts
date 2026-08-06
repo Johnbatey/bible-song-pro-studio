@@ -64,6 +64,7 @@ export default defineConfig({
         splash: path.resolve(__dirname, 'splash.html'),
         audienceDisplay: path.resolve(__dirname, 'audience-display.html'),
         stageDisplay: path.resolve(__dirname, 'stage-display.html'),
+        stageDesigner: path.resolve(__dirname, 'stage-designer.html'),
         audienceDisplayFixture: path.resolve(__dirname, 'audience-display-fixture.html'),
         programSurfaceHarness: path.resolve(__dirname, 'program-surface-harness.html'),
         programSurfaceSingle: path.resolve(__dirname, 'program-surface-single.html'),

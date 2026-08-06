@@ -10,6 +10,7 @@ const { createNdiService } = require('./ndi-service.cjs');
 const { createSessionHistoryService } = require('./session-history-service.cjs');
 const { createSongImportService } = require('./song-import-service.cjs');
 const { createAppStoreService } = require('./app-store-service.cjs');
+const { createStageLayoutsService } = require('./stage-layouts-service.cjs');
 const { createMediaService } = require('./media-service.cjs');
 const deckService = require('./deck-service.cjs');
 const { createSettingsService } = require('./settings-service.cjs');
@@ -23,6 +24,13 @@ let displayWindow = null;
 /* Stage windows are a set, not a single handle: the operator can put a
    confidence monitor on more than one screen, and each needs both feeds. */
 const stageWindows = new Set();
+/* Designer windows are their own set rather than members of stageWindows. Both
+   receive the stage feed, but only a stage window is a stage: a designer must
+   never be counted as a screen the service is going out on, and closing every
+   stage while a designer stays open has to read as "no stage". */
+const stageDesignerWindows = new Set();
+/** webContents id → does that designer hold unsaved work. */
+const dirtyDesigners = new Map();
 let wss = null;
 /* The asset server's port. Not a constant: a conflict walks up the range, and
    everything that builds a URL reads this rather than the base. */
@@ -36,6 +44,7 @@ let ndiService = null;
 let sessionHistory = null;
 let songImportService = null;
 let appStoreService = null;
+let stageLayoutsService = null;
 let mediaService = null;
 let settingsService = null;
 let deepgramService = null;
@@ -173,6 +182,29 @@ function liveStageWindows() {
   return stageWindows;
 }
 
+/** Every live designer window, pruned the same way. */
+function liveStageDesignerWindows() {
+  for (const win of stageDesignerWindows) if (win.isDestroyed()) stageDesignerWindows.delete(win);
+  return stageDesignerWindows;
+}
+
+/**
+ * Everyone who renders stage state: the screens, the designers, and the
+ * operator's own panel, which shows a preview of the stage in its dock.
+ *
+ * The stage feed used to run one way — the operator published, the screens
+ * received — because the operator window was the only thing that could
+ * originate a change. The designer breaks that assumption: it is a second
+ * author of the same state, in its own window, and its edits have to reach
+ * both the screens and the panel preview. So the feed is a bus now, and the
+ * only rule is that a window never receives its own message back.
+ */
+function stageAudience() {
+  const windows = [...liveStageWindows(), ...liveStageDesignerWindows()];
+  if (mainWindow && !mainWindow.isDestroyed()) windows.push(mainWindow);
+  return windows;
+}
+
 function broadcastDisplayState() {
   const msg = JSON.stringify({ type: 'display:update', state: displayState });
   if (wss) wss.clients.forEach((c) => { if (c.readyState === 1) c.send(msg); });
@@ -190,8 +222,14 @@ function setDisplayState(next) {
   return displayState;
 }
 
-function broadcastStageState(message) {
-  for (const win of liveStageWindows()) win.webContents.send('stage:message', message);
+function broadcastStageState(message, senderId) {
+  for (const win of stageAudience()) {
+    // Skipping the sender is not an optimisation. Most messages are state and
+    // fold in idempotently, but a timer command is an instruction, and a
+    // window that applied its own "reset" locally would apply it twice.
+    if (senderId != null && win.webContents.id === senderId) continue;
+    win.webContents.send('stage:message', message);
+  }
 }
 
 /* Kinds that are events rather than state, and so are passed on but never
@@ -210,15 +248,21 @@ const STAGE_TRANSIENT_KINDS = new Set(['timer-command', 'program-output', 'messa
  * a single ordinary message through the same code path as a live one, with no
  * second interpretation of the vocabulary living up here in the main process.
  */
-function setStageState(message) {
+function setStageState(message, senderId) {
   if (!message || typeof message !== 'object') return stageState;
   if (!STAGE_TRANSIENT_KINDS.has(message.kind)) {
     const value = message.kind === 'config' ? (message.config || {}) : message;
     const { kind, ...rest } = value;
     void kind;
     stageState = { ...stageState, ...rest, updatedAt: Date.now() };
+    /* A layout and a custom layout are two answers to the same question, and
+       the snapshot must not carry both: a window catching up would apply the
+       preset and then have the stale custom layout drawn over it. Whichever
+       one this message set wins, and the other is dropped. */
+    if ('layout' in rest && !('customLayout' in rest)) delete stageState.customLayout;
+    if ('customLayout' in rest && rest.customLayout && !('layout' in rest)) delete stageState.layout;
   }
-  broadcastStageState(message);
+  broadcastStageState(message, senderId);
   return stageState;
 }
 
@@ -538,6 +582,73 @@ function createStageDisplayWindow() {
   return win;
 }
 
+/**
+ * The Stage Layout Designer, in a window of its own.
+ *
+ * Its own window rather than a modal in the operator's: designing a layout is
+ * a two-screen job — the canvas here, the stage screen over there — and a
+ * modal that owns the operator's whole window means the person laying out a
+ * confidence monitor cannot see the confidence monitor. One at a time, and a
+ * second call focuses the one already open rather than opening a rival editor
+ * onto the same layouts.
+ */
+function createStageDesignerWindow() {
+  for (const existing of liveStageDesignerWindows()) {
+    if (existing.isMinimized()) existing.restore();
+    existing.focus();
+    return existing;
+  }
+  const win = new BrowserWindow({
+    width: 1440, height: 920, minWidth: 1040, minHeight: 640,
+    resizable: true, maximizable: true, fullscreenable: true, thickFrame: true,
+    backgroundColor: '#0b0d12', title: 'BSP Stage Layout Designer',
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true },
+  });
+  win.loadURL(isDev ? 'http://localhost:5173/stage-designer.html' : `file://${path.join(__dirname, '../../dist/stage-designer.html')}`);
+  win.setMenuBarVisibility(false);
+
+  stageDesignerWindows.add(win);
+  win.on('closed', () => { stageDesignerWindows.delete(win); dirtyDesigners.delete(win.webContents.id); });
+
+  /* An hour of layout work is not something to lose to a stray Cmd+W. The
+     renderer keeps this flag current; the check has to live up here because a
+     renderer cannot hold a window open long enough to ask a question. */
+  win.on('close', (event) => {
+    if (!dirtyDesigners.get(win.webContents.id)) return;
+    const choice = dialog.showMessageBoxSync(win, {
+      type: 'warning',
+      buttons: ['Cancel', 'Discard changes'],
+      defaultId: 0,
+      cancelId: 0,
+      message: 'This layout has unsaved changes.',
+      detail: 'Closing the designer now will discard them.',
+    });
+    if (choice === 0) event.preventDefault();
+    else dirtyDesigners.delete(win.webContents.id);
+  });
+
+  /* The designer draws the real stage, so it needs the real feeds — the same
+     catch-up a stage window gets, for the same reason. A designer opened
+     mid-service should be laying out over what is actually on the screen. */
+  win.webContents.once('did-finish-load', () => {
+    win.webContents.send('display:message', { type: 'display:update', state: displayState });
+    if (Object.keys(stageState).length > 0) win.webContents.send('stage:message', stageState);
+  });
+
+  if (isDev) win.webContents.openDevTools({ mode: 'detach' });
+  return win;
+}
+
+/** Tell every window that the saved-layout list has changed, so the operator
+    panel's dropdown and the designer's library cannot disagree about what
+    exists. */
+function broadcastStageLayouts() {
+  const payload = stageLayoutsService.list();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('stage-layouts:changed', payload);
+  }
+}
+
 function createSlideEditorWindow() {
   const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0b0d12', title: 'BSP Slide Editor', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
   win.loadURL(isDev ? 'http://localhost:5173/slide-editor/index.html' : `file://${path.join(__dirname, '../../dist/slide-editor/index.html')}`);
@@ -570,6 +681,7 @@ app.whenReady().then(async () => {
   sessionHistory = createSessionHistoryService({ app });
   songImportService = createSongImportService();
   appStoreService = createAppStoreService({ app });
+  stageLayoutsService = createStageLayoutsService({ app });
   mediaService = createMediaService({ app });
   settingsService = createSettingsService({ app });
   deepgramService = createDeepgramService({
@@ -666,13 +778,32 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('slide-editor:open', () => { createSlideEditorWindow(); return true; });
   ipcMain.handle('stage-display:open', () => { createStageDisplayWindow(); return true; });
+  ipcMain.handle('stage-designer:open', () => { createStageDesignerWindow(); return true; });
+  ipcMain.on('stage-designer:dirty', (event, dirty) => dirtyDesigners.set(event.sender.id, !!dirty));
 
-  /* The stage's own feed, alongside display:* — same shape, same reasons. The
-     renderer publishes; every stage window receives; a window that opens late
-     asks for the retained snapshot. */
-  ipcMain.handle('stage:sendState', (_, message) => setStageState(message));
+  /* The stage's own feed, alongside display:* — same shape, same reasons.
+     Anyone on the bus may publish; everyone else receives; a window that opens
+     late asks for the retained snapshot. The sender id is passed on so the
+     publisher does not receive its own message back. */
+  ipcMain.handle('stage:sendState', (event, message) => setStageState(message, event.sender.id));
   ipcMain.handle('stage:getState', () => stageState);
-  ipcMain.on('stage:message', (_, message) => setStageState(message));
+  ipcMain.on('stage:message', (event, message) => setStageState(message, event.sender.id));
+
+  /* Operator-authored layouts. The presets in src/stage/layouts.ts are
+     compiled in and read-only; everything the designer saves lives here. */
+  ipcMain.handle('stage-layouts:list', () => stageLayoutsService.list());
+  ipcMain.handle('stage-layouts:save', (_, layout) => {
+    const result = stageLayoutsService.save(layout);
+    // Every window with a layout list open is now showing a stale one.
+    if (result.ok) broadcastStageLayouts();
+    return result;
+  });
+  ipcMain.handle('stage-layouts:delete', (_, id) => {
+    const result = stageLayoutsService.remove(typeof id === 'string' ? id : id?.id);
+    if (result.ok) broadcastStageLayouts();
+    return result;
+  });
+  ipcMain.handle('stage-layouts:setActive', (_, id) => stageLayoutsService.setActive(typeof id === 'string' ? id : id?.id));
 
   ipcMain.handle('get:platform', () => process.platform);
   ipcMain.handle('get:userDataPath', () => app.getPath('userData'));
