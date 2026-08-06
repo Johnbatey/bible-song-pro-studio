@@ -177,7 +177,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   const shadowBlur = typeof themeSection?.textShadowBlur === 'number' ? themeSection.textShadowBlur : (shadowLevel === 'heavy' ? 12 : shadowLevel === 'subtle' ? 3 : 6);
   const shadowCss = shadowEnabled ? `0px 2px ${shadowBlur}px ${shadowColor}` : undefined;
 
-  const showReference = state.showReference !== false;
+  const showReference = state.showReference !== false && scene?.type !== 'presentation';
   const showStageBackground = !scene || mode === 'fullscreen';
 
   const textStyle: React.CSSProperties = {
@@ -297,9 +297,11 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
             </div>
           ) : (
             <>
-              <div className="program-ref-row" style={refRowStyle}>
-                {showReference && content?.reference && <span style={refStyle}>{content.reference}</span>}
-              </div>
+              {showReference && content?.reference && (
+                <div className="program-ref-row" style={refRowStyle}>
+                  <span style={refStyle}>{content.reference}</span>
+                </div>
+              )}
               <div className="program-main-text" style={textStyle}>{content?.text || ''}</div>
               {songCredit(scene) && <div className="program-song-credit">{songCredit(scene)}</div>}
             </>

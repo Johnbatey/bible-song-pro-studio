@@ -127,14 +127,15 @@ export function SlideEditorModal() {
 
   /* The rail draws PowerPoint slides with the same canvas as the board, so a
      thumbnail cannot drift from what it is a thumbnail of. */
-  const renderPptxThumb = useCallback((index: number) => {
+  const renderPptxThumb = useCallback((index: number, width = 180) => {
     const slide = pkg.slides[index];
-    if (!slide?.parsed) return <div style={{ height: 90, width: '100%' }} />;
+    const thumbH = Math.round((width * 9) / 16);
+    if (!slide?.parsed) return <div style={{ height: thumbH, width: '100%' }} />;
     return (
       <SlideCanvas
         slide={slide}
         slideSizeEmu={pkg.slideSizeEmu}
-        width={RAIL_THUMB_W}
+        width={width}
         dynamicAutofit={false}
         /* Only the slide being edited can have changed, and the revision ticks
            per keystroke — handing it to all of them would redraw the whole rail
@@ -197,6 +198,30 @@ export function SlideEditorModal() {
     });
     setPptxSelection(null);
   }, [pptxSlide, pptxShapes, pptxSelection, commitStyle]);
+
+  /* Keyboard shortcut for deleting selected elements or layers */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (isPptxDeck) {
+        if (pptxSelection && pptxSelection.ids.length > 0) {
+          e.preventDefault();
+          handlePptxDelete();
+        }
+      } else {
+        if (selectedElementId) {
+          e.preventDefault();
+          handleDeleteElement(selectedElementId);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPptxDeck, pptxSelection, selectedElementId, handlePptxDelete]);
 
   const handlePptxTextEdit = useCallback((shape: ParsedShape, value: string) => {
     setShapeText(shape, value);
@@ -630,6 +655,16 @@ export function SlideEditorModal() {
   }
 
   function handleDeleteSlide(index: number) {
+    if (isPptxDeck) {
+      if (pkg.slides.length <= 1) return;
+      pkg.slides.splice(index, 1);
+      deck.slides.splice(index, 1);
+      const nextActive = Math.max(0, Math.min(pkg.slides.length - 1, pkg.activeIndex >= index ? pkg.activeIndex - 1 : pkg.activeIndex));
+      pkg.setActiveIndex(nextActive);
+      setPptxRevision((n) => n + 1);
+      handleSaveToDeck();
+      return;
+    }
     if (slides.length <= 1) return;
     const nextSlides = slides.filter((_, i) => i !== index);
     updateDeckState((prev) => ({ ...prev, slides: nextSlides }));
@@ -646,13 +681,334 @@ export function SlideEditorModal() {
   }
 
   function handleApplyTemplate(templateType: string) {
-    let tplBg = 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)';
-    if (templateType === 'announcement') tplBg = 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)';
-    if (templateType === 'sermon') tplBg = 'linear-gradient(135deg, #18181b 0%, #09090b 100%)';
+    let tplBg = 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)';
+    let elements: SlideElement[] = [];
+
+    if (templateType === 'worship') {
+      tplBg = 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)';
+      elements = [
+        {
+          id: `el-${Date.now()}-1`,
+          type: 'text',
+          content: 'AMAZING GRACE, HOW SWEET THE SOUND',
+          x: 100,
+          y: 260,
+          width: 1080,
+          height: 120,
+          fontSize: 48,
+          color: '#ffffff',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+        {
+          id: `el-${Date.now()}-2`,
+          type: 'text',
+          content: 'That saved a wretch like me! I once was lost, but now am found',
+          x: 140,
+          y: 400,
+          width: 1000,
+          height: 90,
+          fontSize: 28,
+          color: 'rgba(255, 255, 255, 0.8)',
+          textAlign: 'center',
+        },
+      ];
+    } else if (templateType === 'sermon') {
+      tplBg = 'linear-gradient(135deg, #18181b 0%, #09090b 100%)';
+      elements = [
+        {
+          id: `el-${Date.now()}-card`,
+          type: 'shape',
+          content: 'box',
+          x: 120,
+          y: 140,
+          width: 1040,
+          height: 480,
+          backgroundColor: 'rgba(35, 34, 33, 0.7)',
+          borderColor: 'rgba(255, 85, 0, 0.3)',
+          borderWidth: 1,
+          borderRadius: 16,
+        },
+        {
+          id: `el-${Date.now()}-badge`,
+          type: 'shape',
+          content: 'box',
+          x: 160,
+          y: 180,
+          width: 60,
+          height: 60,
+          backgroundColor: '#f4621f',
+          borderRadius: 12,
+        },
+        {
+          id: `el-${Date.now()}-num`,
+          type: 'text',
+          content: '01',
+          x: 160,
+          y: 190,
+          width: 60,
+          height: 40,
+          fontSize: 24,
+          color: '#ffffff',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+        {
+          id: `el-${Date.now()}-title`,
+          type: 'text',
+          content: 'FAITH OVER FEAR: WALKING IN PURPOSE',
+          x: 240,
+          y: 188,
+          width: 880,
+          height: 60,
+          fontSize: 34,
+          color: '#ffffff',
+          fontWeight: 700,
+        },
+        {
+          id: `el-${Date.now()}-body`,
+          type: 'text',
+          content: '• Trusting God in times of uncertainty\n• Stepping out of your comfort zone\n• Building a foundation rooted in Prayer',
+          x: 240,
+          y: 280,
+          width: 880,
+          height: 280,
+          fontSize: 26,
+          color: '#d4d4d8',
+        },
+      ];
+    } else if (templateType === 'scripture') {
+      tplBg = 'linear-gradient(135deg, #0b132b 0%, #1c2541 100%)';
+      elements = [
+        {
+          id: `el-${Date.now()}-verse`,
+          type: 'text',
+          content: '"For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life."',
+          x: 140,
+          y: 220,
+          width: 1000,
+          height: 220,
+          fontSize: 36,
+          color: '#ffffff',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+        {
+          id: `el-${Date.now()}-ref`,
+          type: 'text',
+          content: 'JOHN 3:16 (KJV)',
+          x: 340,
+          y: 480,
+          width: 600,
+          height: 60,
+          fontSize: 26,
+          color: '#f4621f',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+      ];
+    } else if (templateType === 'lower-third') {
+      tplBg = 'rgba(0, 0, 0, 0.85)';
+      elements = [
+        {
+          id: `el-${Date.now()}-bg`,
+          type: 'shape',
+          content: 'box',
+          x: 80,
+          y: 520,
+          width: 1120,
+          height: 140,
+          backgroundColor: 'rgba(22, 20, 20, 0.9)',
+          borderColor: '#f4621f',
+          borderWidth: 2,
+          borderRadius: 12,
+        },
+        {
+          id: `el-${Date.now()}-name`,
+          type: 'text',
+          content: 'PASTOR DAVID E. JOHNSON',
+          x: 120,
+          y: 545,
+          width: 1000,
+          height: 50,
+          fontSize: 32,
+          color: '#ffffff',
+          fontWeight: 700,
+        },
+        {
+          id: `el-${Date.now()}-role`,
+          type: 'text',
+          content: 'Senior Pastor · Grace Community Church',
+          x: 120,
+          y: 600,
+          width: 1000,
+          height: 40,
+          fontSize: 20,
+          color: '#f4621f',
+          fontWeight: 700,
+        },
+      ];
+    } else if (templateType === 'announcement') {
+      tplBg = 'linear-gradient(135deg, #4c1d95 0%, #831843 100%)';
+      elements = [
+        {
+          id: `el-${Date.now()}-badge`,
+          type: 'shape',
+          content: 'box',
+          x: 490,
+          y: 120,
+          width: 300,
+          height: 44,
+          backgroundColor: '#f4621f',
+          borderRadius: 22,
+        },
+        {
+          id: `el-${Date.now()}-badgetxt`,
+          type: 'text',
+          content: 'UPCOMING EVENT',
+          x: 490,
+          y: 130,
+          width: 300,
+          height: 30,
+          fontSize: 16,
+          color: '#ffffff',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+        {
+          id: `el-${Date.now()}-title`,
+          type: 'text',
+          content: 'SUNDAY NIGHT WORSHIP & HEALING',
+          x: 140,
+          y: 220,
+          width: 1000,
+          height: 120,
+          fontSize: 44,
+          color: '#ffffff',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+        {
+          id: `el-${Date.now()}-details`,
+          type: 'text',
+          content: 'THIS SUNDAY · 6:00 PM · MAIN SANCTUARY\nJoin us for a powerful evening of praise, prayer and communion.',
+          x: 140,
+          y: 370,
+          width: 1000,
+          height: 120,
+          fontSize: 24,
+          color: 'rgba(255, 255, 255, 0.85)',
+          textAlign: 'center',
+        },
+      ];
+    } else if (templateType === 'welcome') {
+      tplBg = 'linear-gradient(135deg, #1c1917 0%, #292524 100%)';
+      elements = [
+        {
+          id: `el-${Date.now()}-title`,
+          type: 'text',
+          content: 'WELCOME TO OUR CHURCH',
+          x: 140,
+          y: 240,
+          width: 1000,
+          height: 120,
+          fontSize: 52,
+          color: '#ffffff',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+        {
+          id: `el-${Date.now()}-sub`,
+          type: 'text',
+          content: 'We are so glad you are worshipping with us today!',
+          x: 140,
+          y: 380,
+          width: 1000,
+          height: 80,
+          fontSize: 28,
+          color: '#f4621f',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+      ];
+    } else if (templateType === 'offering') {
+      tplBg = 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)';
+      elements = [
+        {
+          id: `el-${Date.now()}-title`,
+          type: 'text',
+          content: 'TITHE & OFFERING',
+          x: 140,
+          y: 180,
+          width: 1000,
+          height: 100,
+          fontSize: 48,
+          color: '#ffffff',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+        {
+          id: `el-${Date.now()}-verse`,
+          type: 'text',
+          content: '"Honor the LORD with your wealth and with the firstfruits of all your produce." — Proverbs 3:9',
+          x: 140,
+          y: 300,
+          width: 1000,
+          height: 80,
+          fontSize: 22,
+          color: 'rgba(255, 255, 255, 0.8)',
+          textAlign: 'center',
+        },
+        {
+          id: `el-${Date.now()}-ways`,
+          type: 'text',
+          content: 'GIVE ONLINE: www.church.org/give  |  TEXT TO GIVE: (800) 555-GIVE',
+          x: 140,
+          y: 440,
+          width: 1000,
+          height: 60,
+          fontSize: 24,
+          color: '#22c55e',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+      ];
+    } else if (templateType === 'benediction') {
+      tplBg = 'linear-gradient(135deg, #450a0a 0%, #1c0505 100%)';
+      elements = [
+        {
+          id: `el-${Date.now()}-title`,
+          type: 'text',
+          content: 'GO IN PEACE & GRACE',
+          x: 140,
+          y: 240,
+          width: 1000,
+          height: 100,
+          fontSize: 48,
+          color: '#ffffff',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+        {
+          id: `el-${Date.now()}-sub`,
+          type: 'text',
+          content: 'The LORD bless you and keep you; the LORD make his face shine upon you.',
+          x: 140,
+          y: 360,
+          width: 1000,
+          height: 90,
+          fontSize: 26,
+          color: '#f4621f',
+          fontWeight: 700,
+          textAlign: 'center',
+        },
+      ];
+    }
 
     handleUpdateSlide({
       background: { type: 'gradient', value: tplBg },
       aspectRatio: templateType === 'lower-third' ? 'lower-third' : '16:9',
+      elements: elements.length > 0 ? elements : activeSlide.elements,
     });
   }
 
@@ -717,7 +1073,7 @@ export function SlideEditorModal() {
         position: 'fixed',
         inset: 0,
         zIndex: 99999,
-        background: '#0b0d12',
+        background: 'var(--bg-primary, #111010)',
         display: 'flex',
         flexDirection: 'column',
         fontFamily: 'var(--font-ui)',
@@ -806,6 +1162,7 @@ export function SlideEditorModal() {
           onSelectTool={handleSelectTool}
           smartSnap={smartSnap}
           onToggleSmartSnap={() => setSmartSnap(!smartSnap)}
+          onAddElements={(newEls) => handleUpdateSlideElements([...(activeSlide.elements || []), ...newEls])}
           pptx={pptxInspector && {
             canGroup: pptxInspector.canGroup,
             canUngroup: pptxInspector.canUngroup,

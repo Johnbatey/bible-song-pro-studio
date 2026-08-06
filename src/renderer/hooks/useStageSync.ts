@@ -36,10 +36,11 @@ export function useStageSync(): void {
   // What is on the screen now, and which song it belongs to.
   useEffect(() => {
     const { songTitle, songSubtitle } = songCue(currentScene);
+    const isPresentation = currentScene?.type === 'presentation';
     publishStage({
       current: currentScene
         ? {
-            title: currentScene.content?.reference || currentScene.name,
+            title: isPresentation ? '' : (currentScene.content?.reference || currentScene.name),
             body: currentScene.content?.text || '',
             bodyHtml: currentScene.content?.html || '',
           }
@@ -53,10 +54,11 @@ export function useStageSync(): void {
      array's, so re-ordering further down the queue does not repaint the stage. */
   const next = queue[0];
   useEffect(() => {
+    const isNextPresentation = (next?.type as string) === 'presentation' || next?.type === 'slide';
     publishStage({
-      next: next ? { title: next.reference, body: next.text } : null,
+      next: next ? { title: isNextPresentation ? '' : (next.reference || ''), body: next.text } : null,
     });
-  }, [next?.id, next?.reference, next?.text]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [next?.id, next?.reference, next?.text, next?.type]);
 
   /* Alerts double as the stage's broadcast messages — an operator telling the
      band something is telling the room the same thing. Cleared by id when the

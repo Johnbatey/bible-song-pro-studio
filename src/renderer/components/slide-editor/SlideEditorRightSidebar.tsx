@@ -91,8 +91,8 @@ export function SlideEditorRightSidebar({
       style={{
         width: 280,
         minWidth: 280,
-        background: '#15171d',
-        borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+        background: 'var(--bg-surface, #161414)',
+        borderLeft: '1px solid var(--block-line, #262628)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -101,7 +101,7 @@ export function SlideEditorRightSidebar({
       }}
     >
       {/* Inspector Tri-Tab Header */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: '#111318' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--block-line, #262628)', background: 'var(--bg-primary, #111010)' }}>
         {(['design', 'layer', 'ai'] as const).map((tab) => (
           <button
             key={tab}

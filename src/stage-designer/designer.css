@@ -11,19 +11,19 @@
    ========================================================================= */
 
 .dz-app {
-  --dz-bg: #0b0d12;
-  --dz-panel: #12151d;
-  --dz-raised: #1a1e28;
-  --dz-line: rgba(255, 255, 255, 0.09);
+  --dz-bg: var(--bg-primary, #111010);
+  --dz-panel: var(--bg-surface, #161414);
+  --dz-raised: var(--bg-elevated, #232221);
+  --dz-line: var(--block-line, #262628);
   --dz-line-strong: rgba(255, 255, 255, 0.16);
-  --dz-text: #e8eaf0;
-  --dz-dim: rgba(232, 234, 240, 0.55);
-  --dz-faint: rgba(232, 234, 240, 0.34);
-  --dz-accent: #f4621f;
+  --dz-text: #ffffff;
+  --dz-dim: #d4d4d8;
+  --dz-faint: rgba(212, 212, 216, 0.4);
+  --dz-accent: var(--accent, #FF5500);
   --dz-select: #3b9dff;
   --dz-guide: #ff3ba7;
   --dz-danger: #ef4444;
-  --dz-radius: 7px;
+  --dz-radius: 6px;
 
   position: absolute;
   inset: 0;
@@ -499,10 +499,10 @@
   /* Room at the top for the floating toolbar and at the bottom for the zoom
      bar, so neither ever sits on top of the stage. */
   padding: 76px 28px 64px;
-  background-color: #2c2c2e;
+  background-color: var(--bg-primary, #111010);
   background-image:
-    linear-gradient(rgba(128, 128, 128, 0.14) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(128, 128, 128, 0.14) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 .dz-viewport[data-panning] { cursor: grab; }

@@ -134,8 +134,12 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 24,
     overflow: 'auto',
+    backgroundColor: '#111010',
+    backgroundImage:
+      'linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px)',
+    backgroundSize: '24px 24px',
   },
   canvasFrame: {
     overflow: 'hidden',

@@ -13,10 +13,40 @@ interface SlideEditorLeftRailProps {
   /* Supplied by the PowerPoint path, whose slides are parsed OOXML rather than
      the native element model — the rail draws whatever this returns in place
      of its own background-and-title preview. */
-  renderThumb?: (index: number) => React.ReactNode;
+  renderThumb?: (index: number, width: number) => React.ReactNode;
   /* PowerPoint decks have a fixed slide list: adding, duplicating, deleting
      and reordering would have to rewrite the package, which is not ported. */
   readOnlyDeck?: boolean;
+}
+
+function RailSlideThumb({
+  index,
+  renderThumb,
+}: {
+  index: number;
+  renderThumb: (index: number, width: number) => React.ReactNode;
+}) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [width, setWidth] = React.useState<number>(180);
+
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const measured = entries[0]?.contentRect?.width;
+      if (measured && measured > 0) {
+        setWidth(Math.round(measured));
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} style={{ width: '100%', overflow: 'hidden', background: '#000', display: 'flex' }}>
+      {renderThumb(index, width)}
+    </div>
+  );
 }
 
 export function SlideEditorLeftRail({
@@ -34,10 +64,14 @@ export function SlideEditorLeftRail({
   const [activeTab, setActiveTab] = useState<'slides' | 'templates'>('slides');
 
   const prebuiltTemplates = [
-    { id: 'worship', name: 'Worship Song Classic', bg: 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)', text: 'Sing unto the Lord a new song' },
-    { id: 'sermon', name: 'Sermon Points Dark', bg: 'linear-gradient(135deg, #18181b 0%, #09090b 100%)', text: 'Main Scripture & Key Takeaways' },
-    { id: 'lower-third', name: 'Lower Third Overlay', bg: 'rgba(0, 0, 0, 0.85)', text: 'Speaker Name & Title' },
-    { id: 'announcement', name: 'Event Announcement', bg: 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)', text: 'Sunday Service & Worship' },
+    { id: 'worship', name: 'Worship Song Classic', bg: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)', text: 'Sing unto the Lord a new song' },
+    { id: 'sermon', name: 'Sermon Key Points', bg: 'linear-gradient(135deg, #18181b 0%, #09090b 100%)', text: '01. Main Scripture & Key Takeaways' },
+    { id: 'scripture', name: 'Scripture Verse Display', bg: 'linear-gradient(135deg, #0b132b 0%, #1c2541 100%)', text: '"For God so loved the world..." — John 3:16' },
+    { id: 'lower-third', name: 'Lower Third Overlay Bar', bg: 'rgba(0, 0, 0, 0.85)', text: 'Pastor David · Guest Speaker' },
+    { id: 'announcement', name: 'Event Announcement', bg: 'linear-gradient(135deg, #4c1d95 0%, #831843 100%)', text: 'Sunday Worship Service · 10 AM' },
+    { id: 'welcome', name: 'Welcome & Fellowship', bg: 'linear-gradient(135deg, #1c1917 0%, #292524 100%)', text: 'Welcome to Our Church Family' },
+    { id: 'offering', name: 'Offering & Tithing', bg: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', text: 'Honour the Lord with your wealth' },
+    { id: 'benediction', name: 'Benediction & Closing', bg: 'linear-gradient(135deg, #450a0a 0%, #1c0505 100%)', text: 'The Peace & Blessing of Christ' },
   ];
 
   return (
@@ -45,8 +79,8 @@ export function SlideEditorLeftRail({
       style={{
         width: 240,
         minWidth: 240,
-        background: '#15171d',
-        borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+        background: 'var(--bg-surface, #161414)',
+        borderRight: '1px solid var(--block-line, #262628)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -203,9 +237,7 @@ export function SlideEditorLeftRail({
                     }}
                   >
                     {renderThumb ? (
-                      <div style={{ width: '100%', overflow: 'hidden', background: '#000', display: 'flex' }}>
-                        {renderThumb(idx)}
-                      </div>
+                      <RailSlideThumb index={idx} renderThumb={renderThumb} />
                     ) : (
                     <div
                       style={{
@@ -250,8 +282,8 @@ export function SlideEditorLeftRail({
                     <div
                       style={{
                         padding: '4px 8px',
-                        background: '#15171d',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: 'var(--bg-surface, #161414)',
+                        borderTop: '1px solid var(--block-line, #262628)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
@@ -260,9 +292,8 @@ export function SlideEditorLeftRail({
                       <span style={{ fontSize: 9, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', fontWeight: 600 }}>
                         {slide.transition || 'fade'}
                       </span>
-                      {!readOnlyDeck && (
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        {idx > 0 && (
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        {!readOnlyDeck && idx > 0 && (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -275,7 +306,7 @@ export function SlideEditorLeftRail({
                             ▲
                           </button>
                         )}
-                        {idx < slides.length - 1 && (
+                        {!readOnlyDeck && idx < slides.length - 1 && (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -288,17 +319,19 @@ export function SlideEditorLeftRail({
                             ▼
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDuplicateSlide(idx);
-                          }}
-                          style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 10 }}
-                          title="Duplicate Slide"
-                        >
-                          ❐
-                        </button>
+                        {!readOnlyDeck && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDuplicateSlide(idx);
+                            }}
+                            style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 10 }}
+                            title="Duplicate Slide"
+                          >
+                            ❐
+                          </button>
+                        )}
                         {slides.length > 1 && (
                           <button
                             type="button"
@@ -306,14 +339,27 @@ export function SlideEditorLeftRail({
                               e.stopPropagation();
                               onDeleteSlide(idx);
                             }}
-                            style={{ background: 'none', border: 'none', color: '#ff453a', cursor: 'pointer', fontSize: 10 }}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.12)',
+                              border: 'none',
+                              borderRadius: 4,
+                              color: '#f87171',
+                              cursor: 'pointer',
+                              fontSize: 11,
+                              padding: '2px 5px',
+                              lineHeight: 1,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
                             title="Delete Slide"
                           >
-                            ✕
+                            <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}>
+                              <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
+                            </svg>
                           </button>
                         )}
                       </div>
-                      )}
                     </div>
                   </div>
                 </div>

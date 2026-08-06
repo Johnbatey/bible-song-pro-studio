@@ -211,13 +211,60 @@ export function PresentationPanel() {
     subtitle: deck.slides?.[0]?.title || deck.slides?.[0]?.body || '',
   }));
 
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newProjectTitle, setNewProjectTitle] = useState('New Presentation Deck');
+
   function handleCreateNew(val: string) {
     if (val === 'manual') {
-      openSlideEditor();
+      setNewProjectTitle('New Presentation Deck');
+      setIsCreateModalOpen(true);
     } else if (val === 'import') {
       clearStatus();
       pickPptx();
     }
+  }
+
+  function handleConfirmCreateProject() {
+    const title = newProjectTitle.trim() || 'New Presentation Deck';
+    const newDeck: PresentationDeck = {
+      id: `deck-${Date.now()}`,
+      title,
+      slides: [
+        {
+          id: `slide-${Date.now()}`,
+          title: 'Welcome',
+          body: title,
+          label: 'Slide 1',
+          notes: '',
+          transition: 'fade',
+          durationMs: 3000,
+          hidden: false,
+          buildCount: 0,
+          buildStep: 0,
+          background: { type: 'gradient', value: 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)' },
+          elements: [
+            {
+              id: `text-${Date.now()}`,
+              type: 'text',
+              content: title,
+              x: 140,
+              y: 280,
+              width: 1000,
+              height: 160,
+              fontSize: 48,
+              color: '#ffffff',
+              fontWeight: 700,
+              textAlign: 'center',
+            },
+          ],
+        },
+      ],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    addPresentationDeck(newDeck);
+    setIsCreateModalOpen(false);
+    setSelectedDeckId(newDeck.id);
   }
 
   function handleEditSlide(id: string) {
@@ -329,7 +376,6 @@ export function PresentationPanel() {
       content: {
         text,
         slide: projection,
-        reference: selectedDeck.title,
         slideId: String(index),
         slides: selectedDeck.slides?.map((s, idx) => ({
           id: s.id || String(idx),
@@ -681,6 +727,113 @@ export function PresentationPanel() {
 
       {/* Bottom Bar */}
       {barPosition === 'bottom' && (!selectedDeck ? page1Toolbar : page2Toolbar)}
+
+      {/* Project Creation Modal */}
+      {isCreateModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={() => setIsCreateModalOpen(false)}
+        >
+          <div
+            style={{
+              width: 420,
+              maxWidth: '90vw',
+              background: '#161414',
+              border: '1px solid var(--block-line, #262628)',
+              borderRadius: 12,
+              padding: 24,
+              boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+              color: '#ffffff',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Create New Pro Slide Project</div>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 18 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ fontSize: 13, color: 'var(--text-dim, #d4d4d8)' }}>
+              Enter a name for your new presentation deck project:
+            </div>
+
+            <input
+              type="text"
+              value={newProjectTitle}
+              onChange={(e) => setNewProjectTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleConfirmCreateProject();
+              }}
+              autoFocus
+              placeholder="e.g. Sunday Service Presentation"
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                background: '#111010',
+                border: '1px solid var(--block-line, #262628)',
+                borderRadius: 8,
+                color: '#ffffff',
+                fontSize: 14,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                style={{
+                  padding: '8px 16px',
+                  background: 'transparent',
+                  border: '1px solid var(--block-line, #262628)',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCreateProject}
+                style={{
+                  padding: '8px 18px',
+                  background: 'var(--accent, #f4621f)',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(244, 98, 31, 0.4)',
+                }}
+              >
+                Create Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

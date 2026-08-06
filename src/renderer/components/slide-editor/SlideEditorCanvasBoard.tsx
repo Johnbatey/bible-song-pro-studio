@@ -186,7 +186,10 @@ export function SlideEditorCanvasBoard({
       onMouseUp={() => setIsPanning(false)}
       style={{
         flex: 1,
-        background: '#0b0d12',
+        backgroundColor: '#111010',
+        backgroundImage:
+          'linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px)',
+        backgroundSize: '24px 24px',
         position: 'relative',
         overflow: 'hidden',
         userSelect: 'none',

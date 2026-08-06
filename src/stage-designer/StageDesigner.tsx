@@ -99,7 +99,7 @@ export function StageDesigner() {
 
   const [zoom, setZoom] = useState(1);
   const [grid, setGrid] = useState(2.5);
-  const [showGrid, setShowGrid] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [live, setLive] = useState(true);
   const [mode, setMode] = useState<StageMode>('confidence');
