@@ -150,10 +150,6 @@ function buildAppMenu(openIds) {
         { role: 'reload' },
         { role: 'forceReload' },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
     },
@@ -1019,6 +1015,17 @@ app.whenReady().then(async () => {
   // Fullscreen events
   mainWindow.on('enter-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', true));
   mainWindow.on('leave-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', false));
+});
+
+app.on('web-contents-created', (_evt, contents) => {
+  try {
+    contents.setVisualZoomLevelLimits(1, 1);
+  } catch (err) {}
+  contents.on('before-input-event', (event, input) => {
+    if ((input.control || input.meta) && (input.key === '=' || input.key === '+' || input.key === '-' || input.key === '_' || input.key === '0')) {
+      event.preventDefault();
+    }
+  });
 });
 
 app.on('window-all-closed', () => { appStoreService?.flush(); deepgramService?.destroy(); ndiService?.destroy(); sessionHistory?.endSession(); if (process.platform !== 'darwin') app.quit(); });

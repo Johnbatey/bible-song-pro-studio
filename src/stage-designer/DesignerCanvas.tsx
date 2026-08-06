@@ -67,7 +67,7 @@ type Drag =
   | { kind: 'move'; ids: string[]; startX: number; startY: number; origin: Map<string, Rect>; group: Rect }
   | { kind: 'resize'; id: string; edges: HandleEdges; startX: number; startY: number; origin: Rect }
   | { kind: 'marquee'; startX: number; startY: number; additive: boolean }
-  | { kind: 'pan'; startX: number; startY: number; scrollLeft: number; scrollTop: number };
+  | { kind: 'pan'; startX: number; startY: number; initialPanX: number; initialPanY: number };
 
 function zoneRect(zone: StageZone): Rect {
   return { x: zone.x, y: zone.y, w: zone.w, h: zone.h };
@@ -93,14 +93,13 @@ export function DesignerCanvas({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<Drag | null>(null);
-  /* The layout at the instant the drag began. Reading zones out of props
-     mid-drag would compound each frame's rounding into the next one's origin,
-     and a zone dragged in a slow circle would drift away from the pointer. */
   const dragZonesRef = useRef<StageZone[]>([]);
 
   const [fitScale, setFitScale] = useState(0.4);
   const [guides, setGuides] = useState<Guide[]>([]);
   const [marquee, setMarquee] = useState<Rect | null>(null);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
   /* The pointerup handler needs the marquee, and it is registered once — so it
      would otherwise close over whatever the rect was at registration. The ref
      is written alongside the state rather than during render: assigning a ref
@@ -230,14 +229,15 @@ export function DesignerCanvas({
   const onSurfacePointerDown = useCallback(
     (event: ReactPointerEvent) => {
       const viewport = viewportRef.current;
-      if ((spaceHeld || event.button === 1) && viewport) {
+      const isBg = event.target === viewport || (event.target as HTMLElement).className.includes('dz-viewport');
+      if ((spaceHeld || event.button === 1 || event.button === 2 || isBg) && viewport) {
         event.preventDefault();
         dragRef.current = {
           kind: 'pan',
           startX: event.clientX,
           startY: event.clientY,
-          scrollLeft: viewport.scrollLeft,
-          scrollTop: viewport.scrollTop,
+          initialPanX: panX,
+          initialPanY: panY,
         };
         return;
       }
@@ -248,7 +248,7 @@ export function DesignerCanvas({
       dragRef.current = { kind: 'marquee', startX: point.x, startY: point.y, additive };
       updateMarquee({ x: point.x, y: point.y, w: 0, h: 0 });
     },
-    [onSelectionChange, toPercent, spaceHeld, updateMarquee],
+    [onSelectionChange, toPercent, spaceHeld, updateMarquee, panX, panY],
   );
 
   useEffect(() => {
@@ -257,10 +257,8 @@ export function DesignerCanvas({
       if (!drag) return;
 
       if (drag.kind === 'pan') {
-        const viewport = viewportRef.current;
-        if (!viewport) return;
-        viewport.scrollLeft = drag.scrollLeft - (event.clientX - drag.startX);
-        viewport.scrollTop = drag.scrollTop - (event.clientY - drag.startY);
+        setPanX(drag.initialPanX + (event.clientX - drag.startX));
+        setPanY(drag.initialPanY + (event.clientY - drag.startY));
         return;
       }
 
@@ -420,9 +418,13 @@ export function DesignerCanvas({
     const viewport = viewportRef.current;
     if (!viewport) return;
     const onWheel = (event: WheelEvent) => {
-      if (!(event.ctrlKey || event.metaKey)) return;
       event.preventDefault();
-      onZoomChange(clamp(zoom * (event.deltaY > 0 ? 0.94 : 1.06), 0.25, 4));
+      if (event.ctrlKey || event.metaKey) {
+        onZoomChange(clamp(zoom * (event.deltaY > 0 ? 0.94 : 1.06), 0.25, 4));
+      } else {
+        setPanX((px) => px - event.deltaX);
+        setPanY((py) => py - event.deltaY);
+      }
     };
     viewport.addEventListener('wheel', onWheel, { passive: false });
     return () => viewport.removeEventListener('wheel', onWheel);
@@ -448,7 +450,14 @@ export function DesignerCanvas({
 
   return (
     <div className="dz-viewport" ref={viewportRef} data-panning={spaceHeld || undefined}>
-      <div className="dz-canvas" style={{ width: boxW, height: boxH }}>
+      <div
+        className="dz-canvas"
+        style={{
+          width: boxW,
+          height: boxH,
+          transform: `translate(${panX}px, ${panY}px)`,
+        }}
+      >
         <div
           className="dz-stage"
           style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${scale})` }}

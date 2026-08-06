@@ -533,6 +533,38 @@ export function StageDesigner() {
     history.begin();
   }, [history]);
 
+  /* Movable / Draggable Stage Toolbar State */
+  const [floatbarPos, setFloatbarPos] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingFloatbar, setIsDraggingFloatbar] = useState(false);
+  const floatbarDragStartRef = useRef<{ x: number; y: number; initialX: number; initialY: number }>({ x: 0, y: 0, initialX: 0, initialY: 0 });
+
+  const handleFloatbarPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsDraggingFloatbar(true);
+    const currentX = floatbarPos ? floatbarPos.x : window.innerWidth / 2;
+    const currentY = floatbarPos ? floatbarPos.y : 54;
+    floatbarDragStartRef.current = { x: e.clientX, y: e.clientY, initialX: currentX, initialY: currentY };
+  };
+
+  useEffect(() => {
+    if (!isDraggingFloatbar) return;
+    const onPointerMove = (e: PointerEvent) => {
+      const dx = e.clientX - floatbarDragStartRef.current.x;
+      const dy = e.clientY - floatbarDragStartRef.current.y;
+      setFloatbarPos({
+        x: floatbarDragStartRef.current.initialX + dx,
+        y: Math.max(10, floatbarDragStartRef.current.initialY + dy),
+      });
+    };
+    const onPointerUp = () => setIsDraggingFloatbar(false);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [isDraggingFloatbar]);
+
   return (
     <div className="dz-app">
       <header className="dz-topbar">
@@ -671,8 +703,22 @@ export function StageDesigner() {
               fifteen bare buttons showed the operator everything and told them
               nothing; four menus put the same choices one click away and give
               the canvas back the space. */}
-          <div className="dz-floatbar">
-            <span className="dz-floatbar-label">Add to layout</span>
+          <div
+            className="dz-floatbar"
+            style={
+              floatbarPos
+                ? { left: floatbarPos.x, top: floatbarPos.y, transform: 'translateX(-50%)' }
+                : { top: 54 }
+            }
+          >
+            <span
+              className="dz-floatbar-label"
+              onPointerDown={handleFloatbarPointerDown}
+              style={{ cursor: isDraggingFloatbar ? 'grabbing' : 'grab', userSelect: 'none' }}
+              title="Drag to move toolbar"
+            >
+              ⋮⋮ Add to layout
+            </span>
             <div className="dz-floatbar-card">
               <Menu
                 label="Add layer"

@@ -2,7 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import type { SlideElement, Song, BibleVerse } from '../../types';
 
-export type ActiveTool = 'select' | 'text' | 'box' | 'circle' | 'image' | 'pencil' | 'bezier' | 'eraser';
+export type ActiveTool =
+  | 'select'
+  | 'text'
+  | 'box'
+  | 'rectangle'
+  | 'rounded'
+  | 'circle'
+  | 'triangle'
+  | 'star'
+  | 'line'
+  | 'image'
+  | 'pencil'
+  | 'bezier'
+  | 'eraser';
 
 export interface PptxToolbarActions {
   canGroup: boolean;
@@ -208,223 +221,351 @@ export function SlideEditorQuickToolbar({
     (s) => s.title.toLowerCase().includes(songQuery.toLowerCase()) || s.author?.toLowerCase().includes(songQuery.toLowerCase()),
   );
 
-  const isShapeActive = activeTool === 'box' || activeTool === 'circle';
+  /* Movable / Draggable Toolbar State */
+  const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingToolbar, setIsDraggingToolbar] = useState(false);
+  const dragStartRef = React.useRef<{ x: number; y: number; initialX: number; initialY: number }>({ x: 0, y: 0, initialX: 0, initialY: 0 });
+
+  const handlePointerDownHeader = (e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsDraggingToolbar(true);
+    const currentX = toolbarPos ? toolbarPos.x : window.innerWidth / 2;
+    const currentY = toolbarPos ? toolbarPos.y : 54;
+    dragStartRef.current = { x: e.clientX, y: e.clientY, initialX: currentX, initialY: currentY };
+  };
+
+  useEffect(() => {
+    if (!isDraggingToolbar) return;
+    const onPointerMove = (e: PointerEvent) => {
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      setToolbarPos({
+        x: dragStartRef.current.initialX + dx,
+        y: Math.max(10, dragStartRef.current.initialY + dy),
+      });
+    };
+    const onPointerUp = () => setIsDraggingToolbar(false);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [isDraggingToolbar]);
+
+  const isShapeActive = ['box', 'rectangle', 'rounded', 'circle', 'triangle', 'star', 'line'].includes(activeTool);
 
   return (
-    <div style={CONTAINER}>
-      {/* Centered Pill Title Header */}
-      <div style={HEADER_LABEL}>Add content</div>
-
-      {/* Floating Toolbar Pill */}
-      <div style={TOOLBAR_PILL}>
-        {/* 1. Text Tool */}
-        <button
-          type="button"
-          onClick={() => {
-            onSelectTool('text');
-            setActiveDropdown(null);
+    <div
+      style={{
+        ...CONTAINER,
+        ...(toolbarPos
+          ? { left: toolbarPos.x, top: toolbarPos.y, transform: 'translateX(-50%)' }
+          : { top: 54 }),
+      }}
+    >
+      {/* Unified Toolbar Card Block (Matching Reference Image 2) */}
+      <div style={TOOLBAR_CARD}>
+        {/* Integrated Top Drag Handle & Label */}
+        <div
+          onPointerDown={handlePointerDownHeader}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            cursor: isDraggingToolbar ? 'grabbing' : 'grab',
+            paddingBottom: 6,
+            width: '100%',
           }}
-          style={activeTool === 'text' ? PILL_BTN_ACTIVE : PILL_BTN}
-          title="Add Text Box"
+          title="Drag to move toolbar"
         >
-          <svg viewBox="0 0 24 24" style={ICON}>
-            <path d="M4 7V4h16v3M9 20h6M12 4v16" />
-          </svg>
-          <span>Text</span>
-        </button>
+          <div style={{ width: 28, height: 3, background: 'rgba(255, 255, 255, 0.25)', borderRadius: 2, marginBottom: 3 }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255, 255, 255, 0.55)', letterSpacing: '0.01em' }}>Add content</span>
+        </div>
 
-        {/* 2. Scripture Tool Button (Proper SVG Bible Icon) */}
-        <div style={{ position: 'relative' }}>
+        {/* Floating Toolbar Buttons Row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* 1. Text Tool */}
           <button
             type="button"
-            onClick={() => setActiveDropdown(activeDropdown === 'scripture' ? null : 'scripture')}
-            style={activeDropdown === 'scripture' ? PILL_BTN_ACTIVE : PILL_BTN}
-            title="Scripture Tool"
+            onClick={() => {
+              onSelectTool('text');
+              setActiveDropdown(null);
+            }}
+            style={activeTool === 'text' ? PILL_BTN_ACTIVE : PILL_BTN}
+            title="Add Text Box"
           >
-            {/* Bible SVG Icon matching BiblePanel */}
             <svg viewBox="0 0 24 24" style={ICON}>
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              <path d="M12 6v6M9 9h6" />
+              <path d="M4 7V4h16v3M9 20h6M12 4v16" />
             </svg>
-            <span>Scripture</span>
+            <span>Text</span>
           </button>
 
-          {/* Scripture Popover (Matching Reference Screenshots 3 & 4) */}
-          {activeDropdown === 'scripture' && (
-            <div style={{ ...POPOVER_SHELL, width: 380 }}>
-              {/* Top Row: Version Dropdown & Reference Input */}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <select
-                  value={bibleVersion}
-                  onChange={(e) => {
-                    setBibleVersion(e.target.value);
-                    searchScripture(scriptureQuery, e.target.value);
+          {/* 2. Scripture Tool Button (Proper SVG Bible Icon) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setActiveDropdown(activeDropdown === 'scripture' ? null : 'scripture')}
+              style={activeDropdown === 'scripture' ? PILL_BTN_ACTIVE : PILL_BTN}
+              title="Scripture Tool"
+            >
+              <svg viewBox="0 0 24 24" style={ICON}>
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <path d="M12 6v6M9 9h6" />
+              </svg>
+              <span>Scripture</span>
+            </button>
+
+            {/* Scripture Popover */}
+            {activeDropdown === 'scripture' && (
+              <div style={{ ...POPOVER_SHELL, width: 380 }}>
+                {/* Top Row: Version Dropdown & Reference Input */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <select
+                    value={bibleVersion}
+                    onChange={(e) => {
+                      setBibleVersion(e.target.value);
+                      searchScripture(scriptureQuery, e.target.value);
+                    }}
+                    style={{
+                      padding: '8px 10px',
+                      background: '#1a1a1c',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: 8,
+                      color: '#ffffff',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="KJV">KJV</option>
+                    <option value="NKJV">NKJV</option>
+                    <option value="NIV">NIV</option>
+                    <option value="NLT">NLT</option>
+                    <option value="NASB">NASB</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    value={scriptureQuery}
+                    onChange={(e) => searchScripture(e.target.value)}
+                    placeholder="Genesis 1:1, John 3:16..."
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      background: '#1a1a1c',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: 8,
+                      color: '#ffffff',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                {/* Verses List Header */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.5)', marginTop: 10, letterSpacing: '0.05em' }}>
+                  {scriptureQuery.toUpperCase() || 'SEARCH RESULTS'}
+                </div>
+
+                {/* Verses Selection list */}
+                <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, paddingRight: 4 }}>
+                  {scriptureLoading ? (
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>Searching Bible...</div>
+                  ) : scriptureVerses.length === 0 ? (
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>No verses found</div>
+                  ) : (
+                    scriptureVerses.map((v) => (
+                      <button
+                        key={`${v.book}-${v.chapter}-${v.verse}`}
+                        type="button"
+                        onClick={() => handleSelectVerse(v)}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          color: '#ffffff',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          gap: 10,
+                          alignItems: 'flex-start',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(244, 98, 31, 0.15)';
+                          e.currentTarget.style.borderColor = 'rgba(244, 98, 31, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                        }}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 800, color: '#f4621f', marginTop: 1, minWidth: 16 }}>{v.verse}</span>
+                        <span style={{ fontSize: 13, color: '#ffffff', lineHeight: 1.4, flex: 1 }}>{v.text}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {/* Color Customizers Footer */}
+                <div style={{ display: 'flex', gap: 12, marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 10 }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="color" value={verseColor} onChange={(e) => setVerseColor(e.target.value)} style={COLOR_DOT} />
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>Verse Color</span>
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="color" value={refColor} onChange={(e) => setRefColor(e.target.value)} style={COLOR_DOT} />
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>Ref Color</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 3. Shape Tool Dropdown (Clean Row List matching Reference Image 2) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setActiveDropdown(activeDropdown === 'shapes' ? null : 'shapes')}
+              style={isShapeActive || activeDropdown === 'shapes' ? PILL_BTN_ACTIVE : PILL_BTN}
+              title="Insert Shapes"
+            >
+              <svg viewBox="0 0 24 24" style={ICON}>
+                <rect x="3" y="3" width="18" height="18" rx="4" />
+              </svg>
+              <span>Shape</span>
+              <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
+            </button>
+
+            {activeDropdown === 'shapes' && (
+              <div style={{ ...POPOVER_SHELL, width: 170, padding: 6, gap: 2 }}>
+                {/* 1. Rectangle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectTool('rectangle');
+                    setActiveDropdown(null);
                   }}
-                  style={{
-                    padding: '8px 10px',
-                    background: '#1a1a1c',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: 8,
-                    color: '#ffffff',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
+                  style={DROPDOWN_ITEM_CLEAN}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <option value="KJV">KJV</option>
-                  <option value="NKJV">NKJV</option>
-                  <option value="NIV">NIV</option>
-                  <option value="NLT">NLT</option>
-                  <option value="NASB">NASB</option>
-                </select>
+                  <svg viewBox="0 0 24 24" style={ICON}>
+                    <rect x="4" y="4" width="16" height="16" rx="0" />
+                  </svg>
+                  <span>Rectangle</span>
+                </button>
 
-                <input
-                  type="text"
-                  value={scriptureQuery}
-                  onChange={(e) => searchScripture(e.target.value)}
-                  placeholder="Genesis 1:1, John 3:16..."
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    background: '#1a1a1c',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: 8,
-                    color: '#ffffff',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    outline: 'none',
+                {/* 2. Rounded */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectTool('rounded');
+                    setActiveDropdown(null);
                   }}
-                />
-              </div>
+                  style={DROPDOWN_ITEM_CLEAN}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <svg viewBox="0 0 24 24" style={ICON}>
+                    <rect x="4" y="4" width="16" height="16" rx="5" />
+                  </svg>
+                  <span>Rounded</span>
+                </button>
 
-              {/* Verses List Header */}
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.5)', marginTop: 10, letterSpacing: '0.05em' }}>
-                {scriptureQuery.toUpperCase() || 'SEARCH RESULTS'}
-              </div>
+                {/* 3. Circle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectTool('circle');
+                    setActiveDropdown(null);
+                  }}
+                  style={DROPDOWN_ITEM_CLEAN}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <svg viewBox="0 0 24 24" style={ICON}>
+                    <circle cx="12" cy="12" r="8" />
+                  </svg>
+                  <span>Circle</span>
+                </button>
 
-              {/* Verses Selection list (Direct 1-Click Clickable) */}
-              <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, paddingRight: 4 }}>
-                {scriptureLoading ? (
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>Searching Bible...</div>
-                ) : scriptureVerses.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>No verses found</div>
-                ) : (
-                  scriptureVerses.map((v) => (
-                    <button
-                      key={`${v.book}-${v.chapter}-${v.verse}`}
-                      type="button"
-                      onClick={() => handleSelectVerse(v)}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 8,
-                        background: 'rgba(255, 255, 255, 0.04)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        color: '#ffffff',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        gap: 10,
-                        alignItems: 'flex-start',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(244, 98, 31, 0.15)';
-                        e.currentTarget.style.borderColor = 'rgba(244, 98, 31, 0.4)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                      }}
-                    >
-                      <span style={{ fontSize: 13, fontWeight: 800, color: '#f4621f', marginTop: 1, minWidth: 16 }}>{v.verse}</span>
-                      <span style={{ fontSize: 13, color: '#ffffff', lineHeight: 1.4, flex: 1 }}>{v.text}</span>
-                    </button>
-                  ))
-                )}
-              </div>
+                {/* 4. Triangle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectTool('triangle');
+                    setActiveDropdown(null);
+                  }}
+                  style={DROPDOWN_ITEM_CLEAN}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <svg viewBox="0 0 24 24" style={ICON}>
+                    <polygon points="12,4 4,20 20,20" />
+                  </svg>
+                  <span>Triangle</span>
+                </button>
 
-              {/* Color Customizers Footer */}
-              <div style={{ display: 'flex', gap: 12, marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 10 }}>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="color" value={verseColor} onChange={(e) => setVerseColor(e.target.value)} style={COLOR_DOT} />
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>Verse Color</span>
-                </div>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="color" value={refColor} onChange={(e) => setRefColor(e.target.value)} style={COLOR_DOT} />
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>Ref Color</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+                {/* 5. Star */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectTool('star');
+                    setActiveDropdown(null);
+                  }}
+                  style={DROPDOWN_ITEM_CLEAN}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <svg viewBox="0 0 24 24" style={ICON}>
+                    <polygon points="12,2 15,9 22,9 16,14 18,21 12,17 6,21 8,14 2,9 9,9" />
+                  </svg>
+                  <span>Star</span>
+                </button>
 
-        {/* 3. Shape Tool Dropdown (Box / Circle) */}
-        <div style={{ position: 'relative' }}>
+                {/* 6. Line */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectTool('line');
+                    setActiveDropdown(null);
+                  }}
+                  style={DROPDOWN_ITEM_CLEAN}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <svg viewBox="0 0 24 24" style={ICON}>
+                    <line x1="4" y1="12" x2="20" y2="12" strokeWidth="2.5" />
+                  </svg>
+                  <span>Line</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 4. Image Tool (Triggers File Picker Upload) */}
           <button
             type="button"
-            onClick={() => setActiveDropdown(activeDropdown === 'shapes' ? null : 'shapes')}
-            style={isShapeActive || activeDropdown === 'shapes' ? PILL_BTN_ACTIVE : PILL_BTN}
-            title="Insert Shapes"
+            onClick={() => {
+              onSelectTool('image');
+              setActiveDropdown(null);
+            }}
+            style={activeTool === 'image' ? PILL_BTN_ACTIVE : PILL_BTN}
+            title="Upload / Add Image Asset"
           >
             <svg viewBox="0 0 24 24" style={ICON}>
-              <rect x="3" y="3" width="18" height="18" rx="4" />
+              <rect x="3" y="3" width="18" height="18" rx="3.5" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="M21 15l-3.086-3.086a2 2 0 00-2.828 0L6 21" />
             </svg>
-            <span>Shape</span>
-            <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
+            <span>Image</span>
           </button>
-
-          {activeDropdown === 'shapes' && (
-            <div style={{ ...POPOVER_SHELL, width: 170 }}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelectTool('box');
-                  setActiveDropdown(null);
-                }}
-                style={DROPDOWN_ITEM}
-              >
-                <svg viewBox="0 0 24 24" style={ICON}>
-                  <rect x="3" y="3" width="18" height="18" rx="4" />
-                </svg>
-                <span>Rectangle</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelectTool('circle');
-                  setActiveDropdown(null);
-                }}
-                style={DROPDOWN_ITEM}
-              >
-                <svg viewBox="0 0 24 24" style={ICON}>
-                  <circle cx="12" cy="12" r="9" />
-                </svg>
-                <span>Circle</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* 4. Image Tool */}
-        <button
-          type="button"
-          onClick={() => {
-            onSelectTool('image');
-            setActiveDropdown(null);
-          }}
-          style={activeTool === 'image' ? PILL_BTN_ACTIVE : PILL_BTN}
-          title="Add Image Asset"
-        >
-          <svg viewBox="0 0 24 24" style={ICON}>
-            <rect x="3" y="3" width="18" height="18" rx="3.5" />
-            <circle cx="9" cy="9" r="2" />
-            <path d="M21 15l-3.086-3.086a2 2 0 00-2.828 0L6 21" />
-          </svg>
-          <span>Image</span>
-          <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
-        </button>
 
         {/* 5. Song Tool Button (Worship Songs with 2nd-level Section Selector) */}
         <div style={{ position: 'relative' }}>
@@ -594,6 +735,7 @@ export function SlideEditorQuickToolbar({
         )}
       </div>
     </div>
+  </div>
   );
 }
 
@@ -608,6 +750,18 @@ const CONTAINER: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   userSelect: 'none',
+};
+
+const TOOLBAR_CARD: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  padding: '6px 10px 8px',
+  background: 'rgba(20, 20, 22, 0.95)',
+  border: '1px solid rgba(255, 255, 255, 0.12)',
+  borderRadius: 16,
+  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+  backdropFilter: 'blur(20px)',
 };
 
 const HEADER_LABEL: React.CSSProperties = {
@@ -712,6 +866,23 @@ const DROPDOWN_ITEM: React.CSSProperties = {
   alignItems: 'center',
   gap: 8,
   cursor: 'pointer',
+};
+
+const DROPDOWN_ITEM_CLEAN: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 12px',
+  background: 'transparent',
+  border: 'none',
+  borderRadius: 8,
+  color: '#ffffff',
+  fontSize: 13,
+  fontWeight: 600,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  cursor: 'pointer',
+  textAlign: 'left',
+  transition: 'background 0.12s ease',
 };
 
 const COLOR_DOT: React.CSSProperties = {

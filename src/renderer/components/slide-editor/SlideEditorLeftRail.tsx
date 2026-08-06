@@ -395,20 +395,36 @@ export function SlideEditorLeftRail({
               key={tpl.id}
               onClick={() => onApplyTemplate(tpl.id)}
               style={{
-                background: '#1c1e26',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: 8,
                 overflow: 'hidden',
                 cursor: 'pointer',
-                padding: 6,
+                padding: 0,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 6,
-                transition: 'border-color 0.15s ease',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(244, 98, 31, 0.5)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              <TemplateCardThumb id={tpl.id} bg={tpl.bg} name={tpl.name} />
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#ffffff', padding: '0 2px' }}>
+              <TemplateCardThumb id={tpl.id} bg={tpl.bg} />
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  padding: '6px 10px',
+                  background: 'rgba(0, 0, 0, 0.6)',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                }}
+              >
                 {tpl.name}
               </div>
             </div>
@@ -419,106 +435,163 @@ export function SlideEditorLeftRail({
   );
 }
 
-function TemplateCardThumb({
-  id,
-  bg,
-  name,
-}: {
-  id: string;
-  bg: string;
-  name: string;
-}) {
+function getTemplateElements(id: string): any[] {
+  if (id === 'worship') {
+    return [
+      { id: '1', type: 'text', content: 'AMAZING GRACE, HOW SWEET THE SOUND', x: 10, y: 28, width: 80, height: 25, fontSize: 48, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
+      { id: '2', type: 'text', content: 'That saved a wretch like me! I once was lost, but now am found', x: 10, y: 56, width: 80, height: 20, fontSize: 28, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center' },
+    ];
+  }
+  if (id === 'sermon') {
+    return [
+      { id: 'card', type: 'shape', x: 8, y: 12, width: 84, height: 76, backgroundColor: 'rgba(35, 34, 33, 0.7)', borderColor: 'rgba(255, 85, 0, 0.3)', borderWidth: 1, borderRadius: 16 },
+      { id: 'badge', type: 'shape', x: 12, y: 18, width: 6, height: 10, backgroundColor: '#f4621f', borderRadius: 12 },
+      { id: 'num', type: 'text', content: '01', x: 12, y: 19, width: 6, height: 8, fontSize: 24, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
+      { id: 'title', type: 'text', content: 'FAITH OVER FEAR: WALKING IN PURPOSE', x: 20, y: 18, width: 68, height: 12, fontSize: 34, color: '#ffffff', fontWeight: 700 },
+      { id: 'body', type: 'text', content: '• Trusting God in times of uncertainty\n• Stepping out of your comfort zone\n• Building a foundation rooted in Prayer', x: 20, y: 34, width: 68, height: 48, fontSize: 26, color: '#d4d4d8' },
+    ];
+  }
+  if (id === 'scripture') {
+    return [
+      { id: 'verse', type: 'text', content: '"For God so loved the world, that he gave his only begotten Son..."', x: 10, y: 25, width: 80, height: 40, fontSize: 36, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
+      { id: 'ref', type: 'text', content: 'JOHN 3:16 (KJV)', x: 25, y: 70, width: 50, height: 12, fontSize: 26, color: '#f4621f', fontWeight: 700, textAlign: 'center' },
+    ];
+  }
+  if (id === 'lower-third') {
+    return [
+      { id: 'bg', type: 'shape', x: 6, y: 70, width: 88, height: 22, backgroundColor: 'rgba(22, 20, 20, 0.92)', borderColor: '#f4621f', borderWidth: 2, borderRadius: 12 },
+      { id: 'name', type: 'text', content: 'PASTOR DAVID E. JOHNSON', x: 10, y: 73, width: 80, height: 10, fontSize: 32, color: '#ffffff', fontWeight: 700 },
+      { id: 'role', type: 'text', content: 'Senior Pastor · Grace Community Church', x: 10, y: 82, width: 80, height: 8, fontSize: 20, color: '#f4621f', fontWeight: 700 },
+    ];
+  }
+  if (id === 'announcement') {
+    return [
+      { id: 'badge', type: 'shape', x: 35, y: 15, width: 30, height: 8, backgroundColor: '#f4621f', borderRadius: 22 },
+      { id: 'badgetxt', type: 'text', content: 'UPCOMING EVENT', x: 35, y: 16, width: 30, height: 6, fontSize: 16, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
+      { id: 'title', type: 'text', content: 'SUNDAY NIGHT WORSHIP & HEALING', x: 10, y: 28, width: 80, height: 25, fontSize: 44, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
+      { id: 'details', type: 'text', content: 'THIS SUNDAY · 6:00 PM · MAIN SANCTUARY', x: 10, y: 56, width: 80, height: 25, fontSize: 24, color: 'rgba(255, 255, 255, 0.85)', textAlign: 'center' },
+    ];
+  }
+  if (id === 'welcome') {
+    return [
+      { id: 'title', type: 'text', content: 'WELCOME TO OUR CHURCH', x: 10, y: 30, width: 80, height: 25, fontSize: 52, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
+      { id: 'sub', type: 'text', content: 'We are so glad you are worshipping with us today!', x: 10, y: 58, width: 80, height: 18, fontSize: 28, color: '#f4621f', fontWeight: 700, textAlign: 'center' },
+    ];
+  }
+  if (id === 'offering') {
+    return [
+      { id: 'title', type: 'text', content: 'TITHE & OFFERING', x: 10, y: 20, width: 80, height: 20, fontSize: 48, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
+      { id: 'verse', type: 'text', content: '"Honor the LORD with your wealth..."', x: 10, y: 42, width: 80, height: 18, fontSize: 22, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center' },
+      { id: 'ways', type: 'text', content: 'GIVE ONLINE: www.church.org/give', x: 10, y: 64, width: 80, height: 15, fontSize: 24, color: '#22c55e', fontWeight: 700, textAlign: 'center' },
+    ];
+  }
+  if (id === 'benediction') {
+    return [
+      { id: 'title', type: 'text', content: 'GO IN PEACE & GRACE', x: 10, y: 30, width: 80, height: 25, fontSize: 48, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
+      { id: 'sub', type: 'text', content: 'The LORD bless you and keep you', x: 10, y: 58, width: 80, height: 20, fontSize: 26, color: '#f4621f', fontWeight: 700, textAlign: 'center' },
+    ];
+  }
+  return [];
+}
+
+function TemplateCardThumb({ id, bg }: { id: string; bg: string }) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [containerW, setContainerW] = React.useState(210);
+
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) setContainerW(w);
+    };
+    measure();
+    const obs = new ResizeObserver(measure);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const scale = containerW / 1280;
+  const height = Math.max(80, Math.round(containerW * (720 / 1280)));
   const isLowerThird = id === 'lower-third';
   const isTransparent = isLowerThird || bg === 'transparent';
+  const elements = getTemplateElements(id);
 
   return (
     <div
+      ref={containerRef}
       style={{
         width: '100%',
-        aspectRatio: '16/9',
-        borderRadius: 6,
-        overflow: 'hidden',
+        height,
         position: 'relative',
+        overflow: 'hidden',
         background: isTransparent
-          ? 'repeating-conic-gradient(#262628 0% 25%, #161414 0% 50%) 50% / 12px 12px'
+          ? 'repeating-conic-gradient(#262628 0% 25%, #161414 0% 50%) 50% / 14px 14px'
           : bg,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
         boxSizing: 'border-box',
       }}
     >
-      {id === 'worship' && (
-        <div style={{ textAlign: 'center', padding: '0 12px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Sing Unto The Lord
+      <div
+        style={{
+          width: 1280,
+          height: 720,
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          transform: `scale(${scale})`,
+          transformOrigin: '0 0',
+          pointerEvents: 'none',
+        }}
+      >
+        {elements.map((el) => (
+          <div
+            key={el.id}
+            style={{
+              position: 'absolute',
+              left: `${el.x}%`,
+              top: `${el.y}%`,
+              width: `${el.width}%`,
+              height: `${el.height}%`,
+              zIndex: el.zIndex || 1,
+            }}
+          >
+            {el.type === 'text' && (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  color: el.color || '#ffffff',
+                  fontFamily: el.fontFamily || 'Inter',
+                  fontSize: el.fontSize || 36,
+                  fontWeight: el.fontWeight || 500,
+                  textAlign: el.textAlign || 'center',
+                  lineHeight: el.lineHeight || 1.3,
+                  textShadow: el.textShadow || '0 2px 8px rgba(0, 0, 0, 0.6)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: el.textAlign === 'left' ? 'flex-start' : el.textAlign === 'right' ? 'flex-end' : 'center',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {el.content}
+              </div>
+            )}
+            {el.type === 'shape' && (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: el.backgroundColor || 'rgba(255, 255, 255, 0.1)',
+                  borderColor: el.borderColor || 'transparent',
+                  borderWidth: el.borderWidth || 0,
+                  borderStyle: el.borderWidth ? 'solid' : 'none',
+                  borderRadius: el.borderRadius || 0,
+                }}
+              />
+            )}
           </div>
-          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-            A new song of praise and worship
-          </div>
-        </div>
-      )}
-
-      {id === 'sermon' && (
-        <div style={{ width: '85%', height: '70%', background: 'rgba(35, 34, 33, 0.75)', border: '1px solid rgba(255,85,0,0.4)', borderRadius: 6, padding: 6, boxSizing: 'border-box', display: 'flex', gap: 6, alignItems: 'center' }}>
-          <div style={{ width: 16, height: 16, borderRadius: 3, background: '#f4621f', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>01</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 8, fontWeight: 700, color: '#ffffff' }}>FAITH OVER FEAR</div>
-            <div style={{ fontSize: 6, color: '#a1a1aa', marginTop: 1 }}>• Trusting God in trials</div>
-          </div>
-        </div>
-      )}
-
-      {id === 'scripture' && (
-        <div style={{ width: '85%', textAlign: 'center' }}>
-          <div style={{ fontSize: 8, fontWeight: 600, color: '#ffffff', fontStyle: 'italic' }}>
-            &ldquo;For God so loved the world...&rdquo;
-          </div>
-          <div style={{ fontSize: 7, fontWeight: 700, color: '#f4621f', marginTop: 3 }}>
-            JOHN 3:16 (KJV)
-          </div>
-        </div>
-      )}
-
-      {id === 'lower-third' && (
-        <div style={{ position: 'absolute', bottom: 6, left: 10, right: 10, height: 28, background: 'rgba(22, 20, 20, 0.92)', border: '1px solid #f4621f', borderRadius: 5, padding: '3px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: 8, fontWeight: 800, color: '#ffffff' }}>PASTOR DAVID E. JOHNSON</div>
-          <div style={{ fontSize: 6, fontWeight: 600, color: '#f4621f' }}>Senior Pastor &bull; Grace Community</div>
-        </div>
-      )}
-
-      {id === 'announcement' && (
-        <div style={{ textAlign: 'center', padding: '0 10px' }}>
-          <div style={{ display: 'inline-block', background: '#f4621f', borderRadius: 8, padding: '1px 6px', fontSize: 6, fontWeight: 800, color: '#fff', marginBottom: 2 }}>
-            UPCOMING EVENT
-          </div>
-          <div style={{ fontSize: 9, fontWeight: 800, color: '#ffffff' }}>NIGHT OF WORSHIP</div>
-        </div>
-      )}
-
-      {id === 'welcome' && (
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: '#ffffff' }}>WELCOME</div>
-          <div style={{ fontSize: 7, fontWeight: 600, color: '#f4621f', marginTop: 1 }}>We are so glad you are here</div>
-        </div>
-      )}
-
-      {id === 'offering' && (
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: '#ffffff' }}>TITHE &amp; OFFERING</div>
-          <div style={{ fontSize: 6, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>www.church.org/give</div>
-        </div>
-      )}
-
-      {id === 'benediction' && (
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: '#ffffff' }}>GO IN PEACE</div>
-          <div style={{ fontSize: 7, color: '#f4621f', marginTop: 1 }}>The LORD bless you and keep you</div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }

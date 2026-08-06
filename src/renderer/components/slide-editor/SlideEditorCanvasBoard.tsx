@@ -65,6 +65,30 @@ export function SlideEditorCanvasBoard({
     return () => window.removeEventListener('resize', fitToViewport);
   }, []);
 
+  /* Keyboard CMD/Ctrl +/-/0 for Canvas-only zoom */
+  useEffect(() => {
+    function handleCanvasZoomKeys(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+' || e.key === 'NumpadAdd') {
+          e.preventDefault();
+          e.stopPropagation();
+          setScale((s) => Math.min(2.5, s + 0.1));
+        } else if (e.key === '-' || e.key === '_' || e.key === 'NumpadSubtract') {
+          e.preventDefault();
+          e.stopPropagation();
+          setScale((s) => Math.max(0.2, s - 0.1));
+        } else if (e.key === '0' || e.key === 'Numpad0') {
+          e.preventDefault();
+          e.stopPropagation();
+          fitToViewport();
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleCanvasZoomKeys, { capture: true });
+    return () => window.removeEventListener('keydown', handleCanvasZoomKeys, { capture: true });
+  }, []);
+
   // Wheel zoom / pan
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -163,27 +187,74 @@ export function SlideEditorCanvasBoard({
   const bgValue = slide.background?.value || '#18181b';
   const bgType = slide.background?.type || 'color';
 
+  /* Spacebar key listener for Space+Drag panning */
+  const [spaceHeld, setSpaceHeld] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        setSpaceHeld(true);
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setSpaceHeld(false);
+    };
+    const onBlur = () => setSpaceHeld(false);
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
+
+  /* Native non-passive wheel listener for smooth wheel pan & Ctrl/Cmd zoom */
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+        setScale((s) => Math.min(Math.max(s * zoomFactor, 0.2), 2.5));
+      } else {
+        setPanX((px) => px - e.deltaX);
+        setPanY((py) => py - e.deltaY);
+      }
+    };
+
+    viewport.addEventListener('wheel', onWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', onWheel);
+  }, []);
+
   return (
     <section
       ref={viewportRef}
       id="canvas-viewport"
-      onWheel={handleWheel}
-      onMouseDown={(e) => {
-        if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      onPointerDown={(e) => {
+        const isBgClick = e.target === viewportRef.current || (e.target as HTMLElement).id === 'slide-canvas-root';
+        if (spaceHeld || e.button === 1 || (e.button === 0 && e.altKey) || isBgClick) {
           setIsPanning(true);
           setPanStart({ x: e.clientX - panX, y: e.clientY - panY });
-        } else if (e.target === viewportRef.current || (e.target as HTMLElement).id === 'slide-canvas-root') {
+        }
+        if (isBgClick) {
           onSelectElement(null);
           setEditingTextId(null);
         }
       }}
-      onMouseMove={(e) => {
+      onPointerMove={(e) => {
         if (isPanning) {
           setPanX(e.clientX - panStart.x);
           setPanY(e.clientY - panStart.y);
         }
       }}
-      onMouseUp={() => setIsPanning(false)}
+      onPointerUp={() => setIsPanning(false)}
+      onPointerLeave={() => setIsPanning(false)}
       style={{
         flex: 1,
         backgroundColor: '#111010',
@@ -193,7 +264,7 @@ export function SlideEditorCanvasBoard({
         position: 'relative',
         overflow: 'hidden',
         userSelect: 'none',
-        cursor: isPanning ? 'grabbing' : 'default',
+        cursor: isPanning || spaceHeld ? 'grabbing' : 'default',
       }}
     >
       {/* Top-Left Mode Indicator */}
@@ -369,6 +440,11 @@ export function SlideEditorCanvasBoard({
           const isSelected = el.id === selectedElementId;
           const isEditing = el.id === editingTextId;
 
+          const elX = el.x > 100 ? (el.x / 1280) * 100 : el.x;
+          const elY = el.y > 100 ? (el.y / 720) * 100 : el.y;
+          const elW = el.width > 100 ? (el.width / 1280) * 100 : el.width;
+          const elH = el.height > 100 ? (el.height / 720) * 100 : el.height;
+
           return (
             <div
               key={el.id}
@@ -390,18 +466,18 @@ export function SlideEditorCanvasBoard({
                   handle: null,
                   startX: e.clientX,
                   startY: e.clientY,
-                  initialX: el.x,
-                  initialY: el.y,
-                  initialW: el.width,
-                  initialH: el.height,
+                  initialX: elX,
+                  initialY: elY,
+                  initialW: elW,
+                  initialH: elH,
                 });
               }}
               style={{
                 position: 'absolute',
-                left: `${el.x}%`,
-                top: `${el.y}%`,
-                width: `${el.width}%`,
-                height: `${el.height}%`,
+                left: `${elX}%`,
+                top: `${elY}%`,
+                width: `${elW}%`,
+                height: `${elH}%`,
                 zIndex: el.zIndex || 1,
                 cursor: isEditing ? 'text' : 'move',
                 border: isSelected ? '1.5px solid rgba(255, 255, 255, 0.7)' : '1px transparent solid',
@@ -484,9 +560,22 @@ export function SlideEditorCanvasBoard({
                     height: '100%',
                     backgroundColor: el.backgroundColor || 'rgba(244, 98, 31, 0.25)',
                     borderColor: el.borderColor || '#f4621f',
-                    borderWidth: el.borderWidth || 3,
+                    borderWidth: el.borderWidth !== undefined ? el.borderWidth : 3,
                     borderStyle: 'solid',
-                    borderRadius: el.content === 'circle' ? '50%' : el.borderRadius || 12,
+                    borderRadius:
+                      el.content === 'circle'
+                        ? '50%'
+                        : el.content === 'rectangle'
+                        ? 0
+                        : el.borderRadius !== undefined
+                        ? el.borderRadius
+                        : 12,
+                    clipPath:
+                      el.content === 'triangle'
+                        ? 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                        : el.content === 'star'
+                        ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                        : undefined,
                     opacity: el.opacity ?? 1,
                   }}
                 />

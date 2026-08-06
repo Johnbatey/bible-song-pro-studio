@@ -247,10 +247,10 @@ export function PresentationPanel() {
               id: `text-${Date.now()}`,
               type: 'text',
               content: title,
-              x: 140,
-              y: 280,
-              width: 1000,
-              height: 160,
+              x: 10,
+              y: 35,
+              width: 80,
+              height: 30,
               fontSize: 48,
               color: '#ffffff',
               fontWeight: 700,
@@ -677,7 +677,7 @@ export function PresentationPanel() {
                   />
 
                   {/* Index Badge */}
-                  <div style={styles.slideIndexBadge}>#{index + 1}</div>
+                  <div style={styles.slideIndexBadge}>{index + 1}</div>
 
                   {/* Live Status Badge */}
                   {live && (

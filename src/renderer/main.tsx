@@ -42,6 +42,16 @@ function Root() {
 
   useEffect(() => {
     setReady(true);
+
+    /* Block Cmd/Ctrl + / - / 0 from zooming the entire HTML application page */
+    function blockAppZoom(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '_' || e.key === '0')) {
+        e.preventDefault();
+      }
+    }
+
+    window.addEventListener('keydown', blockAppZoom, { capture: true });
+    return () => window.removeEventListener('keydown', blockAppZoom, { capture: true });
   }, []);
 
   return (

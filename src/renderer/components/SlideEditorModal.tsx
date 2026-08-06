@@ -559,8 +559,8 @@ export function SlideEditorModal() {
   const selectedElement = activeSlide.elements?.find((el) => el.id === selectedElementId) || null;
 
   // Tool Selection Handlers
-  const handleSelectTool = (tool: ActiveTool) => {
-    setActiveTool(tool);
+  const handleSelectTool = (tool: ActiveTool | string) => {
+    setActiveTool(tool as ActiveTool);
     if (tool === 'text') {
       const newElement: SlideElement = {
         id: `text-${Date.now()}`,
@@ -580,23 +580,54 @@ export function SlideEditorModal() {
       handleUpdateSlideElements([...(activeSlide.elements || []), newElement]);
       setSelectedElementId(newElement.id);
       setActiveTool('select');
-    } else if (tool === 'box' || tool === 'circle') {
+    } else if (['box', 'rectangle', 'rounded', 'circle', 'triangle', 'star', 'line'].includes(tool)) {
+      const isCircle = tool === 'circle';
+      const isRounded = tool === 'rounded';
+      const isLine = tool === 'line';
       const newElement: SlideElement = {
         id: `shape-${Date.now()}`,
         type: 'shape',
         x: 34.4,
-        y: 33.3,
+        y: isLine ? 48 : 33.3,
         width: 31.3,
-        height: 33.3,
-        content: tool === 'circle' ? 'circle' : 'rectangle',
-        backgroundColor: 'rgba(244, 98, 31, 0.25)',
+        height: isLine ? 1 : 33.3,
+        content: tool,
+        backgroundColor: isLine ? '#f4621f' : 'rgba(244, 98, 31, 0.25)',
         borderColor: '#f4621f',
-        borderWidth: 3,
-        borderRadius: tool === 'circle' ? 300 : 12,
+        borderWidth: isLine ? 0 : 3,
+        borderRadius: isCircle ? 300 : isRounded ? 12 : 0,
         zIndex: (activeSlide.elements?.length || 0) + 1,
       };
       handleUpdateSlideElements([...(activeSlide.elements || []), newElement]);
       setSelectedElementId(newElement.id);
+      setActiveTool('select');
+    } else if (tool === 'image') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e: any) => {
+        const file = e.target?.files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            const imgUrl = evt.target?.result as string;
+            const newElement: SlideElement = {
+              id: `image-${Date.now()}`,
+              type: 'image',
+              content: imgUrl,
+              x: 20,
+              y: 15,
+              width: 60,
+              height: 70,
+              zIndex: (activeSlide.elements?.length || 0) + 1,
+            };
+            handleUpdateSlideElements([...(activeSlide.elements || []), newElement]);
+            setSelectedElementId(newElement.id);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
       setActiveTool('select');
     }
   };
