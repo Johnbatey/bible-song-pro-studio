@@ -356,44 +356,50 @@
 .dz-floatbar-card {
   pointer-events: auto;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 4px;
-  background: #141416;
+  padding: 4px 8px 6px;
+  background: rgba(20, 20, 22, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 9px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
 }
 .dz-floatbar-sep { width: 1px; align-self: stretch; margin: 2px 3px; background: rgba(255, 255, 255, 0.1); }
 .dz-floatbar-swatch {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 9px 4px 6px;
-  border-radius: 6px;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
   font-size: 12px;
   font-weight: 600;
   color: var(--dz-dim);
   cursor: pointer;
 }
-.dz-floatbar-swatch:hover { background: rgba(255, 255, 255, 0.07); color: var(--dz-text); }
+.dz-floatbar-swatch:hover { background: rgba(255, 255, 255, 0.12); color: var(--dz-text); }
 
 .dz-menu-trigger {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 9px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
   color: var(--dz-text);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
-.dz-menu-trigger:hover { background: rgba(255, 255, 255, 0.08); }
-.dz-menu-trigger[data-open] { background: rgba(255, 255, 255, 0.12); }
+.dz-menu-trigger:hover { background: rgba(255, 255, 255, 0.12); }
+.dz-menu-trigger[data-open] { background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.3); }
 /* Amber, not accent: this marks a setting turned off, which is a thing to
    notice rather than a thing that is going well. */
 .dz-menu-trigger[data-active] { border-color: rgba(255, 179, 122, 0.45); }
@@ -458,7 +464,7 @@
 .dz-menu-check:hover { background: rgba(255, 255, 255, 0.07); }
 .dz-menu-check input { accent-color: var(--dz-accent); cursor: pointer; }
 
-/* ---- zoom bar ----------------------------------------------------------- */
+/* ---- zoom bar (Sleek Bottom Pill Bar matching Image 1) ---------------- */
 .dz-zoombar {
   position: absolute;
   bottom: 38px;
@@ -467,21 +473,43 @@
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  background: #141416;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 9px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  gap: 10px;
+  user-select: none;
 }
-.dz-zoombar input[type='range'] { width: 104px; accent-color: var(--dz-accent); }
+.dz-zoombar-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  background: rgba(20, 20, 22, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(16px);
+}
+.dz-zoombar input[type='range'] { width: 110px; accent-color: var(--dz-accent); cursor: pointer; }
 .dz-zoom {
-  min-width: 42px;
+  min-width: 36px;
   text-align: center;
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--dz-dim);
+  color: rgba(255, 255, 255, 0.85);
+}
+.dz-zoombar-fit {
+  padding: 7px 16px;
+  background: rgba(255, 255, 255, 0.85);
+  border: none;
+  border-radius: 8px;
+  color: #111010;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: all 0.15s ease;
+}
+.dz-zoombar-fit:hover {
+  background: #ffffff;
 }
 
 /* ---- canvas ------------------------------------------------------------- */

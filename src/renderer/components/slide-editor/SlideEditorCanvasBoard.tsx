@@ -298,74 +298,80 @@ export function SlideEditorCanvasBoard({
         <span>Slide Builder Mode: Creating Custom Slide Canvas</span>
       </div>
 
-      {/* Top-Right Floating Zoom Controls */}
+      {/* Sleek Bottom-Center Canvas Zoom Pill Bar (Matching Reference Image 1) */}
       <div
         style={{
           position: 'absolute',
-          top: 14,
-          right: 16,
+          bottom: 18,
+          left: '50%',
+          transform: 'translateX(-50%)',
           zIndex: 40,
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
-          background: 'rgba(21, 23, 29, 0.85)',
-          padding: '4px 8px',
-          borderRadius: 8,
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(12px)',
+          gap: 10,
+          userSelect: 'none',
         }}
       >
-        <button
-          type="button"
-          onClick={() => setScale((s) => Math.max(0.2, s - 0.1))}
+        <div
           style={{
-            width: 26,
-            height: 26,
-            background: 'none',
-            border: 'none',
-            color: '#ffffff',
-            cursor: 'pointer',
-            fontSize: 14,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '5px 14px',
+            background: 'rgba(20, 20, 22, 0.92)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: 24,
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(16px)',
           }}
-          title="Zoom Out"
         >
-          -
-        </button>
+          <button
+            type="button"
+            onClick={() => setScale((s) => Math.max(0.2, s - 0.1))}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', padding: 2 }}
+            title="Zoom Out"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
 
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#ffffff', minWidth: 44, textAlign: 'center' }}>
-          {Math.round(scale * 100)}%
-        </span>
+          <input
+            type="range"
+            min={0.2}
+            max={2.0}
+            step={0.02}
+            value={scale}
+            onChange={(e) => setScale(parseFloat(e.target.value))}
+            style={{ width: 110, accentColor: '#f4621f', cursor: 'pointer', height: 4 }}
+          />
 
-        <button
-          type="button"
-          onClick={() => setScale((s) => Math.min(2.0, s + 0.1))}
-          style={{
-            width: 26,
-            height: 26,
-            background: 'none',
-            border: 'none',
-            color: '#ffffff',
-            cursor: 'pointer',
-            fontSize: 14,
-          }}
-          title="Zoom In"
-        >
-          +
-        </button>
+          <button
+            type="button"
+            onClick={() => setScale((s) => Math.min(2.0, s + 0.1))}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', padding: 2 }}
+            title="Zoom In"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.85)', minWidth: 36, textAlign: 'center' }}>
+            {Math.round(scale * 100)}%
+          </span>
+        </div>
 
         <button
           type="button"
           onClick={fitToViewport}
           style={{
-            padding: '2px 8px',
-            background: 'rgba(255, 255, 255, 0.1)',
+            padding: '7px 16px',
+            background: 'rgba(255, 255, 255, 0.85)',
             border: 'none',
-            borderRadius: 4,
-            color: '#ffffff',
-            fontSize: 11,
-            fontWeight: 600,
+            borderRadius: 8,
+            color: '#111010',
+            fontSize: 12,
+            fontWeight: 700,
             cursor: 'pointer',
-            marginLeft: 4,
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)',
+            transition: 'all 0.15s ease',
           }}
           title="Fit to Screen"
         >

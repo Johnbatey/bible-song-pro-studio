@@ -476,11 +476,6 @@ export function DesignerCanvas({
           onPointerDown={onSurfacePointerDown}
           style={gridStyle}
         >
-          {/* Thirds and centre lines, always on. Placing a confidence monitor
-              is mostly about the middle of the screen and the eye is bad at
-              finding it unaided. */}
-          <div className="dz-centre dz-centre-v" />
-          <div className="dz-centre dz-centre-h" />
 
           {layout.zones.map((zone) => {
             const selected = selection.includes(zone.id);

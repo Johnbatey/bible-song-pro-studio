@@ -242,7 +242,7 @@ export function SlideEditorLeftRail({
                     <div
                       style={{
                         width: '100%',
-                        height: 90,
+                        aspectRatio: '16 / 9',
                         background: bgType === 'gradient' ? bgValue : bgType === 'color' ? bgValue : '#18181b',
                         display: 'flex',
                         flexDirection: 'column',
@@ -522,6 +522,7 @@ function TemplateCardThumb({ id, bg }: { id: string; bg: string }) {
       ref={containerRef}
       style={{
         width: '100%',
+        aspectRatio: '16 / 9',
         height,
         position: 'relative',
         overflow: 'hidden',

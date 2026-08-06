@@ -711,15 +711,26 @@ export function StageDesigner() {
                 : { top: 54 }
             }
           >
-            <span
-              className="dz-floatbar-label"
-              onPointerDown={handleFloatbarPointerDown}
-              style={{ cursor: isDraggingFloatbar ? 'grabbing' : 'grab', userSelect: 'none' }}
-              title="Drag to move toolbar"
-            >
-              ⋮⋮ Add to layout
-            </span>
             <div className="dz-floatbar-card">
+              {/* Integrated Top Drag Handle & Label */}
+              <div
+                onPointerDown={handleFloatbarPointerDown}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  cursor: isDraggingFloatbar ? 'grabbing' : 'grab',
+                  paddingBottom: 4,
+                  width: '100%',
+                  userSelect: 'none',
+                }}
+                title="Drag to move toolbar"
+              >
+                <div style={{ width: 24, height: 2.5, background: 'rgba(255, 255, 255, 0.25)', borderRadius: 2, marginBottom: 2 }} />
+                <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255, 255, 255, 0.55)', letterSpacing: '0.01em' }}>Add to layout</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <Menu
                 label="Add layer"
                 icon={<Plus />}
@@ -834,6 +845,7 @@ export function StageDesigner() {
                 />
                 <span>Stage</span>
               </label>
+              </div>
             </div>
           </div>
 
@@ -855,21 +867,45 @@ export function StageDesigner() {
             hiddenTypes={hiddenTypes}
           />
 
-          {/* Bottom-centre, where every canvas tool puts it. */}
+          {/* Bottom-centre sleek zoom pill bar matching Image 1 */}
           <div className="dz-zoombar">
-            <button type="button" onClick={() => setZoom((z) => clamp(z - 0.1, ZOOM_MIN, ZOOM_MAX))} title="Zoom out">−</button>
-            <input
-              type="range"
-              min={ZOOM_MIN}
-              max={ZOOM_MAX}
-              step={0.01}
-              value={zoom}
-              onChange={(event) => setZoom(Number(event.currentTarget.value))}
-              title="Canvas zoom"
-            />
-            <button type="button" onClick={() => setZoom((z) => clamp(z + 0.1, ZOOM_MIN, ZOOM_MAX))} title="Zoom in">+</button>
-            <span className="dz-zoom">{Math.round(zoom * 100)}%</span>
-            <button type="button" onClick={() => setZoom(1)} title="Fit the stage to the window">Fit</button>
+            <div className="dz-zoombar-pill">
+              <button
+                type="button"
+                onClick={() => setZoom((z) => clamp(z - 0.1, ZOOM_MIN, ZOOM_MAX))}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', padding: 2 }}
+                title="Zoom out"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </button>
+              <input
+                type="range"
+                min={ZOOM_MIN}
+                max={ZOOM_MAX}
+                step={0.01}
+                value={zoom}
+                onChange={(event) => setZoom(Number(event.currentTarget.value))}
+                title="Canvas zoom"
+                style={{ width: 110, accentColor: '#f4621f', cursor: 'pointer', height: 4 }}
+              />
+              <button
+                type="button"
+                onClick={() => setZoom((z) => clamp(z + 0.1, ZOOM_MIN, ZOOM_MAX))}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', padding: 2 }}
+                title="Zoom in"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </button>
+              <span className="dz-zoom">{Math.round(zoom * 100)}%</span>
+            </div>
+            <button
+              type="button"
+              className="dz-zoombar-fit"
+              onClick={() => setZoom(1)}
+              title="Fit the stage to the window"
+            >
+              Fit
+            </button>
           </div>
 
           <footer className="dz-statusbar">

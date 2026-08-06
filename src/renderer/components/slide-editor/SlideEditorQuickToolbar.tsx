@@ -756,45 +756,45 @@ const TOOLBAR_CARD: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  padding: '6px 10px 8px',
+  padding: '4px 8px 6px',
   background: 'rgba(20, 20, 22, 0.95)',
   border: '1px solid rgba(255, 255, 255, 0.12)',
-  borderRadius: 16,
+  borderRadius: 12,
   boxShadow: '0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
   backdropFilter: 'blur(20px)',
 };
 
 const HEADER_LABEL: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 10,
   fontWeight: 600,
   color: 'rgba(255, 255, 255, 0.45)',
   letterSpacing: '0.02em',
-  marginBottom: 4,
+  marginBottom: 3,
 };
 
 const TOOLBAR_PILL: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 4,
-  padding: '5px 8px',
+  gap: 3,
+  padding: '3px 6px',
   background: 'rgba(20, 20, 22, 0.92)',
   border: '1px solid rgba(255, 255, 255, 0.12)',
-  borderRadius: 14,
+  borderRadius: 10,
   boxShadow: '0 16px 40px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05)',
   backdropFilter: 'blur(16px)',
 };
 
 const PILL_BTN: React.CSSProperties = {
-  height: 36,
-  padding: '0 12px',
+  height: 28,
+  padding: '0 9px',
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 6,
+  gap: 5,
   background: 'rgba(255, 255, 255, 0.06)',
   border: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: 10,
+  borderRadius: 7,
   color: 'rgba(255, 255, 255, 0.9)',
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 600,
   cursor: 'pointer',
   transition: 'all 0.15s ease',
@@ -823,14 +823,14 @@ const DISABLED_BTN: React.CSSProperties = {
 
 const DIVIDER: React.CSSProperties = {
   width: 1,
-  height: 20,
+  height: 16,
   background: 'rgba(255, 255, 255, 0.12)',
   margin: '0 2px',
 };
 
 const ICON: React.CSSProperties = {
-  width: 15,
-  height: 15,
+  width: 13,
+  height: 13,
   fill: 'none',
   stroke: 'currentColor',
   strokeWidth: 2,
@@ -840,13 +840,13 @@ const ICON: React.CSSProperties = {
 
 const POPOVER_SHELL: React.CSSProperties = {
   position: 'absolute',
-  top: 46,
+  top: 36,
   left: '50%',
   transform: 'translateX(-50%)',
   background: '#161618',
   border: '1px solid rgba(255, 255, 255, 0.15)',
-  borderRadius: 14,
-  padding: 12,
+  borderRadius: 12,
+  padding: 10,
   boxShadow: '0 24px 48px rgba(0, 0, 0, 0.85)',
   backdropFilter: 'blur(20px)',
   zIndex: 100,

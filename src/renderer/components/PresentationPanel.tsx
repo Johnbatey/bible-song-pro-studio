@@ -1052,7 +1052,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   projectSlideThumbBox: {
     position: 'relative',
-    height: 115,
+    width: '100%',
+    aspectRatio: '16 / 9',
     background: '#090a0f',
     display: 'flex',
     alignItems: 'center',
