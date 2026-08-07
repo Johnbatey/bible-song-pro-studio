@@ -58,15 +58,15 @@ function assetUrl(value: string | undefined, assetBaseUrl = '') {
 function displayFontSize(state: ProgramSurfaceState, preview: boolean) {
   if (state.fontSize && state.fontSize > 0) return `${state.fontSize}px`;
   return state.outputMode === 'lowerThird' || state.mode === 'lowerThird'
-    ? 'clamp(16px, 2.2vw, 44px)'
-    : 'clamp(26px, 4vw, 78px)';
+    ? '44px'
+    : '76px';
 }
 
 function referenceFontSize(state: ProgramSurfaceState, preview: boolean) {
   if (state.referenceFontSize && state.referenceFontSize > 0) {
     return `${state.referenceFontSize}px`;
   }
-  return 'clamp(12px, 1.35vw, 28px)';
+  return '28px';
 }
 
 function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lowerThird', assetBaseUrl?: string): React.CSSProperties {
