@@ -897,15 +897,17 @@ export function StageDesigner() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               </button>
               <span className="dz-zoom">{Math.round(zoom * 100)}%</span>
+              <div className="dz-zoom-divider" />
+              <button
+                type="button"
+                className="dz-zoombar-fit"
+                data-active={zoom === 1 || undefined}
+                onClick={() => setZoom(1)}
+                title="Fit the stage to the window"
+              >
+                Fit
+              </button>
             </div>
-            <button
-              type="button"
-              className="dz-zoombar-fit"
-              onClick={() => setZoom(1)}
-              title="Fit the stage to the window"
-            >
-              Fit
-            </button>
           </div>
 
           <footer className="dz-statusbar">

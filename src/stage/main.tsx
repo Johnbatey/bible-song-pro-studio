@@ -48,6 +48,19 @@ function StageHost() {
   const [state, dispatch] = useReducer(stageReducer, undefined, initialStageState);
   const [program, setProgram] = useState<ProgramSurfaceState>({});
   const [assetBaseUrl, setAssetBaseUrl] = useState(DEFAULT_ASSET_BASE);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    function updateScale() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const s = Math.min(w / 1920, h / 1080);
+      setScale(s);
+    }
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
 
   // Media and fonts resolve against the local server, as they do for the
   // audience window. Installed twice on purpose — once against the fallback so
@@ -104,7 +117,23 @@ function StageHost() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onKeyDown]);
 
-  return <StageSurface state={state} program={program} assetBaseUrl={assetBaseUrl} />;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        width: 1920,
+        height: 1080,
+        transform: `translate(-50%, -50%) scale(${scale})`,
+        transformOrigin: 'center center',
+        overflow: 'hidden',
+        background: '#000',
+      }}
+    >
+      <StageSurface state={state} program={program} assetBaseUrl={assetBaseUrl} />
+    </div>
+  );
 }
 
 const root = document.getElementById('root');
