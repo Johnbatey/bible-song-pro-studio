@@ -8,6 +8,19 @@ let assetBaseUrl = 'http://localhost:8942';
 
 function DisplayHost() {
   const [displayState, setDisplayState] = useState<ProgramSurfaceState>({});
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    function updateScale() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const s = Math.min(w / 1920, h / 1080);
+      setScale(s);
+    }
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, []);
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
@@ -36,11 +49,25 @@ function DisplayHost() {
   }, []);
 
   return (
-    <ProgramSurface
-      className="audience-program-surface"
-      state={displayState}
-      assetBaseUrl={assetBaseUrl}
-    />
+    <div
+      style={{
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        width: 1920,
+        height: 1080,
+        transform: `translate(-50%, -50%) scale(${scale})`,
+        transformOrigin: 'center center',
+        overflow: 'hidden',
+        background: '#000',
+      }}
+    >
+      <ProgramSurface
+        className="audience-program-surface"
+        state={displayState}
+        assetBaseUrl={assetBaseUrl}
+      />
+    </div>
   );
 }
 

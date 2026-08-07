@@ -87,6 +87,8 @@
   --settings-panel: #1E1C1C;   /* Eerie Black */
   --settings-line: #312F2D;    /* Acadia */
   --settings-card: #252323;    /* Young Night */
+:root {
+  color-scheme: dark;
 }
 
 * {
@@ -105,8 +107,35 @@ html, body, #root {
   line-height: var(--lh-base);
   background: var(--bg-primary);
   color: var(--text-primary);
+  color-scheme: dark;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Custom App-Themed Select Controls ── */
+select {
+  background-color: var(--chrome-control, #1d1b1c);
+  color: #ffffff;
+  border: 1px solid var(--block-line, #262628);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+select option, select optgroup {
+  background-color: #161414 !important;
+  color: #ffffff !important;
+  padding: 8px 12px !important;
+  font-family: var(--font-ui) !important;
+}
+
+select option:hover, select option:focus, select option:checked {
+  background-color: var(--chrome-control-active, #2e2c2b) !important;
+  color: var(--accent, #FF5500) !important;
 }
 
 ::-webkit-scrollbar {

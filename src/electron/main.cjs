@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog, systemPreferences, session, Menu, MenuItem } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog, systemPreferences, session, Menu, MenuItem, nativeTheme } = require('electron');
+nativeTheme.themeSource = 'dark';
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -66,20 +67,20 @@ let verseDetectionService = null;
 const DOCK_DEFS = [
   // Workspace panels — always present; no TitleBar pill for some of these,
   // so the native menu is the primary way to re-open them.
-  { id: 'output',       label: 'Output' },
-  { id: 'transcript',   label: 'Live Transcript' },
-  { id: 'history',      label: 'History' },
-  { id: 'queue',        label: 'Queue' },
+  { id: 'output', label: 'Output' },
+  { id: 'transcript', label: 'Live Transcript' },
+  { id: 'history', label: 'History' },
+  { id: 'queue', label: 'Queue' },
   null, // separator
   // Content panels — all have TitleBar pill tabs too.
-  { id: 'bible',        label: 'Bible' },
-  { id: 'songs',        label: 'Songs' },
+  { id: 'bible', label: 'Bible' },
+  { id: 'songs', label: 'Songs' },
   { id: 'presentation', label: 'Pro Slides' },
-  { id: 'live',         label: 'Live Scripture' },
-  { id: 'media',        label: 'Media' },
-  { id: 'stage',        label: 'Stage Display' },
-  { id: 'scenes',       label: 'Scenes' },
-  { id: 'themes',       label: 'Themes' },
+  { id: 'live', label: 'Live Scripture' },
+  { id: 'media', label: 'Media' },
+  { id: 'stage', label: 'Stage Display' },
+  { id: 'scenes', label: 'Scenes' },
+  { id: 'themes', label: 'Themes' },
 ];
 
 /**
@@ -118,19 +119,19 @@ function buildAppMenu(openIds) {
   const template = [
     ...(process.platform === 'darwin'
       ? [{
-          label: app.name,
-          submenu: [
-            { role: 'about' },
-            { type: 'separator' },
-            { role: 'services' },
-            { type: 'separator' },
-            { role: 'hide' },
-            { role: 'hideOthers' },
-            { role: 'unhide' },
-            { type: 'separator' },
-            { role: 'quit' },
-          ],
-        }]
+        label: app.name,
+        submenu: [
+          { role: 'about' },
+          { type: 'separator' },
+          { role: 'services' },
+          { type: 'separator' },
+          { role: 'hide' },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit' },
+        ],
+      }]
       : []),
     {
       label: 'Edit',
@@ -272,8 +273,8 @@ function serveStatic(dirName) {
     const ext = path.extname(fp).toLowerCase();
     const ct = ext === '.ttf' ? 'font/ttf' : ext === '.woff' ? 'font/woff' : ext === '.woff2' ? 'font/woff2' : ext === '.otf' ? 'font/otf'
       : ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
-      : ext === '.mp4' ? 'video/mp4' : ext === '.html' ? 'text/html' : ext === '.css' ? 'text/css' : ext === '.js' ? 'application/javascript'
-      : 'application/octet-stream';
+        : ext === '.mp4' ? 'video/mp4' : ext === '.html' ? 'text/html' : ext === '.css' ? 'text/css' : ext === '.js' ? 'application/javascript'
+          : 'application/octet-stream';
     res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'public, max-age=31536000', 'Access-Control-Allow-Origin': '*' });
     fs.createReadStream(fp).pipe(res);
   };
@@ -687,10 +688,10 @@ app.whenReady().then(async () => {
   if (process.platform === 'darwin' && systemPreferences && systemPreferences.askForMediaAccess) {
     systemPreferences.askForMediaAccess('microphone').then((granted) => {
       console.log('macOS Microphone Access:', granted ? 'GRANTED' : 'DENIED');
-    }).catch(() => {});
+    }).catch(() => { });
     systemPreferences.askForMediaAccess('camera').then((granted) => {
       console.log('macOS Camera Access:', granted ? 'GRANTED' : 'DENIED');
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   transcriptionService = createTranscriptionService({ app });
@@ -1020,7 +1021,7 @@ app.whenReady().then(async () => {
 app.on('web-contents-created', (_evt, contents) => {
   try {
     contents.setVisualZoomLevelLimits(1, 1);
-  } catch (err) {}
+  } catch (err) { }
   contents.on('before-input-event', (event, input) => {
     if ((input.control || input.meta) && (input.key === '=' || input.key === '+' || input.key === '-' || input.key === '_' || input.key === '0')) {
       event.preventDefault();
