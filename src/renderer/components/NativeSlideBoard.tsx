@@ -81,6 +81,12 @@ function textJustify(align: SlideElement['textAlign']) {
   return 'center';
 }
 
+function vJustify(vAlign?: SlideElement['vAlign']) {
+  if (vAlign === 'top') return 'flex-start';
+  if (vAlign === 'bottom') return 'flex-end';
+  return 'center';
+}
+
 function ElementBox({ el }: { el: SlideElement }) {
   const outer: CSSProperties = {
     position: 'absolute',
@@ -89,6 +95,7 @@ function ElementBox({ el }: { el: SlideElement }) {
     width: `${el.width}%`,
     height: `${el.height}%`,
     zIndex: el.zIndex || 1,
+    transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
   };
 
   if (el.type === 'image') {
@@ -140,9 +147,12 @@ function ElementBox({ el }: { el: SlideElement }) {
           fontWeight: el.fontWeight || 500,
           textAlign: el.textAlign || 'center',
           lineHeight: el.lineHeight || 1.3,
+          letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
+          textTransform: el.textTransform || 'none',
+          textDecoration: el.textDecoration || 'none',
           textShadow: el.textShadow || '0 2px 8px rgba(0, 0, 0, 0.6)',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: vJustify(el.vAlign),
           justifyContent: textJustify(el.textAlign),
           wordBreak: 'break-word',
           whiteSpace: 'pre-wrap',

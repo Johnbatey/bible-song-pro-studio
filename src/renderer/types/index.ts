@@ -93,13 +93,18 @@ export interface SlideElement {
   fontWeight?: string | number;
   color?: string;
   textAlign?: 'left' | 'center' | 'right' | 'justify';
+  vAlign?: 'top' | 'middle' | 'bottom';
   textShadow?: string;
+  textDecoration?: 'none' | 'underline' | 'line-through';
+  textTransform?: 'none' | 'uppercase' | 'capitalize' | 'lowercase';
   lineHeight?: number;
+  letterSpacing?: number;
   backgroundColor?: string;
   borderColor?: string;
   borderWidth?: number;
   borderRadius?: number;
   opacity?: number;
+  rotation?: number;
   zIndex?: number;
 }
 

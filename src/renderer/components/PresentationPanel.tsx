@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '../stores/appStore';
 import { SlideCanvas } from './SlideCanvas';
 import { NativeSlideBoard, NATIVE_BOARD_W, slideElementsFor } from './NativeSlideBoard';
@@ -185,8 +186,38 @@ export function PresentationPanel() {
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_slidesBarPosition');
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [activeMenu, setActiveMenu] = useState<{ id: string; x: number; y: number; btnRect?: DOMRect } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { inputRef, pick: pickPptx, onInputChange, status, clearStatus } = usePptxImport();
+
+  /* Auto-close floating context menu on click outside, scroll, resize or escape key */
+  useEffect(() => {
+    if (!activeMenu) return;
+    function handleGlobalClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenu(null);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setActiveMenu(null);
+      }
+    }
+    function handleScrollResize() {
+      setActiveMenu(null);
+    }
+
+    window.addEventListener('mousedown', handleGlobalClick);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScrollResize, true);
+    window.addEventListener('resize', handleScrollResize);
+    return () => {
+      window.removeEventListener('mousedown', handleGlobalClick);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScrollResize, true);
+      window.removeEventListener('resize', handleScrollResize);
+    };
+  }, [activeMenu]);
 
   const selectedDeck = presentationDecks.find((d) => d.id === selectedDeckId) || null;
 
@@ -268,13 +299,13 @@ export function PresentationPanel() {
   }
 
   function handleEditSlide(id: string) {
-    setActiveMenuId(null);
+    setActiveMenu(null);
     openSlideEditor(id);
   }
 
   function handleDeleteSlide(id: string) {
     deletePresentationDeck(id);
-    setActiveMenuId(null);
+    setActiveMenu(null);
     if (selectedDeckId === id) setSelectedDeckId(null);
   }
 
@@ -289,7 +320,7 @@ export function PresentationPanel() {
       updatedAt: Date.now(),
     };
     addPresentationDeck(newDeck);
-    setActiveMenuId(null);
+    setActiveMenu(null);
   }
 
   function handleRenameDeck(deckId: string) {
@@ -299,7 +330,7 @@ export function PresentationPanel() {
     if (newTitle && newTitle.trim()) {
       updatePresentationDeck(deckId, { title: newTitle.trim(), updatedAt: Date.now() });
     }
-    setActiveMenuId(null);
+    setActiveMenu(null);
   }
 
   function handleAddSlideToDeck() {
@@ -571,7 +602,16 @@ export function PresentationPanel() {
                 style={styles.card}
                 onClick={() => setSelectedDeckId(item.id)}
                 onDoubleClick={() => handleEditSlide(item.id)}
-                title="Click to view project slides · double-click to open editor"
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setActiveMenu({
+                    id: item.id,
+                    x: e.clientX,
+                    y: e.clientY,
+                  });
+                }}
+                title="Click to view project slides · double-click to open editor · right-click for options"
               >
                 <CardThumb
                   deck={presentationDecks.find((d) => d.id === item.id)}
@@ -585,37 +625,25 @@ export function PresentationPanel() {
                     <div style={styles.cardSubtitle}>{item.pagesCount} {item.pagesCount === 1 ? 'page' : 'pages'}</div>
                   </div>
 
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      style={styles.moreBtn}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuId(activeMenuId === item.id ? null : item.id);
-                      }}
-                    >
-                      •••
-                    </button>
-
-                    {activeMenuId === item.id && (
-                      <div style={styles.contextMenu} onClick={(e) => e.stopPropagation()}>
-                        <button style={styles.menuItem} onClick={() => { setActiveMenuId(null); setSelectedDeckId(item.id); }}>
-                          👁 View project slides
-                        </button>
-                        <button style={styles.menuItem} onClick={() => handleEditSlide(item.id)}>
-                          ✏ Edit design in editor
-                        </button>
-                        <button style={styles.menuItem} onClick={() => handleRenameDeck(item.id)}>
-                          Rename project
-                        </button>
-                        <button style={styles.menuItem} onClick={() => handleDuplicateDeck(item.id)}>
-                          Duplicate project
-                        </button>
-                        <button style={{ ...styles.menuItem, color: '#ef4444' }} onClick={() => handleDeleteSlide(item.id)}>
-                          Delete project
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    style={styles.moreBtn}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (activeMenu?.id === item.id) {
+                        setActiveMenu(null);
+                      } else {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setActiveMenu({
+                          id: item.id,
+                          x: rect.right,
+                          y: rect.bottom,
+                          btnRect: rect,
+                        });
+                      }
+                    }}
+                  >
+                    •••
+                  </button>
                 </div>
               </div>
             ))}
@@ -834,6 +862,93 @@ export function PresentationPanel() {
           </div>
         </div>
       )}
+
+      {/* Floating Project Context Menu (Portalled to document.body to prevent clipping under chrome bar) */}
+      {activeMenu && (() => {
+        const activeDeck = presentationDecks.find((d) => d.id === activeMenu.id);
+        if (!activeDeck) return null;
+
+        const menuW = 175;
+        const menuH = 185;
+        const padding = 8;
+        let top = 0;
+        let left = 0;
+
+        if (activeMenu.btnRect) {
+          const rect = activeMenu.btnRect;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const spaceAbove = rect.top;
+
+          if (spaceBelow >= menuH + padding || spaceBelow >= spaceAbove) {
+            top = Math.min(rect.bottom + 4, window.innerHeight - menuH - padding);
+          } else {
+            top = Math.max(padding, rect.top - menuH - 4);
+          }
+          left = Math.max(padding, Math.min(rect.right - menuW, window.innerWidth - menuW - padding));
+        } else {
+          const spaceBelow = window.innerHeight - activeMenu.y;
+          top = spaceBelow >= menuH + padding
+            ? activeMenu.y + 4
+            : Math.max(padding, activeMenu.y - menuH - 4);
+          left = Math.max(padding, Math.min(activeMenu.x, window.innerWidth - menuW - padding));
+        }
+
+        return createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed',
+              top,
+              left,
+              zIndex: 99999,
+              background: '#18181b',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: 8,
+              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(0, 0, 0, 0.5)',
+              padding: 4,
+              display: 'flex',
+              flexDirection: 'column',
+              minWidth: 175,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              style={styles.menuItem}
+              onClick={() => {
+                setActiveMenu(null);
+                setSelectedDeckId(activeDeck.id);
+              }}
+            >
+              👁 View project slides
+            </button>
+            <button
+              style={styles.menuItem}
+              onClick={() => handleEditSlide(activeDeck.id)}
+            >
+              ✏ Edit design in editor
+            </button>
+            <button
+              style={styles.menuItem}
+              onClick={() => handleRenameDeck(activeDeck.id)}
+            >
+              Rename project
+            </button>
+            <button
+              style={styles.menuItem}
+              onClick={() => handleDuplicateDeck(activeDeck.id)}
+            >
+              Duplicate project
+            </button>
+            <button
+              style={{ ...styles.menuItem, color: '#ef4444' }}
+              onClick={() => handleDeleteSlide(activeDeck.id)}
+            >
+              Delete project
+            </button>
+          </div>,
+          document.body
+        );
+      })()}
     </div>
   );
 }

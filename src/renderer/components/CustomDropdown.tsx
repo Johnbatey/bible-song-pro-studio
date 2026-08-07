@@ -29,7 +29,7 @@ export function CustomDropdown<T extends string = string>({
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = options.find((o) => o.value === value) || options[0];
+  const selectedOption = options.find((o) => o.value === value) || { value, label: value || options[0]?.label || '' };
 
   /**
    * The menu is portalled to the body rather than positioned inside the
