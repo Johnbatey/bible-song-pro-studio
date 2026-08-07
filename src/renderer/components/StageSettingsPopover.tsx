@@ -123,7 +123,7 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
       ref={ref}
       style={{ ...styles.popover, top: rect.top, left: rect.left }}
       role="dialog"
-      aria-label="Stage display settings"
+      aria-label="Stage display appearance"
     >
       <div style={styles.title}>Stage Display</div>
 
