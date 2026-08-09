@@ -491,14 +491,18 @@ export function LiveScripturePanel() {
             height: 30,
             padding: '0 12px',
             background: '#232221',
-            border: '1px solid #262628',
+            border: 'none',
             borderRadius: 6,
             color: '#ffffff',
             fontSize: 12,
             fontWeight: 600,
             cursor: 'pointer',
             fontFamily: 'var(--font-ui)',
+            transition: 'all 0.15s ease',
+            flexShrink: 0,
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#2e2c2b'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = '#232221'; }}
           title="Live Scripture Settings & Audio Inputs"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -508,8 +512,7 @@ export function LiveScripturePanel() {
           <span>Config</span>
         </button>
 
-        {/* Level and state read as one status cluster, pushed to the far end
-            together — apart, the meter sat stranded mid-bar. */}
+        {/* Level and state read as one status cluster */}
         <div style={styles.statusCluster}>
           <div style={styles.meter} aria-label="Mic meter">
             <div style={{ ...styles.meterFill, width: `${Math.round(live.meter.level * 100)}%` }} />
@@ -544,34 +547,85 @@ export function LiveScripturePanel() {
       {/* Config Popup Window */}
       {isConfigOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: 460, maxWidth: '92vw', background: '#161414', border: '1px solid #262628', borderRadius: 8, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.8)' }}>
+          <div style={{ width: 520, maxWidth: '92vw', background: '#161414', border: '1px solid #262628', borderRadius: 10, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.85)' }}>
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid #262628', background: '#141416' }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#ffffff', margin: 0 }}>Live Scripture Config</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #262628', background: '#141416' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', margin: 0, letterSpacing: '-0.01em' }}>Live Scripture Config</h3>
               <button
                 onClick={() => setIsConfigOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#ffffff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-dim, #d4d4d8)',
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#ffffff';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--text-dim, #d4d4d8)';
+                  e.currentTarget.style.background = 'transparent';
+                }}
+                title="Close"
               >
                 ✕
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Microphone Select */}
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>Audio Input Microphone</div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Modal Body with Parallel Horizontal Section Lines */}
+            <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column' }}>
+              {/* Row 1: Audio Input Microphone */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Audio Input Microphone</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                    Hardware device used for speech transcription
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                   <CustomDropdown
                     value={live.selectedInputId}
-                    onChange={(val) => setLive({ selectedInputId: val })}
-                    options={devices.length === 0 ? [{ value: '', label: 'No microphone available' }] : devices.map((d) => ({ value: d.deviceId, label: d.label }))}
-                    buttonStyle={{ flex: 1 }}
+                    onChange={(val) => {
+                      setLive({ selectedInputId: val });
+                      if (live.isActive) {
+                        stopLive();
+                        setTimeout(() => startLive(), 100);
+                      }
+                    }}
+                    options={
+                      devices.length === 0
+                        ? [{ value: '', label: 'No microphone available' }]
+                        : devices.map((d) => ({ value: d.deviceId, label: d.label }))
+                    }
+                    buttonStyle={{ width: 220, justifyContent: 'space-between' }}
                     title="Select Microphone"
                   />
                   <button
                     onClick={refreshInputs}
-                    style={{ padding: '0 12px', height: 34, background: '#232221', border: '1px solid #262628', borderRadius: 6, color: '#ffffff', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                    style={{
+                      padding: '0 12px',
+                      height: 34,
+                      background: '#232221',
+                      border: '1px solid #262628',
+                      borderRadius: 6,
+                      color: '#ffffff',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#2e2c2b'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = '#232221'; }}
                     title="Refresh audio inputs"
                   >
                     Refresh
@@ -579,54 +633,95 @@ export function LiveScripturePanel() {
                 </div>
               </div>
 
-              {/* AI Engine Select */}
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>AI Speech Model Engine</div>
+              {/* Row 2: AI Speech Model Engine */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>AI Speech Model Engine</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                    Engine used for live speech recognition
+                  </div>
+                </div>
                 <CustomDropdown
                   value={engine}
                   onChange={(val) => {
                     const next = val as 'local' | 'deepgram';
                     setEngine(next);
+                    setLive({ provider: next });
                     window.BSP?.settings?.set({ sttEngine: next }).catch(() => {});
+                    if (live.isActive) {
+                      stopLive();
+                      setTimeout(() => startLive(), 100);
+                    }
                   }}
                   options={[
-                    { value: 'local', label: 'Local (Whisper AI)' },
-                    { value: 'deepgram', label: 'Deepgram (Cloud API)' },
+                    { value: 'local', label: 'Local (Whisper AI)', sublabel: 'On-device model' },
+                    { value: 'deepgram', label: 'Deepgram (Cloud API)', sublabel: 'Fast cloud engine' },
                   ]}
-                  buttonStyle={{ width: '100%' }}
+                  buttonStyle={{ width: 220, justifyContent: 'space-between' }}
                   title="Select AI Speech Model"
                 />
               </div>
 
-              {/* Bible Version Select */}
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>Bible Version</div>
+              {/* Row 3: Bible Version */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Bible Version</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                    Default Bible version for verse detection
+                  </div>
+                </div>
                 <CustomDropdown
                   value={version}
-                  onChange={(val) => setVersion(val)}
+                  onChange={(val) => {
+                    setVersion(val);
+                    setLive({ requestedVersion: val });
+                  }}
                   options={(versions.length ? versions : [{ id: 'KJV', abbreviation: 'KJV', name: 'King James Version' }]).map((v) => ({
                     value: v.id,
                     label: `${v.abbreviation} - ${v.name}`,
                   }))}
-                  buttonStyle={{ width: '100%' }}
+                  buttonStyle={{ width: 220, justifyContent: 'space-between' }}
                   title="Select Bible Version"
                 />
               </div>
 
-              {/* Apple Toggle Switches */}
-              <div style={{ display: 'flex', flexDirection: 'column', marginTop: 4 }}>
+              {/* Row 4: Auto project direct references */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Auto project direct references</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                    Automatically project scripture references when detected
+                  </div>
+                </div>
                 <AppleToggle
-                  label="Auto project direct references"
                   checked={live.autoProject}
                   onChange={(val) => setDirectAutoProject(val)}
                 />
+              </div>
+
+              {/* Row 5: Project quoted matches */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Project quoted matches</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                    Project verbatim spoken matches in continuous speech
+                  </div>
+                </div>
                 <AppleToggle
-                  label="Project quoted matches"
                   checked={live.autoProjectQuoted}
                   onChange={(val) => setQuotedAutoProject(val)}
                 />
+              </div>
+
+              {/* Row 6: Auto-version switch */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Auto-version switch</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                    Automatically switch Bible version when spoken in speech
+                  </div>
+                </div>
                 <AppleToggle
-                  label="Auto-version switch"
                   checked={live.autoVersionSwitch}
                   onChange={(val) => setAutoVersionSwitch(val)}
                 />
@@ -634,10 +729,23 @@ export function LiveScripturePanel() {
             </div>
 
             {/* Modal Footer */}
-            <div style={{ padding: '12px 20px', borderTop: '1px solid #262628', background: '#141416', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #262628', background: '#141416', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setIsConfigOpen(false)}
-                style={{ padding: '6px 16px', background: '#FF5500', border: 'none', borderRadius: 6, color: '#ffffff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                style={{
+                  padding: '7px 20px',
+                  background: '#FF5500',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 2px 8px rgba(255, 85, 0, 0.3)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#FF7728'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#FF5500'; }}
               >
                 Done
               </button>

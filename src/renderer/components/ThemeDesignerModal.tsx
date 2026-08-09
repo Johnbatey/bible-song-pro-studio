@@ -252,17 +252,41 @@ export function ThemeDesignerModal() {
 
           {/* Bottom Zoom Controls */}
           <div style={styles.zoomBar}>
-            <button style={styles.zoomBtn} onClick={() => setZoomLevel(Math.max(40, zoomLevel - 10))}>-</button>
-            <input
-              type="range"
-              min="40"
-              max="150"
-              value={zoomLevel}
-              onChange={(e) => setZoomLevel(Number(e.target.value))}
-              style={{ width: 100, accentColor: '#FF5500' }}
-            />
-            <button style={styles.zoomBtn} onClick={() => setZoomLevel(Math.min(150, zoomLevel + 10))}>+</button>
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{zoomLevel}%</span>
+            <div className="zoombar-pill">
+              <button
+                type="button"
+                onClick={() => setZoomLevel(Math.max(40, zoomLevel - 10))}
+                title="Zoom out"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
+              </button>
+              <input
+                type="range"
+                min="40"
+                max="150"
+                value={zoomLevel}
+                onChange={(e) => setZoomLevel(Number(e.target.value))}
+                title="Canvas zoom level"
+              />
+              <button
+                type="button"
+                onClick={() => setZoomLevel(Math.min(150, zoomLevel + 10))}
+                title="Zoom in"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
+              </button>
+              <span className="zoombar-val">{zoomLevel}%</span>
+              <div className="zoombar-divider" />
+              <button
+                type="button"
+                className="zoombar-fit"
+                data-active={zoomLevel === 100 || undefined}
+                onClick={() => setZoomLevel(100)}
+                title="Reset zoom to 100%"
+              >
+                Fit
+              </button>
+            </div>
           </div>
         </div>
 

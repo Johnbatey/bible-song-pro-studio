@@ -153,14 +153,22 @@ function CardThumb({ deck, fallback, caption }: { deck?: PresentationDeck; fallb
     return () => observer.disconnect();
   }, [ref]);
 
+  const firstNativeSlide = deck?.slides?.[0];
+
   return (
-    <div ref={ref} style={{ ...styles.cardThumb, background: preview ? '#000' : fallback }}>
+    <div ref={ref} style={{ ...styles.cardThumb, background: (preview || firstNativeSlide) ? '#000' : fallback }}>
       {preview ? (
         <SlideCanvas
           slide={preview.slide}
           slideSizeEmu={preview.slideSizeEmu}
           width={width}
           dynamicAutofit
+        />
+      ) : firstNativeSlide ? (
+        <NativeSlideBoard
+          elements={slideElementsFor(firstNativeSlide)}
+          background={firstNativeSlide.background}
+          width={width}
         />
       ) : (
         <div style={styles.cardTitleOverlay}>{caption}</div>
@@ -185,6 +193,7 @@ export function PresentationPanel() {
   /* Page navigation state: null = Decks List (Page 1), string = Open Project View (Page 2) */
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [cardZoom, setCardZoom] = useState<number>(1.0);
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_slidesBarPosition');
   const [activeMenu, setActiveMenu] = useState<{ id: string; x: number; y: number; btnRect?: DOMRect } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -244,6 +253,9 @@ export function PresentationPanel() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState('New Presentation Deck');
+
+  const [renameDeckTarget, setRenameDeckTarget] = useState<{ id: string; title: string } | null>(null);
+  const [renameTitleInput, setRenameTitleInput] = useState('');
 
   function handleCreateNew(val: string) {
     if (val === 'manual') {
@@ -326,11 +338,18 @@ export function PresentationPanel() {
   function handleRenameDeck(deckId: string) {
     const target = presentationDecks.find((d) => d.id === deckId);
     if (!target) return;
-    const newTitle = window.prompt('Rename presentation deck:', target.title);
-    if (newTitle && newTitle.trim()) {
-      updatePresentationDeck(deckId, { title: newTitle.trim(), updatedAt: Date.now() });
-    }
+    setRenameDeckTarget({ id: target.id, title: target.title });
+    setRenameTitleInput(target.title || '');
     setActiveMenu(null);
+  }
+
+  function handleConfirmRenameProject() {
+    if (!renameDeckTarget) return;
+    const newTitle = renameTitleInput.trim();
+    if (newTitle) {
+      updatePresentationDeck(renameDeckTarget.id, { title: newTitle, updatedAt: Date.now() });
+    }
+    setRenameDeckTarget(null);
   }
 
   function handleAddSlideToDeck() {
@@ -431,6 +450,53 @@ export function PresentationPanel() {
     return false;
   }
 
+  const renderZoomPill = (
+    <div className="zoombar-pill" style={{ margin: '0 4px' }}>
+      <button
+        type="button"
+        onClick={() => setCardZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))}
+        title="Zoom Out Thumbnails"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
+      </button>
+
+      <input
+        type="range"
+        min={0.5}
+        max={1.8}
+        step={0.05}
+        value={cardZoom}
+        onChange={(e) => setCardZoom(parseFloat(e.target.value))}
+        title="Adjust thumbnail size"
+        style={{ width: 64 }}
+      />
+
+      <button
+        type="button"
+        onClick={() => setCardZoom((z) => Math.min(1.8, Math.round((z + 0.1) * 10) / 10))}
+        title="Zoom In Thumbnails"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
+      </button>
+
+      <span className="zoombar-val">
+        {Math.round(cardZoom * 100)}%
+      </span>
+
+      <div className="zoombar-divider" />
+
+      <button
+        type="button"
+        className="zoombar-fit"
+        data-active={Math.abs(cardZoom - 1.0) < 0.01 || undefined}
+        onClick={() => setCardZoom(1.0)}
+        title="Reset thumbnail scale"
+      >
+        Fit
+      </button>
+    </div>
+  );
+
   /* Page 1 Toolbar */
   const page1Toolbar = (
     <div className="blk blk--bar">
@@ -463,17 +529,7 @@ export function PresentationPanel() {
         />
       </div>
 
-      <div className="blk-seg">
-        <button style={styles.gridToggleBtn} title="List View">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-        </button>
-        <button style={{ ...styles.gridToggleBtn, background: 'var(--block-active)' }} title="2 Column Grid View">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        </button>
-        <button style={styles.gridToggleBtn} title="3 Column Grid View">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-        </button>
-      </div>
+      {renderZoomPill}
 
       <MoveBarButton
         position={barPosition}
@@ -487,10 +543,6 @@ export function PresentationPanel() {
   /* Page 2 Toolbar */
   const page2Toolbar = (
     <div className="blk blk--bar">
-      <BlockButton onClick={() => setSelectedDeckId(null)} style={styles.backBtn}>
-        ← Projects
-      </BlockButton>
-
       <div style={styles.searchBox}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input
@@ -501,13 +553,7 @@ export function PresentationPanel() {
         />
       </div>
 
-      <button
-        style={styles.editorActionBtn}
-        onClick={() => selectedDeck && handleEditSlide(selectedDeck.id)}
-        title="Open full slide editor modal to edit design & layers"
-      >
-        ✏ Open in Editor
-      </button>
+      {renderZoomPill}
 
       <button
         style={styles.addSlideBtn}
@@ -570,6 +616,16 @@ export function PresentationPanel() {
     );
   });
 
+  const cardMinW = Math.max(120, Math.round(210 * cardZoom));
+  const dynamicGridStyle: React.CSSProperties = {
+    ...styles.gridContainer,
+    gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinW}px, 1fr))`,
+  };
+  const dynamicProjectSlidesGridStyle: React.CSSProperties = {
+    ...styles.projectSlidesGrid,
+    gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinW}px, 1fr))`,
+  };
+
   return (
     <div className="blk-col" style={styles.container}>
       {/* Top Bar */}
@@ -577,7 +633,7 @@ export function PresentationPanel() {
 
       {/* PAGE 1: PROJECTS GRID VIEW */}
       {!selectedDeck ? (
-        <Block className="blk-fill" title="Slides Projects" subtitle={`${presentations.length}`} bodyStyle={styles.gridContainer}>
+        <Block className="blk-fill" title="Slides Projects" subtitle={`${presentations.length}`} bodyStyle={dynamicGridStyle}>
           {status && (
             <div
               style={{
@@ -652,7 +708,7 @@ export function PresentationPanel() {
         /* PAGE 2: PROJECT SLIDES VIEW */
         <Block
           className="blk-fill"
-          title={<>Project: <span style={{ color: 'var(--f4621f, #ea580c)' }}>{selectedDeck.title}</span></>}
+          title={<>Project: <span style={{ color: 'var(--f4621f, #ea580c)', cursor: 'pointer' }} title="Click to rename project" onClick={() => handleRenameDeck(selectedDeck.id)}>{selectedDeck.title} ✏</span></>}
           subtitle={`${page2SlidesList.length} ${page2SlidesList.length === 1 ? 'slide' : 'slides'}`}
           tools={(
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -660,7 +716,7 @@ export function PresentationPanel() {
               <BlockButton onClick={() => handleEditSlide(selectedDeck.id)}>✏ Open in Editor</BlockButton>
             </div>
           )}
-          bodyStyle={styles.projectSlidesGrid}
+          bodyStyle={dynamicProjectSlidesGridStyle}
         >
           {pkg.status && isPptxSelected && (
             <div style={styles.pptxStatusNote}>
@@ -857,6 +913,114 @@ export function PresentationPanel() {
                 }}
               >
                 Create Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Rename Modal */}
+      {renameDeckTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={() => setRenameDeckTarget(null)}
+        >
+          <div
+            style={{
+              width: 420,
+              maxWidth: '90vw',
+              background: '#161414',
+              border: '1px solid var(--block-line, #262628)',
+              borderRadius: 12,
+              padding: 24,
+              boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+              color: '#ffffff',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Rename Pro Slide Project</div>
+              <button
+                type="button"
+                onClick={() => setRenameDeckTarget(null)}
+                style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 18 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ fontSize: 13, color: 'var(--text-dim, #d4d4d8)' }}>
+              Enter a new title for this presentation project:
+            </div>
+
+            <input
+              type="text"
+              value={renameTitleInput}
+              onChange={(e) => setRenameTitleInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleConfirmRenameProject();
+                if (e.key === 'Escape') setRenameDeckTarget(null);
+              }}
+              autoFocus
+              placeholder="e.g. Technology Consulting"
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                background: '#111010',
+                border: '1px solid var(--block-line, #262628)',
+                borderRadius: 8,
+                color: '#ffffff',
+                fontSize: 14,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => setRenameDeckTarget(null)}
+                style={{
+                  padding: '8px 16px',
+                  background: 'transparent',
+                  border: '1px solid var(--block-line, #262628)',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRenameProject}
+                style={{
+                  padding: '8px 18px',
+                  background: 'var(--accent, #f4621f)',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(244, 98, 31, 0.4)',
+                }}
+              >
+                Save Name
               </button>
             </div>
           </div>

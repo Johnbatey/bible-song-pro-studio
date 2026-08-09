@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { PresentationSlide } from '../../types';
+import { NativeSlideBoard, slideElementsFor } from '../NativeSlideBoard';
 
 interface SlideEditorLeftRailProps {
   slides: PresentationSlide[];
@@ -236,48 +237,23 @@ export function SlideEditorLeftRail({
                       position: 'relative',
                     }}
                   >
-                    {renderThumb ? (
-                      <RailSlideThumb index={idx} renderThumb={renderThumb} />
-                    ) : (
-                    <div
-                      style={{
-                        width: '100%',
-                        aspectRatio: '16 / 9',
-                        background: bgType === 'gradient' ? bgValue : bgType === 'color' ? bgValue : '#18181b',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: 6,
-                        boxSizing: 'border-box',
-                        position: 'relative',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {bgType === 'image' && bgValue && (
-                        <img
-                          src={bgValue}
-                          alt=""
-                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      )}
-                      <div
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: '#ffffff',
-                          textAlign: 'center',
-                          zIndex: 2,
-                          maxWidth: '95%',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {slide.title || `Slide ${idx + 1}`}
-                      </div>
-                    </div>
-                    )}
+                    <RailSlideThumb
+                      index={idx}
+                      renderThumb={
+                        renderThumb ||
+                        ((slideIndex: number, width: number) => {
+                          const targetSlide = slides[slideIndex];
+                          if (!targetSlide) return null;
+                          return (
+                            <NativeSlideBoard
+                              elements={slideElementsFor(targetSlide)}
+                              background={targetSlide.background}
+                              width={width}
+                            />
+                          );
+                        })
+                      }
+                    />
 
                     <div
                       style={{

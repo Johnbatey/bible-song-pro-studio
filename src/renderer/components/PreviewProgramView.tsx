@@ -285,12 +285,15 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
               </BlockButton>
             </BlockSegment>
 
-            <div style={styles.footerScale}>
-              <span style={styles.footerLabel}>SCALE</span>
-              <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom - ZOOM_STEP)} title="Zoom out">-</button>
-              <span style={styles.zoomValue}>{zoomLabel}</span>
+            <div className="zoombar-pill">
+              <button
+                type="button"
+                onClick={() => setZoomAround(zoom - ZOOM_STEP)}
+                title="Zoom out"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
+              </button>
               <input
-                style={styles.zoomSlider}
                 type="range"
                 min={ZOOM_MIN}
                 max={ZOOM_MAX}
@@ -299,8 +302,24 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                 onChange={(event) => setZoomAround(Number(event.currentTarget.value))}
                 title="Preview/program scale"
               />
-              <button style={styles.zoomBtn} onClick={() => setZoomAround(zoom + ZOOM_STEP)} title="Zoom in">+</button>
-              <button style={styles.zoomBtnWide} onClick={fitStage} title="Fit preview/program to view">FIT</button>
+              <button
+                type="button"
+                onClick={() => setZoomAround(zoom + ZOOM_STEP)}
+                title="Zoom in"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
+              </button>
+              <span className="zoombar-val">{zoomLabel}</span>
+              <div className="zoombar-divider" />
+              <button
+                type="button"
+                className="zoombar-fit"
+                data-active={zoom === 1 || undefined}
+                onClick={fitStage}
+                title="Fit preview/program to view"
+              >
+                Fit
+              </button>
             </div>
           </div>
 

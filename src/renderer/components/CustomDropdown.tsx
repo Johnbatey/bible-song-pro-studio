@@ -14,6 +14,7 @@ interface CustomDropdownProps<T extends string = string> {
   title?: string;
   style?: React.CSSProperties;
   buttonStyle?: React.CSSProperties;
+  zIndex?: number;
 }
 
 export function CustomDropdown<T extends string = string>({
@@ -23,6 +24,7 @@ export function CustomDropdown<T extends string = string>({
   title,
   style,
   buttonStyle,
+  zIndex = 9999,
 }: CustomDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number; flip: boolean } | null>(null);
@@ -84,8 +86,8 @@ export function CustomDropdown<T extends string = string>({
           gap: 8,
           padding: '6px 12px',
           height: 34,
-          background: 'var(--chrome-control)',
-          border: '1px solid var(--chrome-control)',
+          background: 'var(--chrome-control, #1d1b1c)',
+          border: '1px solid var(--border-primary, #262628)',
           borderRadius: 6,
           color: '#ffffff',
           fontSize: 13,
@@ -98,7 +100,9 @@ export function CustomDropdown<T extends string = string>({
         onClick={() => setIsOpen(!isOpen)}
         title={title}
       >
-        <span>{selectedOption?.label || value}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
+          {selectedOption?.label || value}
+        </span>
         <svg
           width="12"
           height="12"
@@ -109,7 +113,8 @@ export function CustomDropdown<T extends string = string>({
           style={{
             transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 0.15s ease',
-            color: '#ffffff',
+            color: 'var(--text-dim, #d4d4d8)',
+            flexShrink: 0,
           }}
         >
           <path d="M6 9l6 6 6-6" />
@@ -124,18 +129,18 @@ export function CustomDropdown<T extends string = string>({
             top: menuRect.top,
             left: menuRect.left,
             transform: menuRect.flip ? 'translateY(-100%)' : undefined,
-            zIndex: 1500,
-            minWidth: menuRect.width,
-            width: 'max-content',
-            background: '#161414',
-            border: '1px solid #262628',
+            zIndex: zIndex,
+            minWidth: Math.max(menuRect.width, 220),
+            maxWidth: 360,
+            background: 'var(--bg-secondary, #161414)',
+            border: '1px solid var(--border-primary, #262628)',
             borderRadius: 8,
-            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.8)',
+            boxShadow: '0 16px 40px rgba(0, 0, 0, 0.85)',
             padding: 4,
             display: 'flex',
             flexDirection: 'column',
             gap: 2,
-            maxHeight: 240,
+            maxHeight: 260,
             overflowY: 'auto',
           }}
         >
@@ -150,15 +155,15 @@ export function CustomDropdown<T extends string = string>({
                   justifyContent: 'space-between',
                   gap: 12,
                   padding: '8px 12px',
-                  background: isSelected ? 'rgba(255, 85, 0, 0.1)' : 'transparent',
+                  background: isSelected ? 'var(--accent-dim, rgba(255, 85, 0, 0.15))' : 'transparent',
                   border: 'none',
-                  borderRadius: 4,
-                  color: isSelected ? '#FF5500' : '#ffffff',
+                  borderRadius: 6,
+                  color: isSelected ? 'var(--accent, #FF5500)' : '#ffffff',
                   fontSize: 13,
                   fontWeight: isSelected ? 700 : 500,
                   cursor: 'pointer',
                   textAlign: 'left',
-                  transition: 'background 0.15s ease',
+                  transition: 'all 0.15s ease',
                   fontFamily: 'var(--font-ui)',
                 }}
                 onClick={() => {
@@ -167,7 +172,7 @@ export function CustomDropdown<T extends string = string>({
                 }}
                 onMouseEnter={(e) => {
                   if (!isSelected) {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                    e.currentTarget.style.background = 'var(--bg-hover, rgba(255, 255, 255, 0.08))';
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -176,9 +181,16 @@ export function CustomDropdown<T extends string = string>({
                   }
                 }}
               >
-                <span>{opt.label}</span>
-                {opt.sublabel && (
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{opt.sublabel}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
+                  {opt.sublabel && (
+                    <span style={{ fontSize: 11, color: 'var(--text-dim, #d4d4d8)', fontWeight: 400 }}>{opt.sublabel}</span>
+                  )}
+                </div>
+                {isSelected && (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent, #FF5500)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
                 )}
               </button>
             );

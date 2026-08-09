@@ -298,7 +298,7 @@ export function SlideEditorCanvasBoard({
         <span>Slide Builder Mode: Creating Custom Slide Canvas</span>
       </div>
 
-      {/* Sleek Bottom-Center Canvas Zoom Pill Bar (Matching Reference Image 1) */}
+      {/* Sleek Bottom-Center Canvas Zoom Pill Bar */}
       <div
         style={{
           position: 'absolute',
@@ -306,32 +306,16 @@ export function SlideEditorCanvasBoard({
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 40,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
           userSelect: 'none',
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '5px 14px',
-            background: 'rgba(20, 20, 22, 0.92)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: 24,
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(16px)',
-          }}
-        >
+        <div className="zoombar-pill">
           <button
             type="button"
             onClick={() => setScale((s) => Math.max(0.2, s - 0.1))}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', padding: 2 }}
             title="Zoom Out"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
           </button>
 
           <input
@@ -341,42 +325,33 @@ export function SlideEditorCanvasBoard({
             step={0.02}
             value={scale}
             onChange={(e) => setScale(parseFloat(e.target.value))}
-            style={{ width: 110, accentColor: '#f4621f', cursor: 'pointer', height: 4 }}
+            title="Canvas zoom level"
           />
 
           <button
             type="button"
             onClick={() => setScale((s) => Math.min(2.0, s + 0.1))}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', padding: 2 }}
             title="Zoom In"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
           </button>
 
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.85)', minWidth: 36, textAlign: 'center' }}>
+          <span className="zoombar-val">
             {Math.round(scale * 100)}%
           </span>
-        </div>
 
-        <button
-          type="button"
-          onClick={fitToViewport}
-          style={{
-            padding: '7px 16px',
-            background: 'rgba(255, 255, 255, 0.85)',
-            border: 'none',
-            borderRadius: 8,
-            color: '#111010',
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)',
-            transition: 'all 0.15s ease',
-          }}
-          title="Fit to Screen"
-        >
-          Fit
-        </button>
+          <div className="zoombar-divider" />
+
+          <button
+            type="button"
+            className="zoombar-fit"
+            data-active={Math.abs(scale - 1) < 0.01 || undefined}
+            onClick={fitToViewport}
+            title="Fit slide to view"
+          >
+            Fit
+          </button>
+        </div>
       </div>
 
       {/* Free-floating 1280x720 Canvas Board */}

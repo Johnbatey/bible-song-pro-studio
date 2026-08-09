@@ -869,14 +869,13 @@ export function StageDesigner() {
 
           {/* Bottom-centre sleek zoom pill bar matching Image 1 */}
           <div className="dz-zoombar">
-            <div className="dz-zoombar-pill">
+            <div className="zoombar-pill">
               <button
                 type="button"
                 onClick={() => setZoom((z) => clamp(z - 0.1, ZOOM_MIN, ZOOM_MAX))}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', padding: 2 }}
                 title="Zoom out"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
               </button>
               <input
                 type="range"
@@ -886,21 +885,19 @@ export function StageDesigner() {
                 value={zoom}
                 onChange={(event) => setZoom(Number(event.currentTarget.value))}
                 title="Canvas zoom"
-                style={{ width: 110, accentColor: '#f4621f', cursor: 'pointer', height: 4 }}
               />
               <button
                 type="button"
                 onClick={() => setZoom((z) => clamp(z + 0.1, ZOOM_MIN, ZOOM_MAX))}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', display: 'flex', padding: 2 }}
                 title="Zoom in"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="7"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
               </button>
-              <span className="dz-zoom">{Math.round(zoom * 100)}%</span>
-              <div className="dz-zoom-divider" />
+              <span className="zoombar-val">{Math.round(zoom * 100)}%</span>
+              <div className="zoombar-divider" />
               <button
                 type="button"
-                className="dz-zoombar-fit"
+                className="zoombar-fit"
                 data-active={zoom === 1 || undefined}
                 onClick={() => setZoom(1)}
                 title="Fit the stage to the window"

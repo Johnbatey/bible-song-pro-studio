@@ -8,6 +8,7 @@ import { SlideEditorRightSidebar, type PptxInspector } from './slide-editor/Slid
 import type { LayerRow } from './slide-editor/LayerList';
 import { PptxDeckView } from './PptxDeckView';
 import { SlideCanvas } from './SlideCanvas';
+import { NativeSlideBoard, slideElementsFor } from './NativeSlideBoard';
 import type { ParsedShape } from '../slide-engine/parser/slide-parser';
 
 /** Width the rail draws PowerPoint thumbnails at. */
@@ -536,8 +537,6 @@ export function SlideEditorModal() {
     }
   };
 
-  if (!isSlideEditorOpen) return null;
-
   const slides = deck.slides.length > 0 ? deck.slides : [
     {
       id: 'slide-default',
@@ -557,6 +556,20 @@ export function SlideEditorModal() {
 
   const activeSlide = slides[activeSlideIndex] || slides[0];
   const selectedElement = activeSlide.elements?.find((el) => el.id === selectedElementId) || null;
+
+  const renderNativeThumb = useCallback((index: number, width = 180) => {
+    const slide = slides[index];
+    if (!slide) return null;
+    return (
+      <NativeSlideBoard
+        elements={slideElementsFor(slide)}
+        background={slide.background}
+        width={width}
+      />
+    );
+  }, [slides]);
+
+  if (!isSlideEditorOpen) return null;
 
   // Tool Selection Handlers
   const handleSelectTool = (tool: ActiveTool | string) => {
@@ -1156,7 +1169,7 @@ export function SlideEditorModal() {
             setActiveSlideIndex(idx);
             setSelectedElementId(null);
           }}
-          renderThumb={isPptxDeck ? renderPptxThumb : undefined}
+          renderThumb={isPptxDeck ? renderPptxThumb : renderNativeThumb}
           readOnlyDeck={isPptxDeck}
           onAddSlide={handleAddSlide}
           onDuplicateSlide={handleDuplicateSlide}

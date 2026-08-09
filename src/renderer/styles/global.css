@@ -1234,3 +1234,83 @@ select option:hover, select option:focus, select option:checked {
   color: var(--text-secondary);
   margin-top: 2px;
 }
+
+/* ── Sleek Zoom Pill Template Control ── */
+.zoombar-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  background: rgba(20, 20, 22, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+  font-family: var(--font-ui);
+  user-select: none;
+  backdrop-filter: blur(16px);
+}
+
+.zoombar-pill button {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  transition: color 0.15s ease;
+}
+
+.zoombar-pill button:hover {
+  color: #ffffff;
+}
+
+.zoombar-pill input[type='range'] {
+  width: 100px;
+  height: 4px;
+  accent-color: var(--chrome-control-active, rgba(255, 255, 255, 0.8));
+  cursor: pointer;
+}
+
+.zoombar-val {
+  min-width: 36px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.zoombar-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 2px;
+}
+
+.zoombar-fit {
+  padding: 3px 10px !important;
+  height: 24px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.zoombar-fit:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.zoombar-fit:active,
+.zoombar-fit[data-active] {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
