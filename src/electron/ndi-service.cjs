@@ -209,7 +209,19 @@ function createNdiService() {
 
       capturing = true;
       try {
-        const image = await displayWindow.capturePage();
+        let rect = undefined;
+        if (displayWindow.getContentBounds) {
+          const bounds = displayWindow.getContentBounds();
+          if (bounds && bounds.width > 0 && bounds.height > 0) {
+            const scale = Math.min(bounds.width / 1920, bounds.height / 1080);
+            const surfaceW = Math.max(1, Math.round(1920 * scale));
+            const surfaceH = Math.max(1, Math.round(1080 * scale));
+            const surfaceX = Math.max(0, Math.round((bounds.width - surfaceW) / 2));
+            const surfaceY = Math.max(0, Math.round((bounds.height - surfaceH) / 2));
+            rect = { x: surfaceX, y: surfaceY, width: surfaceW, height: surfaceH };
+          }
+        }
+        const image = await displayWindow.capturePage(rect);
         if (image && !image.isEmpty()) {
           const size = image.getSize();
           if (size.width > 0 && size.height > 0) {

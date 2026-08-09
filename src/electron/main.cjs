@@ -556,6 +556,7 @@ function createDisplayWindow(bounds) {
   displayWindow = new BrowserWindow({ x: d.x, y: d.y, width: d.width, height: d.height, minWidth: 640, minHeight: 360, frame: true, autoHideMenuBar: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#000000', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, backgroundThrottling: false } });
   displayWindow.setResizable(true);
   displayWindow.setMinimumSize(640, 360);
+  displayWindow.setAspectRatio(16 / 9);
   displayWindow.loadURL(isDev ? 'http://localhost:5173/audience-display.html' : `file://${path.join(__dirname, '../../dist/audience-display.html')}`);
   displayWindow.setMenuBarVisibility(false);
   displayWindow.webContents.once('did-finish-load', () => {
