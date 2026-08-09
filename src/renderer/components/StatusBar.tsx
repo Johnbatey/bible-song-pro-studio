@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type } from '../styles/type';
 
@@ -8,6 +9,18 @@ export function StatusBar() {
   const transcription = useAppStore((s) => s.transcription);
   const scenes = useAppStore((s) => s.scenes);
   const currentScene = useAppStore((s) => s.display.currentScene);
+  const [ndiStatus, setNdiStatus] = useState<{ running: boolean; connections: number } | null>(null);
+
+  useEffect(() => {
+    const check = () => {
+      window.BSP?.ndi?.status?.().then((st) => {
+        setNdiStatus(st ? { running: Boolean(st.running), connections: st.connections || 0 } : null);
+      }).catch(() => {});
+    };
+    check();
+    const interval = setInterval(check, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div style={styles.bar}>
@@ -30,6 +43,16 @@ export function StatusBar() {
             }}
           />
           {isExternalDisplayActive ? 'Ext Display' : 'No Ext Display'}
+        </span>
+        <span style={styles.separator} />
+        <span style={styles.item}>
+          <span
+            style={{
+              ...styles.dot,
+              background: ndiStatus?.running ? '#2ecc71' : 'var(--text-dim)',
+            }}
+          />
+          {ndiStatus?.running ? `NDI Stream (${ndiStatus.connections})` : 'NDI Off'}
         </span>
         <span style={styles.separator} />
         <span style={styles.item}>

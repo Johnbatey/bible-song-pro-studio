@@ -90,7 +90,7 @@ contextBridge.exposeInMainWorld('BSP', {
   },
 
   ndi: {
-    start: () => ipcRenderer.invoke('ndi:start'),
+    start: (payload) => ipcRenderer.invoke('ndi:start', payload),
     stop: () => ipcRenderer.invoke('ndi:stop'),
     status: () => ipcRenderer.invoke('ndi:status'),
   },

@@ -592,9 +592,9 @@ declare global {
         disposeMlxWhisper: () => Promise<any>;
       };
       ndi: {
-        start: () => Promise<any>;
-        stop: () => Promise<any>;
-        status: () => Promise<any>;
+        start: (payload?: { name?: string; fps?: number; width?: number; height?: number }) => Promise<{ ok: boolean; error?: string; source?: string; status?: NdiStatus }>;
+        stop: () => Promise<{ ok: boolean; status?: NdiStatus }>;
+        status: () => Promise<NdiStatus>;
       };
       session: {
         start: (payload?: { name?: string }) => Promise<any>;
@@ -743,4 +743,18 @@ export interface TranscriptionResult {
   isPassthrough?: boolean;
   activeEngine?: string;
   error?: string;
+}
+
+export interface NdiStatus {
+  ok: boolean;
+  available: boolean;
+  libraryLoaded: boolean;
+  running: boolean;
+  source: string;
+  instanceActive: boolean;
+  framesSent: number;
+  width: number;
+  height: number;
+  connections: number;
+  lastError: string;
 }

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { AppleToggle } from './AppleToggle';
-import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice } from '../types';
+import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, NdiStatus } from '../types';
 import { SongPacks } from './settings/SongPacks';
 
 export type SettingsCategory =
@@ -181,6 +181,40 @@ export function SettingsModal() {
   const [wordStudy, setWordStudy] = useState(true);
   const [inputGain, setInputGain] = useState(0);
   const [voiceCommands, setVoiceCommands] = useState(true);
+
+  // NDI Streaming State
+  const [ndiStatus, setNdiStatus] = useState<NdiStatus | null>(null);
+  const [ndiName, setNdiName] = useState('Bible Song Pro');
+  const [ndiFps, setNdiFps] = useState<number>(15);
+  const [ndiResWidth, setNdiResWidth] = useState<number>(1280);
+  const [ndiResHeight, setNdiResHeight] = useState<number>(720);
+  const [isNdiLoading, setIsNdiLoading] = useState(false);
+
+  const refreshNdiStatus = useCallback(() => {
+    window.BSP?.ndi?.status?.().then((st) => setNdiStatus(st)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshNdiStatus();
+    const interval = setInterval(refreshNdiStatus, 2000);
+    return () => clearInterval(interval);
+  }, [refreshNdiStatus]);
+
+  const toggleNdiStream = async () => {
+    setIsNdiLoading(true);
+    if (ndiStatus?.running) {
+      await window.BSP?.ndi?.stop?.();
+    } else {
+      await window.BSP?.ndi?.start?.({
+        name: ndiName,
+        fps: ndiFps,
+        width: ndiResWidth,
+        height: ndiResHeight,
+      });
+    }
+    refreshNdiStatus();
+    setIsNdiLoading(false);
+  };
 
   useEffect(() => {
     if (activeCategoryValue) {
@@ -556,22 +590,111 @@ export function SettingsModal() {
                   </div>
                 </div>
 
-                <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch' }}>
+                <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={modalStyles.rowTitle}>NDI® Network Video Output</div>
-                      <div style={modalStyles.rowSub}>Publish program output live for OBS, vMix, and network receivers</div>
+                      <div style={modalStyles.rowSub}>Publish program output live over local network for OBS, vMix, and NDI receivers</div>
                     </div>
-                    <span style={{ fontSize: 11, background: '#22c55e', color: '#000', padding: '2px 8px', borderRadius: 999, fontWeight: 700 }}>
-                      NDI LIVE
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          background: ndiStatus?.running ? '#22c55e' : '#3f3f46',
+                          color: ndiStatus?.running ? '#000000' : '#ffffff',
+                          padding: '3px 10px',
+                          borderRadius: 999,
+                          fontWeight: 700,
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        {ndiStatus?.running ? `NDI LIVE (${ndiStatus.connections || 0} CONNECTED)` : 'NDI OFF'}
+                      </span>
+                      <button
+                        style={{
+                          padding: '6px 14px',
+                          background: ndiStatus?.running ? '#ef4444' : '#FF5500',
+                          border: 'none',
+                          borderRadius: 6,
+                          color: '#ffffff',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: isNdiLoading ? 'not-allowed' : 'pointer',
+                          opacity: isNdiLoading ? 0.7 : 1,
+                        }}
+                        disabled={isNdiLoading}
+                        onClick={toggleNdiStream}
+                      >
+                        {isNdiLoading ? 'Processing...' : ndiStatus?.running ? 'Stop NDI Stream' : 'Start NDI Stream'}
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText('OBS NDI Source: Bible Song Pro')}>
-                      Copy OBS Setup
+
+                  {/* NDI Stream Configuration Options */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, background: '#161414', padding: 12, borderRadius: 8, border: '1px solid #262628' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>NDI Source Name</label>
+                      <input
+                        type="text"
+                        style={{ ...modalStyles.textInput, width: '100%' }}
+                        value={ndiName}
+                        onChange={(e) => setNdiName(e.target.value)}
+                        placeholder="Bible Song Pro"
+                        disabled={ndiStatus?.running}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>Target Frame Rate</label>
+                      <select
+                        style={{ ...modalStyles.selectInput, width: '100%' }}
+                        value={ndiFps}
+                        onChange={(e) => setNdiFps(Number(e.target.value))}
+                        disabled={ndiStatus?.running}
+                      >
+                        <option value={15}>15 FPS (Standard)</option>
+                        <option value={30}>30 FPS (Smooth)</option>
+                        <option value={60}>60 FPS (Ultra Smooth)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>Capture Resolution</label>
+                      <select
+                        style={{ ...modalStyles.selectInput, width: '100%' }}
+                        value={`${ndiResWidth}x${ndiResHeight}`}
+                        onChange={(e) => {
+                          const [w, h] = e.target.value.split('x').map(Number);
+                          setNdiResWidth(w);
+                          setNdiResHeight(h);
+                        }}
+                        disabled={ndiStatus?.running}
+                      >
+                        <option value="1280x720">720p (1280 x 720)</option>
+                        <option value="1920x1080">1080p (1920 x 1080)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Diagnostic / Status Bar */}
+                  {ndiStatus && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', background: '#121212', padding: '6px 10px', borderRadius: 6 }}>
+                      <span>Frames Sent: <strong style={{ color: '#ffffff' }}>{ndiStatus.framesSent || 0}</strong></span>
+                      <span>Connections: <strong style={{ color: '#ffffff' }}>{ndiStatus.connections || 0}</strong></span>
+                      <span>Runtime: <strong style={{ color: ndiStatus.available ? '#22c55e' : '#ef4444' }}>{ndiStatus.available ? 'NDI SDK Loaded' : 'NDI Runtime Missing'}</strong></span>
+                    </div>
+                  )}
+
+                  {ndiStatus?.lastError && (
+                    <div style={{ fontSize: 12, color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: 8, borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)' }}>
+                      {ndiStatus.lastError}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText(`OBS NDI Source: ${ndiName}`)}>
+                      Copy OBS Setup Info
                     </button>
-                    <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText('vMix NDI Input: Bible Song Pro')}>
-                      Copy vMix Setup
+                    <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText(`vMix NDI Input: ${ndiName}`)}>
+                      Copy vMix Setup Info
                     </button>
                   </div>
                 </div>
