@@ -150,6 +150,8 @@ function parseReferenceQuery(query: string, books: BibleBook[]) {
 
   const verseStr = match[3]?.trim();
   const verseNum = verseStr && !isNaN(Number(verseStr)) && Number(verseStr) > 0 ? Number(verseStr) : null;
+  const endVerseStr = match[4]?.trim();
+  const endVerseNum = endVerseStr && !isNaN(Number(endVerseStr)) && Number(endVerseStr) > 0 ? Number(endVerseStr) : null;
 
   const aliasMatch = BOOK_ALIASES[rawBook] || BOOK_ALIASES[rawBook.replace(/\s+/g, '')];
 
@@ -182,6 +184,7 @@ function parseReferenceQuery(query: string, books: BibleBook[]) {
     bookName: matchedBookName,
     chapter: chapterNum,
     verse: verseNum,
+    endVerse: endVerseNum,
   };
 }
 
@@ -208,6 +211,8 @@ export function BiblePanel() {
   const [results, setResults] = useState<BibleSearchResult[]>([]);
   const [chapterVerses, setChapterVerses] = useState<BibleVerse[]>([]);
   const [highlightedVerse, setHighlightedVerse] = useState<number | null>(null);
+  const [selectedVerseNumbers, setSelectedVerseNumbers] = useState<number[]>([]);
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [pinned, setPinned] = useState<BibleVerse[]>([]);
   /** Where the control bar sits — above the verse list, or under it. */
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_bibleBarPosition');
@@ -279,7 +284,17 @@ export function BiblePanel() {
       if (parsedRef.chapter !== chapter) {
         setChapter(parsedRef.chapter);
       }
-      setHighlightedVerse(parsedRef.verse);
+      if (parsedRef.verse && parsedRef.endVerse) {
+        const start = Math.min(parsedRef.verse, parsedRef.endVerse);
+        const end = Math.max(parsedRef.verse, parsedRef.endVerse);
+        const range: number[] = [];
+        for (let i = start; i <= end; i++) range.push(i);
+        setSelectedVerseNumbers(range);
+        setHighlightedVerse(start);
+      } else {
+        setHighlightedVerse(parsedRef.verse);
+        setSelectedVerseNumbers(parsedRef.verse ? [parsedRef.verse] : []);
+      }
       setResults([]);
       return;
     }
@@ -429,6 +444,108 @@ export function BiblePanel() {
     projectScene(scene, { direct: opts.direct });
   }
 
+  async function sendVerses(verses: BibleVerse[], opts: { direct?: boolean } = {}) {
+    if (!verses || verses.length === 0) return;
+    if (verses.length === 1) return sendVerse(verses[0], opts);
+
+    const sorted = [...verses].sort((a, b) => a.verse - b.verse);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+
+    const isSingleBookChapter = sorted.every((v) => v.book === first.book && v.chapter === first.chapter);
+    let refTitle = '';
+    if (isSingleBookChapter) {
+      const isContiguous = last.verse - first.verse === sorted.length - 1;
+      if (isContiguous) {
+        refTitle = `${first.book} ${first.chapter}:${first.verse}–${last.verse}`;
+      } else {
+        refTitle = `${first.book} ${first.chapter}:${sorted.map((v) => v.verse).join(',')}`;
+      }
+    } else {
+      refTitle = `${first.reference} – ${last.reference}`;
+    }
+
+    const combinedText = sorted.map((v) => `[${v.verse}] ${v.text}`).join('\n\n');
+
+    let secondaryVerseObj: { text: string; reference: string; version: string } | undefined = undefined;
+    if (dualVersion) {
+      const secondaryList = await Promise.all(sorted.map((v) => fetchSecondary(v)));
+      const validSecondary = secondaryList.filter(Boolean);
+      if (validSecondary.length > 0) {
+        const combinedSecText = sorted
+          .map((v, i) => {
+            const sec = secondaryList[i];
+            return sec ? `[${v.verse}] ${sec.text}` : `[${v.verse}] ${v.text}`;
+          })
+          .join('\n\n');
+        secondaryVerseObj = {
+          text: combinedSecText,
+          reference: `${refTitle} (${secondaryVersion})`,
+          version: secondaryVersion,
+        };
+      }
+    }
+
+    const primaryVer = first.version || selectedVersion;
+    const sceneId = `bible-${primaryVer}-${refTitle}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
+
+    const goesLive = opts.direct || operatingMode === 'basic';
+    const activeScene = goesLive ? currentScene : previewScene;
+    if (activeScene?.id === sceneId) {
+      if (goesLive) {
+        setCurrentScene(null);
+        setPreviewScene(null);
+      } else {
+        setPreviewScene(null);
+      }
+      return;
+    }
+
+    const scene: Scene = {
+      id: sceneId,
+      name: refTitle,
+      type: 'bible',
+      content: {
+        text: combinedText,
+        reference: secondaryVerseObj ? `${refTitle} (${primaryVer})` : refTitle,
+        version: primaryVer,
+        secondaryVerse: secondaryVerseObj,
+      },
+      transition: { type: 'fade', duration: 0.45, easing: 'ease' },
+    };
+
+    addVerseToHistory(first);
+    projectScene(scene, { direct: opts.direct });
+  }
+
+  const handleRowClick = (verse: BibleVerse, index: number, e: React.MouseEvent, isDoubleClick = false) => {
+    const list = results.length ? results : chapterVerses;
+    if (e.shiftKey && lastClickedIndex !== null) {
+      const start = Math.min(lastClickedIndex, index);
+      const end = Math.max(lastClickedIndex, index);
+      const range = list.slice(start, end + 1);
+      setSelectedVerseNumbers(range.map((v) => v.verse));
+      void sendVerses(range, { direct: isDoubleClick });
+    } else if (e.metaKey || e.ctrlKey) {
+      const isSelected = selectedVerseNumbers.includes(verse.verse);
+      const nextNums = isSelected
+        ? selectedVerseNumbers.filter((n) => n !== verse.verse)
+        : [...selectedVerseNumbers, verse.verse];
+      setSelectedVerseNumbers(nextNums);
+      const range = list.filter((v) => nextNums.includes(v.verse));
+      void sendVerses(range, { direct: isDoubleClick });
+      setLastClickedIndex(index);
+    } else {
+      setLastClickedIndex(index);
+      setSelectedVerseNumbers([verse.verse]);
+      if (isDoubleClick) {
+        void sendVerse(verse, { direct: true });
+      } else {
+        void sendVerse(verse);
+      }
+    }
+  };
+
   /**
    * Crosses into the neighbouring chapter, projecting the verse at whichever
    * end we arrive from. The chapter loads asynchronously, so the edge is
@@ -522,8 +639,26 @@ export function BiblePanel() {
     if (event.key === 'Enter') {
       event.preventDefault();
       void (async () => {
-        let verseToSend: BibleVerse | undefined;
         const parsedRef = parseReferenceQuery(query, bookOptions);
+        if (parsedRef && parsedRef.verse && parsedRef.endVerse) {
+          let verses = chapterVerses;
+          if (parsedRef.bookName !== selectedBook || parsedRef.chapter !== chapter || !verses.length) {
+            verses = (await window.BSP?.bible?.getChapter({
+              versionId: selectedVersion,
+              book: parsedRef.bookName,
+              chapter: parsedRef.chapter,
+            }).catch(() => [])) || [];
+          }
+          const start = Math.min(parsedRef.verse, parsedRef.endVerse);
+          const end = Math.max(parsedRef.verse, parsedRef.endVerse);
+          const targetVerses = verses.filter((v) => v.verse >= start && v.verse <= end);
+          if (targetVerses.length > 0) {
+            void sendVerses(targetVerses, { direct: true });
+            return;
+          }
+        }
+
+        let verseToSend: BibleVerse | undefined;
         if (parsedRef && parsedRef.verse) {
           verseToSend = chapterVerses.find((v) => v.verse === parsedRef.verse);
           if (!verseToSend) {
@@ -539,7 +674,7 @@ export function BiblePanel() {
           const found = await runSearch();
           verseToSend = found[0] || results[0];
         }
-        if (verseToSend) await sendVerse(verseToSend, { direct: true });
+        if (verseToSend) void sendVerse(verseToSend, { direct: true });
       })();
     }
   }
@@ -722,11 +857,14 @@ export function BiblePanel() {
               const isHighlighted = !results.length && highlightedVerse === verse.verse;
               const isLive = currentScene?.type === 'bible' && currentScene.name === verse.reference;
               const isPreview = previewScene?.type === 'bible' && previewScene.name === verse.reference;
+              const isSelectedMulti = selectedVerseNumbers.length > 1 && selectedVerseNumbers.includes(verse.verse);
 
               const borderStyle = isLive
                 ? '1px solid #FF5500'
                 : isPreview
                 ? '1px solid #3b82f6'
+                : isSelectedMulti
+                ? '1px solid #FF5500'
                 : isHighlighted
                 ? '1px solid var(--chrome-control-active)'
                 : '1px solid #262628';
@@ -735,6 +873,8 @@ export function BiblePanel() {
                 ? '#3d1403'
                 : isPreview
                 ? '#232221'
+                : isSelectedMulti
+                ? 'rgba(255, 85, 0, 0.22)'
                 : isHighlighted
                 ? 'var(--chrome-control-active)'
                 : '#141416';
@@ -744,8 +884,8 @@ export function BiblePanel() {
                   key={`${verse.reference}-${verse.version}`}
                   className="row-hover"
                   ref={(el) => { verseRefs.current[verse.reference] = el; }}
-                  onClick={() => sendVerse(verse)}
-                  onDoubleClick={() => sendVerse(verse, { direct: true })}
+                  onClick={(e) => handleRowClick(verse, index, e, false)}
+                  onDoubleClick={(e) => handleRowClick(verse, index, e, true)}
                   style={{
                     height: 38,
                     minHeight: 38,
