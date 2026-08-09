@@ -441,17 +441,19 @@ export function BiblePanel() {
     }
     const primaryVer = verse.version || selectedVersion;
     const secondaryVer = secondaryVerse?.version || secondaryVersion;
+    const verseText = `${toSuperscript(verse.verse)}\u00A0${verse.text}`;
     const scene: Scene = {
       id: sceneId,
       name: verse.reference,
       type: 'bible',
       content: {
-        text: verse.text,
+        text: verseText,
         reference: secondaryVerse ? `${verse.reference} (${primaryVer})` : verse.reference,
         version: primaryVer,
         secondaryVerse: secondaryVerse
           ? {
               ...secondaryVerse,
+              text: `${toSuperscript(verse.verse)}\u00A0${secondaryVerse.text}`,
               reference: `${secondaryVerse.reference || verse.reference} (${secondaryVer})`,
               version: secondaryVer,
             }
