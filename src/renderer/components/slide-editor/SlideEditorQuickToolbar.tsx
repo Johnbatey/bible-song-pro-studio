@@ -341,10 +341,10 @@ export function SlideEditorQuickToolbar({
                     }}
                   >
                     <option value="KJV">KJV</option>
-                    <option value="NKJV">NKJV</option>
-                    <option value="NIV">NIV</option>
-                    <option value="NLT">NLT</option>
-                    <option value="NASB">NASB</option>
+                    <option value="ASV">ASV</option>
+                    <option value="Darby">Darby</option>
+                    <option value="YLT">YLT</option>
+                    <option value="LSG">LSG</option>
                   </select>
 
                   <input

@@ -28,6 +28,7 @@
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test:live-scripture": "node scripts/test-live-scripture-parser.cjs",
+    "verify:bibles": "node scripts/test-bible-canon.cjs && node scripts/check-bible-licensing.cjs",
     "verify:display-architecture": "node scripts/verify-display-architecture.cjs",
     "verify:window-resizing": "node scripts/verify-window-resizing.cjs",
     "verify:remote-architecture": "node scripts/verify-remote-architecture.cjs",
@@ -44,7 +45,7 @@
     "verify:stage-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-stage-display.cjs",
     "verify:dist-audience-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-dist-audience-display.cjs",
     "verify:display-all": "npm run typecheck && npm run verify:display-architecture && npm run verify:stage-architecture && npm run verify:port-fallback && npm run verify:window-resizing && npm run verify:display-stack && npm run verify:dist-audience-display && npm run verify:stage-layouts && npm run verify:stage-designer",
-    "verify:all": "npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all",
+    "verify:all": "npm run verify:bibles && npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all",
     "verify:stage-designer": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-stage-designer.cjs",
     "verify:stage-layouts": "node scripts/verify-stage-layouts.cjs"
   },

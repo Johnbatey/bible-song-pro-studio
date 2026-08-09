@@ -126,7 +126,7 @@ export function ThemeDesignerModal() {
               onClick={() => setActiveTheme(themes[0] || null)}
             >
               <div style={styles.selahThumb}>
-                <div style={styles.selahRef}>Genesis 1:1 (NKJV)</div>
+                <div style={styles.selahRef}>Genesis 1:1 (KJV)</div>
                 <div style={styles.selahText}>In the beginning God created the heaven and the earth</div>
               </div>
               <div style={styles.cardFooter}>
@@ -144,7 +144,7 @@ export function ThemeDesignerModal() {
             >
               <div style={styles.edenThumb}>
                 <div style={styles.edenText}>In the beginning God created the heaven and the earth</div>
-                <div style={styles.edenRef}>Genesis 1:1 (NKJV)</div>
+                <div style={styles.edenRef}>Genesis 1:1 (KJV)</div>
               </div>
               <div style={styles.cardFooter}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>Eden</span>
@@ -160,7 +160,7 @@ export function ThemeDesignerModal() {
             >
               <div style={styles.ltThumb}>
                 <div style={styles.ltBox}>
-                  <div style={styles.ltRef}>GENESIS 1:1 (NKJV)</div>
+                  <div style={styles.ltRef}>GENESIS 1:1 (KJV)</div>
                   <div style={styles.ltText}>IN THE BEGINNING GOD CREATED THE HEAVEN AND THE EARTH</div>
                 </div>
               </div>
@@ -217,7 +217,7 @@ export function ThemeDesignerModal() {
                 onClick={() => setSelectedElement('scripture')}
               >
                 <div style={{ fontSize: Math.round(fontSize * 0.4), color: '#eab308', marginBottom: refGap / 4, textAlign: 'center', fontWeight: 600 }}>
-                  Genesis 1:1 (NKJV)
+                  Genesis 1:1 (KJV)
                 </div>
                 <div
                   style={{

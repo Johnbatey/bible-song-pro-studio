@@ -14,9 +14,10 @@ const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mar
     the list keeps one identity across renders. */
 const FALLBACK_VERSIONS: BibleVersion[] = [
   { id: 'KJV', name: 'King James Version', abbreviation: 'KJV', language: 'en', books: [] },
-  { id: 'NKJV', name: 'New King James Version', abbreviation: 'NKJV', language: 'en', books: [] },
-  { id: 'NASB', name: 'New American Standard Bible', abbreviation: 'NASB', language: 'en', books: [] },
-  { id: 'NLT', name: 'New Living Translation', abbreviation: 'NLT', language: 'en', books: [] },
+  { id: 'ASV', name: 'American Standard Version', abbreviation: 'ASV', language: 'en', books: [] },
+  { id: 'Darby', name: 'Darby Translation', abbreviation: 'DBY', language: 'en', books: [] },
+  { id: 'YLT', name: "Young's Literal Translation", abbreviation: 'YLT', language: 'en', books: [] },
+  { id: 'LSG', name: 'Louis Segond 1910', abbreviation: 'LSG', language: 'fr', books: [] },
 ];
 
 function normalizeSearchText(value: string) {
@@ -221,7 +222,7 @@ export function BiblePanel() {
   const [versions, setVersions] = useState<BibleVersion[]>([]);
   const [books, setBooks] = useState<BibleBook[]>([]);
   const [selectedVersion, setSelectedVersion] = useState('KJV');
-  const [secondaryVersion, setSecondaryVersion] = useState('NKJV');
+  const [secondaryVersion, setSecondaryVersion] = useState('ASV');
   const [dualVersion, setDualVersion] = useState(false);
   const [selectedBook, setSelectedBook] = useState('Genesis');
   const [chapter, setChapter] = useState(1);

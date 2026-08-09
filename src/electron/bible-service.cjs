@@ -2,11 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const { ALL_BOOKS } = require('./scripture-reference.cjs');
 
+// Bundled scripture is public domain and 66-book Protestant canon only — see
+// BIBLES.md. Copyrighted translations (NIV, NKJV, NLT, NASB, ESV) are not shipped;
+// users import their own licensed copy instead.
 const VERSION_META = [
   { id: 'KJV', name: 'King James Version (1769)', abbreviation: 'KJV', language: 'en', file: 'KJV.json', type: 'json' },
-  { id: 'NKJV', name: 'New King James Version', abbreviation: 'NKJV', language: 'en', file: 'NKJV_bible.json', type: 'json' },
-  { id: 'NASB', name: 'New American Standard Bible', abbreviation: 'NASB', language: 'en', file: 'NASB_bible.json', type: 'json' },
-  { id: 'NLT', name: 'New Living Translation', abbreviation: 'NLT', language: 'en', file: 'NLT_bible.json', type: 'json' },
+  { id: 'ASV', name: 'American Standard Version (1901)', abbreviation: 'ASV', language: 'en', file: 'ASV.json', type: 'json' },
+  { id: 'Darby', name: 'Darby Translation (1890)', abbreviation: 'DBY', language: 'en', file: 'Darby.json', type: 'json' },
+  { id: 'YLT', name: "Young's Literal Translation (1898)", abbreviation: 'YLT', language: 'en', file: 'YLT.json', type: 'json' },
+  { id: 'LSG', name: 'Louis Segond 1910', abbreviation: 'LSG', language: 'fr', file: 'LSG.json', type: 'json' },
 ];
 
 const BOOK_ALIASES = new Map();

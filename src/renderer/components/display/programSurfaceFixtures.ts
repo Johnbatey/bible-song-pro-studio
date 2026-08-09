@@ -34,7 +34,7 @@ export const programSurfaceFixtures: Array<{ name: string; state: ProgramSurface
           secondaryVerse: {
             text: 'The LORD is my shepherd; I have all that I need.',
             reference: 'Psalm 23:1',
-            version: 'NLT',
+            version: 'ASV',
           },
         },
       },
