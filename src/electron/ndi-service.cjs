@@ -203,8 +203,8 @@ function createNdiService() {
       const numConnections = connectionCount();
       // When nobody is connected, publish at 1 FPS to keep NDI source discovery/preview responsive in OBS/vMix without wasting CPU
       if (numConnections === 0 && options.idleWhenUnwatched !== false) {
-        if (now - (captureTimer as any).lastIdleTick < 1000) return;
-        (captureTimer as any).lastIdleTick = now;
+        if (captureTimer.lastIdleTick && now - captureTimer.lastIdleTick < 1000) return;
+        captureTimer.lastIdleTick = now;
       }
 
       capturing = true;
