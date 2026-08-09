@@ -448,7 +448,7 @@ export function BiblePanel() {
       type: 'bible',
       content: {
         text: verseText,
-        reference: secondaryVerse ? `${verse.reference} (${primaryVer})` : verse.reference,
+        reference: `${verse.reference} (${primaryVer})`,
         version: primaryVer,
         secondaryVerse: secondaryVerse
           ? {
@@ -528,7 +528,7 @@ export function BiblePanel() {
       type: 'bible',
       content: {
         text: combinedText,
-        reference: secondaryVerseObj ? `${refTitle} (${primaryVer})` : refTitle,
+        reference: `${refTitle} (${primaryVer})`,
         version: primaryVer,
         secondaryVerse: secondaryVerseObj,
       },
@@ -979,7 +979,7 @@ export function BiblePanel() {
                         type: 'bible',
                         content: {
                           text: verse.text,
-                          reference: verse.reference,
+                          reference: `${verse.reference} (${verse.version || selectedVersion})`,
                           version: verse.version || selectedVersion,
                         },
                       };

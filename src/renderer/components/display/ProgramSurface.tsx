@@ -153,9 +153,22 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   const primaryVersionTag = content?.version ? content.version.split('/')[0] : '';
   const secondaryVersionTag = secondaryVerse?.version || (content?.version ? content.version.split('/')[1] : '');
 
+  const hasVersionInRef = Boolean(
+    content?.reference &&
+      primaryVersionTag &&
+      (content.reference.toLowerCase().includes(`(${primaryVersionTag.toLowerCase()})`) ||
+        content.reference.toLowerCase().includes(` ${primaryVersionTag.toLowerCase()}`))
+  );
+
+  const formattedRef = content?.reference
+    ? hasVersionInRef || !primaryVersionTag
+      ? content.reference
+      : `${content.reference} (${primaryVersionTag})`
+    : '';
+
   const primaryRef = isCompare && primaryVersionTag && !content?.reference?.includes(`(${primaryVersionTag})`)
     ? `${baseRef} (${primaryVersionTag})`
-    : content?.reference;
+    : formattedRef;
 
   const secondaryRef = isCompare && secondaryVersionTag && !secondaryVerse?.reference?.includes(`(${secondaryVersionTag})`)
     ? `${(secondaryVerse?.reference || baseRef).replace(/\s*\([^)]*\/[^)]*\)\s*$/, '').trim()} (${secondaryVersionTag})`
@@ -258,9 +271,9 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           }}
         >
           <div className="program-lt-text" style={textStyle}>{content?.text || ''}</div>
-          {showReference && content?.reference && (
+          {showReference && formattedRef && (
             <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign }}>
-              {content.reference}
+              {formattedRef}
             </div>
           )}
           {songCredit(scene) && <div className="program-song-credit" style={{ textAlign }}>{songCredit(scene)}</div>}
@@ -297,9 +310,9 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
             </div>
           ) : (
             <>
-              {showReference && content?.reference && (
+              {showReference && formattedRef && (
                 <div className="program-ref-row" style={refRowStyle}>
-                  <span style={refStyle}>{content.reference}</span>
+                  <span style={refStyle}>{formattedRef}</span>
                 </div>
               )}
               <div className="program-main-text" style={textStyle}>{content?.text || ''}</div>
