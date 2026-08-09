@@ -171,7 +171,9 @@ function extractZefaniaBookNames(xmlText) {
   return [...String(xmlText || '').matchAll(/<b\b[^>]*\bn="([^"]*)"/g)].map(m => m[1]);
 }
 
-module.exports = {
+// Shared by the build scripts (Node) and the panel (browser). One canon list, so
+// an imported bible is held to exactly the same standard as a bundled one.
+const BIBLE_CANON = {
   CANON,
   APOCRYPHA,
   normalise,
@@ -179,3 +181,6 @@ module.exports = {
   assertProtestantCanon,
   extractZefaniaBookNames
 };
+
+if (typeof module !== 'undefined' && module.exports) module.exports = BIBLE_CANON;
+if (typeof window !== 'undefined') window.BSP_BIBLE_CANON = BIBLE_CANON;

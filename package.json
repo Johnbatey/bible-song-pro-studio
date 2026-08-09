@@ -1,14 +1,14 @@
 {
   "name": "bible-song-pro",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "Bible Song Pro - Professional Church Presentation & Streaming Software",
   "main": "src/electron/main.cjs",
-  "author": "Bible Song Pro Team",
-  "license": "UNLICENSED",
+  "author": "Johnson Olakotan",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/biblesongpro/bible-song-pro.git"
+    "url": "https://github.com/Johnbatey/bible-song-pro-desktop.git"
   },
   "scripts": {
     "start": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE; electron .",
