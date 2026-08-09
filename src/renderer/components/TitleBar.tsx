@@ -27,6 +27,50 @@ export function TitleBar() {
     }
   }, []);
 
+  const [ndiStatus, setNdiStatus] = useState<{ running: boolean; connections: number } | null>(null);
+
+  useEffect(() => {
+    const checkNdi = () => {
+      window.BSP?.ndi?.status?.().then((st) => setNdiStatus(st ? { running: Boolean(st.running), connections: st.connections || 0 } : null)).catch(() => {});
+    };
+    checkNdi();
+    const timer = setInterval(checkNdi, 2500);
+    return () => clearInterval(timer);
+  }, []);
+
+  const toggleNdi = async () => {
+    if (ndiStatus?.running) {
+      await window.BSP?.ndi?.stop?.();
+      triggerAlert({
+        id: `ndi-${Date.now()}`,
+        text: 'NDI Stream Stopped',
+        type: 'info',
+        duration: 3,
+        animation: 'slideDown',
+      });
+    } else {
+      const res = await window.BSP?.ndi?.start?.();
+      if (res?.ok) {
+        triggerAlert({
+          id: `ndi-${Date.now()}`,
+          text: 'NDI Stream Live (OBS / vMix)',
+          type: 'info',
+          duration: 4,
+          animation: 'slideDown',
+        });
+      } else if (res?.error) {
+        triggerAlert({
+          id: `ndi-${Date.now()}`,
+          text: `NDI Error: ${res.error}`,
+          type: 'warning',
+          duration: 5,
+          animation: 'slideDown',
+        });
+      }
+    }
+    window.BSP?.ndi?.status?.().then((st) => setNdiStatus(st ? { running: Boolean(st.running), connections: st.connections || 0 } : null)).catch(() => {});
+  };
+
 
   const toggleBlackout = () => {
     const nextState = !isBlackout;
@@ -140,6 +184,31 @@ export function TitleBar() {
               <line x1="12" y1="17" x2="12" y2="21" />
             </svg>
             Outputs
+          </button>
+
+          {/* NDI Quick Toggle Button */}
+          <button
+            style={{
+              ...styles.toolbarBtn,
+              background: ndiStatus?.running ? 'rgba(34, 197, 94, 0.18)' : styles.toolbarBtn.background,
+              borderColor: ndiStatus?.running ? '#22c55e' : 'transparent',
+              color: ndiStatus?.running ? '#22c55e' : 'var(--text-secondary)',
+              fontWeight: ndiStatus?.running ? 700 : 500,
+            }}
+            onClick={toggleNdi}
+            title={ndiStatus?.running ? `NDI Streaming Active (${ndiStatus.connections} receiver connected) - Click to Stop` : 'Start NDI Stream for OBS / vMix'}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <path d="M8 21h8" />
+              <path d="M12 17v4" />
+            </svg>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              NDI
+              {ndiStatus?.running && (
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+              )}
+            </span>
           </button>
 
           {/* Copy Display URL — sits with Outputs, the control it relates to */}

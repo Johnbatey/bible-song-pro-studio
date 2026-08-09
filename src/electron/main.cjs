@@ -377,9 +377,14 @@ const apiHandlers = {
   'GET /api/session/export': ({ query }) => sessionHistory?.exportSession(query?.id, query?.format || 'json'),
   'POST /api/ndi/start': () => {
     const result = ndiService?.start('Bible Song Pro');
-    if (result?.ok && displayWindow && !displayWindow.isDestroyed()) {
-      ndiService.setDisplayWindow(displayWindow);
-      ndiService.startCapture(15, { width: 1280, height: 720 });
+    if (result?.ok) {
+      if (!displayWindow || displayWindow.isDestroyed()) {
+        createDisplayWindow();
+      }
+      if (displayWindow && !displayWindow.isDestroyed()) {
+        ndiService.setDisplayWindow(displayWindow);
+        ndiService.startCapture(15, { width: 1280, height: 720 });
+      }
     }
     return result || { ok: false, error: 'NDI not available' };
   },
@@ -553,7 +558,13 @@ function createDisplayWindow(bounds) {
   displayWindow.setMinimumSize(640, 360);
   displayWindow.loadURL(isDev ? 'http://localhost:5173/audience-display.html' : `file://${path.join(__dirname, '../../dist/audience-display.html')}`);
   displayWindow.setMenuBarVisibility(false);
-  displayWindow.webContents.once('did-finish-load', () => broadcastDisplayState());
+  displayWindow.webContents.once('did-finish-load', () => {
+    broadcastDisplayState();
+    if (ndiService && ndiService.status().running) {
+      ndiService.setDisplayWindow(displayWindow);
+      ndiService.startCapture();
+    }
+  });
   return displayWindow;
 }
 
@@ -871,8 +882,9 @@ app.whenReady().then(async () => {
   ipcMain.handle('ndi:start', async (_, p) => {
     const r = ndiService?.start(p?.name || 'Bible Song Pro');
     if (r?.ok) {
-      // Capture the display output if it's open; otherwise the source is created and
-      // starts publishing as soon as one is.
+      if (!displayWindow || displayWindow.isDestroyed()) {
+        createDisplayWindow();
+      }
       if (displayWindow && !displayWindow.isDestroyed()) {
         ndiService.setDisplayWindow(displayWindow);
         ndiService.startCapture(p?.fps || 15, { width: p?.width || 1280, height: p?.height || 720 });

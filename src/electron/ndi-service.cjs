@@ -197,18 +197,24 @@ function createNdiService() {
 
     captureTimer = setInterval(async () => {
       if (!displayWindow || displayWindow.isDestroyed() || !sendInstance) { stopCapture(); return; }
-      // capturePage can take longer than the frame interval; skipping is far better
-      // than queueing captures until the main process falls over.
       if (capturing) return;
-      // Nobody is receiving — skip the capture entirely rather than encode ~8 MB a
-      // frame into the void. Resumes by itself when a receiver subscribes.
-      if (options.idleWhenUnwatched !== false && connectionCount() === 0) return;
+      
+      const now = Date.now();
+      const numConnections = connectionCount();
+      // When nobody is connected, publish at 1 FPS to keep NDI source discovery/preview responsive in OBS/vMix without wasting CPU
+      if (numConnections === 0 && options.idleWhenUnwatched !== false) {
+        if (now - (captureTimer as any).lastIdleTick < 1000) return;
+        (captureTimer as any).lastIdleTick = now;
+      }
+
       capturing = true;
       try {
-        const image = await displayWindow.capturePage({ x: 0, y: 0, width, height });
+        const image = await displayWindow.capturePage();
         if (image && !image.isEmpty()) {
           const size = image.getSize();
-          sendFrame(image.toBitmap(), size.width, size.height, fps);
+          if (size.width > 0 && size.height > 0) {
+            sendFrame(image.toBitmap(), size.width, size.height, fps);
+          }
         }
       } catch {
         // window closed mid-capture
