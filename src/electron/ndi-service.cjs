@@ -223,9 +223,14 @@ function createNdiService() {
         }
         const image = await displayWindow.capturePage(rect);
         if (image && !image.isEmpty()) {
+          const bitmap = image.toBitmap();
           const size = image.getSize();
-          if (size.width > 0 && size.height > 0) {
-            sendFrame(image.toBitmap(), size.width, size.height, fps);
+          if (bitmap && bitmap.length > 0 && size.width > 0 && size.height > 0) {
+            const totalPixels = Math.floor(bitmap.length / 4);
+            const aspect = size.width / size.height;
+            const realWidth = Math.max(1, Math.round(Math.sqrt(totalPixels * aspect)));
+            const realHeight = Math.max(1, Math.round(totalPixels / realWidth));
+            sendFrame(bitmap, realWidth, realHeight, fps);
           }
         }
       } catch {
