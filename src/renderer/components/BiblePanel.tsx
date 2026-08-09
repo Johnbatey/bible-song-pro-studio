@@ -37,6 +37,25 @@ function normalizeReferenceQuery(value: string) {
     .replace(/\s*[-–]\s*/g, '-');
 }
 
+function toSuperscript(num: number): string {
+  const map: Record<string, string> = {
+    '0': '⁰',
+    '1': '¹',
+    '2': '²',
+    '3': '³',
+    '4': '⁴',
+    '5': '⁵',
+    '6': '⁶',
+    '7': '⁷',
+    '8': '⁸',
+    '9': '⁹',
+  };
+  return String(num)
+    .split('')
+    .map((d) => map[d] || d)
+    .join('');
+}
+
 /**
  * Marks what the search actually caught. Each word of the query is highlighted
  * on its own rather than only the whole phrase, so a multi-word search still
@@ -465,7 +484,7 @@ export function BiblePanel() {
       refTitle = `${first.reference} – ${last.reference}`;
     }
 
-    const combinedText = sorted.map((v) => `[${v.verse}] ${v.text}`).join('\n\n');
+    const combinedText = sorted.map((v) => `${toSuperscript(v.verse)}\u00A0${v.text}`).join('\n\n');
 
     let secondaryVerseObj: { text: string; reference: string; version: string } | undefined = undefined;
     if (dualVersion) {
@@ -475,7 +494,7 @@ export function BiblePanel() {
         const combinedSecText = sorted
           .map((v, i) => {
             const sec = secondaryList[i];
-            return sec ? `[${v.verse}] ${sec.text}` : `[${v.verse}] ${v.text}`;
+            return sec ? `${toSuperscript(v.verse)}\u00A0${sec.text}` : `${toSuperscript(v.verse)}\u00A0${v.text}`;
           })
           .join('\n\n');
         secondaryVerseObj = {
