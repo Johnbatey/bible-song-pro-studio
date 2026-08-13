@@ -23,6 +23,33 @@ nativeTheme.themeSource = 'dark';
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+
+/* ── Where the operator's data lives, and why renaming is expensive ─────────
+ *
+ * Everything an operator owns — settings and API keys, the app-state store
+ * with their themes, songs, scenes and workspaces, session history, stage
+ * layouts, the media index, and the downloaded speech models — sits under
+ * app.getPath('userData'). Nothing here hardcodes that path; it is derived.
+ *
+ * But Electron derives it from package.json, and from two different fields:
+ *
+ *   dev  (`electron .`)  →  top-level `name`         → …/bible-song-pro-studio
+ *   packaged             →  `build.productName`      → …/Bible Song Pro Studio
+ *
+ * So renaming either field silently moves every operator to an empty folder.
+ * It looks like data loss and it is indistinguishable from a bug. This already
+ * happened once, when `name` went from bible-song-pro to bible-song-pro-studio.
+ *
+ * The two paths differing is deliberate, not an oversight: it is what keeps a
+ * development run from writing over the library of an installed copy on the
+ * same machine. Do not "fix" it by pinning them together.
+ *
+ * If either name has to change after a build ships, the rename needs a
+ * migration that copies the old folder forward on first launch. There is no
+ * such migration today, on purpose — nothing has shipped yet, and writing one
+ * for a rename that may never happen is guesswork.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
