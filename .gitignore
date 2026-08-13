@@ -15,6 +15,10 @@ artifacts/
 # Vendored package tarballs — installed from npm, not needed in history
 *.tgz
 
+# Slide-engine parity test decks. Staged locally per scripts/parity-slide-engine.md;
+# the verify scripts skip cleanly when they are absent.
+public/__parity/
+
 # Logs
 *.log
 npm-debug.log*
@@ -26,7 +30,8 @@ npm-debug.log*
 
 # Local secrets. API keys live in the app's userData settings.json, never here —
 # this is belt-and-braces in case anything is ever written to the project dir.
+# Anchored to the project root so a future src/**/settings.json is not dropped silently.
 .env
 .env.local
-settings.json
+/settings.json
 .opencode
