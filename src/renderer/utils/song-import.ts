@@ -5,20 +5,32 @@ export const SONG_FILE_ACCEPT = '.xml,.pro,.chordpro,.chopro,.txt';
 
 /** Map the import service's `{ title, verses[] }` shape onto the app's Song type. */
 export function toSong(imported: ImportedSong): Song {
+  const slides = imported.verses
+    .filter((verse) => verse.lines.length > 0)
+    .map((verse, index) => ({
+      id: uuid(),
+      label: verse.name || `Slide ${index + 1}`,
+      text: verse.lines.join('\n'),
+      order: index,
+    }));
+
+  /* The parser hands back a play order in verse *names*, because ids do not
+     exist until this function mints them. Translating here keeps the whole
+     name-to-id question in one place. A name with no slide is dropped rather
+     than guessed at — the same rule the parser applies to `<verseOrder>`. */
+  const byLabel = new Map(slides.map((slide) => [slide.label, slide.id]));
+  const arrangement = (imported.verseOrder || [])
+    .map((name) => byLabel.get(name))
+    .filter((id): id is string => Boolean(id));
+
   return {
     id: uuid(),
     title: imported.title || 'Untitled',
     author: imported.author || undefined,
     copyright: imported.copyright || undefined,
     ccli: imported.ccli || undefined,
-    slides: imported.verses
-      .filter((verse) => verse.lines.length > 0)
-      .map((verse, index) => ({
-        id: uuid(),
-        label: verse.name || `Slide ${index + 1}`,
-        text: verse.lines.join('\n'),
-        order: index,
-      })),
+    slides,
+    arrangement: arrangement.length > 0 ? arrangement : undefined,
     categories: ['Imported'],
   };
 }

@@ -307,6 +307,18 @@ export interface Song {
       it follows the theme, which is what Scripture does and what a song
       imported from OpenLyrics or ChordPro will always do. */
   background?: Background;
+  /** Play order, as slide ids; an id may repeat (V1 C V2 C B C).
+   *
+   *  Ids rather than labels because labels are operator-editable and not
+   *  unique — two slides can both read "Chorus", and renaming one would
+   *  silently re-point the order at the other.
+   *
+   *  Absent or empty means "play the slides in list order", which is what
+   *  every song written before this field existed does — so nothing needs
+   *  migrating and the persist version must not be bumped for it. Ids that no
+   *  longer name a slide are dropped when the order is expanded, so deleting a
+   *  slide can never leave a song unprojectable. */
+  arrangement?: string[];
 }
 
 export interface SongSlide {
@@ -324,6 +336,27 @@ export interface ImportedSong {
   author?: string;
   copyright?: string;
   ccli?: string;
+  /** Play order as verse *names*, because slide ids do not exist until `toSong`
+   *  mints them. Comes from OpenLyrics' own `<verseOrder>` element, or from the
+   *  repetition pass on a plain sheet. Empty when the order would just be each
+   *  verse once. */
+  verseOrder?: string[];
+  /** Non-fatal notes from the parser — a `<verseOrder>` naming a verse the file
+   *  does not contain, for instance. The import still succeeds. */
+  warnings?: string[];
+}
+
+/** What the section detector returns for a pasted or imported lyric sheet. */
+export interface ArrangeResult {
+  ok: boolean;
+  sections?: Array<{ name: string; lines: string[] }>;
+  verseOrder?: string[];
+  /** 1 when the sheet labelled its own sections, down to 0.25 when the split
+   *  was guessed from line count. Below 0.6 the UI says so rather than
+   *  presenting a guess as a fact. */
+  confidence?: number;
+  warnings?: string[];
+  error?: string;
 }
 
 export interface SongImportResult {
@@ -691,6 +724,7 @@ declare global {
       song: {
         importFile: (payload: { filePath: string }) => Promise<SongImportResult>;
         importText: (payload: { text: string }) => Promise<SongImportResult>;
+        arrangeText: (payload: { text: string }) => Promise<ArrangeResult>;
       };
       deck: {
         /** Reads a .pptx back from disk. Only the path is persisted with a deck. */

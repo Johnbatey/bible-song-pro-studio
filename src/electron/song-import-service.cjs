@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { arrangeLyrics, canonicalSectionKey, prettyLabel } = require('./lyric-sections.cjs');
 
 const NUL = String.fromCharCode(0);
 const REPLACEMENT = String.fromCharCode(0xfffd);
@@ -21,6 +22,64 @@ function looksBinary(text) {
   return control / sample.length > 0.05;
 }
 
+/**
+ * Verse names as the operator will see them. OpenLyrics stores `v1` and `c`,
+ * which used to reach the deck verbatim — a freshly imported song showed cards
+ * labelled "v1" and "c" rather than "Verse 1" and "Chorus".
+ *
+ * Labels have to come out unique because `verseOrder` indexes by them.
+ */
+function labelsFor(rawNames) {
+  const used = new Map();
+  return rawNames.map((raw, index) => {
+    const key = canonicalSectionKey(raw);
+    const base = key ? prettyLabel(key) : (String(raw || '').trim() || `Slide ${index + 1}`);
+    const count = (used.get(base) || 0) + 1;
+    used.set(base, count);
+    return count > 1 ? `${base} (${count})` : base;
+  });
+}
+
+/**
+ * Resolves one `<verseOrder>` token onto a parsed verse, by cascade. Real files
+ * write `V1` against `<verse name="v1">`, split a long verse into `v1a`/`v1b`,
+ * and suffix translations as `c_en` — so an exact match alone drops most of the
+ * order it was given.
+ *
+ * Returns null rather than guessing. A phantom entry would surface as a missing
+ * slide mid-service, which is worse than a shorter arrangement.
+ */
+function resolveOrderToken(token, rawNames) {
+  const raw = String(token || '').trim();
+  if (!raw) return -1;
+
+  let index = rawNames.indexOf(raw);
+  if (index !== -1) return index;
+
+  const lower = raw.toLowerCase();
+  index = rawNames.findIndex((name) => String(name).toLowerCase() === lower);
+  if (index !== -1) return index;
+
+  // v1a -> v1, c_en -> c
+  const stripped = lower.replace(/[_-][a-z]{2,}$/, '').replace(/([a-z]+\d+)[a-z]$/, '$1');
+  index = rawNames.findIndex((name) => String(name).toLowerCase() === stripped);
+  if (index !== -1) return index;
+
+  const wanted = canonicalSectionKey(stripped);
+  if (!wanted) return -1;
+  return rawNames.findIndex((name) => {
+    const got = canonicalSectionKey(name);
+    return got && got.key === wanted.key && (got.number || null) === (wanted.number || null);
+  });
+}
+
+/** An order that is each verse once, in order, is what no arrangement already
+    does. Storing it adds a thing to break for no change in behaviour. */
+function suppressRedundant(order, labels) {
+  if (order.length !== labels.length) return order;
+  return order.every((name, i) => name === labels[i]) ? [] : order;
+}
+
 function createSongImportService() {
 
   function parseOpenLyrics(xml) {
@@ -38,13 +97,32 @@ function createSongImportService() {
       while ((aMatch = authorRe.exec(body)) !== null) authors.push(aMatch[1].trim());
       const copyright = (body.match(/<copyright[^>]*>([^<]+)<\/copyright>/i) || [])[1] || '';
       const ccli = (body.match(/<ccliNo[^>]*>([^<]+)<\/ccliNo>/i) || [])[1] || '';
-      const verses = [];
+
+      const rawNames = [];
+      const verseLines = [];
       const verseRe = /<verse[^>]*name=["']([^"']*)["'][^>]*>([\s\S]*?)<\/verse>/gi;
       let vMatch;
       while ((vMatch = verseRe.exec(body)) !== null) {
         const lines = vMatch[2].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
-        verses.push({ name: vMatch[1], lines: lines.split('\n').map((l) => l.trim()).filter(Boolean) });
+        rawNames.push(vMatch[1]);
+        verseLines.push(lines.split('\n').map((l) => l.trim()).filter(Boolean));
       }
+
+      const labels = labelsFor(rawNames);
+      const verses = labels.map((name, i) => ({ name, lines: verseLines[i] }));
+
+      /* <verseOrder> is the arrangement the format already carries, and it was
+         being thrown away — so an OpenLyrics song that repeats its chorus
+         imported as a straight run through the verses. */
+      const orderRaw = (body.match(/<verseOrder[^>]*>([^<]+)<\/verseOrder>/i) || [])[1] || '';
+      const verseOrder = [];
+      const warnings = [];
+      orderRaw.trim().split(/\s+/).filter(Boolean).forEach((token) => {
+        const index = resolveOrderToken(token, rawNames);
+        if (index !== -1) verseOrder.push(labels[index]);
+        else warnings.push(`Play order names "${token}", which this song has no verse for — skipped.`);
+      });
+
       songs.push({
         title,
         verses,
@@ -52,43 +130,44 @@ function createSongImportService() {
         author: authors.join(', '),
         copyright: copyright.trim(),
         ccli: ccli.trim(),
+        verseOrder: suppressRedundant(verseOrder, labels),
+        warnings,
       });
     }
     return songs;
   }
 
-  function parseChordPro(text) {
-    const songs = [];
-    const lines = text.split('\n');
-    let title = 'Untitled';
-    let currentVerse = null;
-    const verses = [];
+  /* A sheet is ChordPro if it says so. Everything past that — bracket headers,
+     colon headers, chord lines, repeated choruses — is handled identically for
+     both formats by lyric-sections, so the only thing this decides is what the
+     result is called. */
+  function looksLikeChordPro(text) {
+    return /\{\s*(title|t|soc|eoc|sov|eov|sob|eob|start_of_|end_of_|comment|c)\s*[:}]/i.test(text)
+      || /^\s*\[[^\]]+\]\s*$/m.test(text);
+  }
 
-    lines.forEach((line) => {
-      const trimmed = line.trim();
-      const dirMatch = trimmed.match(/\{title:\s*([^}]+)\}/i);
-      if (dirMatch) { title = dirMatch[1]; return; }
-      const tagMatch = trimmed.match(/^\[([^\]]+)\]/);
-      if (tagMatch) {
-        const tag = tagMatch[1].toLowerCase();
-        if (['verse', 'v', 'chorus', 'c', 'bridge', 'b', 'intro', 'outro', 'tag', 'pre-chorus', 'pc', 'interlude'].includes(tag) || tag.startsWith('verse') || tag.startsWith('v')) {
-          if (currentVerse) verses.push(currentVerse);
-          currentVerse = { name: tagMatch[1], lines: [] };
-          return;
-        }
-      }
-      if (currentVerse && trimmed && !trimmed.startsWith('{')) {
-        // Strip chord annotations (words in brackets or above)
-        const cleaned = trimmed.replace(/\[[^\]]+\]/g, '').trim();
-        if (cleaned) currentVerse.lines.push(cleaned);
-      }
-    });
-    if (currentVerse) verses.push(currentVerse);
+  /**
+   * ChordPro and plain lyrics both come through here.
+   *
+   * This used to be a hand-rolled loop that recognised only `^[Tag]` prefixes,
+   * dropped every `{...}` directive, discarded any lyrics appearing before the
+   * first tag, and treated a leading `[G]` chord as a section header. Plain text
+   * with no tags at all fell through to a branch that made the whole file one
+   * verse called `v1` — which is what an operator pasting a lyric sheet hit.
+   */
+  function parseLyricSheet(text) {
+    const titleMatch = String(text).match(/\{\s*(?:title|t)\s*:\s*([^}]+)\}/i);
+    const title = titleMatch ? titleMatch[1].trim() : 'Untitled';
 
-    if (verses.length > 0 || title !== 'Untitled') {
-      songs.push({ title, verses, format: 'chordpro' });
-    }
-    return songs;
+    const { sections, verseOrder } = arrangeLyrics(text);
+    if (sections.length === 0) return [];
+
+    return [{
+      title,
+      verses: sections.map((section) => ({ name: section.name, lines: section.lines })),
+      format: looksLikeChordPro(text) ? 'chordpro' : 'plain',
+      verseOrder,
+    }];
   }
 
   function importFile(filePath) {
@@ -100,13 +179,9 @@ function createSongImportService() {
     if (ext === '.xml' || content.trim().startsWith('<?xml') || content.trim().startsWith('<song')) {
       return { ok: true, songs: parseOpenLyrics(content), format: 'openlyrics' };
     }
-    if (ext === '.chordpro' || ext === '.chopro' || ext === '.pro' || ext === '.txt') {
-      const songs = parseChordPro(content);
-      if (songs.length > 0) return { ok: true, songs, format: 'chordpro' };
-    }
-    // Try chordpro format as fallback for .txt
-    const songs = parseChordPro(content);
-    if (songs.length > 0) return { ok: true, songs, format: 'chordpro' };
+
+    const songs = parseLyricSheet(content);
+    if (songs.length > 0) return { ok: true, songs, format: songs[0].format };
 
     return { ok: false, error: 'Unrecognized format. Supported: OpenLyrics (.xml), ChordPro (.chordpro, .chopro), plain lyrics (.txt)' };
   }
@@ -123,18 +198,23 @@ function createSongImportService() {
       return { ok: false, error: 'XML file contained no <song> elements (expected OpenLyrics format)' };
     }
 
-    // Try chordpro
-    const songs = parseChordPro(text);
-    if (songs.length > 0) return { ok: true, songs, format: 'chordpro' };
-    // Treat as plain lyrics — one song, one verse
-    return {
-      ok: true,
-      songs: [{ title: 'Imported Song', verses: [{ name: 'v1', lines: text.split('\n').filter(Boolean) }], format: 'plain' }],
-      format: 'plain',
-    };
+    const songs = parseLyricSheet(text);
+    if (songs.length === 0) return { ok: false, error: 'No lyrics found' };
+    return { ok: true, songs, format: songs[0].format };
   }
 
-  return { importFile, importText, parseOpenLyrics, parseChordPro, looksBinary };
+  /** Sections a lyric sheet without importing it, for re-arranging a song that
+      is already in the library. */
+  function arrangeText(text) {
+    const trimmed = String(text || '').trim();
+    if (!trimmed) return { ok: false, error: 'Nothing to arrange' };
+    if (looksBinary(trimmed)) return { ok: false, error: BINARY_ERROR };
+    const result = arrangeLyrics(text);
+    if (result.sections.length === 0) return { ok: false, error: 'No lyrics found' };
+    return { ok: true, ...result };
+  }
+
+  return { importFile, importText, arrangeText, parseOpenLyrics, parseLyricSheet, looksBinary };
 }
 
 module.exports = { createSongImportService };

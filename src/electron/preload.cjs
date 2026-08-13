@@ -113,6 +113,7 @@ contextBridge.exposeInMainWorld('BSP', {
   song: {
     importFile: (payload) => ipcRenderer.invoke('song:importFile', payload),
     importText: (payload) => ipcRenderer.invoke('song:importText', payload),
+    arrangeText: (payload) => ipcRenderer.invoke('song:arrangeText', payload),
   },
 
   store: {

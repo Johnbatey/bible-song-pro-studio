@@ -1205,6 +1205,8 @@ app.whenReady().then(async () => {
   // Song import IPC
   ipcMain.handle('song:importFile', (_, p) => songImportService?.importFile(p?.filePath));
   ipcMain.handle('song:importText', (_, p) => songImportService?.importText(p?.text));
+  ipcMain.handle('song:arrangeText', (_, p) => songImportService?.arrangeText(p?.text)
+    || { ok: false, error: 'Song import service unavailable' });
 
   // Settings IPC — secrets are write-only from the renderer's point of view
   ipcMain.handle('settings:get', () => settingsService?.getPublic() || { ok: false, settings: {} });

@@ -101,9 +101,30 @@ top of these candidates later.
       the Import button or drag-and-drop in `SongsPanel.tsx` → `song:importText` → `song-import-service.cjs`.
       Binary files (incl. ProPresenter .pro protobufs) are rejected with a clear message rather than
       parsed into junk
-- [ ] Auto-arrange lyrics — button present, disabled and labelled "Coming soon"
-- [ ] Auto-search lyrics online — the fake `alert()` search is gone; the field now filters the local
-      library. Real CCLI SongSelect / OpenLyrics catalogue search is still unbuilt
+- [x] **Auto-arrange lyrics** — `lyric-sections.cjs` sections a lyric sheet and works out the play
+      order. Six rules, first match wins: ChordPro `{soc}`/`{eoc}` environments, whole-line `[Chorus]`
+      tags, `Verse 1:` word headers, blank-line blocks, 4-line chunks as a last resort, and a
+      repetition pass that always runs. Repeated blocks collapse to one section whose positions
+      become an arrangement, so a sheet with the chorus typed three times is four slides and a
+      seven-entry order rather than seven slides. Chord-only lines and CCLI footers are dropped
+      first. Confidence is reported, and below 0.6 the UI says it guessed.
+
+      Three import defects went with it: a pasted plain sheet became one slide called `v1`; every
+      `{...}` directive was discarded, so ChordPro sections were invisible and lyrics before the
+      first tag vanished; and `tag.startsWith('v')` made `[Vamp]` — and the chord `[V/G]` — open a
+      verse. OpenLyrics `<verseOrder>` is now read as well, having been thrown away before.
+
+      `Song.arrangement?: string[]` holds slide ids with repeats allowed. Optional on purpose:
+      absent means list order, so no persisted song needs migrating and the persist `version` must
+      stay at 1 — the store has no `migrate`, and a bump would discard every operator's library.
+      Editable as chips under the Songs panel; auto-arrange previews and waits rather than
+      restructuring a song someone has built a service around.
+- [ ] Auto-search lyrics online — **licensing, not engineering.** The fake `alert()` search is gone
+      and the field filters the local library. CCLI SongSelect has no open API: access needs an NDA
+      and ~$1000/yr, is limited to approved partner companies, and OpenLP and OpenSong both report
+      being told it is closed to new partners. Nothing to build until that changes. A public-domain
+      hymn catalogue extending the existing Song Packs is the buildable alternative, and would match
+      the public-domain-only stance in `BIBLES.md`
 - [~] Song packs — three bundled packs install locally (no network, and no longer pretends to download)
 - [x] **CCLI credit footer** — `author`/`copyright`/`ccli` on `Song`, parsed from OpenLyrics
       (`<author>`, `<copyright>`, `<ccliNo>`) or entered in the Songs panel, rendered as a legible
@@ -182,13 +203,19 @@ and require redistribution licences.
 6. ✅ Dual translation + CCLI credit footer
 7. ✅ NDI fixed and verified on the wire
 8. ✅ OBS Studio integration
+9. ✅ Auto-arrange lyrics + `Song.arrangement`, with 36 assertions in `verify:song-arrange`
 
 ## Next up
 1. **Get a Deepgram key and exercise the live success path** — the only major piece not verified
    against a real service
 2. Bible licensing (ESV/NIV) — commercial, not engineering. Ship public-domain ASV/WEB/YLT now
 3. MLX Whisper — implement properly or drop the engine option
-4. Auto-arrange lyrics; online song catalogue search
+4. Online song catalogue — **blocked on CCLI, not on us** (see Phase 6). Public-domain hymns via
+   Song Packs is the version that can actually be built
 5. vMix, RTMP/SRT, native recording
-6. Automated tests — there are still none; the services added here were verified with one-off
-   scripts, which should be turned into a real suite
+6. Automated tests — still no unit suite. `verify:song-arrange` is the first script to execute
+   renderer TypeScript (compiled through esbuild) rather than grep it, which is the pattern the
+   rest should follow
+7. Drop `SongSlide.order` — written by `toSong` and every demo literal, read by nothing.
+   `Song.arrangement` is what it was reaching for. It is a required field, so removing it touches
+   every object literal and was kept out of the arrangement change deliberately

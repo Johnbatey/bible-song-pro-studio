@@ -34,15 +34,9 @@ export function AIConsole({ onClose }: { onClose: () => void }) {
         }, 1200);
       },
     },
-    {
-      id: 'auto-lyrics',
-      label: 'Auto-Arrange Lyrics',
-      desc: 'Parse and arrange raw lyrics into slide format',
-      icon: '🎵',
-      action: () => {
-        alert('AI will parse pasted lyrics into structured song slides with verse/chorus labels.');
-      },
-    },
+    /* The Auto-Arrange Lyrics card was removed: it alert()ed a description of a
+       feature that now genuinely exists, under Arrangement in the Songs panel.
+       A fake and the real thing must not coexist under the same name. */
     {
       id: 'gen-sermon',
       label: 'Generate Sermon Notes',

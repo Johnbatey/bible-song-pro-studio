@@ -11,6 +11,7 @@ import { BackgroundPicker } from './BackgroundPicker';
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
 import { backgroundSwatchCss, describeBackground } from '../utils/background';
 import { isFocusedDock } from './dock/dockFocus';
+import { arrangeExistingSong, describeArrangement, shortLabel, type ArrangeProposal } from '../utils/song-arrange';
 
 const DEMO_SONGS: Song[] = [
   {
@@ -49,6 +50,7 @@ const DEMO_SONGS: Song[] = [
 export function SongsPanel() {
   const songs = useAppStore((s) => s.songs);
   const setSongs = useAppStore((s) => s.setSongs);
+  const updateSong = useAppStore((s) => s.updateSong);
   const projectScene = useAppStore((s) => s.projectScene);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
@@ -63,6 +65,14 @@ export function SongsPanel() {
   const [search, setSearch] = useState('');
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
   const [bgOpen, setBgOpen] = useState(false);
+  const [arrOpen, setArrOpen] = useState(false);
+  const [arranging, setArranging] = useState(false);
+  /** A proposal is shown and waited on — auto-arrange never restructures a song
+      someone has already built a service around without being told to. */
+  const [proposal, setProposal] = useState<ArrangeProposal | null>(null);
+  /** One level of undo, in local state on purpose: it covers the "that wasn't
+      what I meant" moment, and Clear arrangement covers everything after. */
+  const [undoSnapshot, setUndoSnapshot] = useState<Song | null>(null);
   const { items: mediaItems } = useMediaLibrary();
   const [isDragging, setIsDragging] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -138,18 +148,74 @@ export function SongsPanel() {
     return titleHit && hits.length === 0 ? [] : hits;
   }).slice(0, 20);
 
-  /** Edits the selected song in place; persisted with the rest of the library. */
+  /** Edits the selected song in place; persisted with the rest of the library.
+      The local copy has to be updated too — this panel holds `selectedSong` as
+      its own object, not an id, so a store-only write leaves the deck stale. */
   const patchSelectedSong = (patch: Partial<Song>) => {
     if (!selectedSong) return;
     const updated = { ...selectedSong, ...patch };
     setSelectedSong(updated);
-    setSongs(songs.map((s) => (s.id === updated.id ? updated : s)));
+    updateSong(updated.id, patch);
+  };
+
+  /* The order as the deck will play it. An absent arrangement means the slide
+     list, which is what the editor starts from when the operator first opens it. */
+  const effectiveOrder = selectedSong
+    ? (Array.isArray(selectedSong.arrangement) && selectedSong.arrangement.length > 0
+        ? selectedSong.arrangement.filter((id) => selectedSong.slides.some((s) => s.id === id))
+        : selectedSong.slides.map((s) => s.id))
+    : [];
+
+  /** Writing back the natural order clears the field rather than storing it —
+      an arrangement that changes nothing is a thing that can break for nothing. */
+  const setOrder = (next: string[]) => {
+    if (!selectedSong) return;
+    const natural = selectedSong.slides.map((s) => s.id);
+    const redundant = next.length === natural.length && next.every((id, i) => id === natural[i]);
+    patchSelectedSong({ arrangement: redundant ? undefined : next });
+  };
+
+  const runAutoArrange = async () => {
+    if (!selectedSong) return;
+    setArranging(true);
+    try {
+      const result = await arrangeExistingSong(selectedSong);
+      if ('error' in result) { notify(result.error, 'warning'); return; }
+      if (!result.changed) { notify('Already arranged — nothing to change.'); return; }
+      setProposal(result);
+    } finally {
+      setArranging(false);
+    }
+  };
+
+  const applyProposal = () => {
+    if (!proposal || !selectedSong) return;
+    setUndoSnapshot(selectedSong);
+    setSelectedSong(proposal.song);
+    updateSong(proposal.song.id, proposal.song);
+    setProposal(null);
+    notify(`Arranged into ${proposal.song.slides.length} sections.`);
+  };
+
+  const undoArrange = () => {
+    if (!undoSnapshot) return;
+    setSelectedSong(undoSnapshot);
+    updateSong(undoSnapshot.id, undoSnapshot);
+    setUndoSnapshot(null);
+    notify('Arrangement undone.');
   };
 
   /* Name the chosen clip in the summary row rather than its url — a background
      reading `/media/a1b2c3.mp4` tells the operator nothing about which one. */
   const mediaNameFor = (url: string | undefined) =>
     url ? mediaItems.find((item) => item.url === url)?.name : undefined;
+
+  /* A pending proposal belongs to the song it was computed from, and an undo
+     stash to the song it was taken from. Switching songs drops both. */
+  useEffect(() => {
+    setProposal(null);
+    setUndoSnapshot(null);
+  }, [selectedSong?.id]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -327,6 +393,130 @@ export function SongsPanel() {
             )}
           </div>
         )}
+
+        {/* Play order. Lives here rather than in the deck's toolbar because it
+            restructures the song, and the deck's tools are also Live's — those
+            are for running a service, not rebuilding one mid-service. */}
+        {selectedSong && (
+          <div style={styles.bgSection}>
+            <button
+              type="button"
+              onClick={() => setArrOpen((open) => !open)}
+              style={styles.bgHeader}
+              title={arrOpen ? 'Hide play order' : 'Set the order sections are sung in'}
+            >
+              <span>Arrangement</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'var(--text-dim)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                  {describeArrangement(selectedSong)}
+                </span>
+                <span style={{ color: 'var(--text-dim)' }}>{arrOpen ? '▾' : '▸'}</span>
+              </span>
+            </button>
+
+            {arrOpen && (
+              <div style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* The order itself, editable. Repeating a chorus is the weekly
+                    job and wants no detector at all. */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {effectiveOrder.map((id, index) => {
+                    const slide = selectedSong.slides.find((s) => s.id === id);
+                    return (
+                      <span key={`${id}-${index}`} style={styles.chip}>
+                        <button
+                          type="button"
+                          style={styles.chipArrow}
+                          disabled={index === 0}
+                          title="Move earlier"
+                          onClick={() => {
+                            const next = [...effectiveOrder];
+                            [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                            setOrder(next);
+                          }}
+                        >‹</button>
+                        <span title={slide?.label}>{shortLabel(slide?.label || '?')}</span>
+                        <button
+                          type="button"
+                          style={styles.chipArrow}
+                          disabled={index === effectiveOrder.length - 1}
+                          title="Move later"
+                          onClick={() => {
+                            const next = [...effectiveOrder];
+                            [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                            setOrder(next);
+                          }}
+                        >›</button>
+                        <button
+                          type="button"
+                          style={{ ...styles.chipArrow, color: 'var(--tally-fault)' }}
+                          title="Remove from the order"
+                          onClick={() => setOrder(effectiveOrder.filter((_, i) => i !== index))}
+                        >×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                  <span style={{ ...type.caption, color: 'var(--text-dim)' }}>Add</span>
+                  {selectedSong.slides.map((slide) => (
+                    <BlockButton
+                      key={slide.id}
+                      onClick={() => setOrder([...effectiveOrder, slide.id])}
+                      title={`Add ${slide.label} to the end of the order`}
+                    >
+                      + {shortLabel(slide.label)}
+                    </BlockButton>
+                  ))}
+                </div>
+
+                {proposal ? (
+                  <div style={styles.proposal}>
+                    <div style={{ ...type.caption, color: 'var(--text-secondary)' }}>
+                      {proposal.confidence < 0.6
+                        ? 'Guessed from the line breaks — check the sections before applying.'
+                        : 'Proposed sections and play order:'}
+                    </div>
+                    <div style={{ ...type.secondary, color: 'var(--text-primary)' }}>
+                      {proposal.song.slides.map((s) => s.label).join(' · ')}
+                    </div>
+                    <div style={{ ...type.caption, color: 'var(--text-dim)' }}>
+                      Order:{' '}
+                      {(proposal.song.arrangement || proposal.song.slides.map((s) => s.id))
+                        .map((id) => shortLabel(proposal.song.slides.find((s) => s.id === id)?.label || '?'))
+                        .join(' ')}
+                    </div>
+                    {proposal.warnings.map((w) => (
+                      <div key={w} style={{ ...type.caption, color: 'var(--tally-fault)' }}>{w}</div>
+                    ))}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <BlockButton onClick={applyProposal}>Apply</BlockButton>
+                      <BlockButton onClick={() => setProposal(null)}>Cancel</BlockButton>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <BlockButton
+                      onClick={runAutoArrange}
+                      disabled={arranging}
+                      title="Re-read the lyrics, split them into sections and work out the play order"
+                    >
+                      {arranging ? 'Reading…' : 'Auto-arrange'}
+                    </BlockButton>
+                    {undoSnapshot && (
+                      <BlockButton onClick={undoArrange}>Undo arrange</BlockButton>
+                    )}
+                    {selectedSong.arrangement && selectedSong.arrangement.length > 0 && (
+                      <BlockButton onClick={() => patchSelectedSong({ arrangement: undefined })}>
+                        Clear order
+                      </BlockButton>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </Block>
 
       <PanelSplitter
@@ -377,5 +567,35 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase',
     color: 'var(--text-dim)',
     padding: '8px 2px 2px',
+  },
+  chip: {
+    ...type.caption,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 2,
+    padding: '1px 2px 1px 6px',
+    borderRadius: 4,
+    border: '1px solid var(--border-primary)',
+    background: 'var(--bg-surface)',
+    color: 'var(--text-primary)',
+    fontFamily: 'var(--font-ui)',
+  },
+  chipArrow: {
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--text-dim)',
+    cursor: 'pointer',
+    padding: '0 3px',
+    lineHeight: 1,
+    fontSize: 12,
+  },
+  proposal: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    padding: 8,
+    borderRadius: 6,
+    border: '1px solid var(--chrome-control-active)',
+    background: 'var(--bg-surface)',
   },
 };
