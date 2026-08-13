@@ -207,6 +207,8 @@ and require redistribution licences.
 10. ✅ Dropped `SongSlide.order` (written everywhere, read nowhere) and deleted `AIConsole.tsx`,
     196 lines of unreachable code whose six `alert()` stubs included one that projected a
     hardcoded John 3:16
+11. ✅ `verify:song-arrange-ui` — the Arrangement panel clicked through in a real renderer, and
+    CI on GitHub for the headless half of the suite
 
 ## Next up
 1. **Get a Deepgram key and exercise the live success path** — the only major piece not verified
