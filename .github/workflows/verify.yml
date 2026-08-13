@@ -1,0 +1,63 @@
+# The headless half of `npm run verify:all`.
+#
+# The other half — verify:display-all — drives real Electron windows, projects
+# to a display and compares audience output pixel by pixel. That cannot run
+# here honestly, so it stays on the machine with a screen. What runs here is
+# everything that needs nothing but Node, which is most of the guards.
+#
+# The point is not redundancy with local runs. It is that the Bible licensing
+# check is currently a pre-commit hook, and a hook only protects the machine
+# that installed it — clone this repo somewhere else, skip install-hooks.cjs,
+# and an unvetted translation commits cleanly. Here it is not optional.
+
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push makes an in-flight run pointless.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  headless:
+    runs-on: ubuntu-latest
+    env:
+      # None of the checks below require Electron — verified by their imports.
+      # Skipping the binary saves the largest download in the install.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Bible canon and licensing
+        run: npm run verify:bibles
+
+      - name: Media library
+        run: npm run verify:media
+
+      - name: Slide element parity
+        run: npm run verify:slide-parity
+
+      - name: Song arrangement
+        run: npm run verify:song-arrange
+
+      - name: Live scripture parser
+        run: npm run test:live-scripture
+
+      - name: Renderer build
+        run: npm run build:renderer
