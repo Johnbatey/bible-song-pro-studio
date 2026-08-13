@@ -73,7 +73,6 @@ export function songFromPack(entry: PackSong, packName: string): Song {
       id: uuid(),
       label: slide.label || `Slide ${i + 1}`,
       text: slide.text,
-      order: i,
     })),
     categories: [packName],
   };

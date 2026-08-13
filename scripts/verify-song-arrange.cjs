@@ -23,11 +23,13 @@ const {
  * duplicate keys. All four compile perfectly.
  */
 
-let n = 0;
+/* Checks are collected and run at the end rather than as they are declared,
+   because some of them are async — the arrange orchestrator awaits what is
+   normally an IPC call. Running them here would have let a rejected promise
+   pass as a tick. */
+const checks = [];
 function check(label, fn) {
-  fn();
-  n += 1;
-  console.log(`${String(n).padStart(2)} ✓ ${label}`);
+  checks.push([label, fn]);
 }
 
 const names = (result) => result.sections.map((s) => s.name);
@@ -82,6 +84,26 @@ check('[Vamp] is a header but [G]Amazing grace is a lyric', () => {
   const result = arrangeLyrics('[Verse 1]\n[G]Amazing grace how sweet\n\n[Vamp]\nOh oh oh');
   assert.deepEqual(names(result), ['Verse 1', 'Vamp']);
   assert.deepEqual(result.sections[0].lines, ['Amazing grace how sweet']);
+});
+
+check('a bracket header outside the lexicon is still a header; a bare chord is not', () => {
+  // The lexicon classifies headers, it does not gatekeep them — otherwise
+  // [Instrumental Break] reads as a lyric. A chord alone in brackets is the one
+  // thing that must not open a section.
+  const result = arrangeLyrics('[Opening Refrain]\nA one\n\n[Instrumental Break]\nB one');
+  assert.deepEqual(names(result), ['Opening Refrain', 'Instrumental Break']);
+
+  const chord = arrangeLyrics('[Verse 1]\nA one\n[G]\nA two');
+  assert.deepEqual(names(chord), ['Verse 1']);
+  assert.deepEqual(chord.sections[0].lines, ['A one', 'A two']);
+});
+
+check('a verse after a tagged chorus is not swallowed into it', () => {
+  // A blank line closes the open section even in header mode. Without that,
+  // untagged lyrics following a tagged section were appended to it.
+  const result = arrangeLyrics(`A one\nA two\n\n[Chorus]\n${CHORUS}\n\nB one\nB two`);
+  assert.equal(result.sections.length, 3);
+  assert.deepEqual(result.sections[2].lines, ['B one', 'B two']);
 });
 
 check('ChordPro {soc}/{eoc} and {comment:} survive', () => {
@@ -355,6 +377,112 @@ check('expandArrangement is exported so the arrangement editor shares the filter
   assert.deepEqual(expandArrangement(song(undefined)).map((s) => s.id), ['s1', 's2', 's3', 's4']);
 });
 
+// ---------------------------------------------------------------- Part D
+
+/* arrangeExistingSong is what Auto-arrange actually runs. Its job is not the
+   heuristic — that is Part A — but deciding what to keep: a label the operator
+   chose, and above all a slide id, because scenes and queue entries already
+   built on that id must keep resolving after Apply. */
+const arrangeBundle = esbuild.buildSync({
+  entryPoints: ['src/renderer/utils/song-arrange.ts'],
+  bundle: true,
+  format: 'cjs',
+  platform: 'node',
+  write: false,
+});
+const arrangeShim = { exports: {} };
+new Function('module', 'exports', 'require', arrangeBundle.outputFiles[0].text)(
+  arrangeShim, arrangeShim.exports, require,
+);
+const { arrangeExistingSong, describeArrangement, shortLabel } = arrangeShim.exports;
+
+// The renderer calls this over IPC; here it goes straight to the real service.
+global.window = { BSP: { song: { arrangeText: async ({ text }) => importer.arrangeText(text) } } };
+
+const CHORUS_TEXT = 'Praise him praise him all the day\nPraise him praise him evermore';
+
+check('a song imported as one slab is re-sectioned', async () => {
+  const slab = {
+    id: 'x', title: 'T',
+    slides: [{ id: 'only', label: 'v1', text: `A one\nA two\n\n${CHORUS_TEXT}\n\nB one\nB two\n\n${CHORUS_TEXT}` }],
+  };
+  const out = await arrangeExistingSong(slab);
+  assert.ok(!('error' in out), 'expected a proposal');
+  assert.deepEqual(out.song.slides.map((s) => s.label), ['Verse 1', 'Chorus', 'Verse 2']);
+  assert.equal(out.song.arrangement.length, 4);
+  assert.equal(out.changed, true);
+});
+
+check('slide ids survive re-arranging when the text is unchanged', async () => {
+  // The reason Apply does not break scenes and queue entries already built on
+  // these slides.
+  const song = {
+    id: 'x', title: 'T',
+    slides: [
+      { id: 'keep-a', label: 'Verse 1', text: 'A one\nA two' },
+      { id: 'keep-b', label: 'Chorus', text: CHORUS_TEXT },
+      { id: 'keep-c', label: 'Verse 2', text: 'B one\nB two' },
+      { id: 'dupe', label: 'Chorus', text: CHORUS_TEXT },
+    ],
+  };
+  const out = await arrangeExistingSong(song);
+  assert.ok(!('error' in out));
+  // The duplicate chorus collapses, and the survivor keeps the original id.
+  assert.deepEqual(out.song.slides.map((s) => s.id), ['keep-a', 'keep-b', 'keep-c']);
+  assert.deepEqual(out.song.arrangement.map((id) => id), ['keep-a', 'keep-b', 'keep-c', 'keep-b']);
+});
+
+check('labels the operator chose are not renamed', async () => {
+  const song = {
+    id: 'x', title: 'T',
+    slides: [
+      { id: 'a', label: 'Opening Refrain', text: 'A one\nA two' },
+      { id: 'b', label: 'Sending', text: 'B one\nB two' },
+    ],
+  };
+  const out = await arrangeExistingSong(song);
+  assert.deepEqual(out.song.slides.map((s) => s.label), ['Opening Refrain', 'Sending']);
+});
+
+check('an already-tidy song reports nothing to change', async () => {
+  const song = {
+    id: 'x', title: 'T',
+    slides: [
+      { id: 'a', label: 'Verse 1', text: 'A one\nA two' },
+      { id: 'b', label: 'Chorus', text: CHORUS_TEXT },
+    ],
+  };
+  const out = await arrangeExistingSong(song);
+  assert.equal(out.changed, false, 'expected changed:false so the UI can decline to offer Apply');
+});
+
+check('the original song object is never mutated', async () => {
+  const song = {
+    id: 'x', title: 'T',
+    slides: [{ id: 'only', label: 'v1', text: `A one\n\n${CHORUS_TEXT}\n\nB one\n\n${CHORUS_TEXT}` }],
+  };
+  const before = JSON.stringify(song);
+  await arrangeExistingSong(song);
+  assert.equal(JSON.stringify(song), before);
+});
+
+check('the header summary reads as a play order, not a slide count', () => {
+  const song = {
+    id: 'x', title: 'T',
+    slides: [
+      { id: 'a', label: 'Verse 1', text: 'x' },
+      { id: 'b', label: 'Chorus', text: 'y' },
+      { id: 'c', label: 'Pre-Chorus', text: 'z' },
+    ],
+    arrangement: ['a', 'c', 'b', 'a', 'c', 'b'],
+  };
+  assert.equal(describeArrangement(song), '6 slides · V1 PC C V1 PC C');
+  assert.match(describeArrangement({ ...song, arrangement: undefined }), /^Plays in order · 3 slides$/);
+  assert.equal(shortLabel('Verse 12'), 'V12');
+  assert.equal(shortLabel('Pre-Chorus'), 'PC');
+  assert.equal(shortLabel('Chorus'), 'C');
+});
+
 // ---------------------------------------------------------------- Part C
 
 /* Nothing type-checks the contextBridge. A renderer calling a channel that
@@ -417,4 +545,15 @@ check('the persist version is untouched — bumping it without a migrate wipes t
   assert.doesNotMatch(store, /\bmigrate\s*:/, 'a migrate function appeared — revisit whether version 1 is still right');
 });
 
-console.log(`\nSong arrange verified: ${n} checks passed.`);
+(async () => {
+  let n = 0;
+  for (const [label, fn] of checks) {
+    await fn();
+    n += 1;
+    console.log(`${String(n).padStart(2)} ✓ ${label}`);
+  }
+  console.log(`\nSong arrange verified: ${n} checks passed.`);
+})().catch((err) => {
+  console.error(`\nFAILED after ${checks.length} declared checks:\n`, err.message);
+  process.exit(1);
+});

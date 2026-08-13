@@ -11,7 +11,6 @@ export function toSong(imported: ImportedSong): Song {
       id: uuid(),
       label: verse.name || `Slide ${index + 1}`,
       text: verse.lines.join('\n'),
-      order: index,
     }));
 
   /* The parser hands back a play order in verse *names*, because ids do not

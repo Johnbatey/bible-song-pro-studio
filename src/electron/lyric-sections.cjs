@@ -160,8 +160,18 @@ function headerFor(line) {
 
   const bracket = trimmed.match(/^\[([^\]]+)\]$/);
   if (bracket) {
-    const section = canonicalSectionKey(bracket[1]);
-    return section ? { section, literal: bracket[1].trim() } : null;
+    const inner = bracket[1].trim();
+    const section = canonicalSectionKey(inner);
+    if (section) return { section, literal: inner };
+    /* A whole line inside brackets is a section marker in every format that
+       uses them, so the lexicon classifies headers rather than gatekeeping
+       them — otherwise [Opening Refrain] or [Instrumental Break] is silently
+       read as a lyric. The one thing that also appears bracketed and alone is
+       a chord, which is exactly what isChordLine excludes. */
+    if (!isChordLine(inner) && /[a-z]/i.test(inner) && inner.length <= 40) {
+      return { section: null, literal: inner };
+    }
+    return null;
   }
 
   const comment = commentHeaderFor(trimmed);
@@ -206,7 +216,11 @@ function splitSections(text) {
   }
 
   lines.forEach((line) => {
-    if (!line) return;
+    /* A blank line closes the current section even in header mode. Without
+       this, lyrics sitting between two tagged sections were appended to the
+       one above them — so a sheet tagging only its chorus swallowed the verse
+       that followed it into the chorus. */
+    if (!line) { current = null; return; }
 
     const env = environmentFor(line);
     if (env) {
@@ -232,10 +246,13 @@ function splitSections(text) {
 
     if (line.startsWith('{')) return; // any other directive: not lyric
 
+    const text = stripInlineChords(line);
+    if (!text) return;
+
     /* Lyrics before the first header used to vanish, because the old parser
        had no open section to put them in. */
     if (!current) open(null, false);
-    current.lines.push(stripInlineChords(line));
+    current.lines.push(text);
   });
 
   const named = blocks.filter((b) => b.lines.length > 0);
@@ -247,13 +264,15 @@ function splitSections(text) {
   lines.forEach((line) => {
     if (!line) { block = null; return; }
     if (line.startsWith('{')) return;
+    const text = stripInlineChords(line);
+    if (!text) return;
     if (!block) { block = { name: null, lines: [], explicit: false }; byBlank.push(block); }
-    block.lines.push(stripInlineChords(line));
+    block.lines.push(text);
   });
   if (byBlank.length >= 2) return { blocks: byBlank, rule: 'blank-lines' };
 
   // Rule 5 — no structure at all. Quatrains, and say so.
-  const all = lines.filter(Boolean).map(stripInlineChords);
+  const all = lines.filter(Boolean).map(stripInlineChords).filter(Boolean);
   if (all.length === 0) return { blocks: [], rule: 'empty' };
   if (byBlank.length === 1 && all.length <= 4) return { blocks: byBlank, rule: 'blank-lines' };
 
@@ -268,7 +287,12 @@ function splitSections(text) {
    `[Chorus]` is still a whole-line bracket when it is tested. */
 function stripInlineChords(line) {
   const cleaned = String(line).replace(/\[[^\]]*\]/g, '').trim();
-  return cleaned || String(line).trim();
+  if (cleaned) return cleaned;
+  /* Nothing but brackets, and header detection already declined it. A bare
+     [G] sitting between two lyric lines is a chord and goes; anything else is
+     kept rather than silently lost. */
+  const inner = String(line).trim().replace(/^\[/, '').replace(/\]$/, '').trim();
+  return isChordLine(inner) ? '' : String(line).trim();
 }
 
 function signatureFor(lines) {

@@ -203,7 +203,10 @@ and require redistribution licences.
 6. ✅ Dual translation + CCLI credit footer
 7. ✅ NDI fixed and verified on the wire
 8. ✅ OBS Studio integration
-9. ✅ Auto-arrange lyrics + `Song.arrangement`, with 36 assertions in `verify:song-arrange`
+9. ✅ Auto-arrange lyrics + `Song.arrangement`, with 44 assertions in `verify:song-arrange`
+10. ✅ Dropped `SongSlide.order` (written everywhere, read nowhere) and deleted `AIConsole.tsx`,
+    196 lines of unreachable code whose six `alert()` stubs included one that projected a
+    hardcoded John 3:16
 
 ## Next up
 1. **Get a Deepgram key and exercise the live success path** — the only major piece not verified
@@ -216,6 +219,3 @@ and require redistribution licences.
 6. Automated tests — still no unit suite. `verify:song-arrange` is the first script to execute
    renderer TypeScript (compiled through esbuild) rather than grep it, which is the pattern the
    rest should follow
-7. Drop `SongSlide.order` — written by `toSong` and every demo literal, read by nothing.
-   `Song.arrangement` is what it was reaching for. It is a required field, so removing it touches
-   every object literal and was kept out of the arrangement change deliberately

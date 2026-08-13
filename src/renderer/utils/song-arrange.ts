@@ -13,9 +13,12 @@ export interface ArrangeProposal {
   changed: boolean;
 }
 
-/* Same set the detector treats as renameable. A label the operator chose is
-   left alone; one that came from a filename or an OpenLyrics `v1` is not. */
-const GENERIC_LABEL = /^(slide\s*\d*|untitled|v\d*|verse\s*\d*|section\s*\d*|imported song)$/i;
+/* Labels carrying no structure, which is a narrower set than the one the
+   detector will rename. "Verse 1" is renameable *by* the detector because the
+   detector assigned it — but on the way back in it is a real header and has to
+   be sent as one, or re-arranging a properly sectioned song flattens it. Only
+   a raw import artefact goes in bare. */
+const GENERIC_LABEL = /^(slide\s*\d*|section\s*\d*|untitled|imported song|[vcbpt]\d*)$/i;
 
 function isGenericLabel(label: string) {
   return !label || GENERIC_LABEL.test(label.trim());
@@ -63,13 +66,13 @@ export async function arrangeExistingSong(song: Song): Promise<ArrangeProposal |
   });
 
   const used = new Set<string>();
-  const slides: SongSlide[] = result.sections.map((section, index) => {
+  const slides: SongSlide[] = result.sections.map((section) => {
     const text = section.lines.join('\n');
     const key = normalize(text);
     const existing = reusable.get(key);
     const id = existing && !used.has(existing) ? existing : uuid();
     used.add(id);
-    return { id, label: section.name, text, order: index };
+    return { id, label: section.name, text };
   });
 
   const byName = new Map(result.sections.map((section, i) => [section.name, slides[i].id]));

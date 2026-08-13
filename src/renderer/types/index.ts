@@ -325,7 +325,6 @@ export interface SongSlide {
   id: string;
   label: string;
   text: string;
-  order: number;
 }
 
 /** Shape returned by song-import-service.cjs (OpenLyrics / ChordPro / plain text). */
