@@ -52,6 +52,7 @@
     "verify:stage-layouts": "node scripts/verify-stage-layouts.cjs",
     "verify:media": "node scripts/verify-media-library.cjs",
     "verify:slide-parity": "node scripts/verify-slide-element-parity.cjs",
+    "verify:fonts": "node scripts/verify-fonts.cjs",
     "verify:song-arrange": "node scripts/verify-song-arrange.cjs",
     "verify:song-arrange-ui": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-song-arrange-ui.cjs"
   },
