@@ -230,7 +230,10 @@ export function SettingsModal() {
 
   // NDI Streaming State
   const [ndiStatus, setNdiStatus] = useState<NdiStatus | null>(null);
-  const [ndiName, setNdiName] = useState('Bible Song Pro');
+  /* Matches DEFAULT_NDI_NAME in ndi-service.cjs. Kept as a literal rather than
+     imported because the renderer cannot reach into the main process's modules;
+     if one moves, move the other. */
+  const [ndiName, setNdiName] = useState('Bible Song Pro Studio');
   const [ndiFps, setNdiFps] = useState<number>(15);
   const [ndiResWidth, setNdiResWidth] = useState<number>(1280);
   const [ndiResHeight, setNdiResHeight] = useState<number>(720);
@@ -780,7 +783,7 @@ export function SettingsModal() {
                         style={{ ...modalStyles.textInput, width: '100%' }}
                         value={ndiName}
                         onChange={(e) => setNdiName(e.target.value)}
-                        placeholder="Bible Song Pro"
+                        placeholder="Bible Song Pro Studio"
                         disabled={ndiStatus?.running}
                       />
                     </div>

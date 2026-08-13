@@ -30,7 +30,7 @@ const { WebSocketServer } = require('ws');
 const bibleService = require('./bible-service.cjs');
 const { createTranscriptionService } = require('./transcription-service.cjs');
 const { createVerseDetectionService } = require('./verse-detection-service.cjs');
-const { createNdiService } = require('./ndi-service.cjs');
+const { createNdiService, DEFAULT_NDI_NAME } = require('./ndi-service.cjs');
 const { createSessionHistoryService } = require('./session-history-service.cjs');
 const { createSongImportService } = require('./song-import-service.cjs');
 const { createAppStoreService } = require('./app-store-service.cjs');
@@ -535,7 +535,7 @@ const apiHandlers = {
   'GET /api/session/list': () => ({ ok: true, sessions: sessionHistory?.listSessions() || [] }),
   'GET /api/session/export': ({ query }) => sessionHistory?.exportSession(query?.id, query?.format || 'json'),
   'POST /api/ndi/start': () => {
-    const result = ndiService?.start('Bible Song Pro');
+    const result = ndiService?.start(DEFAULT_NDI_NAME);
     if (result?.ok) {
       if (!displayWindow || displayWindow.isDestroyed()) {
         createDisplayWindow();
@@ -984,7 +984,7 @@ app.whenReady().then(async () => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut:blackout');
     else setDisplayState({ blackout: !displayState.blackout });
   });
-  globalShortcut.register('CommandOrControl+Shift+N', () => { ndiService?.start('Bible Song Pro'); });
+  globalShortcut.register('CommandOrControl+Shift+N', () => { ndiService?.start(DEFAULT_NDI_NAME); });
   globalShortcut.register('CommandOrControl+Shift+E', () => sessionHistory?.endSession());
   globalShortcut.register('CommandOrControl+Shift+P', () => { sessionHistory?.startSession('Session ' + new Date().toLocaleString()); });
   globalShortcut.register('F5', () => { if (displayWindow && !displayWindow.isDestroyed()) displayWindow.reload(); });
@@ -1147,7 +1147,7 @@ app.whenReady().then(async () => {
 
   // NDI IPC
   ipcMain.handle('ndi:start', async (_, p) => {
-    const r = ndiService?.start(p?.name || 'Bible Song Pro');
+    const r = ndiService?.start(p?.name || DEFAULT_NDI_NAME);
     if (r?.ok) {
       if (!displayWindow || displayWindow.isDestroyed()) {
         createDisplayWindow();

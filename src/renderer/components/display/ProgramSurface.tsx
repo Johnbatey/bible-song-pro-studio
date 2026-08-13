@@ -389,6 +389,10 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
 
       {!scene && state.showStandbyBrand !== false && (
         <div className="program-surface-standby">
+          {/* The brand, deliberately without "Studio" — unlike the title bar,
+              the status bar and the NDI source name, this one is projected to a
+              congregation. "Studio" is operator language, and which edition the
+              operator runs is not the room's business. Leave it. */}
           <div className="program-surface-standby-title">Bible Song Pro</div>
           <div className="program-surface-standby-sub">Waiting for signal...</div>
         </div>

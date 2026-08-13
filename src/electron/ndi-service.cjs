@@ -33,6 +33,19 @@ function findLib() {
 }
 
 /**
+ * What this app announces itself as on the network.
+ *
+ * "Studio" is load-bearing here, not decoration: the OBS/vMix plugin is also
+ * called Bible Song Pro, and a church running both would have put two different
+ * sources on the wire under one name for the switcher to pick between.
+ *
+ * Exported because main.cjs has three fallbacks of its own, and a default that
+ * disagrees with itself across four call sites is how a stream ends up named
+ * one thing on launch and another on a hotkey.
+ */
+const DEFAULT_NDI_NAME = 'Bible Song Pro Studio';
+
+/**
  * NDI output.
  *
  * Rewritten against koffi's real API — the previous version declared its bindings with
@@ -45,7 +58,7 @@ function createNdiService() {
   let lib = null;
   let api = null;
   let sendInstance = null;
-  let sourceName = 'Bible Song Pro';
+  let sourceName = DEFAULT_NDI_NAME;
   let isRunning = false;
   let captureTimer = null;
   let displayWindow = null;
@@ -271,4 +284,4 @@ function createNdiService() {
   return { status, start, stop, destroy, setDisplayWindow, startCapture, stopCapture, sendFrame, connectionCount };
 }
 
-module.exports = { createNdiService, findLib, FOURCC_BGRA };
+module.exports = { createNdiService, findLib, FOURCC_BGRA, DEFAULT_NDI_NAME };

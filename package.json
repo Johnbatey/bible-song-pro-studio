@@ -54,8 +54,8 @@
     "verify:slide-parity": "node scripts/verify-slide-element-parity.cjs"
   },
   "build": {
-    "appId": "com.biblesongpro.app",
-    "productName": "Bible Song Pro",
+    "appId": "com.biblesongpro.studio",
+    "productName": "Bible Song Pro Studio",
     "directories": {
       "buildResources": "assets",
       "output": "release"
