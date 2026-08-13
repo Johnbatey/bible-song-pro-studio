@@ -1,4 +1,4 @@
-# Bible Song Pro — Build Plan
+# Bible Song Pro Studio — Build Plan
 
 Status audited 2026-07-30 against the actual codebase and against a reference app
 product. Overall completion: **~50%**. Legend: `[x]` done · `[~]` partial · `[ ]` not started ·
