@@ -209,19 +209,12 @@ and require redistribution licences.
     hardcoded John 3:16
 11. ✅ `verify:song-arrange-ui` — the Arrangement panel clicked through in a real renderer, and
     CI on GitHub for the headless half of the suite
+12. ✅ Fixed the eight dead display faces. Sixteen `.ttf` files were GitHub 404 pages, so Inter,
+    Montserrat, Roboto, Oswald, Crimson Pro, Playfair Display, Lora and Cinzel had never once
+    rendered on the projector. Replaced with the variable releases (`FONTS.md`), guarded by
+    `verify:fonts` on signature and `verify:fonts-render` on whether they actually draw
 
 ## Next up
-0. **[!] Eight of the eleven display faces are broken and always have been.** Sixteen of the twenty
-   `.ttf` files in `public/fonts/` are GitHub "Page not found" pages saved under a `.ttf` name — a
-   fetch hit dead URLs and nobody checked the bytes. Inter, Montserrat, Roboto, Oswald, Crimson Pro,
-   Playfair Display, Lora and Cinzel are all dead; only Poppins and Bebas Neue load. Both display
-   entries and `src/shared/display-fonts.ts` declare all of them, so an operator picking Lora for
-   scripture gets a silent OS fallback on the projector — the one surface where the face matters.
-   The three brand faces (Source Serif 4, Inter Variable, Geist Mono) are genuine `.woff2` and fine,
-   which is why the UI looks right and hides this. `npm run verify:fonts` names the sixteen; it is
-   out of `verify:all` until they are replaced, so the suite goes green on a fix and not on a tuned
-   check. All eight families are SIL OFL / Apache 2.0, so replacing them is a download, not a licence
-   problem
 1. **Get a Deepgram key and exercise the live success path** — the only major piece not verified
    against a real service
 2. Bible licensing (ESV/NIV) — commercial, not engineering. Ship public-domain ASV/WEB/YLT now

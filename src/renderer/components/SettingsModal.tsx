@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { AppleToggle } from './AppleToggle';
 import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, LocalModelStatus, NdiStatus, SermonLanguage } from '../types';
@@ -271,6 +271,18 @@ export function SettingsModal() {
     }
   }, [activeCategoryValue]);
 
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSettings();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSettingsOpen, closeSettings]);
+
   // Load electron IPC settings & devices
   useEffect(() => {
     refreshDisplays();
@@ -364,15 +376,72 @@ export function SettingsModal() {
     });
   }
 
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const positionRef = useRef({ x: 0, y: 0 });
+  positionRef.current = position;
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setPosition({ x: 0, y: 0 });
+    }
+  }, [isSettingsOpen]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, select, textarea, a, [role="button"]')) return;
+
+    setIsDragging(true);
+    isDraggingRef.current = true;
+    dragStartRef.current = {
+      x: e.clientX - positionRef.current.x,
+      y: e.clientY - positionRef.current.y,
+    };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const newX = moveEvent.clientX - dragStartRef.current.x;
+      const newY = moveEvent.clientY - dragStartRef.current.y;
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      isDraggingRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
   if (!isSettingsOpen) return null;
 
   return (
     <div style={modalStyles.overlay}>
-      <div style={modalStyles.container}>
+      <div
+        style={{
+          ...modalStyles.container,
+          transform: `translate3d(${position.x}px, ${position.y}px, 0px)`,
+        }}
+      >
         {/* Left Sidebar */}
         <div style={modalStyles.sidebar}>
           <div>
-            <div style={modalStyles.sidebarHeader}>Settings</div>
+            <div
+              style={{
+                ...modalStyles.sidebarHeader,
+                cursor: isDragging ? 'grabbing' : 'grab',
+                userSelect: 'none',
+              }}
+              onMouseDown={handleMouseDown}
+            >
+              Settings
+            </div>
             <div style={modalStyles.menuList}>
               {categories.map((item) => {
                 const isActive = activeCategory === item.id;
@@ -408,7 +477,14 @@ export function SettingsModal() {
         {/* Right Content Area */}
         <div style={modalStyles.contentArea}>
           {/* Top Header Bar */}
-          <div style={modalStyles.contentHeader}>
+          <div
+            style={{
+              ...modalStyles.contentHeader,
+              cursor: isDragging ? 'grabbing' : 'grab',
+              userSelect: 'none',
+            }}
+            onMouseDown={handleMouseDown}
+          >
             <span style={modalStyles.contentTitle}>
               {categories.find((c) => c.id === activeCategory)?.label || 'Settings'}
             </span>
@@ -1249,13 +1325,18 @@ const modalStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    padding: '20px 0 16px',
+    padding: '0 0 16px',
   },
   sidebarHeader: {
-    padding: '0 20px 14px',
+    height: 54,
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 20px',
     fontSize: 16,
     fontWeight: 700,
     color: '#ffffff',
+    borderBottom: '1px solid var(--settings-line)',
+    marginBottom: 8,
   },
   menuList: {
     display: 'flex',

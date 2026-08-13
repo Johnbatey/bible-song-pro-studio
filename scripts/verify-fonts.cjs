@@ -61,13 +61,36 @@ for (const name of files) {
 
 /* The declared set and the shipped set have to agree in both directions. A
    face declared with no file behind it falls back silently; a file nothing
-   declares is dead weight in every installer. */
-const declared = new Set();
-const shared = fs.readFileSync(path.join(root, 'src/shared/display-fonts.ts'), 'utf8');
-for (const m of shared.matchAll(/'([^']+\.(?:ttf|otf|woff2?))'/g)) declared.add(m[1]);
+   declares is dead weight in every installer.
+
+   And the two declaration sites have to agree with each other. display.html
+   serves the browser and network output; display-fonts.ts serves the bundled
+   audience and stage windows. A face in one but not the other is the operator
+   picking a font and one of the two screens quietly substituting another —
+   which is the failure display-fonts.ts's own header warns about. */
+const fileRefs = (source) => new Set(
+  [...source.matchAll(/[\w-]+\.(?:ttf|otf|woff2?)/g)].map((m) => m[0]),
+);
 
 const present = new Set(files);
+const shared = fs.readFileSync(path.join(root, 'src/shared/display-fonts.ts'), 'utf8');
+const displayHtml = fs.readFileSync(path.join(root, 'display.html'), 'utf8');
+
+const declared = fileRefs(shared);
+const inHtml = fileRefs(displayHtml);
 const declaredMissing = [...declared].filter((file) => !present.has(file));
+const htmlMissing = [...inHtml].filter((file) => !present.has(file));
+
+/* The brand faces are not part of that symmetry and must not be held to it.
+   brand-faces.css owns them, and the entries that link it get them from there
+   — display.html does not link it, so it declares Source Serif 4 inline. That
+   asymmetry is the design, not drift. Only the operator-selectable
+   presentation faces have to match on both surfaces. */
+const brand = fileRefs(fs.readFileSync(path.join(FONT_DIR, 'brand-faces.css'), 'utf8'));
+const presentation = (set) => [...set].filter((f) => !brand.has(f));
+
+const onlyInShared = presentation(declared).filter((f) => !inHtml.has(f));
+const onlyInHtml = presentation(inHtml).filter((f) => !declared.has(f));
 
 if (broken.length > 0) {
   console.error(`\n${broken.length} of ${files.length} bundled fonts are not fonts:\n`);
@@ -79,8 +102,22 @@ if (broken.length > 0) {
 if (declaredMissing.length > 0) {
   console.error(`\ndisplay-fonts.ts declares files that are not shipped: ${declaredMissing.join(', ')}`);
 }
+if (htmlMissing.length > 0) {
+  console.error(`\ndisplay.html references files that are not shipped: ${htmlMissing.join(', ')}`);
+}
+if (onlyInShared.length > 0 || onlyInHtml.length > 0) {
+  console.error('\nthe two font declaration sites disagree:');
+  if (onlyInShared.length > 0) console.error(`  only in display-fonts.ts: ${onlyInShared.join(', ')}`);
+  if (onlyInHtml.length > 0) console.error(`  only in display.html:     ${onlyInHtml.join(', ')}`);
+}
 
-assert.equal(declaredMissing.length, 0, 'every declared face must have a file');
+assert.equal(declaredMissing.length, 0, 'every face declared in display-fonts.ts must have a file');
+assert.equal(htmlMissing.length, 0, 'every face referenced in display.html must have a file');
+assert.equal(
+  onlyInShared.length + onlyInHtml.length,
+  0,
+  'display.html and display-fonts.ts must offer the same faces — see above',
+);
 assert.equal(
   broken.length,
   0,

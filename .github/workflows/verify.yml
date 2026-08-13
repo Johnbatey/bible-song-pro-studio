@@ -47,6 +47,11 @@ jobs:
       - name: Bible canon and licensing
         run: npm run verify:bibles
 
+      # Byte-level only. Whether the faces actually render is verify:fonts-render,
+      # which needs a window and stays local.
+      - name: Bundled fonts are fonts
+        run: npm run verify:fonts
+
       - name: Media library
         run: npm run verify:media
 

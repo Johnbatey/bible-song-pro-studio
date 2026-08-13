@@ -12,29 +12,35 @@
    another.
    ========================================================================= */
 
-/** family, file, weight — every face shipped in public/fonts. */
-const FONTS: Array<[string, string, number]> = [
-  ['Poppins', 'Poppins-Regular.ttf', 400],
-  ['Poppins', 'Poppins-Medium.ttf', 500],
-  ['Poppins', 'Poppins-Bold.ttf', 700],
-  ['Inter', 'Inter-Regular.ttf', 400],
-  ['Inter', 'Inter-Bold.ttf', 700],
-  ['Montserrat', 'Montserrat-Regular.ttf', 400],
-  ['Montserrat', 'Montserrat-Bold.ttf', 700],
-  ['Roboto', 'Roboto-Regular.ttf', 400],
-  ['Roboto', 'Roboto-Bold.ttf', 700],
-  ['Oswald', 'Oswald-Regular.ttf', 400],
-  ['Oswald', 'Oswald-Bold.ttf', 700],
-  ['Crimson Pro', 'CrimsonPro-Regular.ttf', 400],
-  ['Crimson Pro', 'CrimsonPro-Bold.ttf', 700],
-  ['Playfair Display', 'PlayfairDisplay-Regular.ttf', 400],
-  ['Playfair Display', 'PlayfairDisplay-Bold.ttf', 700],
-  ['Lora', 'Lora-Regular.ttf', 400],
-  ['Lora', 'Lora-Bold.ttf', 700],
-  ['Cinzel', 'Cinzel-Regular.ttf', 400],
-  ['Cinzel', 'Cinzel-Bold.ttf', 700],
-  ['Bebas Neue', 'BebasNeue-Regular.ttf', 400],
+/** family, file, weight — every face shipped in public/fonts.
+ *
+ *  Eight of these were a Regular/Bold pair until the files behind them turned
+ *  out to be GitHub 404 pages. Google ships those families as variable fonts
+ *  now — which is why the static URLs a fetch went looking for did not exist —
+ *  so they are one file each with a weight *range*, interpolated rather than
+ *  picked from two cuts. Each range is what the file's own fvar table reports;
+ *  a range wider than the font's would be silently clamped, narrower and the
+ *  browser synthesises a fake bold.
+ *
+ *  Inter reuses the brand's InterVariable.woff2 rather than shipping a second
+ *  copy of the same typeface. Poppins and Bebas Neue stay as static cuts —
+ *  they are genuine files and there is nothing to fix. */
+const FONTS: Array<[string, string, string]> = [
+  ['Poppins', 'Poppins-Regular.ttf', '400'],
+  ['Poppins', 'Poppins-Medium.ttf', '500'],
+  ['Poppins', 'Poppins-Bold.ttf', '700'],
+  ['Bebas Neue', 'BebasNeue-Regular.ttf', '400'],
+  ['Inter', 'InterVariable.woff2', '100 900'],
+  ['Montserrat', 'Montserrat-Variable.ttf', '100 900'],
+  ['Roboto', 'Roboto-Variable.ttf', '100 900'],
+  ['Oswald', 'Oswald-Variable.ttf', '200 700'],
+  ['Crimson Pro', 'CrimsonPro-Variable.ttf', '200 900'],
+  ['Playfair Display', 'PlayfairDisplay-Variable.ttf', '400 900'],
+  ['Lora', 'Lora-Variable.ttf', '400 700'],
+  ['Cinzel', 'Cinzel-Variable.ttf', '400 900'],
 ];
+
+const formatFor = (file: string) => (file.endsWith('.woff2') ? 'woff2' : 'truetype');
 
 const STYLE_ID = 'bsp-display-fonts';
 
@@ -50,7 +56,8 @@ export function installFontFaces(assetBaseUrl: string): void {
   const style = existing instanceof HTMLStyleElement ? existing : document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = FONTS.map(([family, file, weight]) => (
-    `@font-face{font-family:${family};src:url("${assetBaseUrl}/fonts/${file}") format("truetype");font-weight:${weight}}`
+    `@font-face{font-family:"${family}";src:url("${assetBaseUrl}/fonts/${file}") format("${formatFor(file)}");`
+    + `font-weight:${weight};font-display:swap}`
   )).join('\n');
   if (!existing) document.head.appendChild(style);
 }

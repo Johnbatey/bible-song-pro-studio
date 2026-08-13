@@ -9,26 +9,25 @@
 /* Voice — the brand face scripture is set in. Variable, so one file
    covers every weight the themes ask for. */
 @font-face{font-family:"Source Serif 4";src:url(fonts/SourceSerif4-latin-var.woff2) format("woff2");font-weight:200 900;font-display:swap}
-@font-face{font-family:Poppins;src:url(fonts/Poppins-Regular.ttf) format("truetype");font-weight:400}
-@font-face{font-family:Poppins;src:url(fonts/Poppins-Medium.ttf) format("truetype");font-weight:500}
-@font-face{font-family:Poppins;src:url(fonts/Poppins-Bold.ttf) format("truetype");font-weight:700}
-@font-face{font-family:Inter;src:url(fonts/Inter-Regular.ttf) format("truetype");font-weight:400}
-@font-face{font-family:Inter;src:url(fonts/Inter-Bold.ttf) format("truetype");font-weight:700}
-@font-face{font-family:Montserrat;src:url(fonts/Montserrat-Regular.ttf) format("truetype");font-weight:400}
-@font-face{font-family:Montserrat;src:url(fonts/Montserrat-Bold.ttf) format("truetype");font-weight:700}
-@font-face{font-family:Roboto;src:url(fonts/Roboto-Regular.ttf) format("truetype");font-weight:400}
-@font-face{font-family:Roboto;src:url(fonts/Roboto-Bold.ttf) format("truetype");font-weight:700}
-@font-face{font-family:Oswald;src:url(fonts/Oswald-Regular.ttf) format("truetype");font-weight:400}
-@font-face{font-family:Oswald;src:url(fonts/Oswald-Bold.ttf) format("truetype");font-weight:700}
-@font-face{font-family:Crimson Pro;src:url(fonts/CrimsonPro-Regular.ttf) format("truetype");font-weight:400}
-@font-face{font-family:Crimson Pro;src:url(fonts/CrimsonPro-Bold.ttf) format("truetype");font-weight:700}
-@font-face{font-family:Playfair Display;src:url(fonts/PlayfairDisplay-Regular.ttf) format("truetype");font-weight:400}
-@font-face{font-family:Playfair Display;src:url(fonts/PlayfairDisplay-Bold.ttf) format("truetype");font-weight:700}
-@font-face{font-family:Lora;src:url(fonts/Lora-Regular.ttf) format("truetype");font-weight:400}
-@font-face{font-family:Lora;src:url(fonts/Lora-Bold.ttf) format("truetype");font-weight:700}
-@font-face{font-family:Cinzel;src:url(fonts/Cinzel-Regular.ttf) format("truetype");font-weight:400}
-@font-face{font-family:Cinzel;src:url(fonts/Cinzel-Bold.ttf) format("truetype");font-weight:700}
-@font-face{font-family:Bebas Neue;src:url(fonts/BebasNeue-Regular.ttf) format("truetype");font-weight:400}
+/* The presentation faces the operator picks from. Eight of these were a
+   Regular/Bold pair pointing at files that were GitHub 404 pages, so those
+   families silently fell back to a system font on air. They are variable now —
+   one file, one weight range per family, matching src/shared/display-fonts.ts.
+   Keep the two in step: this file serves the browser/network output and that
+   one the bundled windows, and a face in one but not the other is an operator
+   picking a font the other surface substitutes. */
+@font-face{font-family:Poppins;src:url(fonts/Poppins-Regular.ttf) format("truetype");font-weight:400;font-display:swap}
+@font-face{font-family:Poppins;src:url(fonts/Poppins-Medium.ttf) format("truetype");font-weight:500;font-display:swap}
+@font-face{font-family:Poppins;src:url(fonts/Poppins-Bold.ttf) format("truetype");font-weight:700;font-display:swap}
+@font-face{font-family:"Bebas Neue";src:url(fonts/BebasNeue-Regular.ttf) format("truetype");font-weight:400;font-display:swap}
+@font-face{font-family:Inter;src:url(fonts/InterVariable.woff2) format("woff2");font-weight:100 900;font-display:swap}
+@font-face{font-family:Montserrat;src:url(fonts/Montserrat-Variable.ttf) format("truetype");font-weight:100 900;font-display:swap}
+@font-face{font-family:Roboto;src:url(fonts/Roboto-Variable.ttf) format("truetype");font-weight:100 900;font-display:swap}
+@font-face{font-family:Oswald;src:url(fonts/Oswald-Variable.ttf) format("truetype");font-weight:200 700;font-display:swap}
+@font-face{font-family:"Crimson Pro";src:url(fonts/CrimsonPro-Variable.ttf) format("truetype");font-weight:200 900;font-display:swap}
+@font-face{font-family:"Playfair Display";src:url(fonts/PlayfairDisplay-Variable.ttf) format("truetype");font-weight:400 900;font-display:swap}
+@font-face{font-family:Lora;src:url(fonts/Lora-Variable.ttf) format("truetype");font-weight:400 700;font-display:swap}
+@font-face{font-family:Cinzel;src:url(fonts/Cinzel-Variable.ttf) format("truetype");font-weight:400 900;font-display:swap}
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; background: #000; overflow: hidden; }
