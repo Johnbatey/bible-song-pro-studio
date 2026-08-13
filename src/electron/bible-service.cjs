@@ -11,6 +11,8 @@ const VERSION_META = [
   { id: 'Darby', name: 'Darby Translation (1890)', abbreviation: 'DBY', language: 'en', file: 'Darby.json', type: 'json' },
   { id: 'YLT', name: "Young's Literal Translation (1898)", abbreviation: 'YLT', language: 'en', file: 'YLT.json', type: 'json' },
   { id: 'LSG', name: 'Louis Segond 1910', abbreviation: 'LSG', language: 'fr', file: 'LSG.json', type: 'json' },
+  { id: 'OST', name: 'Ostervald', abbreviation: 'OST', language: 'fr', file: 'OST.json', type: 'json' },
+  { id: 'RV1909', name: 'Reina-Valera 1909', abbreviation: 'RVR', language: 'es', file: 'RV1909.json', type: 'json' },
 ];
 
 const BOOK_ALIASES = new Map();

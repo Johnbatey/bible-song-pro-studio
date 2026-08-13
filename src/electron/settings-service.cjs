@@ -8,6 +8,19 @@ const DEFAULTS = {
   deepgramModel: 'nova-2',
   deepgramLanguage: 'en',
   sttEngine: 'local', // 'local' | 'deepgram'
+  /* Which on-device recogniser runs. Empty means "whatever the service
+     defaults to", so a fresh install follows the default in
+     whisper-onnx-service without this file having to name it twice. Stored
+     because the weights are a download: an operator who fetched Moonshine Base
+     and found it restored to the default on the next launch would have paid
+     for it and not got it. */
+  sttLocalModel: '',
+  /* The language the preacher is speaking. 'auto' lets Whisper detect it per
+     utterance; naming one is faster and steadier, which is what a service
+     wants. Only a multilingual model can honour anything but English — the
+     Language settings row says so rather than offering a choice that would go
+     nowhere. */
+  sermonLanguage: 'auto', // 'auto' | 'en' | 'fr' | 'es'
   obsUrl: 'ws://127.0.0.1:4455',
   obsPassword: '',
   obsAutoConnect: false,

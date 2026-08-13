@@ -192,7 +192,7 @@
 
 .stage-display .stage-message {
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: var(--bsp-r-base, 4px);
   background: var(--stage-danger);
   color: #fff;
   font-weight: 700;
@@ -355,6 +355,39 @@
 
 .stage-display .zone-slide-full .zone-slide-stage {
   border-radius: 0;
+}
+
+/* ---- The live scene's picture ---- */
+/* Fills the cell behind everything the zone draws. `inherit` on the radius so
+   hybrid's rounded cards do not end up with square corners of photo poking out
+   of them. */
+.stage-display .zone-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+}
+
+/* The words go over the picture, which needs them to be in the stacking order
+   at all — without this the media paints last and covers them. */
+.stage-display .zone-has-media .zone-inner {
+  position: relative;
+  z-index: 1;
+}
+
+/* Lyrics over somebody's photograph is the case a confidence monitor cannot
+   afford to get wrong: the band is reading this at a glance, from an angle,
+   in a dark room. A scrim costs the picture very little and buys the text the
+   contrast it needs. It is skipped when the picture is the whole point — a
+   media scene carries no words to protect. */
+.stage-display .zone-has-media:not(.zone-slide-full) .zone-inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: -1;
 }
 
 /* Hybrid dresses zones as vibrancy cards floating over the output. A slide

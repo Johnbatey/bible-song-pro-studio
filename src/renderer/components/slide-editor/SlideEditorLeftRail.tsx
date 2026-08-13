@@ -96,7 +96,7 @@ export function SlideEditorLeftRail({
             display: 'flex',
             background: 'rgba(0, 0, 0, 0.3)',
             padding: 3,
-            borderRadius: 8,
+            borderRadius: 6,
             gap: 2,
           }}
         >
@@ -106,7 +106,7 @@ export function SlideEditorLeftRail({
             style={{
               flex: 1,
               padding: '6px 8px',
-              background: activeTab === 'slides' ? '#f4621f' : 'transparent',
+              background: activeTab === 'slides' ? '#FF5500' : 'transparent',
               border: 'none',
               borderRadius: 6,
               color: '#ffffff',
@@ -131,7 +131,7 @@ export function SlideEditorLeftRail({
             style={{
               flex: 1,
               padding: '6px 8px',
-              background: activeTab === 'templates' ? '#f4621f' : 'transparent',
+              background: activeTab === 'templates' ? '#FF5500' : 'transparent',
               border: 'none',
               borderRadius: 6,
               color: '#ffffff',
@@ -181,7 +181,7 @@ export function SlideEditorLeftRail({
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: '#f4621f',
+                background: '#FF5500',
                 border: 'none',
                 borderRadius: 4,
                 color: '#ffffff',
@@ -218,7 +218,7 @@ export function SlideEditorLeftRail({
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
-                      color: isActive ? '#f4621f' : 'rgba(255, 255, 255, 0.4)',
+                      color: isActive ? '#FF5500' : 'rgba(255, 255, 255, 0.4)',
                       minWidth: 16,
                       marginTop: 4,
                       textAlign: 'right',
@@ -231,8 +231,8 @@ export function SlideEditorLeftRail({
                     style={{
                       flex: 1,
                       background: '#1c1e26',
-                      border: isActive ? '2px solid #f4621f' : '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: 8,
+                      border: isActive ? '2px solid #FF5500' : '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: 6,
                       overflow: 'hidden',
                       position: 'relative',
                     }}
@@ -276,7 +276,7 @@ export function SlideEditorLeftRail({
                               e.stopPropagation();
                               onMoveSlide(idx, idx - 1);
                             }}
-                            style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 10 }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10 }}
                             title="Move Up"
                           >
                             ▲
@@ -289,7 +289,7 @@ export function SlideEditorLeftRail({
                               e.stopPropagation();
                               onMoveSlide(idx, idx + 1);
                             }}
-                            style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 10 }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10 }}
                             title="Move Down"
                           >
                             ▼
@@ -302,7 +302,7 @@ export function SlideEditorLeftRail({
                               e.stopPropagation();
                               onDuplicateSlide(idx);
                             }}
-                            style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 10 }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10 }}
                             title="Duplicate Slide"
                           >
                             ❐
@@ -373,7 +373,7 @@ export function SlideEditorLeftRail({
               style={{
                 background: 'rgba(255, 255, 255, 0.03)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: 8,
+                borderRadius: 6,
                 overflow: 'hidden',
                 cursor: 'pointer',
                 padding: 0,
@@ -421,7 +421,7 @@ function getTemplateElements(id: string): any[] {
   if (id === 'sermon') {
     return [
       { id: 'card', type: 'shape', x: 8, y: 12, width: 84, height: 76, backgroundColor: 'rgba(35, 34, 33, 0.7)', borderColor: 'rgba(255, 85, 0, 0.3)', borderWidth: 1, borderRadius: 16 },
-      { id: 'badge', type: 'shape', x: 12, y: 18, width: 6, height: 10, backgroundColor: '#f4621f', borderRadius: 12 },
+      { id: 'badge', type: 'shape', x: 12, y: 18, width: 6, height: 10, backgroundColor: '#FF5500', borderRadius: 12 },
       { id: 'num', type: 'text', content: '01', x: 12, y: 19, width: 6, height: 8, fontSize: 24, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
       { id: 'title', type: 'text', content: 'FAITH OVER FEAR: WALKING IN PURPOSE', x: 20, y: 18, width: 68, height: 12, fontSize: 34, color: '#ffffff', fontWeight: 700 },
       { id: 'body', type: 'text', content: '• Trusting God in times of uncertainty\n• Stepping out of your comfort zone\n• Building a foundation rooted in Prayer', x: 20, y: 34, width: 68, height: 48, fontSize: 26, color: '#d4d4d8' },
@@ -430,19 +430,19 @@ function getTemplateElements(id: string): any[] {
   if (id === 'scripture') {
     return [
       { id: 'verse', type: 'text', content: '"For God so loved the world, that he gave his only begotten Son..."', x: 10, y: 25, width: 80, height: 40, fontSize: 36, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
-      { id: 'ref', type: 'text', content: 'JOHN 3:16 (KJV)', x: 25, y: 70, width: 50, height: 12, fontSize: 26, color: '#f4621f', fontWeight: 700, textAlign: 'center' },
+      { id: 'ref', type: 'text', content: 'JOHN 3:16 (KJV)', x: 25, y: 70, width: 50, height: 12, fontSize: 26, color: '#FF5500', fontWeight: 700, textAlign: 'center' },
     ];
   }
   if (id === 'lower-third') {
     return [
-      { id: 'bg', type: 'shape', x: 6, y: 70, width: 88, height: 22, backgroundColor: 'rgba(22, 20, 20, 0.92)', borderColor: '#f4621f', borderWidth: 2, borderRadius: 12 },
+      { id: 'bg', type: 'shape', x: 6, y: 70, width: 88, height: 22, backgroundColor: 'rgba(22, 20, 20, 0.92)', borderColor: '#FF5500', borderWidth: 2, borderRadius: 12 },
       { id: 'name', type: 'text', content: 'PASTOR DAVID E. JOHNSON', x: 10, y: 73, width: 80, height: 10, fontSize: 32, color: '#ffffff', fontWeight: 700 },
-      { id: 'role', type: 'text', content: 'Senior Pastor · Grace Community Church', x: 10, y: 82, width: 80, height: 8, fontSize: 20, color: '#f4621f', fontWeight: 700 },
+      { id: 'role', type: 'text', content: 'Senior Pastor · Grace Community Church', x: 10, y: 82, width: 80, height: 8, fontSize: 20, color: '#FF5500', fontWeight: 700 },
     ];
   }
   if (id === 'announcement') {
     return [
-      { id: 'badge', type: 'shape', x: 35, y: 15, width: 30, height: 8, backgroundColor: '#f4621f', borderRadius: 22 },
+      { id: 'badge', type: 'shape', x: 35, y: 15, width: 30, height: 8, backgroundColor: '#FF5500', borderRadius: 22 },
       { id: 'badgetxt', type: 'text', content: 'UPCOMING EVENT', x: 35, y: 16, width: 30, height: 6, fontSize: 16, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
       { id: 'title', type: 'text', content: 'SUNDAY NIGHT WORSHIP & HEALING', x: 10, y: 28, width: 80, height: 25, fontSize: 44, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
       { id: 'details', type: 'text', content: 'THIS SUNDAY · 6:00 PM · MAIN SANCTUARY', x: 10, y: 56, width: 80, height: 25, fontSize: 24, color: 'rgba(255, 255, 255, 0.85)', textAlign: 'center' },
@@ -451,7 +451,7 @@ function getTemplateElements(id: string): any[] {
   if (id === 'welcome') {
     return [
       { id: 'title', type: 'text', content: 'WELCOME TO OUR CHURCH', x: 10, y: 30, width: 80, height: 25, fontSize: 52, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
-      { id: 'sub', type: 'text', content: 'We are so glad you are worshipping with us today!', x: 10, y: 58, width: 80, height: 18, fontSize: 28, color: '#f4621f', fontWeight: 700, textAlign: 'center' },
+      { id: 'sub', type: 'text', content: 'We are so glad you are worshipping with us today!', x: 10, y: 58, width: 80, height: 18, fontSize: 28, color: '#FF5500', fontWeight: 700, textAlign: 'center' },
     ];
   }
   if (id === 'offering') {
@@ -464,7 +464,7 @@ function getTemplateElements(id: string): any[] {
   if (id === 'benediction') {
     return [
       { id: 'title', type: 'text', content: 'GO IN PEACE & GRACE', x: 10, y: 30, width: 80, height: 25, fontSize: 48, color: '#ffffff', fontWeight: 700, textAlign: 'center' },
-      { id: 'sub', type: 'text', content: 'The LORD bless you and keep you', x: 10, y: 58, width: 80, height: 20, fontSize: 26, color: '#f4621f', fontWeight: 700, textAlign: 'center' },
+      { id: 'sub', type: 'text', content: 'The LORD bless you and keep you', x: 10, y: 58, width: 80, height: 20, fontSize: 26, color: '#FF5500', fontWeight: 700, textAlign: 'center' },
     ];
   }
   return [];

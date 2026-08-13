@@ -18,10 +18,10 @@ export function AlertOverlay({ alert, onDismiss }: AlertOverlayProps) {
 
   const getAlertColor = () => {
     switch (alert.type) {
-      case 'warning': return { bg: 'rgba(231, 76, 60, 0.95)', border: '#e74c3c' };
+      case 'warning': return { bg: 'rgba(231, 76, 60, 0.95)', border: 'var(--tally-fault)' };
       case 'announcement': return { bg: 'rgba(201, 169, 110, 0.95)', border: '#C9A96E' };
       case 'custom': return { bg: 'rgba(0,0,0,0.9)', border: 'var(--border-accent)' };
-      default: return { bg: 'rgba(52, 152, 219, 0.95)', border: '#3498db' };
+      default: return { bg: 'rgba(52, 152, 219, 0.95)', border: 'var(--tally-link)' };
     }
   };
 

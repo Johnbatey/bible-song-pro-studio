@@ -53,7 +53,7 @@ export function SlidingSwitch({ value, options, onChange, height = 38, style }: 
           border: '1px solid var(--chrome-control-active)',
           borderRadius: 4,
           boxSizing: 'border-box',
-          transition: 'left 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'left var(--d-state) var(--ease)',
           zIndex: 1,
         }}
       />

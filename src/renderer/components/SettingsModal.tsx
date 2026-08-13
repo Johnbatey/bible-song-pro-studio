@@ -1,21 +1,20 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { AppleToggle } from './AppleToggle';
-import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, NdiStatus } from '../types';
+import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, LocalModelStatus, NdiStatus, SermonLanguage } from '../types';
 import { SongPacks } from './settings/SongPacks';
 
 export type SettingsCategory =
-  | 'account'
+  | 'system'
   | 'scripture'
   | 'songs'
   | 'audio'
   | 'output'
   | 'fullscreen'
   | 'lowerthird'
-  | 'language'
-  | 'usage'
   | 'help'
   | 'feedback'
+  | 'language'
   | 'hotkeys';
 
 interface CategoryItem {
@@ -26,8 +25,8 @@ interface CategoryItem {
 
 const categories: CategoryItem[] = [
   {
-    id: 'account',
-    label: 'Account',
+    id: 'system',
+    label: 'System',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 2l-2 2m-2-2l2 2M3 21l8-8" />
@@ -38,7 +37,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'scripture',
-    label: 'Scripture',
+    label: 'Bible',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -110,16 +109,6 @@ const categories: CategoryItem[] = [
     ),
   },
   {
-    id: 'usage',
-    label: 'Usage & Stats',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
-        <path d="M22 12A10 10 0 0 0 12 2v10z" />
-      </svg>
-    ),
-  },
-  {
     id: 'hotkeys',
     label: 'Keyboard Shortcuts',
     icon: (
@@ -155,7 +144,24 @@ const categories: CategoryItem[] = [
   },
 ];
 
+/* The tutorials live on the channel; there is no in-app interactive guide,
+   so the Help view links out rather than pretending to have one. */
+const TUTORIALS_URL = 'https://www.youtube.com/johnsonolakotan';
+
+function openTutorials() {
+  void window.BSP?.openExternal?.(TUTORIALS_URL);
+}
+
 export function SettingsModal() {
+  /* Read from the running build. A hardcoded version goes stale silently and
+     then misreports itself in every bug report. */
+  const [appVersion, setAppVersion] = useState('');
+  useEffect(() => {
+    let alive = true;
+    window.BSP?.version?.().then((v) => { if (alive) setAppVersion(v); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   const isSettingsOpen = useAppStore((s) => s.isSettingsOpen);
   const activeCategoryValue = useAppStore((s) => s.activeSettingsCategory) as SettingsCategory;
   const closeSettings = useAppStore((s) => s.closeSettings);
@@ -164,6 +170,8 @@ export function SettingsModal() {
   const updateTheme = useAppStore((s) => s.updateTheme);
   const live = useAppStore((s) => s.liveScripture);
   const setLive = useAppStore((s) => s.setLiveScripture);
+  const showStandbyBrand = useAppStore((s) => s.showStandbyBrand);
+  const setShowStandbyBrand = useAppStore((s) => s.setShowStandbyBrand);
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(activeCategoryValue || 'scripture');
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -172,6 +180,44 @@ export function SettingsModal() {
   const [selectedDisplayId, setSelectedDisplayId] = useState<string>('auto');
   const [selectedStageDisplayId, setSelectedStageDisplayId] = useState<string>('auto');
   const [audioDevices, setAudioDevices] = useState<AudioInputDevice[]>([]);
+  /** Devices are there but unnamed — Chromium withholds labels until access is granted. */
+  const [micNamesHidden, setMicNamesHidden] = useState(false);
+
+  /* The on-device recogniser. `aiStatus` here is the ONNX engine's own slice of
+     the transcription service's status, which is the half this row is about —
+     the MLX path has no model choice to offer. */
+  const [aiStatus, setAiStatus] = useState<LocalModelStatus | null>(null);
+  const [localBusy, setLocalBusy] = useState(false);
+  const localModels = aiStatus?.models || [];
+  const localModel = localModels.find((m) => m.key === aiStatus?.modelKey) || null;
+
+  const refreshAiStatus = useCallback(async () => {
+    const status = await window.BSP?.ai?.status?.().catch(() => null);
+    if (status?.engines?.onnx) setAiStatus(status.engines.onnx as LocalModelStatus);
+  }, []);
+
+  useEffect(() => { refreshAiStatus(); }, [refreshAiStatus]);
+
+  const selectLocalModel = useCallback(async (key: string) => {
+    await window.BSP?.ai?.setLocalModel?.(key).catch(() => null);
+    await refreshAiStatus();
+  }, [refreshAiStatus]);
+
+  /* Warmup is the download: transformers.js fetches the weights the first time
+     the pipeline is built and reads them off disk every time after. Polling
+     while it runs is how the percentage gets out — the progress arrives on a
+     callback inside the main process, not as an IPC event. */
+  const downloadLocalModel = useCallback(async () => {
+    setLocalBusy(true);
+    const poll = window.setInterval(refreshAiStatus, 700);
+    try {
+      await window.BSP?.ai?.warmup?.({ engine: 'onnx' }).catch(() => null);
+    } finally {
+      window.clearInterval(poll);
+      await refreshAiStatus();
+      setLocalBusy(false);
+    }
+  }, [refreshAiStatus]);
 
   // Feedback form state
   const [feedbackType, setFeedbackType] = useState<'bug' | 'feature'>('bug');
@@ -227,19 +273,62 @@ export function SettingsModal() {
     refreshDisplays();
     window.BSP?.settings?.get().then((res) => { if (res?.ok) setSettings(res.settings); }).catch(() => {});
     
-    // Audio device enumeration
-    window.BSP?.audio?.getInputDevices?.().then((devs) => {
-      setAudioDevices(devs || []);
-    }).catch(() => {
-      navigator.mediaDevices?.enumerateDevices().then((devs) => {
-        const inputs = devs.filter((d) => d.kind === 'audioinput').map((d, i) => ({
-          deviceId: d.deviceId || `dev-${i}`,
-          label: d.label || `Microphone Input ${i + 1}`,
-        }));
-        setAudioDevices(inputs);
-      }).catch(() => {});
-    });
   }, []);
+
+  /* Microphones, from the only place that knows about them.
+   *
+   * This asked the main process first and fell back to the renderer if that
+   * threw — but `audio:getInputDevices` was a stub returning `[]`, and an
+   * empty array is a resolved promise, so the fallback never ran and the list
+   * was empty every time. It could not have worked from there anyway:
+   * enumerateDevices is a renderer API and the main process has no view of the
+   * hardware. The stub is gone; this is the whole implementation now.
+   *
+   * Labels come back blank until the user has granted microphone access, so a
+   * device with no name still gets a usable one rather than an empty row.
+   */
+  const refreshAudioDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices?.enumerateDevices();
+      const inputs = (devices || [])
+        .filter((device) => device.kind === 'audioinput')
+        /* Chromium lists a synthetic "default" entry that mirrors whichever
+           device the OS is on. The select already offers that as its first
+           option, so keeping it would show the same microphone twice. */
+        .filter((device) => device.deviceId !== 'default')
+        .map((device, index) => ({
+          deviceId: device.deviceId || `input-${index}`,
+          label: device.label || `Microphone ${index + 1}`,
+        }));
+      setAudioDevices(inputs);
+      setMicNamesHidden(inputs.length > 0 && (devices || []).every((d) => !d.label));
+    } catch {
+      setAudioDevices([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshAudioDevices();
+    /* Interfaces get plugged in mid-setup, and a list captured when the modal
+       opened would still be showing the built-in mic afterwards. */
+    const media = navigator.mediaDevices;
+    media?.addEventListener?.('devicechange', refreshAudioDevices);
+    return () => media?.removeEventListener?.('devicechange', refreshAudioDevices);
+  }, [refreshAudioDevices]);
+
+  /* Asking for the stream is what makes Chromium hand over the device names;
+     it is dropped immediately, because this is a naming exercise and holding
+     an open capture would light the operator's mic indicator for nothing. */
+  const revealMicNames = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      await refreshAudioDevices();
+    } catch {
+      /* Refused, or no device. The list still works — the names just stay
+         generic, which the row below says. */
+    }
+  }, [refreshAudioDevices]);
 
   async function refreshDisplays() {
     try {
@@ -308,18 +397,8 @@ export function SettingsModal() {
             </div>
           </div>
 
-          {/* Bottom Upgrade Footer Box */}
           <div style={modalStyles.sidebarFooter}>
-            <div style={modalStyles.planCard}>
-              <span style={modalStyles.planLabel}>Free Plan</span>
-              <button
-                style={modalStyles.upgradeBtn}
-                onClick={() => alert('Bible Song Pro Max Unlimited Edition Unlocked!')}
-              >
-                Upgrade
-              </button>
-            </div>
-            <span style={modalStyles.versionText}>version 2.1.9</span>
+            <span style={modalStyles.versionText}>{appVersion ? `version ${appVersion}` : ''}</span>
           </div>
         </div>
 
@@ -340,25 +419,9 @@ export function SettingsModal() {
           </div>
 
           <div style={modalStyles.scrollBody}>
-            {/* 1. Account & System */}
-            {activeCategory === 'account' && (
+            {/* 1. System */}
+            {activeCategory === 'system' && (
               <div>
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>Account License Level</div>
-                    <div style={modalStyles.rowSub}>Logged in as Administrator (Pro Edition)</div>
-                  </div>
-                  <button style={modalStyles.actionBtn}>Manage Account</button>
-                </div>
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>Subscription Tier</div>
-                    <div style={modalStyles.rowSub}>Free Edition • Upgrade for NDI 60fps & cloud Deepgram AI</div>
-                  </div>
-                  <button style={{ ...modalStyles.actionBtn, background: '#FF5500', color: '#ffffff', border: 'none' }}>
-                    Upgrade Plan
-                  </button>
-                </div>
                 <div style={modalStyles.formRow}>
                   <div>
                     <div style={modalStyles.rowTitle}>System Engine Specs</div>
@@ -450,28 +513,103 @@ export function SettingsModal() {
                       }}
                       onClick={() => saveSettings({ sttEngine: 'local' })}
                     >
-                      On-device (Whisper)
+                      On-device
                     </button>
                   </div>
                 </div>
 
+                {/* The on-device model, shown only when it is the one running.
+                    Two families here: Whisper, which every install already has,
+                    and Moonshine, which was built for live speech and answers
+                    faster on the short utterances this app feeds it. Whichever
+                    is picked is downloaded once and then runs with no network
+                    at all. */}
+                {settings?.sttEngine === 'local' && (
+                  <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                      <div>
+                        <div style={modalStyles.rowTitle}>On-device model</div>
+                        <div style={modalStyles.rowSub}>
+                          {localModel?.note || 'Runs on this computer. Downloaded once, then offline.'}
+                        </div>
+                      </div>
+                      <select
+                        style={modalStyles.selectInput}
+                        value={localModel?.key || ''}
+                        onChange={(e) => selectLocalModel(e.target.value)}
+                        disabled={localBusy}
+                      >
+                        {localModels.map((model) => (
+                          <option key={model.key} value={model.key}>
+                            {model.label}
+                            {model.downloaded ? ' — on this computer' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button
+                        style={modalStyles.actionBtn}
+                        onClick={downloadLocalModel}
+                        disabled={localBusy || aiStatus?.ready}
+                      >
+                        {localBusy
+                          ? aiStatus?.warmupState === 'downloading'
+                            ? `Downloading… ${aiStatus?.downloadProgress ?? 0}%`
+                            : 'Preparing…'
+                          : aiStatus?.ready
+                          ? 'Ready'
+                          : localModel?.downloaded
+                          ? 'Load model'
+                          : 'Download model'}
+                      </button>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: aiStatus?.warmupState === 'error' ? 'var(--tally-fault)' : 'var(--text-dim)',
+                        }}
+                      >
+                        {aiStatus?.warmupState === 'error'
+                          ? aiStatus?.lastError || 'The model could not be loaded.'
+                          : aiStatus?.ready
+                          ? 'Loaded and ready to transcribe.'
+                          : 'The first download needs the internet. After that it runs offline.'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div style={modalStyles.formRow}>
                   <div>
                     <div style={modalStyles.rowTitle}>Microphone Input</div>
-                    <div style={modalStyles.rowSub}>{audioDevices.length || 1} audio devices available</div>
+                    <div style={modalStyles.rowSub}>
+                      {micNamesHidden
+                        ? `${audioDevices.length} found — allow microphone access to see their names`
+                        : audioDevices.length === 0
+                        ? 'No microphone found on this computer'
+                        : `${audioDevices.length} microphone${audioDevices.length === 1 ? '' : 's'} available`}
+                    </div>
                   </div>
-                  <select
-                    style={modalStyles.selectInput}
-                    value={live.selectedInputId || 'default'}
-                    onChange={(e) => setLive({ selectedInputId: e.target.value })}
-                  >
-                    <option value="default">System Default Microphone</option>
-                    {audioDevices.map((d) => (
-                      <option key={d.deviceId} value={d.deviceId}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {micNamesHidden && (
+                      <button style={modalStyles.actionBtn} onClick={revealMicNames}>
+                        Show names
+                      </button>
+                    )}
+                    <select
+                      style={modalStyles.selectInput}
+                      value={live.selectedInputId || 'default'}
+                      onChange={(e) => setLive({ selectedInputId: e.target.value })}
+                    >
+                      <option value="default">System Default Microphone</option>
+                      {audioDevices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch' }}>
@@ -481,7 +619,7 @@ export function SettingsModal() {
                       <div style={modalStyles.rowSub}>Cloud STT API key for live scripture detection</div>
                     </div>
                     {settings?.deepgramApiKeySet && (
-                      <button style={{ ...modalStyles.actionBtn, color: '#ef4444' }} onClick={clearDeepgramKey}>
+                      <button style={{ ...modalStyles.actionBtn, color: 'var(--tally-fault)' }} onClick={clearDeepgramKey}>
                         Clear Key
                       </button>
                     )}
@@ -590,48 +728,51 @@ export function SettingsModal() {
                   </div>
                 </div>
 
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Standby Card on Idle Screens</div>
+                    <div style={modalStyles.rowSub}>
+                      Show the “Bible Song Pro — Waiting for signal” card when nothing is being projected.
+                      Turn this off to leave audience screens plain black between items.
+                    </div>
+                  </div>
+                  <AppleToggle checked={showStandbyBrand} onChange={setShowStandbyBrand} />
+                </div>
+
                 <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={modalStyles.rowTitle}>NDI® Network Video Output</div>
                       <div style={modalStyles.rowSub}>Publish program output live over local network for OBS, vMix, and NDI receivers</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          background: ndiStatus?.running ? '#22c55e' : '#3f3f46',
-                          color: ndiStatus?.running ? '#000000' : '#ffffff',
-                          padding: '3px 10px',
-                          borderRadius: 999,
-                          fontWeight: 700,
-                          letterSpacing: '0.04em',
-                        }}
-                      >
-                        {ndiStatus?.running ? `NDI LIVE (${ndiStatus.connections || 0} CONNECTED)` : 'NDI OFF'}
-                      </span>
-                      <button
-                        style={{
-                          padding: '6px 14px',
-                          background: ndiStatus?.running ? '#ef4444' : '#FF5500',
-                          border: 'none',
-                          borderRadius: 6,
-                          color: '#ffffff',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: isNdiLoading ? 'not-allowed' : 'pointer',
-                          opacity: isNdiLoading ? 0.7 : 1,
-                        }}
-                        disabled={isNdiLoading}
-                        onClick={toggleNdiStream}
-                      >
-                        {isNdiLoading ? 'Processing...' : ndiStatus?.running ? 'Stop NDI Stream' : 'Start NDI Stream'}
-                      </button>
-                    </div>
+                    {/* One switch, like every other output on this page.
+                        A status pill reading NDI OFF next to a button reading
+                        Start NDI Stream said the same thing twice and made the
+                        operator read two controls to learn one fact. The
+                        toggle carries both: its position is the state, and it
+                        goes Signal orange when the stream is up — the same rule
+                        the tally works to. The connection count is a line below
+                        in the diagnostic strip, which is where the rest of the
+                        run-time numbers already live.
+
+                        Disabled when the NDI runtime is missing: there is
+                        nothing to switch on, and a control that accepts the
+                        click and then fails is worse than one that does not. */}
+                    <AppleToggle
+                      checked={Boolean(ndiStatus?.running)}
+                      onChange={toggleNdiStream}
+                      disabled={isNdiLoading || ndiStatus?.available === false}
+                    />
                   </div>
 
+                  {ndiStatus?.available === false && (
+                    <div style={{ fontSize: 11, color: 'var(--tally-fault)' }}>
+                      The NDI runtime is not installed on this computer, so there is nothing to publish to.
+                    </div>
+                  )}
+
                   {/* NDI Stream Configuration Options */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, background: '#161414', padding: 12, borderRadius: 8, border: '1px solid #262628' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, background: '#161414', padding: 12, borderRadius: 6, border: '1px solid #262628' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>NDI Source Name</label>
                       <input
@@ -676,15 +817,15 @@ export function SettingsModal() {
 
                   {/* Diagnostic / Status Bar */}
                   {ndiStatus && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', background: '#121212', padding: '6px 10px', borderRadius: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', background: 'var(--bsp-ground)', padding: '6px 10px', borderRadius: 6 }}>
                       <span>Frames Sent: <strong style={{ color: '#ffffff' }}>{ndiStatus.framesSent || 0}</strong></span>
                       <span>Connections: <strong style={{ color: '#ffffff' }}>{ndiStatus.connections || 0}</strong></span>
-                      <span>Runtime: <strong style={{ color: ndiStatus.available ? '#22c55e' : '#ef4444' }}>{ndiStatus.available ? 'NDI SDK Loaded' : 'NDI Runtime Missing'}</strong></span>
+                      <span>Runtime: <strong style={{ color: ndiStatus.available ? 'var(--text-primary)' : 'var(--tally-fault)' }}>{ndiStatus.available ? 'NDI SDK Loaded' : 'NDI Runtime Missing'}</strong></span>
                     </div>
                   )}
 
                   {ndiStatus?.lastError && (
-                    <div style={{ fontSize: 12, color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: 8, borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)' }}>
+                    <div style={{ fontSize: 12, color: 'var(--tally-fault)', background: 'rgba(239,68,68,0.1)', padding: 8, borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)' }}>
                       {ndiStatus.lastError}
                     </div>
                   )}
@@ -858,48 +999,76 @@ export function SettingsModal() {
               </div>
             )}
 
-            {/* 7. Language View */}
+            {/* 7. Language.
+                This replaced a mockup: a select wired to nothing, and two
+                Download buttons with no handler offering "language packs" of
+                93 MB that did not exist — one of them a copyrighted text. The
+                bibles now ship (see BIBLES.md), so what is left here is the one
+                thing that is genuinely a choice: which language the recogniser
+                is listening for. */}
             {activeCategory === 'language' && (
               <div>
                 <div style={modalStyles.formRow}>
                   <div>
                     <div style={modalStyles.rowTitle}>Sermon language</div>
-                    <div style={modalStyles.rowSub}>Lock transcription to a one language for optimal performance</div>
+                    <div style={modalStyles.rowSub}>
+                      Naming the language is steadier than letting it be detected each time.
+                    </div>
                   </div>
-                  <select style={modalStyles.selectInput} defaultValue="auto">
-                    <option value="auto">Auto (multi-language)</option>
+                  <select
+                    style={modalStyles.selectInput}
+                    value={settings?.sermonLanguage || 'auto'}
+                    onChange={(e) => saveSettings({ sermonLanguage: e.target.value as SermonLanguage })}
+                  >
+                    <option value="auto">Auto (detect per utterance)</option>
                     <option value="en">English</option>
-                    <option value="fr">French</option>
-                    <option value="es">Spanish</option>
+                    <option value="fr">French — Français</option>
+                    <option value="es">Spanish — Español</option>
                   </select>
                 </div>
 
+                {/* The honest caveat. Moonshine and Whisper `.en` carry
+                    English-only weights, so choosing French here would do
+                    nothing at all unless the operator also switches model —
+                    which is exactly the sort of silent no-op the old mockup
+                    was made of. */}
+                {settings?.sermonLanguage && settings.sermonLanguage !== 'auto' && settings.sermonLanguage !== 'en'
+                  && aiStatus && !aiStatus.multilingual && (
+                  <div style={modalStyles.formRow}>
+                    <div>
+                      <div style={{ ...modalStyles.rowTitle, color: 'var(--tally-fault)' }}>
+                        {localModel?.label || 'The current model'} only understands English
+                      </div>
+                      <div style={modalStyles.rowSub}>
+                        Pick a multilingual model under Scripture → On-device model, or this
+                        setting will have no effect.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ marginTop: 16 }}>
-                  <div style={modalStyles.rowTitle}>Language packs</div>
-                  <div style={modalStyles.rowSub}>Add additional languages for transcription and bible verses</div>
-
-                  <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-                    <div style={modalStyles.langCard}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 20 }}>🇫🇷</span>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>French</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>LSG & OST</div>
+                  <div style={modalStyles.rowTitle}>Bible translations</div>
+                  <div style={modalStyles.rowSub}>
+                    Bundled and offline — no download. Public domain only; see BIBLES.md.
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                    {[
+                      { flag: '🇬🇧', label: 'English', texts: 'KJV · ASV · Darby · YLT' },
+                      { flag: '🇫🇷', label: 'French', texts: 'Louis Segond 1910 · Ostervald' },
+                      { flag: '🇪🇸', label: 'Spanish', texts: 'Reina-Valera 1909' },
+                    ].map((row) => (
+                      <div key={row.label} style={modalStyles.formRow}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 18 }}>{row.flag}</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{row.label}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{row.texts}</div>
+                          </div>
                         </div>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Installed</span>
                       </div>
-                      <button style={modalStyles.downloadBtn}>Download (93.1 MB)</button>
-                    </div>
-
-                    <div style={modalStyles.langCard}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 20 }}>🇪🇸</span>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Spanish</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>RV1909 & VBL</div>
-                        </div>
-                      </div>
-                      <button style={modalStyles.downloadBtn}>Download (91.1 MB)</button>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -945,12 +1114,9 @@ export function SettingsModal() {
                 <div style={modalStyles.helpRow}>
                   <div>
                     <div style={modalStyles.rowTitle}>Dashboard tutorial</div>
-                    <div style={modalStyles.rowSub}>Learn how to use the app with an interactive guide</div>
+                    <div style={modalStyles.rowSub}>Video walkthroughs of the console, on the channel</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button style={modalStyles.actionBtn}>Restart Tutorial</button>
-                    <button style={modalStyles.actionBtn}>↗ Watch video</button>
-                  </div>
+                  <button style={modalStyles.actionBtn} onClick={openTutorials}>↗ Watch on YouTube</button>
                 </div>
 
                 <div style={modalStyles.helpRow}>
@@ -958,10 +1124,7 @@ export function SettingsModal() {
                     <div style={modalStyles.rowTitle}>Theme designer tutorial</div>
                     <div style={modalStyles.rowSub}>Learn how to use the theme designer</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button style={modalStyles.actionBtn}>Watch Tutorial</button>
-                    <button style={modalStyles.actionBtn}>↗ Watch video</button>
-                  </div>
+                  <button style={modalStyles.actionBtn} onClick={openTutorials}>↗ Watch on YouTube</button>
                 </div>
 
                 <div style={modalStyles.helpRow}>
@@ -972,13 +1135,6 @@ export function SettingsModal() {
                   <button style={modalStyles.actionBtn}>Open docs</button>
                 </div>
 
-                <div style={modalStyles.helpRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>Contact support</div>
-                    <div style={modalStyles.rowSub}>Email the support team for help</div>
-                  </div>
-                  <button style={modalStyles.actionBtn}>Email support</button>
-                </div>
               </div>
             )}
 
@@ -1045,32 +1201,12 @@ export function SettingsModal() {
                 <div style={{ ...modalStyles.formRow, marginTop: 16 }}>
                   <div>
                     <div style={modalStyles.rowTitle}>Blocking issue</div>
-                    <div style={modalStyles.rowSub}>The app cannot be used until this is fixed</div>
                   </div>
                   <AppleToggle checked={isBlocking} onChange={setIsBlocking} />
                 </div>
               </div>
             )}
 
-            {/* Fallback for Usage & Stats */}
-            {activeCategory === 'usage' && (
-              <div>
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>Live STT Audio Ingestion</div>
-                    <div style={modalStyles.rowSub}>Continuous streaming audio buffer processing</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 600 }}>Active • 16kHz</span>
-                </div>
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>Local Verse Index Size</div>
-                    <div style={modalStyles.rowSub}>31,102 Bible verses indexed in memory</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>6.2 MB</span>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1097,7 +1233,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     maxHeight: 'calc(100vh - 48px)',
     background: 'var(--settings-panel)',
     border: '1px solid var(--settings-line)',
-    borderRadius: 10,
+    borderRadius: 6,
     boxShadow: '0 24px 80px rgba(0, 0, 0, 0.8)',
     display: 'flex',
     overflow: 'hidden',
@@ -1142,31 +1278,6 @@ const modalStyles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: 8,
-  },
-  planCard: {
-    width: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    background: 'var(--settings-card)',
-    borderRadius: 999,
-    padding: '4px 6px 4px 14px',
-    border: '1px solid var(--settings-line)',
-  },
-  planLabel: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: '#ffffff',
-  },
-  upgradeBtn: {
-    padding: '5px 14px',
-    borderRadius: 999,
-    border: 'none',
-    background: '#ffffff',
-    color: '#000000',
-    fontSize: 12,
-    fontWeight: 700,
-    cursor: 'pointer',
   },
   versionText: {
     fontSize: 11,
@@ -1237,7 +1348,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   pillGroup: {
     display: 'flex',
     background: 'var(--settings-card)',
-    borderRadius: 8,
+    borderRadius: 6,
     padding: 3,
     border: '1px solid var(--settings-line)',
   },
@@ -1274,27 +1385,6 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   actionBtn: {
     padding: '6px 14px',
-    background: 'var(--settings-card)',
-    border: '1px solid var(--settings-line)',
-    borderRadius: 6,
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  langCard: {
-    flex: 1,
-    background: 'var(--settings-card)',
-    borderRadius: 8,
-    border: '1px solid var(--settings-line)',
-    padding: 12,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  downloadBtn: {
-    width: '100%',
-    padding: '6px',
     background: 'var(--settings-card)',
     border: '1px solid var(--settings-line)',
     borderRadius: 6,

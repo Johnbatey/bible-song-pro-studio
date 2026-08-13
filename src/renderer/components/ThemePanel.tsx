@@ -5,6 +5,8 @@ import { v4 as uuid } from 'uuid';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton } from './Block';
 import { AppleToggle } from './AppleToggle';
+import { MediaGrid } from './MediaGrid';
+import { gradientCss, parseBackgroundInfo } from '../utils/background';
 
 const PRESET_THEMES: Theme[] = [
   {
@@ -22,7 +24,7 @@ const PRESET_THEMES: Theme[] = [
       fontColor: '#1a1a1a',
       textAlign: 'left',
       padding: 20,
-      borderRadius: 8,
+      borderRadius: 6,
       animation: 'slideInLeft',
       position: 'bottom-left',
       offsetX: 0,
@@ -67,7 +69,7 @@ const PRESET_THEMES: Theme[] = [
       fontColor: '#ffffff',
       textAlign: 'left',
       padding: 18,
-      borderRadius: 10,
+      borderRadius: 6,
       animation: 'slideInUp',
       position: 'bottom-left',
       offsetX: 0,
@@ -111,7 +113,7 @@ const PRESET_THEMES: Theme[] = [
       fontColor: '#ffffff',
       textAlign: 'left',
       padding: 20,
-      borderRadius: 8,
+      borderRadius: 6,
       animation: 'slideInLeft',
       position: 'bottom-left',
       offsetX: 0,
@@ -155,7 +157,7 @@ const PRESET_THEMES: Theme[] = [
       fontColor: '#ffffff',
       textAlign: 'left',
       padding: 20,
-      borderRadius: 8,
+      borderRadius: 6,
       animation: 'slideInLeft',
       position: 'bottom-left',
       offsetX: 0,
@@ -199,7 +201,7 @@ const PRESET_THEMES: Theme[] = [
       fontColor: '#1a1a1a',
       textAlign: 'left',
       padding: 18,
-      borderRadius: 10,
+      borderRadius: 6,
       animation: 'slideInUp',
       position: 'bottom-center',
       offsetX: 0,
@@ -243,7 +245,7 @@ const PRESET_THEMES: Theme[] = [
       fontColor: '#ffffff',
       textAlign: 'left',
       padding: 18,
-      borderRadius: 8,
+      borderRadius: 6,
       animation: 'slideInLeft',
       position: 'bottom-left',
       offsetX: 0,
@@ -287,7 +289,7 @@ const PRESET_THEMES: Theme[] = [
       fontColor: '#ffffff',
       textAlign: 'left',
       padding: 18,
-      borderRadius: 10,
+      borderRadius: 6,
       animation: 'slideInUp',
       position: 'bottom-left',
       offsetX: 0,
@@ -331,7 +333,7 @@ const PRESET_THEMES: Theme[] = [
       fontColor: '#ffffff',
       textAlign: 'left',
       padding: 18,
-      borderRadius: 8,
+      borderRadius: 6,
       animation: 'slideInLeft',
       position: 'bottom-left',
       offsetX: 0,
@@ -370,6 +372,13 @@ export function ThemePanel() {
   const activeTheme = useAppStore((s) => s.activeTheme);
   const setActiveTheme = useAppStore((s) => s.setActiveTheme);
   const [editTheme, setEditTheme] = useState<Theme | null>(null);
+  /* Which output each card is previewing. Per card, not one setting for the
+     grid: comparing two themes usually means looking at the same output on
+     both, but checking one theme's lower third should not reframe the other
+     eleven. Full screen is the default because it is what most of a service
+     is. */
+  const [thumbMode, setThumbMode] = useState<Record<string, ThumbMode>>({});
+  const thumbModeFor = (id: string): ThumbMode => thumbMode[id] ?? 'full';
 
   // Combine default preset themes with custom user created/modified themes smoothly
   const themeMap = new Map<string, Theme>();
@@ -380,20 +389,37 @@ export function ThemePanel() {
   });
   const allThemes = Array.from(themeMap.values());
 
+  /**
+   * Carry an edit into the editor, the library, and — only if this is the theme
+   * that is live — the output.
+   *
+   * Editing is not choosing. Opening a preset to change its colours used to
+   * make it the active theme, so an operator who wanted to tidy up a theme they
+   * were not using changed what the congregation was looking at. Which theme is
+   * live is decided by clicking the thumbnail, and nothing else decides it.
+   *
+   * The active theme still updates as it is edited, because that is the whole
+   * point of editing the one you are running: the projector follows the colour
+   * picker live rather than after a save.
+   */
+  const applyThemeEdit = (updated: Theme) => {
+    setEditTheme(updated);
+    if (activeTheme?.id === updated.id) setActiveTheme(updated);
+    updateTheme(updated.id, updated);
+  };
+
   const renameTheme = (theme: Theme, name: string) => {
     const updated = { ...theme, name };
     setEditTheme(updated);
-    setActiveTheme(updated);
+    if (activeTheme?.id === updated.id) setActiveTheme(updated);
+    /* An empty box mid-typing is not a name; it is committed on blur. */
     if (name.trim()) updateTheme(theme.id, updated);
   };
 
   const commitThemeName = (theme: Theme) => {
     const nextName = theme.name.trim();
     const fallback = theme.name || 'Untitled Theme';
-    const updated = { ...theme, name: nextName || fallback };
-    setEditTheme(updated);
-    setActiveTheme(updated);
-    updateTheme(theme.id, updated);
+    applyThemeEdit({ ...theme, name: nextName || fallback });
   };
 
   const deleteTheme = (theme: Theme) => {
@@ -436,7 +462,7 @@ export function ThemePanel() {
                       fontColor: '#ffffff',
                       textAlign: 'left',
                       padding: 16,
-                      borderRadius: 8,
+                      borderRadius: 6,
                       animation: 'fadeIn',
                       position: 'bottom-left',
                     },
@@ -479,23 +505,51 @@ export function ThemePanel() {
                   onClick={() => setActiveTheme(theme)}
                 >
                   {/* Realistic 16:9 Presentation Display Thumbnail */}
-                  <ThemeThumbnailPreview theme={theme} />
+                  <ThemeThumbnailPreview theme={theme} mode={thumbModeFor(theme.id)} />
 
-                  {/* Header Row: Preset Name & Badges on the Same Line */}
+                  {/* Header Row: Preset Name & the two output modes.
+                      These were badges — three labels stating that a theme has
+                      a full screen, a lower third and slides, which every theme
+                      does, so they said nothing and cost the row. They switch
+                      the thumbnail now.
+
+                      SLIDES is gone rather than switchable: nothing renders
+                      with theme.slideTheme. Pro Slides paint their own design
+                      edge to edge, so a slides preview would have advertised
+                      styling the theme does not apply. */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, gap: 6 }}>
                     <div style={{ ...type.heading, fontWeight: fontWeight.bold, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
                       {theme.name}
                     </div>
                     <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
-                      <span className="badge" style={{ background: 'var(--blue-dim)', color: 'var(--blue)', fontSize: 9, padding: '2px 4px' }}>
-                        LT
-                      </span>
-                      <span className="badge" style={{ background: 'var(--green-dim)', color: 'var(--green)', fontSize: 9, padding: '2px 4px' }}>
-                        FULL
-                      </span>
-                      <span className="badge" style={{ background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 9, padding: '2px 4px' }}>
-                        SLIDES
-                      </span>
+                      {THUMB_MODES.map((option) => {
+                        const selected = thumbModeFor(theme.id) === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className="badge"
+                            /* Previewing is not choosing, the same rule Edit
+                               Design follows: only the card applies a theme. */
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setThumbMode((current) => ({ ...current, [theme.id]: option.id }));
+                            }}
+                            title={option.hint}
+                            style={{
+                              fontSize: 9,
+                              padding: '2px 5px',
+                              cursor: 'pointer',
+                              border: 'none',
+                              background: selected ? option.tint : 'transparent',
+                              color: selected ? option.color : 'var(--text-dim)',
+                              fontWeight: selected ? fontWeight.bold : fontWeight.medium,
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -504,9 +558,11 @@ export function ThemePanel() {
                     <button
                       className="btn btn-sm btn-secondary"
                       style={{ flex: 1, padding: '5px 8px', fontSize: 12 }}
+                      /* Opens the editor and nothing else — see applyThemeEdit.
+                         The card behind this button is what applies a theme,
+                         which is why the click stops here. */
                       onClick={(event) => {
                         event.stopPropagation();
-                        setActiveTheme(theme);
                         setEditTheme(theme);
                       }}
                     >
@@ -564,13 +620,12 @@ export function ThemePanel() {
                     <span className="badge" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>FULL SCREEN</span>
                   </div>
                   <ThemeFormSection
+                    allowMedia
                     values={editTheme.fullScreen}
-                    onChange={(updates) => {
-                      const updated = { ...editTheme, fullScreen: { ...editTheme.fullScreen, ...updates } };
-                      setEditTheme(updated);
-                      setActiveTheme(updated);
-                      updateTheme(editTheme.id, updated);
-                    }}
+                    onChange={(updates) => applyThemeEdit({
+                      ...editTheme,
+                      fullScreen: { ...editTheme.fullScreen, ...updates },
+                    })}
                   />
                 </div>
 
@@ -581,12 +636,10 @@ export function ThemePanel() {
                   </div>
                   <ThemeFormSection
                     values={editTheme.lowerThird}
-                    onChange={(updates) => {
-                      const updated = { ...editTheme, lowerThird: { ...editTheme.lowerThird, ...updates } };
-                      setEditTheme(updated);
-                      setActiveTheme(updated);
-                      updateTheme(editTheme.id, updated);
-                    }}
+                    onChange={(updates) => applyThemeEdit({
+                      ...editTheme,
+                      lowerThird: { ...editTheme.lowerThird, ...updates },
+                    })}
                   />
                 </div>
               </div>
@@ -597,7 +650,31 @@ export function ThemePanel() {
   );
 }
 
-function ThemeThumbnailPreview({ theme }: { theme: Theme }) {
+type ThumbMode = 'full' | 'lt';
+
+/* Full screen first: it is the output a service spends most of its time in,
+   and it is the default the card opens on. */
+const THUMB_MODES: { id: ThumbMode; label: string; tint: string; color: string; hint: string }[] = [
+  { id: 'full', label: 'FULL', tint: 'var(--green-dim)', color: 'var(--green)', hint: 'Preview the full screen output' },
+  { id: 'lt', label: 'LT', tint: 'var(--blue-dim)', color: 'var(--blue)', hint: 'Preview the lower third, over transparency' },
+];
+
+/* Checkerboard, the standard way a still says "nothing is painted here". A
+   lower third is a band drawn over whatever the projector is already showing,
+   so previewing it on the theme's full-screen ground would misrepresent it as
+   part of one picture — which is exactly what the stacked preview did. */
+const TRANSPARENCY_CHECKS = {
+  backgroundColor: '#15161a',
+  backgroundImage:
+    'linear-gradient(45deg, #23252b 25%, transparent 25%),' +
+    'linear-gradient(-45deg, #23252b 25%, transparent 25%),' +
+    'linear-gradient(45deg, transparent 75%, #23252b 75%),' +
+    'linear-gradient(-45deg, transparent 75%, #23252b 75%)',
+  backgroundSize: '12px 12px',
+  backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
+};
+
+function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode }) {
   const fs = theme.fullScreen;
   const lt = theme.lowerThird;
 
@@ -615,26 +692,31 @@ function ThemeThumbnailPreview({ theme }: { theme: Theme }) {
   const fsShadowCss = fs.textShadowEnabled ? '0px 1px 4px rgba(0,0,0,0.9)' : undefined;
   const ltShadowCss = lt.textShadowEnabled ? '0px 1px 3px rgba(0,0,0,0.9)' : undefined;
 
+  const showFull = mode === 'full';
+
   return (
     <div
       style={{
         width: '100%',
         aspectRatio: '16 / 9',
-        borderRadius: 8,
+        borderRadius: 6,
         overflow: 'hidden',
         position: 'relative',
-        background: fsBg,
+        ...(showFull ? { background: fsBg } : TRANSPARENCY_CHECKS),
         border: '1px solid rgba(255, 255, 255, 0.12)',
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
         marginBottom: 8,
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
+        /* Full screen centres its verse in the frame; a lower third sits where
+           it sits, near the bottom, over nothing. */
+        justifyContent: showFull ? 'center' : 'flex-end',
         padding: '8px 10px 6px 10px',
         boxSizing: 'border-box',
       }}
     >
       {/* Full Screen Content Preview */}
+      {showFull && (
       <div
         style={{
           display: 'flex',
@@ -677,8 +759,10 @@ function ThemeThumbnailPreview({ theme }: { theme: Theme }) {
           In the beginning God created...
         </div>
       </div>
+      )}
 
-      {/* Mini Lower Third Overlay Preview */}
+      {/* Mini Lower Third Preview */}
+      {!showFull && (
       <div
         style={{
           width: ltWidth,
@@ -724,67 +808,56 @@ function ThemeThumbnailPreview({ theme }: { theme: Theme }) {
           Genesis 1:1 (KJV)
         </div>
       </div>
+      )}
     </div>
   );
 }
 
-function parseBackgroundInfo(bgStr: string | undefined, colorStr: string | undefined) {
-  const str = bgStr || colorStr || '#0c0e14';
-  if (str === 'transparent') {
-    return { type: 'transparent', color: '#000000', start: '#0f172a', end: '#312e81', dir: '135deg' };
-  }
-  if (str.includes('gradient')) {
-    const hexes = str.match(/#[0-9a-fA-F]{3,8}/g) || [];
-    const rgbes = str.match(/rgba?\([^)]+\)/g) || [];
-    const colors = [...hexes, ...rgbes];
-    const dirMatch = str.match(/(\d+deg|circle)/i);
-    return {
-      type: 'gradient',
-      color: colors[0] || '#0f172a',
-      start: colors[0] || '#0f172a',
-      end: colors[colors.length - 1] || '#312e81',
-      dir: dirMatch ? dirMatch[1] : '135deg',
-    };
-  }
-  return {
-    type: 'solid',
-    color: str.startsWith('#') || str.startsWith('rgb') ? str : '#0c0e14',
-    start: '#0f172a',
-    end: '#312e81',
-    dir: '135deg',
-  };
-}
-
-function ThemeFormSection({ values, onChange }: { values: any; onChange: (updates: any) => void }) {
+/* `allowMedia` is the full-screen column only. A lower third is a band drawn
+   over whatever is already on the projector; giving it its own clip would put
+   a second video behind the band and on top of the one already playing. */
+function ThemeFormSection({ values, onChange, allowMedia = false }: { values: any; onChange: (updates: any) => void; allowMedia?: boolean }) {
   const safeInt = (val: string, fallback = 0) => {
     const parsed = parseInt(val, 10);
     return isNaN(parsed) ? fallback : parsed;
   };
 
   const bgInfo = parseBackgroundInfo(values.background, values.backgroundColor);
-  const currentBgType = values.backgroundType || bgInfo.type;
+  /* Media, when set, is the type regardless of what `backgroundType` says —
+     the resolver reads it first, so the editor has to agree or the dropdown
+     would show "Gradient" over a clip that is actually playing. */
+  const currentBgType = values.backgroundMediaUrl && values.backgroundMediaType
+    ? values.backgroundMediaType
+    : values.backgroundType || bgInfo.type;
   const currentStart = values.gradientStart || bgInfo.start;
   const currentEnd = values.gradientEnd || bgInfo.end;
   const currentDir = values.gradientDirection || bgInfo.dir;
   const currentSolid = values.backgroundColor || bgInfo.color;
   const currentOpacity = typeof values.backgroundOpacity === 'number' ? values.backgroundOpacity : 0.95;
 
+  /* Leaving media behind has to erase it, not just stop pointing at it: the
+     resolver checks backgroundMediaUrl before any colour, so a stale url would
+     keep the old clip on screen under a solid the operator just picked. */
+  const CLEAR_MEDIA = { backgroundMediaUrl: '', backgroundMediaType: undefined };
+
   const handleBgTypeChange = (newType: string) => {
-    if (newType === 'transparent') {
-      onChange({ backgroundType: 'transparent', background: 'transparent', backgroundColor: 'transparent' });
+    if (newType === 'image' || newType === 'video') {
+      /* No file yet — the grid below asks. Type is staged so the grid knows
+         which half of the library to show. */
+      onChange({ backgroundMediaType: newType, backgroundMediaUrl: values.backgroundMediaUrl || '' });
+    } else if (newType === 'transparent') {
+      onChange({ ...CLEAR_MEDIA, backgroundType: 'transparent', background: 'transparent', backgroundColor: 'transparent' });
     } else if (newType === 'solid') {
       const solidColor = currentSolid && currentSolid !== 'transparent' ? currentSolid : (values.gradientStart || '#0f172a');
-      onChange({ backgroundType: 'solid', background: solidColor, backgroundColor: solidColor });
+      onChange({ ...CLEAR_MEDIA, backgroundType: 'solid', background: solidColor, backgroundColor: solidColor });
     } else if (newType === 'gradient') {
       const start = currentStart && currentStart !== 'transparent' ? currentStart : '#0f172a';
       const end = currentEnd && currentEnd !== 'transparent' ? currentEnd : '#312e81';
       const dir = currentDir || '135deg';
-      const gradCss = dir === 'radial'
-        ? `radial-gradient(circle, ${start}, ${end})`
-        : `linear-gradient(${dir}, ${start}, ${end})`;
       onChange({
+        ...CLEAR_MEDIA,
         backgroundType: 'gradient',
-        background: gradCss,
+        background: gradientCss(start, end, dir),
         backgroundColor: start,
         gradientStart: start,
         gradientEnd: end,
@@ -797,9 +870,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
     const s = updates.start ?? currentStart;
     const e = updates.end ?? currentEnd;
     const d = updates.dir ?? currentDir;
-    const gradCss = d === 'radial'
-      ? `radial-gradient(circle, ${s}, ${e})`
-      : `linear-gradient(${d}, ${s}, ${e})`;
+    const gradCss = gradientCss(s, e, d);
     onChange({
       backgroundType: 'gradient',
       background: gradCss,
@@ -878,8 +949,17 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
             <option value="zoomIn">Zoom In</option>
             <option value="scaleIn">Scale In</option>
             <option value="flipIn">Flip In</option>
-            <option value="bounceIn">Bounce In</option>
-            <option value="elasticIn">Elastic In</option>
+            {/* Bounce In and Elastic In are retired. Both overshot their
+                resting position, which is the one thing broadcast motion does
+                not do — a lower third that springs reads as amateur on air.
+                A theme saved with either still opens and still plays; it just
+                plays on the house curve, and the option says so rather than
+                disappearing and silently resetting the operator's choice. */}
+            {(values.animation === 'bounceIn' || values.animation === 'elasticIn') && (
+              <option value={values.animation}>
+                {values.animation === 'bounceIn' ? 'Bounce In' : 'Elastic In'} (retired)
+              </option>
+            )}
           </select>
         </div>
       </div>
@@ -994,7 +1074,7 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
       </div>
 
       {/* Background Style Editor */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
+      <div style={{ background: 'rgba(255,255,255,0.03)', padding: 10, borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
         <div style={{ ...type.label, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <span>Background Style</span>
           <span className="badge" style={{ fontSize: 10 }}>{currentBgType.toUpperCase()}</span>
@@ -1018,7 +1098,11 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
             textShadow: '0 1px 2px rgba(0,0,0,0.8)',
           }}
         >
-          {currentBgType === 'gradient' ? 'Gradient Preview' : currentBgType === 'transparent' ? 'Transparent' : 'Solid Preview'}
+          {currentBgType === 'image' ? 'Image Background'
+            : currentBgType === 'video' ? 'Video Background'
+            : currentBgType === 'gradient' ? 'Gradient Preview'
+            : currentBgType === 'transparent' ? 'Transparent'
+            : 'Solid Preview'}
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -1031,6 +1115,8 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
             >
               <option value="solid">Solid Color</option>
               <option value="gradient">Gradient</option>
+              {allowMedia && <option value="image">Image</option>}
+              {allowMedia && <option value="video">Video</option>}
               <option value="transparent">Transparent</option>
             </select>
           </div>
@@ -1047,6 +1133,44 @@ function ThemeFormSection({ values, onChange }: { values: any; onChange: (update
             />
           </div>
         </div>
+
+        {allowMedia && (currentBgType === 'image' || currentBgType === 'video') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <MediaGrid
+              kind={currentBgType}
+              selectedUrl={values.backgroundMediaUrl || ''}
+              onSelect={(item) => onChange({
+                backgroundMediaUrl: item.url,
+                backgroundMediaType: item.type,
+                backgroundFit: values.backgroundFit || 'cover',
+              })}
+            />
+            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Fit</label>
+                <select
+                  className="input"
+                  value={values.backgroundFit || 'cover'}
+                  onChange={(e) => onChange({ backgroundFit: e.target.value })}
+                >
+                  <option value="cover">Cover</option>
+                  <option value="contain">Contain</option>
+                  <option value="fill">Stretch</option>
+                </select>
+              </div>
+              {currentBgType === 'video' && (
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, ...type.caption, color: 'var(--text-secondary)', paddingBottom: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={values.backgroundLoop !== false}
+                    onChange={(e) => onChange({ backgroundLoop: e.target.checked })}
+                  />
+                  Loop
+                </label>
+              )}
+            </div>
+          </div>
+        )}
 
         {currentBgType === 'solid' && (
           <div>

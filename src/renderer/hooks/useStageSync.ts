@@ -36,11 +36,18 @@ export function useStageSync(): void {
   // What is on the screen now, and which song it belongs to.
   useEffect(() => {
     const { songTitle, songSubtitle } = songCue(currentScene);
+    /* Neither of these has a reference line worth showing. A presentation's is
+       the deck's own title, and a media scene falls back to `scene.name` —
+       which for media is the file name off the operator's disk. The stage was
+       putting "Screenshot 2026-08-10 at 00.24.51.png" over the platform in
+       accent orange; the picture is the content, and its file name is a detail
+       of the library, not something a musician needs. */
     const isPresentation = currentScene?.type === 'presentation';
+    const isMedia = currentScene?.type === 'media';
     publishStage({
       current: currentScene
         ? {
-            title: isPresentation ? '' : (currentScene.content?.reference || currentScene.name),
+            title: isPresentation || isMedia ? '' : (currentScene.content?.reference || currentScene.name),
             body: currentScene.content?.text || '',
             bodyHtml: currentScene.content?.html || '',
           }

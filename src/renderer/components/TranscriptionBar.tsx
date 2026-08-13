@@ -61,7 +61,7 @@ export function TranscriptionBar() {
           width: 6,
           height: 6,
           borderRadius: '50%',
-          background: transcription.isActive ? '#2ecc71' : 'var(--text-dim)',
+          background: transcription.isActive ? 'var(--tally-preview)' : 'var(--text-dim)',
           animation: transcription.isActive ? 'pulse 1.5s ease-in-out infinite' : 'none',
         }}
       />

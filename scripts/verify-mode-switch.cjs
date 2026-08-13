@@ -33,13 +33,17 @@ async function main() {
 
   const result = await win.webContents.executeJavaScript(`(async () => {
     const read = () => {
-      const programDock = document.querySelector('.program-dock');
+      /* .program-dock stopped existing in 4ee7563, when every panel became a
+         dock — the Preview/Program pair has been .pv-dock ever since, which is
+         why the line below already reaches for it. Reading the old selector
+         returned null and collapsed the very first assertion, so this has been
+         red since that refactor rather than telling anyone anything. */
       const pvDock = document.querySelector('.pv-dock');
       const programLabel = Array.from(document.querySelectorAll('.pv-dock *')).find((node) => /program/i.test(node.textContent || ''));
       const programSurface = document.querySelector('.pv-dock .program-surface');
       const basicButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === 'Basic');
       const studioButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === 'Studio');
-      const programRect = programDock?.getBoundingClientRect();
+      const programRect = pvDock?.getBoundingClientRect();
       const surfaceRect = programSurface?.getBoundingClientRect();
       return {
         hasBasicButton: Boolean(basicButton),

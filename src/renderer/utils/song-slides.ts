@@ -60,9 +60,17 @@ export function buildSongScene(
         ? { title: song.title, author: song.author || song.artist, copyright: song.copyright, ccli: song.ccli }
         : undefined,
     },
-    background: {
-      type: 'gradient',
-      gradient: 'linear-gradient(135deg, #1a0a2e, #16213e, #0f3460)',
-    },
+    /* The song's own ground, or none at all.
+       ProgramSurface treats a scene's background as the operator having picked
+       one and skips the theme for it — which is exactly right when they set one
+       on this song, and exactly wrong otherwise. A hardcoded gradient used to
+       sit here unconditionally, which is why every song ignored the theme while
+       Scripture obeyed it. Undefined is the default and has to stay undefined:
+       an empty object here would read as a background and swallow the theme.
+
+       The same object on every slide of a song, so the url the surface sees
+       does not change as the operator advances lyrics and the <video> keeps
+       playing rather than cutting back to its first frame. */
+    background: song.background,
   };
 }

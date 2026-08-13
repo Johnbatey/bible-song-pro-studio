@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
 import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
+import { resolveBgVideoLoop } from '../utils/background';
 import { ProgramSurface } from './display/ProgramSurface';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { type, fontWeight } from '../styles/type';
@@ -51,13 +52,29 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
 
   /* Stable identities so the memoised surfaces are not re-rendered by every
      zoom or pan tick — those only move the wrapper's transform. */
+  const previewTransport = useAppStore((s) =>
+    s.display.videoTransport.target === 'preview' ? s.display.videoTransport : null);
+  /* Preview deliberately does NOT carry blackout: it shows what is cued, and
+     blackout is a statement about what is on air. It does follow the standby
+     preference, so the two panes agree about the idle card. */
+  const showStandbyBrand = useAppStore((s) => s.showStandbyBrand);
   const previewSurfaceState = useMemo(
-    () => ({ scene: previewScene, outputMode, theme: activeTheme }),
-    [previewScene, outputMode, activeTheme],
+    () => ({
+      scene: previewScene, outputMode, theme: activeTheme, videoTransport: previewTransport,
+      showStandbyBrand,
+      bgVideoLoop: resolveBgVideoLoop(previewScene?.background, activeTheme),
+    }),
+    [previewScene, outputMode, activeTheme, previewTransport, showStandbyBrand],
   );
   /* Shared with the stage display's program pane — both are claims about what
      the congregation is seeing, so neither derives it privately. */
   const programSurfaceState = useProgramSurfaceState();
+  /* These panes are always mounted, so they are the clock the transport reads:
+     the audience window may not be open, and the browser and NDI clients are
+     not ours to ask. Only the pane the transport is pointed at reports. */
+  const videoTarget = useAppStore((s) => s.display.videoTransport.target);
+  const reportVideoClock = useAppStore((s) => s.reportVideoClock);
+  const setVideoPlaying = useAppStore((s) => s.setVideoPlaying);
   /* Scenes store media relative, so these panes have to resolve it — without
      this an imported image or video renders as nothing here. */
   const assetBaseUrl = useAssetBaseUrl();
@@ -254,8 +271,10 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                 setMode('basic');
                 onPanelChange?.('bible');
               } else {
+                /* Switching to Studio used to open the Scenes window as well.
+                   Changing mode is a claim about how takes work, not a request
+                   to rearrange the operator's panels — the layout is theirs. */
                 setMode('studio');
-                onPanelChange?.('scenes');
               }
             }}
             title="Toggle Studio Mode & Canvas Editor"
@@ -349,27 +368,37 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
         >
           {isStudio && (
             <div style={{ ...styles.previewCol, width: stageSize.itemWidth }}>
+              {/* Preview is green whether or not a take is pending — a cued
+                  source is still a cued source. The readiness lives in the
+                  label and the border, not in a sixth colour: the tally set is
+                  five states and yellow is not one of them. */}
               <div style={styles.label}>
-                <span style={{ ...styles.dot, background: hasPendingTake ? '#f1c40f' : '#2ecc71' }} />
+                <span style={{ ...styles.dot, background: 'var(--tally-preview)' }} />
                 Preview{hasPendingTake ? ' · ready to take' : ''}
               </div>
-              <div style={{ ...styles.displayBox, borderColor: hasPendingTake ? '#f1c40f' : undefined }}>
+              <div style={{ ...styles.displayBox, borderColor: 'var(--tally-preview)', boxShadow: hasPendingTake ? '0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px var(--tally-preview)' : undefined }}>
                 <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
                   <ProgramSurface
                     preview
                     state={previewSurfaceState}
                     assetBaseUrl={assetBaseUrl}
+                    onVideoClock={videoTarget === 'preview' ? reportVideoClock : undefined}
+                    onVideoPlayState={videoTarget === 'preview' ? setVideoPlaying : undefined}
                   />
                 </div>
               </div>
             </div>
           )}
           <div style={{ ...(isStudio ? styles.previewCol : styles.programColSolo), width: stageSize.itemWidth }}>
+            {/* Program was red, which in this system means Fault — a dropped
+                source or no signal. Program is Signal, and the reason the
+                whole palette is built around one orange: if it is orange, it
+                is on screen. */}
             <div style={styles.label}>
-              <span style={{ ...styles.dot, background: '#e74c3c' }} />
+              <span style={{ ...styles.dot, background: 'var(--tally-program)' }} />
               Program{!isStudio ? ' · live' : ''}
             </div>
-            <div style={{ ...styles.displayBox, borderColor: 'var(--border-accent)' }}>
+            <div style={{ ...styles.displayBox, borderColor: 'var(--tally-program)' }}>
               {isTransitioning && (
                 <div style={styles.transitionOverlay}>
                   <div style={styles.transitionSpinner} />
@@ -380,6 +409,8 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                   preview
                   state={programSurfaceState}
                   assetBaseUrl={assetBaseUrl}
+                  onVideoClock={videoTarget === 'program' ? reportVideoClock : undefined}
+                  onVideoPlayState={videoTarget === 'program' ? setVideoPlaying : undefined}
                 />
               </div>
             </div>

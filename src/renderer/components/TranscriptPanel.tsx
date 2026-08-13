@@ -73,7 +73,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
               onClick={startTranscription}
               disabled={!enabledProvider}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview)" strokeWidth="2">
                 <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                 <line x1="12" y1="19" x2="12" y2="22" />
@@ -84,7 +84,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
           <span
             style={{
               ...styles.recDot,
-              background: transcription.isActive ? '#ef4444' : '#3f3f46',
+              background: transcription.isActive ? 'var(--tally-fault)' : 'var(--tally-hold)',
             }}
             title={transcription.isActive ? 'Recording' : 'Idle'}
           />
@@ -149,7 +149,7 @@ const styles: Record<string, React.CSSProperties> = {
   startLabel: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#22c55e',
+    color: 'var(--text-primary)',
   },
   recDot: {
     width: 22,
@@ -167,7 +167,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(239, 68, 68, 0.12)',
     border: '1px solid rgba(239, 68, 68, 0.3)',
     borderRadius: 6,
-    color: '#ef4444',
+    color: 'var(--tally-fault)',
     fontSize: 12,
     fontWeight: 600,
     cursor: 'pointer',
@@ -176,6 +176,6 @@ const styles: Record<string, React.CSSProperties> = {
     width: 6,
     height: 6,
     borderRadius: '50%',
-    background: '#ef4444',
+    background: 'var(--tally-fault)',
   },
 };

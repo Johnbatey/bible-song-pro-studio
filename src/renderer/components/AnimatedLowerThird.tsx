@@ -7,78 +7,81 @@ interface AnimatedLowerThirdProps {
   visible: boolean;
 }
 
-// Spring easing functions matching animejs.com/easing-editor/spring/default
-// These recreate the anime.js spring easings for use in CSS animations
-const animeSpringEasings = {
-  'spring(1, 80, 10, 0)': 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-  'spring(1, 60, 12, 0)': 'cubic-bezier(0.175, 0.885, 0.32, 1.1)',
-  'spring(1, 50, 8, 0)': 'cubic-bezier(0.175, 0.885, 0.32, 1.05)',
-  'spring(1, 40, 6, 0)': 'cubic-bezier(0.175, 0.885, 0.32, 1)',
-};
+// Broadcast motion has one rule the software world forgets: nothing
+// overshoots. A lower third that bounces reads as amateur on air, so every
+// curve here lands and stops. These were spring easings — the two strongest
+// carried the graphic past its resting position and settled back into it.
+//
+// EASE is the house curve; EASE_OUT is the symmetrical one, used on exits.
+// D_AIR is the brand's to-air duration: 400ms in, and out a step under it.
+const EASE = 'cubic-bezier(0.16, 1, 0.30, 1)';
+const EASE_OUT = 'cubic-bezier(0.65, 0, 0.35, 1)';
+const D_AIR = '0.4s';
+const D_OUT = '0.24s';
 
 const getAnimationStyles = (animation: string) => {
-  const easing = animeSpringEasings['spring(1, 80, 10, 0)'];
+  const easing = EASE;
 
   switch (animation) {
     case 'slideInLeft':
       return {
         initial: { transform: 'translateX(-100%)', opacity: 0 },
-        enter: { transform: 'translateX(0)', opacity: 1, transition: `all 0.5s ${easing}` },
-        exit: { transform: 'translateX(-100%)', opacity: 0, transition: 'all 0.3s ease-in' },
+        enter: { transform: 'translateX(0)', opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { transform: 'translateX(-100%)', opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
     case 'slideInRight':
       return {
         initial: { transform: 'translateX(100%)', opacity: 0 },
-        enter: { transform: 'translateX(0)', opacity: 1, transition: `all 0.5s ${easing}` },
-        exit: { transform: 'translateX(100%)', opacity: 0, transition: 'all 0.3s ease-in' },
+        enter: { transform: 'translateX(0)', opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { transform: 'translateX(100%)', opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
     case 'slideInUp':
       return {
         initial: { transform: 'translateY(100%)', opacity: 0 },
-        enter: { transform: 'translateY(0)', opacity: 1, transition: `all 0.5s ${easing}` },
-        exit: { transform: 'translateY(100%)', opacity: 0, transition: 'all 0.3s ease-in' },
+        enter: { transform: 'translateY(0)', opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { transform: 'translateY(100%)', opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
     case 'slideInDown':
       return {
         initial: { transform: 'translateY(-100%)', opacity: 0 },
-        enter: { transform: 'translateY(0)', opacity: 1, transition: `all 0.5s ${easing}` },
-        exit: { transform: 'translateY(-100%)', opacity: 0, transition: 'all 0.3s ease-in' },
+        enter: { transform: 'translateY(0)', opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { transform: 'translateY(-100%)', opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
     case 'zoomIn':
       return {
         initial: { transform: 'scale(0.8)', opacity: 0 },
-        enter: { transform: 'scale(1)', opacity: 1, transition: `all 0.5s ${easing}` },
-        exit: { transform: 'scale(0.8)', opacity: 0, transition: 'all 0.3s ease-in' },
+        enter: { transform: 'scale(1)', opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { transform: 'scale(0.8)', opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
     case 'scaleIn':
       return {
         initial: { transform: 'scale(1.1)', opacity: 0 },
-        enter: { transform: 'scale(1)', opacity: 1, transition: `all 0.5s ${easing}` },
-        exit: { transform: 'scale(1.1)', opacity: 0, transition: 'all 0.3s ease-in' },
+        enter: { transform: 'scale(1)', opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { transform: 'scale(1.1)', opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
     case 'flipIn':
       return {
         initial: { transform: 'rotateX(90deg)', opacity: 0 },
-        enter: { transform: 'rotateX(0deg)', opacity: 1, transition: `all 0.6s ${easing}` },
-        exit: { transform: 'rotateX(90deg)', opacity: 0, transition: 'all 0.3s ease-in' },
+        enter: { transform: 'rotateX(0deg)', opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { transform: 'rotateX(90deg)', opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
     case 'bounceIn':
       return {
         initial: { transform: 'scale(0.3)', opacity: 0 },
-        enter: { transform: 'scale(1)', opacity: 1, transition: `all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)` },
-        exit: { transform: 'scale(0.3)', opacity: 0, transition: 'all 0.3s ease-in' },
+        enter: { transform: 'scale(1)', opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { transform: 'scale(0.3)', opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
     case 'elasticIn':
       return {
         initial: { transform: 'scale(0.5) translateY(20px)', opacity: 0 },
-        enter: { transform: 'scale(1) translateY(0)', opacity: 1, transition: `all 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55)` },
-        exit: { transform: 'scale(0.5) translateY(20px)', opacity: 0, transition: 'all 0.3s ease-in' },
+        enter: { transform: 'scale(1) translateY(0)', opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { transform: 'scale(0.5) translateY(20px)', opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
     default: // fadeIn
       return {
         initial: { opacity: 0 },
-        enter: { opacity: 1, transition: `all 0.4s ${easing}` },
-        exit: { opacity: 0, transition: 'all 0.2s ease-in' },
+        enter: { opacity: 1, transition: `all ${D_AIR} ${easing}` },
+        exit: { opacity: 0, transition: `all ${D_OUT} ${EASE_OUT}` },
       };
   }
 };

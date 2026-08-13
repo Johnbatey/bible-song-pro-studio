@@ -124,7 +124,7 @@ export function SessionHistoryPanel() {
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#FF5500' }}>{entry.reference || 'Projection'}</span>
-                <span style={{ fontSize: 10, color: '#a1a1aa' }}>{new Date(entry.timestamp).toLocaleTimeString()}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(entry.timestamp).toLocaleTimeString()}</span>
               </div>
               {entry.text && (
                 <div style={{ fontSize: 12, color: '#ffffff', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -135,7 +135,7 @@ export function SessionHistoryPanel() {
           ))}
         </div>
       ) : (
-        <div style={{ color: '#a1a1aa', fontSize: 12, padding: '16px 12px', textAlign: 'center' }}>
+        <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '16px 12px', textAlign: 'center' }}>
           No session history yet. Projected scriptures will appear here automatically.
         </div>
       )}

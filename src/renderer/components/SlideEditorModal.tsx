@@ -555,7 +555,24 @@ export function SlideEditorModal() {
   ];
 
   const activeSlide = slides[activeSlideIndex] || slides[0];
-  const selectedElement = activeSlide.elements?.find((el) => el.id === selectedElementId) || null;
+
+  /* The elements the editor is actually looking at.
+   *
+   * A slide that has never been touched carries no `elements` array, and both
+   * canvases paint `defaultSlideElements()` for it — a title and a body with
+   * the fixed ids `title-el` and `body-el`. Everything downstream of the
+   * selection used to read `activeSlide.elements` directly, which for such a
+   * slide is `undefined`, and that is why the whole inspector was dead:
+   * clicking the title selected `title-el`, the lookup found nothing, and the
+   * Typography panel had no element to act on. Worse, the first edit mapped
+   * over `[]` and wrote `elements: []` back — `Array.isArray` then passed, the
+   * defaults stopped being substituted, and the slide went blank.
+   *
+   * Reading through the same helper the canvases render with means the
+   * selection resolves and the first edit materialises those two defaults into
+   * the slide instead of erasing them. */
+  const activeSlideElements = slideElementsFor(activeSlide);
+  const selectedElement = activeSlideElements.find((el) => el.id === selectedElementId) || null;
 
   const renderNativeThumb = useCallback((index: number, width = 180) => {
     const slide = slides[index];
@@ -588,9 +605,9 @@ export function SlideEditorModal() {
         fontWeight: 600,
         color: '#ffffff',
         textAlign: 'center',
-        zIndex: (activeSlide.elements?.length || 0) + 1,
+        zIndex: (activeSlideElements.length) + 1,
       };
-      handleUpdateSlideElements([...(activeSlide.elements || []), newElement]);
+      handleUpdateSlideElements([...activeSlideElements, newElement]);
       setSelectedElementId(newElement.id);
       setActiveTool('select');
     } else if (['box', 'rectangle', 'rounded', 'circle', 'triangle', 'star', 'line'].includes(tool)) {
@@ -605,13 +622,13 @@ export function SlideEditorModal() {
         width: 31.3,
         height: isLine ? 1 : 33.3,
         content: tool,
-        backgroundColor: isLine ? '#f4621f' : 'rgba(244, 98, 31, 0.25)',
-        borderColor: '#f4621f',
+        backgroundColor: isLine ? '#FF5500' : 'rgba(244, 98, 31, 0.25)',
+        borderColor: '#FF5500',
         borderWidth: isLine ? 0 : 3,
         borderRadius: isCircle ? 300 : isRounded ? 12 : 0,
-        zIndex: (activeSlide.elements?.length || 0) + 1,
+        zIndex: (activeSlideElements.length) + 1,
       };
-      handleUpdateSlideElements([...(activeSlide.elements || []), newElement]);
+      handleUpdateSlideElements([...activeSlideElements, newElement]);
       setSelectedElementId(newElement.id);
       setActiveTool('select');
     } else if (tool === 'image') {
@@ -632,9 +649,9 @@ export function SlideEditorModal() {
               y: 15,
               width: 60,
               height: 70,
-              zIndex: (activeSlide.elements?.length || 0) + 1,
+              zIndex: (activeSlideElements.length) + 1,
             };
-            handleUpdateSlideElements([...(activeSlide.elements || []), newElement]);
+            handleUpdateSlideElements([...activeSlideElements, newElement]);
             setSelectedElementId(newElement.id);
           };
           reader.readAsDataURL(file);
@@ -771,7 +788,7 @@ export function SlideEditorModal() {
           backgroundColor: 'rgba(35, 34, 33, 0.7)',
           borderColor: 'rgba(255, 85, 0, 0.3)',
           borderWidth: 1,
-          borderRadius: 16,
+          borderRadius: 6,
         },
         {
           id: `el-${Date.now()}-badge`,
@@ -781,8 +798,8 @@ export function SlideEditorModal() {
           y: 18,
           width: 6,
           height: 10,
-          backgroundColor: '#f4621f',
-          borderRadius: 12,
+          backgroundColor: '#FF5500',
+          borderRadius: 6,
         },
         {
           id: `el-${Date.now()}-num`,
@@ -818,7 +835,7 @@ export function SlideEditorModal() {
           width: 68,
           height: 48,
           fontSize: 26,
-          color: '#d4d4d8',
+          color: 'var(--text-secondary)',
         },
       ];
     } else if (templateType === 'scripture') {
@@ -846,7 +863,7 @@ export function SlideEditorModal() {
           width: 50,
           height: 12,
           fontSize: 26,
-          color: '#f4621f',
+          color: '#FF5500',
           fontWeight: 700,
           textAlign: 'center',
         },
@@ -863,9 +880,9 @@ export function SlideEditorModal() {
           width: 88,
           height: 22,
           backgroundColor: 'rgba(22, 20, 20, 0.92)',
-          borderColor: '#f4621f',
+          borderColor: '#FF5500',
           borderWidth: 2,
-          borderRadius: 12,
+          borderRadius: 6,
         },
         {
           id: `el-${Date.now()}-name`,
@@ -888,7 +905,7 @@ export function SlideEditorModal() {
           width: 80,
           height: 8,
           fontSize: 20,
-          color: '#f4621f',
+          color: '#FF5500',
           fontWeight: 700,
         },
       ];
@@ -903,8 +920,8 @@ export function SlideEditorModal() {
           y: 15,
           width: 30,
           height: 8,
-          backgroundColor: '#f4621f',
-          borderRadius: 22,
+          backgroundColor: '#FF5500',
+          borderRadius: 6,
         },
         {
           id: `el-${Date.now()}-badgetxt`,
@@ -970,7 +987,7 @@ export function SlideEditorModal() {
           width: 80,
           height: 18,
           fontSize: 28,
-          color: '#f4621f',
+          color: '#FF5500',
           fontWeight: 700,
           textAlign: 'center',
         },
@@ -1012,7 +1029,7 @@ export function SlideEditorModal() {
           width: 80,
           height: 15,
           fontSize: 24,
-          color: '#22c55e',
+          color: 'var(--tally-preview)',
           fontWeight: 700,
           textAlign: 'center',
         },
@@ -1042,7 +1059,7 @@ export function SlideEditorModal() {
           width: 80,
           height: 20,
           fontSize: 26,
-          color: '#f4621f',
+          color: '#FF5500',
           fontWeight: 700,
           textAlign: 'center',
         },
@@ -1069,14 +1086,12 @@ export function SlideEditorModal() {
   }
 
   function handleUpdateElement(elementId: string, updates: Partial<SlideElement>) {
-    const currentElements = activeSlide.elements || [];
-    const updatedElements = currentElements.map((el) => (el.id === elementId ? { ...el, ...updates } : el));
+    const updatedElements = activeSlideElements.map((el) => (el.id === elementId ? { ...el, ...updates } : el));
     handleUpdateSlideElements(updatedElements);
   }
 
   function handleDeleteElement(elementId: string) {
-    const currentElements = activeSlide.elements || [];
-    const updatedElements = currentElements.filter((el) => el.id !== elementId);
+    const updatedElements = activeSlideElements.filter((el) => el.id !== elementId);
     handleUpdateSlideElements(updatedElements);
     setSelectedElementId(null);
   }
@@ -1211,7 +1226,7 @@ export function SlideEditorModal() {
           onToggleSmartSnap={() => setSmartSnap(!smartSnap)}
           selectedElementId={selectedElementId}
           onUpdateElement={handleUpdateElement}
-          onAddElements={(newEls) => handleUpdateSlideElements([...(activeSlide.elements || []), ...newEls])}
+          onAddElements={(newEls) => handleUpdateSlideElements([...activeSlideElements, ...newEls])}
           pptx={pptxInspector && {
             canGroup: pptxInspector.canGroup,
             canUngroup: pptxInspector.canUngroup,

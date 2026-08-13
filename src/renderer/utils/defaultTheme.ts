@@ -1,21 +1,39 @@
 import type { Theme } from '../types';
 
+/**
+ * The theme the console ships with — the look of BSP on a screen nobody has
+ * configured yet, which makes it a brand surface rather than a preference.
+ *
+ * It used to be slate `#0f172a` with a `#C9A96E` gold accent in SF Pro. Three
+ * problems with that, in order of seriousness:
+ *
+ *  1. The gold sits inside Johnson Olakotan's Signal Amber range, and BSP's
+ *     Signal Orange is never allowed in the same composition as it. The accent
+ *     on air is Signal, or it is not an accent.
+ *  2. Slate is the blue-grey the neutral ramp exists to avoid, and it is the
+ *     exact ground the four comparables all project on.
+ *  3. Scripture is set in Source Serif 4 — the way scripture is actually set.
+ *     Never bold: the Voice face carries weight through size and measure.
+ *
+ * Operators can still change all of it. This is the default, not a lock.
+ */
 export function createDefaultTheme(): Theme {
   return {
     id: 'settings-live-theme',
     name: 'Live Settings Theme',
     lowerThird: {
-      background: 'linear-gradient(135deg, rgba(10,18,32,0.94), rgba(37,52,78,0.94))',
-      backgroundColor: '#0f172a',
+      // Flat booth, not a gradient. No effect exists to show that an effect exists.
+      background: 'rgba(12, 11, 11, 0.94)',
+      backgroundColor: '#0C0B0B',
       backgroundOpacity: 0.94,
-      accentColor: '#C9A96E',
-      fontFamily: '-apple-system, SF Pro Display, sans-serif',
+      accentColor: '#FF5500',
+      fontFamily: '"Source Serif 4", Georgia, serif',
       fontSize: 36,
-      fontWeight: 700,
-      fontColor: '#ffffff',
+      fontWeight: 400,
+      fontColor: '#FFFFFF',
       textAlign: 'left',
       padding: 20,
-      borderRadius: 18,
+      borderRadius: 4,
       animation: 'slideInUp',
       position: 'bottom-center',
       width: 92,
@@ -25,11 +43,11 @@ export function createDefaultTheme(): Theme {
       anchor: 'bottom',
     },
     fullScreen: {
-      backgroundColor: '#0f172a',
-      fontFamily: '-apple-system, SF Pro Display, sans-serif',
+      backgroundColor: '#0C0B0B',
+      fontFamily: '"Source Serif 4", Georgia, serif',
       fontSize: 56,
-      fontWeight: 700,
-      fontColor: '#ffffff',
+      fontWeight: 400,
+      fontColor: '#FFFFFF',
       textAlign: 'center',
       animation: 'fade',
       referenceFontSize: 26,
@@ -38,12 +56,12 @@ export function createDefaultTheme(): Theme {
       autoResize: 'shrink',
     },
     slideTheme: {
-      backgroundColor: '#0f172a',
-      fontFamily: '-apple-system, SF Pro Display, sans-serif',
+      backgroundColor: '#0C0B0B',
+      fontFamily: '"Source Serif 4", Georgia, serif',
       fontSize: 40,
-      fontWeight: 600,
-      fontColor: '#ffffff',
-      accentColor: '#C9A96E',
+      fontWeight: 400,
+      fontColor: '#FFFFFF',
+      accentColor: '#FF5500',
       transition: 'fade',
     },
     bibleOptions: {

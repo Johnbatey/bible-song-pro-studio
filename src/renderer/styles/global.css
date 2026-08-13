@@ -1,37 +1,75 @@
+/* tokens.css is the brand's single source of truth, copied verbatim from
+   brand/tokens.css in the identity repo. Everything below maps this app's
+   existing alias names onto it — no colour, radius, easing or duration in this
+   file is a literal any more. If a brand value changes, it changes there. */
+@import './tokens.css';
+
 :root {
-  --bg-primary: #111010;      /* Dreamless Sleep — the ground blocks sit on */
-  --bg-secondary: #161414;
-  --bg-surface: #161414;
-  --bg-elevated: #232221;
-  --bg-hover: #232221;
-  --border-primary: #262628;
+  --bg-primary: var(--bsp-ground);    /* the ground blocks sit on */
+  --bg-secondary: var(--bsp-surface);
+  --bg-surface: var(--bsp-surface);
+  --bg-elevated: var(--bsp-active);
+  --bg-hover: var(--bsp-active);
+  --border-primary: var(--bsp-edge);
   --border-accent: rgba(255, 85, 0, 0.4);
-  --text-primary: #ffffff;
-  --text-secondary: #ffffff;
-  --text-dim: #d4d4d8;
-  --accent: #FF5500;
-  --accent-light: #FF7728;
-  --accent-dim: rgba(255, 85, 0, 0.12);
-  --accent-glow: rgba(255, 85, 0, 0.25);
-  --green: #22c55e;
+  --text-primary: var(--bsp-screen);
+  /* Warm ramp. Secondary and dim were both near-white / zinc blue-grey, which
+     flattened every hierarchy and made the accent read as bolted on. */
+  --text-secondary: var(--bsp-soft);
+  --text-dim: var(--bsp-dim);
+  --text-mute: var(--bsp-mute);
+  --accent: var(--bsp-signal);
+  --accent-light: var(--bsp-signal-lift);
+  --accent-dim: var(--bsp-signal-wash);
+  --accent-glow: var(--bsp-signal-glow);
+  --green: var(--bsp-tally-preview);
   --green-dim: rgba(34, 197, 94, 0.15);
-  --red: #ef4444;
+  --red: var(--bsp-tally-fault);
   --red-dim: rgba(239, 68, 68, 0.15);
-  --blue: #3b82f6;
+  --blue: var(--bsp-tally-link);
   --blue-dim: rgba(59, 130, 246, 0.15);
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 6px;
-  --radius-xl: 6px;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+
+  /* ── Tally ────────────────────────────────────────────────────────────
+     The state names, not the colour names. Reach for these wherever the UI
+     is reporting what is on air: if it is orange, it is on screen. --green
+     and friends stay as aliases so existing call sites keep resolving. */
+  --tally-program: var(--bsp-tally-program);
+  --tally-preview: var(--bsp-tally-preview);
+  --tally-hold: var(--bsp-tally-hold);
+  --tally-fault: var(--bsp-tally-fault);
+  --tally-link: var(--bsp-tally-link);
+
+  --radius-sm: var(--bsp-r-base);
+  --radius-md: var(--bsp-r-max);
+  --radius-lg: var(--bsp-r-max);
+  --radius-xl: var(--bsp-r-max);
+  --radius-dot: var(--bsp-r-dot);   /* EXEMPT: tally lamps only */
+  --shadow-sm: var(--bsp-e1);
+  --shadow-md: var(--bsp-e2);
+  --shadow-lg: var(--bsp-e3);
+
+  /* ── Motion ───────────────────────────────────────────────────────────
+     Broadcast motion has one rule the software world forgets: nothing
+     overshoots. A lower third that bounces looks amateur on air. */
+  --ease: var(--bsp-ease);
+  --ease-firm: var(--bsp-ease-firm);
+  --d-state: var(--bsp-d-state);   /* hover, toggle, tally change */
+  --d-panel: var(--bsp-d-panel);   /* panel, popover, modal       */
+  --d-air: var(--bsp-d-air);       /* to-air, lower third in/out  */
+  --d-brand: var(--bsp-d-brand);   /* splash, mark animation      */
   /* ── Typography ────────────────────────────────────────────────────────
      Operator UI type system. Six sizes, four weights, three tracking values.
      Projected output (ProgramSurface, theme presets, audience/stage windows)
      is user-controlled and does NOT use these tokens. */
-  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-ui: var(--bsp-font-interface);
   --font-mono: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  /* Signal — the brand's technical face. Labels, versions, and the Studio
+     superscript. Loaded by index.html / splash.html alongside Inter. */
+  --font-signal: var(--bsp-font-signal);
+  /* Voice — Source Serif 4. Scripture, and exactly one line per surface.
+     Never in UI chrome, never bold, never uppercase, never below 24px in
+     marketing — in here it is for the verse itself and nothing else. */
+  --font-voice: var(--bsp-font-voice);
   /* Alias kept so existing var(--font-sans) references keep resolving. */
   --font-sans: var(--font-ui);
 
@@ -54,7 +92,7 @@
 
   --ls-tight: -0.01em;  /* >= 15px */
   --ls-normal: 0;       /* 11-13px */
-  --ls-caps: 0.06em;    /* uppercase labels only */
+  --ls-caps: var(--bsp-ls-caps);  /* 0.14em — Signal caps, the brand's figure */
 
   --icon-sm: 14px;
   --icon-md: 18px;
@@ -64,11 +102,11 @@
      Every window in the app is one block: a chrome bar carrying the block's
      label and its tools, a 1px rule, then the body. Blocks sit next to each
      other with --block-gap between them and a divider line in that gap. */
-  --block-bg: #161414;        /* Matt Black — block surface */
-  --block-line: #262628;      /* Black Beauty — block border + chrome rule */
-  --block-active: #232221;    /* Black Chestnut Oak — chrome switch highlight */
-  --block-radius: 4px;        /* soften the corner matching the reference design */
-  --block-gap: 4px;           /* gutter between blocks */
+  --block-bg: var(--bsp-surface);     /* block surface */
+  --block-line: var(--bsp-edge);      /* block border + chrome rule */
+  --block-active: var(--bsp-active);  /* chrome switch highlight */
+  --block-radius: var(--bsp-r-base);  /* the instrument corner — nothing exceeds 6px */
+  --block-gap: var(--bsp-s1);         /* gutter between blocks */
   --block-chrome-h: 48px;
   --block-pad: 14px;
 
@@ -77,13 +115,13 @@
      Matt Black they stand on, and carry no contrasting outline — the fill alone
      draws the shape. Giving them --block-line for a border rings each control
      in a lighter rectangle, which is what makes a toolbar look busy. */
-  --chrome-control: #1d1b1c;         /* control fill */
+  --chrome-control: var(--bsp-raised); /* control fill */
   --chrome-control-active: #2e2c2b;  /* selected segment / pressed state */
 
   /* ── Settings dialog ──
      Its own ramp: the sidebar drops to the block surface while the panel
      beside it sits a step lighter. */
-  --settings-sidebar: #161414; /* Matt Black */
+  --settings-sidebar: var(--bsp-surface);
   --settings-panel: #1E1C1C;   /* Eerie Black */
   --settings-line: #312F2D;    /* Acadia */
   --settings-card: #252323;    /* Young Night */
@@ -236,6 +274,16 @@ select option:hover, select option:focus, select option:checked {
    draws — the same shape OBS uses. It is deliberately shorter and quieter
    than .blk__chrome so that a docked panel's own chrome still reads as the
    panel's, not the dock's. */
+/* Holds dockview and the empty state in one stacking context, so the latter
+   can cover the former without either being unmounted. */
+.dock-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
 .bsp-dock-root {
   flex: 1;
   min-width: 0;
@@ -577,6 +625,11 @@ select option:hover, select option:focus, select option:checked {
   gap: 6px;
   height: 28px;
   padding: 0 10px;
+  /* A chrome button is a fixed 28px tall, so a label allowed to wrap does not
+     make it taller — it stacks two half-clipped lines inside the same box.
+     Every button on every chrome bar is one line, and shrinks last. */
+  white-space: nowrap;
+  flex-shrink: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -761,7 +814,7 @@ select option:hover, select option:focus, select option:checked {
   border-radius: 999px;
   border: 1px solid var(--text-dim);
   background: transparent;
-  animation: transcript-breathe 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: transcript-breathe 1.5s var(--ease-firm) infinite;
 }
 
 .transcript-cursor i:nth-child(2) { animation-delay: 0.19s; }
@@ -984,11 +1037,13 @@ select option:hover, select option:focus, select option:checked {
   color: var(--text-dim);
 }
 
+/* A badge is a block, not a lozenge. The pill is the category's shape; the
+   only round thing in this system is a tally lamp. */
 .badge {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   font-size: var(--fs-label);
   font-weight: var(--fw-semibold);
   line-height: var(--lh-tight);
@@ -1047,7 +1102,7 @@ select option:hover, select option:focus, select option:checked {
   max-height: calc(100vh - 48px);
   background: var(--block-bg);
   border: 1px solid var(--block-line);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
   display: flex;
   flex-direction: column;
@@ -1243,7 +1298,7 @@ select option:hover, select option:focus, select option:checked {
   padding: 5px 14px;
   background: rgba(20, 20, 22, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 24px;
+  border-radius: var(--radius-md);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
   font-family: var(--font-ui);
   user-select: none;
@@ -1294,7 +1349,7 @@ select option:hover, select option:focus, select option:checked {
   height: 24px !important;
   background: transparent !important;
   border: 1px solid transparent !important;
-  border-radius: 12px !important;
+  border-radius: var(--radius-sm) !important;
   color: rgba(255, 255, 255, 0.8) !important;
   font-size: 11px !important;
   font-weight: 600 !important;

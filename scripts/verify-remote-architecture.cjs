@@ -18,7 +18,21 @@ assert.match(main, /'POST \/api\/display\/clear'\s*:/, 'HTTP server must expose 
 assert.match(main, /'POST \/api\/display\/blackout'\s*:/, 'HTTP server must expose blackout endpoint for mobile remote');
 assert.match(main, /pn\.startsWith\('\/media\/'\)/, 'HTTP server must keep /media/* serving for imported media');
 assert.match(main, /new WebSocketServer\(\{ server \}\)/, 'HTTP server must keep WebSocket support for remote/browser clients');
-assert.match(main, /displayPort\s*=\s*startHttpServer\(\)/, 'app startup must still start the local HTTP server');
+/* This used to read `displayPort = startHttpServer()`, from when the server
+   bound one port synchronously and handed it back. Since ec6a5f3 it walks a
+   range instead, so the port is not known until the listen callback fires and
+   there is nothing for the call to return. The two things worth pinning are
+   the ones that would silently cost the phone remote its origin: that startup
+   still starts the server at all, and that displayPort is taken from the port
+   actually bound rather than assumed to be the base of the range.
+
+   The stepping behaviour itself is verify:port-fallback's job, not this one's. */
+assert.match(main, /^\s*startHttpServer\(\);/m, 'app startup must still start the local HTTP server');
+assert.match(
+  main,
+  /onListening:\s*\(port\)\s*=>\s*\{[\s\S]*?displayPort\s*=\s*port/,
+  'displayPort must come from the port the server actually bound, not the base of the range',
+);
 
 assert.match(remote, /new WebSocket\(/, 'remote.html must keep its WebSocket connection');
 assert.match(remote, /fetch\(API_BASE \+ path/, 'remote.html must call REST API through the local HTTP origin');

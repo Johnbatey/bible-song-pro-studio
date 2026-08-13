@@ -15,6 +15,27 @@ const fixtures = [
   ['Jean chapitre trois verset seize', 'John 3:16'],
   ['John chapter three verse twenty and eight', 'John 3:28'],
   ['Romans chapter eight verses twenty eight to thirty', 'Romans 8:28-30'],
+
+  /* Spanish and French by book name, not by phonetic luck. "Juan" and "Jean"
+     above resolve because they sound like "John"; nothing sounds "Salmos" into
+     "Psalms" or "Apocalipsis" into "Revelation" — those need the native names
+     carried in ALL_BOOKS. */
+  ['Génesis capítulo uno versículo uno', 'Genesis 1:1'],
+  ['Salmos capítulo veintitrés versículo uno', 'Psalms 23:1'],
+  ['Apocalipsis capítulo veintiuno versículo cuatro', 'Revelation 21:4'],
+  ['San Mateo capítulo cinco versículo nueve', 'Matthew 5:9'],
+  ['Efesios capítulo dos versículo ocho', 'Ephesians 2:8'],
+  ['Genèse chapitre un verset un', 'Genesis 1:1'],
+  ['Apocalypse chapitre vingt et un verset quatre', 'Revelation 21:4'],
+  ['Cantique chapitre deux verset un', 'Song of Solomon 2:1'],
+
+  /* French hyphenates its compound numbers, so the recogniser hands back one
+     token. "quatre-vingt-trois" is the case that fails on a naive split: four,
+     twenty and three add up to 27, not 83. */
+  ['Psaumes chapitre vingt-trois verset un', 'Psalms 23:1'],
+  ['Psaumes chapitre quatre-vingt-trois verset un', 'Psalms 83:1'],
+  ['Ésaïe chapitre quarante verset trente-et-un', 'Isaiah 40:31'],
+  ['Jean chapitre dix-sept verset trois', 'John 17:3'],
 ];
 
 for (const [transcript, expected] of fixtures) {

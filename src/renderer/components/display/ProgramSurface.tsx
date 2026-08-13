@@ -1,5 +1,5 @@
-import type { Alert, Scene, FullScreenTheme, Theme } from '../../types';
-import { memo } from 'react';
+import type { Alert, Scene, FullScreenTheme, Theme, VideoTransport } from '../../types';
+import { memo, useEffect, useRef } from 'react';
 import type React from 'react';
 import { SlideStage } from './SlideStage';
 import './ProgramSurface.css';
@@ -11,6 +11,13 @@ export interface ProgramSurfaceState {
   activeAlert?: Alert | null;
   transcription?: string;
   blackout?: boolean;
+  /**
+   * Whether an idle screen shows the "Bible Song Pro / Waiting for signal"
+   * card. Defaults on, so a caller that knows nothing about it behaves as
+   * before; Settings → Displays & Output turns it off for a room where a
+   * branded holding card between items is a distraction.
+   */
+  showStandbyBrand?: boolean;
   mode?: 'fullscreen' | 'lowerThird';
   fontFamily?: string;
   fontSize?: number;
@@ -27,6 +34,8 @@ export interface ProgramSurfaceState {
   bgFit?: 'cover' | 'contain' | 'fill';
   bgOpacity?: number;
   bgVideoLoop?: boolean;
+  /** The operator's transport for this surface's video background. */
+  videoTransport?: VideoTransport | null;
 }
 
 interface ProgramSurfaceProps {
@@ -34,6 +43,15 @@ interface ProgramSurfaceProps {
   preview?: boolean;
   assetBaseUrl?: string;
   className?: string;
+  /** Reports this surface's video clock back to whoever is driving it. Only
+      the one pane the transport is pointed at should pass this — every
+      surface playing its own copy would otherwise fight over the readout. */
+  onVideoClock?: (clock: { currentTime: number; duration: number }) => void;
+  /** The element's real play state. The transport holds intent, the element
+      holds truth, and this is how they reconcile — without it a video that
+      stops for any reason the transport did not ask for leaves the button
+      showing Pause over a still frame. */
+  onVideoPlayState?: (playing: boolean) => void;
 }
 
 const defaultTheme: Pick<ProgramSurfaceState, 'fontFamily' | 'fontSize' | 'fontWeight' | 'fontColor' | 'textAlign' | 'referenceColor' | 'referenceFontSize'> = {
@@ -46,7 +64,16 @@ const defaultTheme: Pick<ProgramSurfaceState, 'fontFamily' | 'fontSize' | 'fontW
   referenceFontSize: 0,
 };
 
-function assetUrl(value: string | undefined, assetBaseUrl = '') {
+/**
+ * Resolves a scene's stored media path against the origin serving it.
+ *
+ * Scenes hold server-relative paths on purpose — an absolute URL would pin a
+ * saved service to whatever port the display server happened to hold that day
+ * — so every surface that loads one has to supply the origin. Exported because
+ * the stage now loads the same media into its own zones and must resolve it the
+ * identical way; two spellings of this would be two ways to get a broken image.
+ */
+export function assetUrl(value: string | undefined, assetBaseUrl = '') {
   if (!value) return '';
   if (/^(https?:|file:|data:|blob:)/i.test(value)) return value;
   const base = assetBaseUrl || '';
@@ -87,19 +114,58 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
     else if (state.bgFill.includes('gradient')) style.backgroundImage = state.bgFill;
     else style.backgroundColor = state.bgFill;
   } else {
+    /* The scene's own background wins over the theme's.
+     *
+     * These were the other way round, and because a theme always carries a
+     * fullScreen.backgroundColor, the scene branch below was unreachable: send
+     * an image from the media library and the surface painted the theme's flat
+     * colour instead. The screen appeared to clear to a colour nobody had
+     * picked. Video escaped it only because videoSource() reads the scene
+     * directly and never consults the theme — which is why video played and
+     * images did not.
+     *
+     * The theme is the ground a scene sits on when it brings none of its own.
+     * A scene that names a background has been given one by the operator, on
+     * purpose, and that is the more specific instruction.
+     */
+    const bg = state.scene?.background;
+    const sceneImage = bg?.type === 'image' && bg.mediaUrl;
+    const sceneGradient = bg?.type === 'gradient' && bg.gradient;
+    const sceneSolid = bg?.type === 'solid' && bg.color;
+    const sceneTransparent = bg?.type === 'transparent';
     const themeFs = state.theme?.fullScreen;
-    if (themeFs?.background) {
+
+    if (sceneImage) {
+      style.backgroundImage = `url("${assetUrl(bg.mediaUrl as string, assetBaseUrl).replace(/"/g, '%22')}")`;
+    } else if (sceneGradient) {
+      style.backgroundImage = bg.gradient as string;
+    } else if (sceneSolid) {
+      style.backgroundColor = bg.color as string;
+    } else if (sceneTransparent) {
+      style.backgroundColor = 'transparent';
+      /* A video scene paints no colour here — videoSource() supplies the frame
+         and a fill underneath it would only show during the load. */
+    } else if (bg?.type === 'video' && bg.mediaUrl) {
+      style.backgroundColor = '#000';
+      /* No scene background, so the theme's is the ground. Its media outranks
+         its colour for the same reason a scene's does: a still or a clip is the
+         more specific thing the operator chose, and a theme carries a
+         backgroundColor whether or not anybody picked one. */
+    } else if (themeFs?.backgroundMediaType === 'image' && themeFs.backgroundMediaUrl) {
+      style.backgroundImage = `url("${assetUrl(themeFs.backgroundMediaUrl, assetBaseUrl).replace(/"/g, '%22')}")`;
+      if (themeFs.backgroundFit) {
+        style.backgroundSize = themeFs.backgroundFit === 'fill' ? '100% 100%' : themeFs.backgroundFit;
+      }
+    } else if (themeFs?.backgroundMediaType === 'video' && themeFs.backgroundMediaUrl) {
+      /* videoSource() supplies the frame; a fill under it would only show
+         during the load. */
+      style.backgroundColor = '#000';
+    } else if (themeFs?.background) {
       if (themeFs.background === 'transparent') style.backgroundColor = 'transparent';
       else if (themeFs.background.includes('gradient')) style.backgroundImage = themeFs.background;
       else style.backgroundColor = themeFs.background;
     } else if (themeFs?.backgroundColor) {
       style.backgroundColor = themeFs.backgroundColor;
-    } else {
-      const bg = state.scene?.background;
-      if (bg?.type === 'image' && bg.mediaUrl) style.backgroundImage = `url("${assetUrl(bg.mediaUrl, assetBaseUrl).replace(/"/g, '%22')}")`;
-      else if (bg?.type === 'gradient' && bg.gradient) style.backgroundImage = bg.gradient;
-      else if (bg?.type === 'solid' && bg.color) style.backgroundColor = bg.color;
-      else if (bg?.type === 'transparent') style.backgroundColor = 'transparent';
     }
   }
 
@@ -122,6 +188,20 @@ function videoSource(state: ProgramSurfaceState, assetBaseUrl?: string) {
   if (state.bgVideo) return assetUrl(state.bgVideo, assetBaseUrl);
   const bg = state.scene?.background;
   if (bg?.type === 'video' && bg.mediaUrl) return assetUrl(bg.mediaUrl, assetBaseUrl);
+  /* A scene that brings any background of its own has answered this — falling
+     through to the theme's clip here would run it underneath a still the
+     operator deliberately put on screen. Only a scene with no background at all
+     takes the theme's.
+
+     Because this src is the theme's, it does not change as scenes do, and the
+     <video> below keeps its DOM node: the loop plays unbroken across takes and
+     slide advances for as long as the theme holds. */
+  if (!bg) {
+    const themeFs = state.theme?.fullScreen;
+    if (themeFs?.backgroundMediaType === 'video' && themeFs.backgroundMediaUrl) {
+      return assetUrl(themeFs.backgroundMediaUrl, assetBaseUrl);
+    }
+  }
   return '';
 }
 
@@ -142,7 +222,28 @@ function contentFromScene(scene: Scene | null | undefined) {
  * every tick even though only the wrapper's transform had changed. Callers must
  * pass a stable `state` object for this to bite.
  */
-export const ProgramSurface = memo(function ProgramSurface({ state, preview = false, assetBaseUrl = '', className = '' }: ProgramSurfaceProps) {
+export const ProgramSurface = memo(function ProgramSurface({ state, preview = false, assetBaseUrl = '', className = '', onVideoClock, onVideoPlayState }: ProgramSurfaceProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const transport = state.videoTransport;
+
+  /* Play state follows the operator. Chromium rejects play() if the element is
+     not ready yet; the rejection is expected and carries no information the
+     operator could act on, so it is swallowed rather than surfaced. */
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !transport) return;
+    if (transport.playing) void el.play().catch(() => {});
+    else el.pause();
+  }, [transport?.playing, transport?.target]);
+
+  /* Seeks fire on the nonce, not the value: dropping the playhead on the same
+     second twice has to move the video twice. */
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !transport || transport.seekTo === null) return;
+    if (Number.isFinite(transport.seekTo)) el.currentTime = transport.seekTo;
+  }, [transport?.seekNonce]);
+
   const mode = state.outputMode || state.mode || 'fullscreen';
   const themeSection = mode === 'lowerThird' ? state.theme?.lowerThird : state.theme?.fullScreen;
   const scene = state.scene || null;
@@ -240,17 +341,53 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
       {showStageBackground && <div className="program-surface-bg" style={backgroundStyle(state, mode, assetBaseUrl)} />}
       {showStageBackground && video && (
         <video
+          ref={videoRef}
           className="program-surface-video"
           src={video}
           autoPlay
           muted
           loop={state.bgVideoLoop !== false}
           playsInline
+          onPlay={() => onVideoPlayState?.(true)}
+          /* Not every pause is the operator's.
+           *
+           * The only surface that reports play state is the operator's small
+           * Program preview, and that preview lives in the window they leave
+           * the moment they need anything else. Chromium suspends a window
+           * nobody is looking at, its <video> pauses, this handler called it a
+           * pause — and because the transport it wrote to is pushed straight to
+           * the projector, the audience screen and the NDI feed off it stopped
+           * with it, until the operator came back and the preview resumed.
+           *
+           * So a pause is passed on only when it is one somebody asked for:
+           * the transport already intended it, or the clip genuinely ran out.
+           * Anything else is the environment interfering with a preview, and
+           * the answer is to start it playing again and leave what is on air
+           * alone. Intent stays with the operator, where it belongs.
+           */
+          onPause={(e) => {
+            const el = e.currentTarget;
+            const ranOut = el.ended
+              || (Number.isFinite(el.duration) && el.duration > 0 && el.currentTime >= el.duration - 0.25);
+            if (ranOut || !transport?.playing) {
+              onVideoPlayState?.(false);
+              return;
+            }
+            void el.play().catch(() => {});
+          }}
+          onLoadedMetadata={(e) => onVideoClock?.({
+            currentTime: e.currentTarget.currentTime,
+            duration: Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0,
+          })}
+          onTimeUpdate={(e) => onVideoClock?.({
+            currentTime: e.currentTarget.currentTime,
+            duration: Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0,
+          })}
           style={{ objectFit: state.bgFit === 'contain' ? 'contain' : state.bgFit === 'fill' ? 'fill' : 'cover' }}
         />
       )}
 
-      {!scene && (
+      {!scene && state.showStandbyBrand !== false && (
         <div className="program-surface-standby">
           <div className="program-surface-standby-title">Bible Song Pro</div>
           <div className="program-surface-standby-sub">Waiting for signal...</div>

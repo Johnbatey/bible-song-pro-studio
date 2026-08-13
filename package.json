@@ -1,5 +1,5 @@
 {
-  "name": "bible-song-pro",
+  "name": "bible-song-pro-studio",
   "version": "3.0.0",
   "description": "Bible Song Pro - Professional Church Presentation & Streaming Software",
   "main": "src/electron/main.cjs",
@@ -8,7 +8,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/Johnbatey/bible-song-pro-desktop.git"
+    "url": "https://github.com/Johnbatey/bible-song-pro-studio.git"
   },
   "scripts": {
     "start": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE; electron .",
@@ -28,6 +28,7 @@
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test:live-scripture": "node scripts/test-live-scripture-parser.cjs",
+    "verify:local-models": "node scripts/verify-local-models.cjs",
     "verify:bibles": "node scripts/test-bible-canon.cjs && node scripts/check-bible-licensing.cjs",
     "verify:display-architecture": "node scripts/verify-display-architecture.cjs",
     "verify:window-resizing": "node scripts/verify-window-resizing.cjs",
@@ -35,6 +36,7 @@
     "verify:program-surface": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-program-surface.cjs",
     "verify:audience-display": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-audience-display.cjs",
     "verify:display-parity": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-display-parity.cjs",
+    "verify:display-fields": "node scripts/verify-display-fields.cjs",
     "verify:operator-layout": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-operator-layout.cjs",
     "verify:mode-switch": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-mode-switch.cjs",
     "verify:display-stack": "node scripts/verify-display-stack.cjs",
@@ -44,10 +46,12 @@
     "verify:port-fallback": "node scripts/verify-port-fallback.cjs",
     "verify:stage-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-stage-display.cjs",
     "verify:dist-audience-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-dist-audience-display.cjs",
-    "verify:display-all": "npm run typecheck && npm run verify:display-architecture && npm run verify:stage-architecture && npm run verify:port-fallback && npm run verify:window-resizing && npm run verify:display-stack && npm run verify:dist-audience-display && npm run verify:stage-layouts && npm run verify:stage-designer",
-    "verify:all": "npm run verify:bibles && npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all",
+    "verify:display-all": "npm run typecheck && npm run verify:display-fields && npm run verify:display-architecture && npm run verify:stage-architecture && npm run verify:port-fallback && npm run verify:window-resizing && npm run verify:display-stack && npm run verify:dist-audience-display && npm run verify:stage-layouts && npm run verify:stage-designer",
+    "verify:all": "npm run verify:bibles && npm run verify:media && npm run verify:slide-parity && npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all",
     "verify:stage-designer": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-stage-designer.cjs",
-    "verify:stage-layouts": "node scripts/verify-stage-layouts.cjs"
+    "verify:stage-layouts": "node scripts/verify-stage-layouts.cjs",
+    "verify:media": "node scripts/verify-media-library.cjs",
+    "verify:slide-parity": "node scripts/verify-slide-element-parity.cjs"
   },
   "build": {
     "appId": "com.biblesongpro.app",
@@ -105,7 +109,7 @@
   },
   "dependencies": {
     "@deepgram/sdk": "^3.6.0",
-    "@xenova/transformers": "^2.17.2",
+    "@huggingface/transformers": "^3.8.1",
     "animejs": "^3.2.2",
     "dockview": "^7.0.4",
     "dockview-react": "^7.0.4",

@@ -23,8 +23,8 @@
    below the fold. In BSP that height comes from `#page-slide-editor.app-page`;
    the testbed sets `html, body { height: 100% }` in its own <style> block.
 
-   The palette the prototype encoded as a `tailwind.config` remap (the reference
-   orange primary, calm blue secondary, inverted Apple-neutral surfaces) now
+   The palette the prototype encoded as a `tailwind.config` remap (orange
+   primary, calm blue secondary, inverted neutral surfaces) now
    lives in --se-accent / --se-accent-2 / the surface ramp. The markup never
    names a color, so retheming stays a one-block edit.
    ========================================================================= */
@@ -46,7 +46,7 @@
   --se-border-2:  var(--border-elevated, rgba(0, 0, 0, 0.16));
 
   /* ── Accents ──────────────────────────────────────────────────────── */
-  --se-accent:       var(--accent, #f4621f);
+  --se-accent:       var(--accent, #FF5500);
   --se-accent-hover: var(--accent-light, #ff7a45);
   --se-accent-ink:   #ffffff;
   --se-accent-2:     #2f80ed;         /* secondary (import / informational) */

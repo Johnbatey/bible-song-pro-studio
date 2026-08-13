@@ -3,6 +3,11 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('BSP', {
   platform: () => ipcRenderer.invoke('get:platform'),
   userDataPath: () => ipcRenderer.invoke('get:userDataPath'),
+  version: () => ipcRenderer.invoke('get:version'),
+
+  /* Opens a link in the operator's own browser. The main process refuses
+     anything that is not https and on its allowlist. */
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
 
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
@@ -73,9 +78,8 @@ contextBridge.exposeInMainWorld('BSP', {
     detect: (payload) => ipcRenderer.invoke('verse:detect', payload),
   },
 
-  audio: {
-    getInputDevices: () => ipcRenderer.invoke('audio:getInputDevices'),
-  },
+  /* No `audio` bridge — see main.cjs. Microphones are enumerated in the
+     renderer, which is the only side that can see them. */
 
   ai: {
     status: () => ipcRenderer.invoke('ai:status'),
@@ -83,6 +87,7 @@ contextBridge.exposeInMainWorld('BSP', {
     transcribe: (payload) => ipcRenderer.invoke('ai:transcribe', payload),
     dispose: (payload) => ipcRenderer.invoke('ai:dispose', payload),
     setEngine: (engine) => ipcRenderer.invoke('ai:setEngine', engine),
+    setLocalModel: (model) => ipcRenderer.invoke('ai:setLocalModel', model),
     getMlxWhisperStatus: () => ipcRenderer.invoke('ai:getMlxWhisperStatus'),
     warmupMlxWhisper: (payload) => ipcRenderer.invoke('ai:warmupMlxWhisper', payload),
     transcribeMlxWhisper: (payload) => ipcRenderer.invoke('ai:transcribeMlxWhisper', payload),
@@ -155,6 +160,11 @@ contextBridge.exposeInMainWorld('BSP', {
     import: (paths) => ipcRenderer.invoke('media:import', { paths }),
     remove: (id) => ipcRenderer.invoke('media:remove', { id }),
     rename: (id, name) => ipcRenderer.invoke('media:rename', { id, name }),
+    /* Relink points an entry at the file's new home. `relink` takes a known
+       path; `pickRelink` opens a chooser on the last known folder first. */
+    relink: (id, path) => ipcRenderer.invoke('media:relink', { id, path }),
+    pickRelink: (id, currentPath, name) => ipcRenderer.invoke('media:pickRelink', { id, currentPath, name }),
+    reveal: (path) => ipcRenderer.invoke('media:reveal', { path }),
     baseUrl: () => ipcRenderer.invoke('media:baseUrl'),
     // Electron 32+ removed File.path; webUtils is the sanctioned replacement and must
     // be called here in the preload, with the real File object.
@@ -203,15 +213,52 @@ contextBridge.exposeInMainWorld('BSP', {
     },
   },
 
+  /* Named dock arrangements. The renderer owns the layout trees and the file
+     format; this side only carries the menu's view of the list, the menu's
+     commands back, and the two operations that need a native file dialog. */
+  workspace: {
+    /** Push the list and the active id so the Workspace menu can be rebuilt. */
+    sync: (payload) => ipcRenderer.send('workspace:sync', payload),
+    /** Subscribe to Workspace menu clicks. Returns an unsubscribe function. */
+    onCommand: (cb) => {
+      const handler = (_, payload) => cb(payload);
+      ipcRenderer.on('workspace:command', handler);
+      return () => ipcRenderer.removeListener('workspace:command', handler);
+    },
+    exportFile: (payload) => ipcRenderer.invoke('workspace:export', payload),
+    importFile: () => ipcRenderer.invoke('workspace:import'),
+  },
+
   openSlideEditor: () => ipcRenderer.invoke('slide-editor:open'),
   openStageDisplay: () => ipcRenderer.invoke('stage-display:open'),
+  closeStageDisplay: () => ipcRenderer.invoke('stage-display:close'),
   openStageDesigner: () => ipcRenderer.invoke('stage-designer:open'),
+
+  /* The stage screen can also be closed from its own title bar, so the panel
+     asks once on mount and then listens rather than assuming its own toggle
+     is the only thing that ever changes the answer. */
+  isStageDisplayOpen: () => ipcRenderer.invoke('stage-display:isOpen'),
+  onStageDisplayState: (cb) => {
+    const handler = (_, payload) => cb(!!payload?.open);
+    ipcRenderer.on('stage-display:state', handler);
+    return () => ipcRenderer.removeListener('stage-display:state', handler);
+  },
 
   /* The designer tells the main process when it holds unsaved work, because
      only the main process can stop a window closing long enough to ask. */
   stageDesigner: {
     setDirty: (dirty) => ipcRenderer.send('stage-designer:dirty', !!dirty),
     close: () => ipcRenderer.invoke('stage-designer:close'),
+  },
+  /* Blackout is toggled in three places — the BLACK button, Cmd+Shift+B, and
+     POST /api/display/blackout — and the renderer's store is the one authority
+     on it, because the renderer is what pushes display state outward. The
+     other two therefore ask the renderer rather than writing the main
+     process's copy, which the next state push would have overwritten. */
+  onBlackoutToggle: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on('shortcut:blackout', handler);
+    return () => ipcRenderer.removeListener('shortcut:blackout', handler);
   },
   getDisplayUrl: () => ipcRenderer.invoke('get:displayUrl'),
   onDisplayMessage: (cb) => {

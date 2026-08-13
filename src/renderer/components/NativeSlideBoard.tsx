@@ -117,6 +117,15 @@ function ElementBox({ el }: { el: SlideElement }) {
   }
 
   if (el.type === 'shape') {
+    /* The editor offers Rectangle, Rounded, Circle, Triangle, Star and Line.
+       This only ever knew about circles, so a triangle drawn on the canvas
+       reached the congregation as a rounded rectangle — the one direction of
+       this mismatch that is wrong in front of the room rather than merely
+       wrong in front of the operator. Kept in step with the shape block in
+       SlideEditorCanvasBoard; the two draw the same vocabulary.
+
+       `borderWidth || 3` also meant a border deliberately set to 0 came back
+       as 3, so the check is explicit. */
     return (
       <div style={outer}>
         <div
@@ -124,10 +133,23 @@ function ElementBox({ el }: { el: SlideElement }) {
             width: '100%',
             height: '100%',
             backgroundColor: el.backgroundColor || 'rgba(244, 98, 31, 0.25)',
-            borderColor: el.borderColor || '#f4621f',
-            borderWidth: el.borderWidth || 3,
+            borderColor: el.borderColor || '#FF5500',
+            borderWidth: el.borderWidth !== undefined ? el.borderWidth : 3,
             borderStyle: 'solid',
-            borderRadius: el.content === 'circle' ? '50%' : el.borderRadius || 12,
+            borderRadius:
+              el.content === 'circle'
+                ? '50%'
+                : el.content === 'rectangle'
+                ? 0
+                : el.borderRadius !== undefined
+                ? el.borderRadius
+                : 12,
+            clipPath:
+              el.content === 'triangle'
+                ? 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                : el.content === 'star'
+                ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                : undefined,
             opacity: el.opacity ?? 1,
           }}
         />

@@ -86,7 +86,7 @@ export function LayerList({ rows, onSelect, onReorder, onDelete, emptyHint }: La
               ...styles.row,
               background: row.selected ? 'rgba(244,98,31,0.18)' : 'transparent',
               borderColor: isDropTarget
-                ? '#f4621f'
+                ? '#FF5500'
                 : row.selected
                 ? 'rgba(244,98,31,0.55)'
                 : 'rgba(255,255,255,0.07)',

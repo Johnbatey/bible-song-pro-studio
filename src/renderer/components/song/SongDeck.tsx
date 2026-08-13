@@ -183,7 +183,7 @@ export function SongDeck({ song, title, emptyLabel, targetText }: SongDeckProps)
                   border: isLive
                     ? '2px solid #FF5500'
                     : isPreview
-                    ? '2px solid #3b82f6'
+                    ? '2px solid var(--tally-preview)'
                     : isTarget
                     ? '1px solid var(--chrome-control-active)'
                     : '1px solid var(--border-primary)',
@@ -195,7 +195,7 @@ export function SongDeck({ song, title, emptyLabel, targetText }: SongDeckProps)
                     ? 'var(--chrome-control-active)'
                     : 'var(--bg-surface)',
                   color: 'var(--text-primary)',
-                  borderRadius: 8,
+                  borderRadius: 6,
                   padding: 12,
                   textAlign: 'left',
                   cursor: 'pointer',
@@ -218,7 +218,7 @@ export function SongDeck({ song, title, emptyLabel, targetText }: SongDeckProps)
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {isLive && <span style={{ ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#FF5500', color: '#fff' }}>LIVE</span>}
-                    {isPreview && !isLive && <span style={{ ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#3b82f6', color: '#fff' }}>PREVIEW</span>}
+                    {isPreview && !isLive && <span style={{ ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: 'var(--tally-preview)', color: '#fff' }}>PREVIEW</span>}
                     <button
                       type="button"
                       className="row-action"

@@ -97,9 +97,44 @@ function normalize(value) {
 }
 function escapeRegex(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function normalizeNumberToken(token) { const key = normalize(token); return NUMBER_ALIASES[key] || key; }
+
+/**
+ * French writes its compound numbers with hyphens, so a recogniser hands back
+ * "vingt-trois" as one token and nothing above knows it means 23.
+ *
+ * Splitting on the hyphen is not enough: "quatre-vingt-trois" is four-twenties-
+ * three, and three naive pieces add up to 27 rather than 83. So the longest
+ * known alias wins at each step — "quatre-vingt" is claimed as eighty before
+ * "quatre" can be claimed as four. Tokens that are already an alias in their
+ * own right ("dix-sept") never reach here, because the caller resolves them
+ * first.
+ */
+function expandHyphenatedNumber(token) {
+  const pieces = token.split('-').filter(Boolean);
+  if (pieces.length < 2) return [token];
+  const out = [];
+  let index = 0;
+  while (index < pieces.length) {
+    let matched = null;
+    for (let take = pieces.length - index; take >= 1; take--) {
+      const candidate = pieces.slice(index, index + take).join('-');
+      const resolved = NUMBER_ALIASES[candidate] || (candidate in NUMBER_WORDS ? candidate : null);
+      if (resolved) { matched = { resolved, take }; break; }
+    }
+    /* An unknown piece means this was never a number — hand the token back
+       whole so the caller fails it rather than parsing half of it. */
+    if (!matched) return [token];
+    out.push(matched.resolved);
+    index += matched.take;
+  }
+  return out;
+}
+
 function parseNumber(tokens) {
   const parts = (Array.isArray(tokens) ? tokens : String(tokens || '').split(/\s+/))
-    .map(normalizeNumberToken).filter((token) => token && token !== 'and');
+    .map(normalizeNumberToken)
+    .flatMap((token) => (token.includes('-') ? expandHyphenatedNumber(token) : [token]))
+    .filter((token) => token && token !== 'and');
   if (!parts.length) return null;
   const digitParts = parts.map((token) => /^\d$/.test(token) ? token : (NUMBER_WORDS[token] <= 9 ? String(NUMBER_WORDS[token]) : null));
   if (digitParts.every(Boolean) && digitParts.length <= 3) return Number(digitParts.join(''));

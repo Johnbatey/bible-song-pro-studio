@@ -3,7 +3,7 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import type {
   Scene, Theme, Song, BibleVersion, BibleVerse,
   DisplayState, AIProvider, TranscriptionState, Alert, LiveScriptureState, AudioInputDevice,
-  OperatingMode, QueueItem, PresentationDeck
+  OperatingMode, QueueItem, PresentationDeck, Workspace
 } from '../types';
 
 /**
@@ -93,6 +93,13 @@ interface AppState {
   setPreviewScene: (scene: Scene | null) => void;
   setIsTransitioning: (v: boolean) => void;
   setExternalDisplay: (v: boolean) => void;
+  /** BLACK. `undefined` toggles. */
+  setBlackout: (v?: boolean) => void;
+  setVideoPlaying: (playing: boolean) => void;
+  seekVideo: (seconds: number) => void;
+  setVideoTransportTarget: (target: 'program' | 'preview' | null) => void;
+  reportVideoClock: (clock: { currentTime: number; duration: number }) => void;
+  setVideoLoop: (loop: boolean) => void;
   cutToScene: (scene: Scene) => void;
   transitionToScene: (scene: Scene, transitionType?: string) => void;
 
@@ -123,6 +130,14 @@ interface AppState {
   setSongs: (songs: Song[]) => void;
   setShowSongCredits: (show: boolean) => void;
 
+  /**
+   * Whether an idle audience screen shows the "Bible Song Pro / Waiting for
+   * signal" card. Off leaves it plain black, which is what a congregation
+   * should see between items.
+   */
+  showStandbyBrand: boolean;
+  setShowStandbyBrand: (show: boolean) => void;
+
   // Bible
   bibleVersions: BibleVersion[];
   currentBibleVersion: BibleVersion | null;
@@ -148,10 +163,30 @@ interface AppState {
   setAudioInputDevices: (devices: AudioInputDevice[]) => void;
 
   // Alerts
+  /**
+   * Two channels, deliberately separate.
+   *
+   * `activeAlert` is an announcement for the ROOM — the Alerts button's nursery
+   * call, a lost-child notice. It travels to every audience surface.
+   *
+   * `notice` is for the OPERATOR — "Imported 1 file", "NDI stream live", "URL
+   * copied". It stays in this window. These shared one slot, so every routine
+   * confirmation the operator triggered was also thrown across the projector
+   * and the NDI feed mid-service.
+   */
   alerts: Alert[];
   activeAlert: Alert | null;
   triggerAlert: (alert: Alert) => void;
   dismissAlert: () => void;
+  /**
+   * Operator notices, newest last. A list rather than a slot because two
+   * imports a second apart are two things that happened, and the second
+   * silently replacing the first is how an operator misses a failure.
+   */
+  notices: Alert[];
+  /** Post an operator notice. Never leaves this window. */
+  notify: (notice: Alert) => void;
+  dismissNotice: (id: string) => void;
 
   // UI State
   /**
@@ -160,6 +195,27 @@ interface AppState {
    */
   openDockIds: string[];
   setOpenDockIds: (ids: string[]) => void;
+
+  /**
+   * Named dock arrangements.
+   *
+   * The *live* tree stays in localStorage under `bsp_dockLayout` — it is
+   * per-machine scratch, rewritten on every splitter drag, and has no business
+   * in the synced state file. These are the deliberate ones: saved on purpose,
+   * named, and worth carrying to another machine.
+   *
+   * `activeWorkspaceId` is null for the shipped default arrangement, which is
+   * not a Workspace record because it is generated in code rather than stored.
+   */
+  workspaces: Workspace[];
+  activeWorkspaceId: string | null;
+  /** Stores a captured layout under a new name and makes it active. Returns it. */
+  saveWorkspace: (name: string, layout: unknown) => Workspace;
+  /** Overwrites an existing workspace's layout, leaving its name and id alone. */
+  updateWorkspace: (id: string, layout: unknown) => void;
+  renameWorkspace: (id: string, name: string) => void;
+  deleteWorkspace: (id: string) => void;
+  setActiveWorkspace: (id: string | null) => void;
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   setSidebarOpen: (v: boolean) => void;
@@ -167,10 +223,6 @@ interface AppState {
   activeSettingsCategory: string;
   openSettings: (category?: string) => void;
   closeSettings: () => void;
-
-  isThemeDesignerOpen: boolean;
-  openThemeDesigner: () => void;
-  closeThemeDesigner: () => void;
 
   isSlideEditorOpen: boolean;
   activePresentationId: string | null;
@@ -200,6 +252,9 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     previewScene: null,
     isTransitioning: false,
     isExternalDisplayActive: false,
+    videoTransport: { target: null, playing: true, seekTo: null, seekNonce: 0 },
+    videoClock: { currentTime: 0, duration: 0 },
+    blackout: false,
   },
 
   setMode: (mode) => set((s) => ({ display: { ...s.display, mode } })),
@@ -209,6 +264,69 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   setPreviewScene: (scene) => set((s) => ({ display: { ...s.display, previewScene: scene } })),
   setIsTransitioning: (v) => set((s) => ({ display: { ...s.display, isTransitioning: v } })),
   setExternalDisplay: (v) => set((s) => ({ display: { ...s.display, isExternalDisplayActive: v } })),
+  setBlackout: (v) =>
+    set((s) => ({ display: { ...s.display, blackout: v === undefined ? !s.display.blackout : v } })),
+
+  /* ── Video transport ──────────────────────────────────────────────────
+     The operator drives a video background from the Media panel; the surface
+     playing it reports its clock back here. Commands go one way, the clock
+     comes the other, and neither writes the other's field. */
+  setVideoPlaying: (playing) =>
+    set((s) => ({ display: { ...s.display, videoTransport: { ...s.display.videoTransport, playing } } })),
+  seekVideo: (seconds) =>
+    set((s) => ({
+      display: {
+        ...s.display,
+        /* The clock is moved here as well as sent, so the scrubber lands
+           where it was dropped instead of snapping back for the frame or two
+           before the surface reports its new position. */
+        videoClock: { ...s.display.videoClock, currentTime: seconds },
+        videoTransport: {
+          ...s.display.videoTransport,
+          seekTo: seconds,
+          seekNonce: s.display.videoTransport.seekNonce + 1,
+        },
+      },
+    })),
+  setVideoTransportTarget: (target) =>
+    set((s) => (
+      s.display.videoTransport.target === target
+        ? s
+        : {
+            display: {
+              ...s.display,
+              /* A new clip starts from the top and starts playing, or the
+                 transport would open showing the last one's position. */
+              videoClock: { currentTime: 0, duration: 0 },
+              videoTransport: { target, playing: true, seekTo: null, seekNonce: 0 },
+            },
+          }
+    )),
+  /* Loop lives on the scene, not the transport: it is a property of the clip
+     the operator chose, it is what every surface already reads, and it has to
+     survive the scene being re-fired later. Written to the live copy and to
+     the saved one so the two do not disagree. */
+  setVideoLoop: (loop) =>
+    set((s) => {
+      const target = s.display.videoTransport.target;
+      if (!target) return s;
+      const key = target === 'program' ? 'currentScene' : 'previewScene';
+      const scene = s.display[key];
+      if (!scene?.background) return s;
+      const next = { ...scene, background: { ...scene.background, loop } };
+      return {
+        display: { ...s.display, [key]: next },
+        scenes: s.scenes.map((sc) => (sc.id === next.id ? next : sc)),
+      };
+    }),
+
+  reportVideoClock: (clock) =>
+    set((s) => (
+      Math.abs(s.display.videoClock.currentTime - clock.currentTime) < 0.05 &&
+      s.display.videoClock.duration === clock.duration
+        ? s
+        : { display: { ...s.display, videoClock: clock } }
+    )),
 
   cutToScene: (scene) => {
     set((s) => ({
@@ -302,6 +420,9 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     })),
   setSongs: (songs) => set({ songs }),
   setShowSongCredits: (showSongCredits) => set({ showSongCredits }),
+
+  showStandbyBrand: true,
+  setShowStandbyBrand: (showStandbyBrand) => set({ showStandbyBrand }),
   setSongLinesPerSlide: (songLinesPerSlide) => set({ songLinesPerSlide }),
 
   bibleVersions: [],
@@ -372,6 +493,14 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   activeAlert: null,
   triggerAlert: (alert) => set({ activeAlert: alert }),
   dismissAlert: () => set({ activeAlert: null }),
+  notices: [],
+  notify: (notice) =>
+    set((s) => ({
+      /* Capped. A stack deep enough to cover the workspace has stopped being a
+         notification and become an obstruction; the oldest goes. */
+      notices: [...s.notices.filter((n) => n.id !== notice.id), notice].slice(-4),
+    })),
+  dismissNotice: (id) => set((s) => ({ notices: s.notices.filter((n) => n.id !== id) })),
 
   openDockIds: [],
   setOpenDockIds: (ids) => set((s) => (
@@ -381,6 +510,37 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       ? s
       : { openDockIds: ids }
   )),
+  workspaces: [],
+  activeWorkspaceId: null,
+  saveWorkspace: (name, layout) => {
+    const now = Date.now();
+    const workspace: Workspace = {
+      id: `ws-${now}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      layout,
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((s) => ({ workspaces: [...s.workspaces, workspace], activeWorkspaceId: workspace.id }));
+    return workspace;
+  },
+  updateWorkspace: (id, layout) =>
+    set((s) => ({
+      workspaces: s.workspaces.map((w) => (w.id === id ? { ...w, layout, updatedAt: Date.now() } : w)),
+    })),
+  renameWorkspace: (id, name) =>
+    set((s) => ({
+      workspaces: s.workspaces.map((w) => (w.id === id ? { ...w, name, updatedAt: Date.now() } : w)),
+    })),
+  deleteWorkspace: (id) =>
+    set((s) => ({
+      workspaces: s.workspaces.filter((w) => w.id !== id),
+      // Deleting what you are standing on drops you back to the default, which
+      // always exists — never to a dangling id the menu would tick nothing for.
+      activeWorkspaceId: s.activeWorkspaceId === id ? null : s.activeWorkspaceId,
+    })),
+  setActiveWorkspace: (activeWorkspaceId) => set({ activeWorkspaceId }),
+
   sidebarOpen: true,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSidebarOpen: (v) => set({ sidebarOpen: v }),
@@ -389,10 +549,6 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   activeSettingsCategory: 'output',
   openSettings: (category) => set((s) => ({ isSettingsOpen: true, activeSettingsCategory: category || s.activeSettingsCategory || 'output' })),
   closeSettings: () => set({ isSettingsOpen: false }),
-
-  isThemeDesignerOpen: false,
-  openThemeDesigner: () => set({ isThemeDesignerOpen: true }),
-  closeThemeDesigner: () => set({ isThemeDesignerOpen: false }),
 
   isSlideEditorOpen: false,
   activePresentationId: null,
@@ -430,6 +586,9 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     verseHistory: state.verseHistory,
     currentBibleVersion: state.currentBibleVersion,
     sidebarOpen: state.sidebarOpen,
+    showStandbyBrand: state.showStandbyBrand,
+    workspaces: state.workspaces,
+    activeWorkspaceId: state.activeWorkspaceId,
     outputMode: state.display.outputMode,
     operatingMode: state.display.mode,
     liveScripturePrefs: {
@@ -457,6 +616,9 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       verseHistory: saved.verseHistory ?? current.verseHistory,
       currentBibleVersion: saved.currentBibleVersion ?? current.currentBibleVersion,
       sidebarOpen: saved.sidebarOpen ?? current.sidebarOpen,
+      showStandbyBrand: saved.showStandbyBrand ?? current.showStandbyBrand,
+      workspaces: saved.workspaces ?? current.workspaces,
+      activeWorkspaceId: saved.activeWorkspaceId ?? current.activeWorkspaceId,
       display: {
         ...current.display,
         outputMode: saved.outputMode ?? current.display.outputMode,
@@ -481,6 +643,9 @@ interface PersistedState {
   verseHistory: BibleVerse[];
   currentBibleVersion: BibleVersion | null;
   sidebarOpen: boolean;
+  showStandbyBrand: boolean;
+  workspaces: Workspace[];
+  activeWorkspaceId: string | null;
   outputMode: DisplayState['outputMode'];
   /** 'simple' only appears in state written by pre-studio/basic builds. */
   operatingMode: OperatingMode | 'simple' | 'program' | 'preview';

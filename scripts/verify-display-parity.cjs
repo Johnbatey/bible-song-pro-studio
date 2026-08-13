@@ -21,6 +21,13 @@ const fixtures = [
   // travelling: the direct render would draw the slide and the audience window
   // would fall back to centred text, which no threshold here would forgive.
   'Projected PowerPoint Slide',
+  // The theme's own ground, and a song's ground overriding it. Both resolve
+  // from state the audience window is sent rather than from the scene it is
+  // showing, so they are exactly the kind of thing that renders in the
+  // operator's pane and arrives at the projector as a flat colour.
+  'Theme Image Under Verse',
+  'Theme Video Under Song',
+  'Song Background Over Theme',
 ];
 
 app.on('window-all-closed', (event) => {

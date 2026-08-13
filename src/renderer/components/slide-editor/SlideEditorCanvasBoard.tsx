@@ -279,7 +279,7 @@ export function SlideEditorCanvasBoard({
           gap: 8,
           background: 'rgba(21, 23, 29, 0.85)',
           padding: '6px 12px',
-          borderRadius: 8,
+          borderRadius: 6,
           border: '1px solid rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(12px)',
           fontSize: 12,
@@ -291,8 +291,8 @@ export function SlideEditorCanvasBoard({
             width: 8,
             height: 8,
             borderRadius: '50%',
-            background: '#f4621f',
-            boxShadow: '0 0 10px #f4621f',
+            background: '#FF5500',
+            boxShadow: '0 0 10px #FF5500',
           }}
         />
         <span>Slide Builder Mode: Creating Custom Slide Canvas</span>
@@ -395,8 +395,8 @@ export function SlideEditorCanvasBoard({
               bottom: 0,
               left: `${snapGuides.x}%`,
               width: 1,
-              background: '#f4621f',
-              boxShadow: '0 0 8px #f4621f',
+              background: '#FF5500',
+              boxShadow: '0 0 8px #FF5500',
               zIndex: 99,
             }}
           />
@@ -409,8 +409,8 @@ export function SlideEditorCanvasBoard({
               right: 0,
               top: `${snapGuides.y}%`,
               height: 1,
-              background: '#f4621f',
-              boxShadow: '0 0 8px #f4621f',
+              background: '#FF5500',
+              boxShadow: '0 0 8px #FF5500',
               zIndex: 99,
             }}
           />
@@ -421,10 +421,19 @@ export function SlideEditorCanvasBoard({
           const isSelected = el.id === selectedElementId;
           const isEditing = el.id === editingTextId;
 
-          const elX = el.x > 100 ? (el.x / 1280) * 100 : el.x;
-          const elY = el.y > 100 ? (el.y / 720) * 100 : el.y;
-          const elW = el.width > 100 ? (el.width / 1280) * 100 : el.width;
-          const elH = el.height > 100 ? (el.height / 720) * 100 : el.height;
+          /* Element geometry is a percentage of the slide, everywhere.
+             This used to read `el.x > 100 ? (el.x / 1280) * 100 : el.x`,
+             guessing at the unit — and it guessed differently from the
+             renderer that actually goes to air, which has always written
+             `${el.x}%` flat (see NativeSlideBoard's ElementBox). So anything
+             positioned or sized past 100 sat in one place on the editor
+             canvas and a different place on the screen: the operator lined it
+             up here and it moved when they took it. The editor now reads the
+             numbers the same way the output does. */
+          const elX = el.x;
+          const elY = el.y;
+          const elW = el.width;
+          const elH = el.height;
 
           return (
             <div
@@ -460,6 +469,10 @@ export function SlideEditorCanvasBoard({
                 width: `${elW}%`,
                 height: `${elH}%`,
                 zIndex: el.zIndex || 1,
+                /* Rotation is applied on air, so it is applied here. Without
+                   it a rotated block sat square in the editor and turned the
+                   moment it was taken. */
+                transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
                 cursor: isEditing ? 'text' : 'move',
                 border: isSelected ? '1.5px solid rgba(255, 255, 255, 0.7)' : '1px transparent solid',
                 boxShadow: isSelected ? '0 0 0 3px rgba(255, 255, 255, 0.15), 0 4px 16px rgba(0, 0, 0, 0.4)' : undefined,
@@ -491,10 +504,22 @@ export function SlideEditorCanvasBoard({
                       fontWeight: el.fontWeight || 500,
                       textAlign: el.textAlign || 'center',
                       lineHeight: el.lineHeight || 1.3,
+                      /* Typing into a block must not change how it is set, or
+                         the text reflows the moment you double-click it. */
+                      letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
+                      textTransform: el.textTransform || 'none',
+                      textDecoration: el.textDecoration || 'none',
                       resize: 'none',
                     }}
                   />
                 ) : (
+                  /* Letter spacing, Case, Decoration, vertical alignment and
+                     opacity were all missing here while the renderer that goes
+                     to air honoured every one of them. Setting any of them did
+                     nothing visible, so they read as broken controls — the
+                     change was real, it just could not be seen until the slide
+                     was on screen. This block now matches ElementBox in
+                     NativeSlideBoard property for property. */
                   <div
                     style={{
                       width: '100%',
@@ -505,12 +530,16 @@ export function SlideEditorCanvasBoard({
                       fontWeight: el.fontWeight || 500,
                       textAlign: el.textAlign || 'center',
                       lineHeight: el.lineHeight || 1.3,
+                      letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
+                      textTransform: el.textTransform || 'none',
+                      textDecoration: el.textDecoration || 'none',
                       textShadow: el.textShadow || '0 2px 8px rgba(0, 0, 0, 0.6)',
                       display: 'flex',
-                      alignItems: 'center',
+                      alignItems: el.vAlign === 'top' ? 'flex-start' : el.vAlign === 'bottom' ? 'flex-end' : 'center',
                       justifyContent: el.textAlign === 'left' ? 'flex-start' : el.textAlign === 'right' ? 'flex-end' : 'center',
                       wordBreak: 'break-word',
                       whiteSpace: 'pre-wrap',
+                      opacity: el.opacity ?? 1,
                     }}
                   >
                     {el.content}
@@ -540,7 +569,7 @@ export function SlideEditorCanvasBoard({
                     width: '100%',
                     height: '100%',
                     backgroundColor: el.backgroundColor || 'rgba(244, 98, 31, 0.25)',
-                    borderColor: el.borderColor || '#f4621f',
+                    borderColor: el.borderColor || '#FF5500',
                     borderWidth: el.borderWidth !== undefined ? el.borderWidth : 3,
                     borderStyle: 'solid',
                     borderRadius:
@@ -594,7 +623,7 @@ export function SlideEditorCanvasBoard({
                         position: 'absolute',
                         width: 10,
                         height: 10,
-                        background: '#f4621f',
+                        background: '#FF5500',
                         border: '2px solid #ffffff',
                         borderRadius: 2,
                         zIndex: 10,

@@ -16,7 +16,7 @@ import { defaultTheme, type StageTheme } from '../../stage/theme';
 
 const ACCENTS = ['#fbbf24', '#0a84ff', '#30d158', '#ff453a', '#bf5af2', '#ff9f0a'];
 const BACKGROUNDS = ['#000000', '#05070d', '#0a0a0a', '#0d1b2a', '#1a1a1a'];
-const TEXTS = ['#ffffff', '#f5f5f7', '#fbbf24', '#a1a1aa'];
+const TEXTS = ['#ffffff', '#f5f5f7', '#fbbf24', 'var(--text-dim)'];
 
 const TOGGLES: Array<{ key: 'showClock' | 'showTimer' | 'showLabels'; label: string }> = [
   { key: 'showClock', label: 'Clock' },
@@ -159,7 +159,7 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
               style={{
                 ...styles.chip,
                 background: theme[key] ? 'rgba(244,98,31,0.18)' : 'transparent',
-                borderColor: theme[key] ? 'var(--accent, #f4621f)' : 'var(--block-line, rgba(255,255,255,0.14))',
+                borderColor: theme[key] ? 'var(--accent, #FF5500)' : 'var(--block-line, rgba(255,255,255,0.14))',
                 color: theme[key] ? '#fff' : 'var(--text-dim, rgba(255,255,255,0.55))',
               }}
             >
@@ -187,7 +187,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
-    borderRadius: 12,
+    borderRadius: 6,
     background: 'var(--chrome-raised, #1c1e26)',
     border: '1px solid var(--block-line, rgba(255,255,255,0.14))',
     boxShadow: '0 18px 50px rgba(0,0,0,0.55)',

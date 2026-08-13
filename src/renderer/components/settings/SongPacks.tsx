@@ -114,7 +114,7 @@ const styles: Record<string, React.CSSProperties> = {
   group: {
     background: 'var(--settings-card)',
     border: '1px solid var(--settings-line)',
-    borderRadius: 10,
+    borderRadius: 6,
     overflow: 'hidden',
   },
   groupHeader: {

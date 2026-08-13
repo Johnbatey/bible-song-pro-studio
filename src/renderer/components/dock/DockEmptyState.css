@@ -1,0 +1,240 @@
+/* =========================================================================
+   The empty workspace
+   -------------------------------------------------------------------------
+   What the operator sees when every dock is closed. Without it the app looks
+   like it failed to paint — a flat rectangle of --bg-primary and nothing to
+   act on, which is indistinguishable from a white-screen bug.
+
+   The grid is not decoration. This surface IS a layout the operator composes,
+   and a modular grid is the plainest way to say so before anything is on it.
+   It is drawn at the spacing scale the rest of the app is built on: a 32px
+   module (--bsp-s6) with a heavier rule every fourth (128px, --bsp-s10), so
+   the empty state and the panels that land on it share one measure.
+   ========================================================================= */
+
+.dock-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--bsp-s6, 32px);
+  background: var(--bg-primary);
+  overflow: hidden;
+
+  /* Lifted out so the light surface can restate them without redeclaring
+     four gradients. Dark-first: these are the dark values. */
+  --dock-grid-fine: rgba(255, 255, 255, 0.04);
+  --dock-grid-major: rgba(255, 255, 255, 0.08);
+  --dock-grid-module: 32px;
+  --dock-grid-block: 128px;
+}
+
+:root[data-bsp-surface='paper'] .dock-empty {
+  --dock-grid-fine: rgba(23, 21, 20, 0.055);
+  --dock-grid-major: rgba(23, 21, 20, 0.10);
+}
+
+/* The grid itself. Two layers on one element: four repeating gradients,
+   fine pair first so the block rules paint over them rather than under. */
+.dock-empty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, var(--dock-grid-major) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--dock-grid-major) 1px, transparent 1px),
+    linear-gradient(to right, var(--dock-grid-fine) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--dock-grid-fine) 1px, transparent 1px);
+  background-size:
+    var(--dock-grid-block) var(--dock-grid-block),
+    var(--dock-grid-block) var(--dock-grid-block),
+    var(--dock-grid-module) var(--dock-grid-module),
+    var(--dock-grid-module) var(--dock-grid-module);
+  /* Centred, so the grid reads as a field the content sits in rather than
+     something anchored to the top-left corner and running off two edges. */
+  background-position: center center;
+  pointer-events: none;
+}
+
+/* A vignette, so the grid is legible at the edges and quiet behind the copy.
+   Without it the lines run straight under the text and fight it. */
+.dock-empty::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Three stops, not two. A straight fade to transparent washed the grid out
+     across most of the field and left one coarse rule visible; this keeps the
+     core clean behind the copy and lets both module scales survive either
+     side of it. */
+  background: radial-gradient(
+    ellipse 46% 44% at 50% 48%,
+    var(--bg-primary) 0%,
+    var(--bg-primary) 34%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.dock-empty__card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--bsp-s4, 16px);
+  max-width: 460px;
+}
+
+/* Four modules arranged as one — the mark restates the grid behind it at the
+   size of a single cell. */
+.dock-empty__mark {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 3px;
+  width: 34px;
+  height: 34px;
+  margin-bottom: var(--bsp-s1, 4px);
+}
+
+.dock-empty__mark span {
+  border-radius: 1px;
+  background: var(--block-line);
+}
+
+/* One cell carries Signal. The rule the whole palette exists for: if it is
+   orange, it is the live one — here, the module you are about to place. */
+.dock-empty__mark span:first-child {
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+.dock-empty__title {
+  font-size: var(--bsp-ui-title, 15px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.dock-empty__body {
+  font-size: var(--bsp-ui-secondary, 12px);
+  line-height: 1.6;
+  color: var(--text-dim);
+  max-width: 42ch;
+}
+
+.dock-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--bsp-s2, 8px);
+  margin-top: var(--bsp-s2, 8px);
+}
+
+.dock-empty__chip {
+  padding: 5px 12px;
+  border: 1px solid var(--block-line);
+  border-radius: var(--bsp-r-base, 4px);
+  background: var(--chrome-control);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--bsp-ui-caption, 11px);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--d-state) var(--ease), color var(--d-state) var(--ease),
+    border-color var(--d-state) var(--ease);
+}
+
+.dock-empty__chip:hover {
+  background: var(--chrome-control-active);
+  border-color: var(--block-line);
+  color: #ffffff;
+}
+
+.dock-empty__chip--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.dock-empty__chip--primary:hover {
+  background: var(--bsp-signal-lift);
+  border-color: var(--bsp-signal-lift);
+  color: #ffffff;
+}
+
+.dock-empty__chip:focus-visible {
+  outline: none;
+  box-shadow: var(--bsp-focus);
+}
+
+/* ---- The panels, in sections ----
+   Left-aligned inside a centred card on purpose: four headings and their
+   chips centred individually give four different ragged edges and read as a
+   poster. A column of labelled rows reads as a list of things to open, which
+   is what it is. */
+.dock-empty__sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bsp-s4, 16px);
+  width: 100%;
+  margin-top: var(--bsp-s2, 8px);
+  text-align: left;
+}
+
+.dock-empty__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bsp-s2, 8px);
+}
+
+/* Label and hint share a baseline, so a section costs one line of height
+   rather than two. */
+.dock-empty__section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--bsp-s2, 8px);
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--block-line);
+}
+
+.dock-empty__section-label {
+  font-family: var(--font-signal);
+  font-size: 10px;
+  letter-spacing: var(--bsp-ls-caps, 0.14em);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.dock-empty__section-hint {
+  font-size: var(--bsp-ui-caption, 11px);
+  color: var(--bsp-mute);
+  /* First to go when the card is narrow: the heading is the part that has to
+     survive, the sentence under it is a courtesy. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-empty__section-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bsp-s2, 8px);
+}
+
+/* The quiet line under the actions: where the same controls live once the
+   operator is past this screen. */
+.dock-empty__footnote {
+  margin-top: var(--bsp-s1, 4px);
+  font-family: var(--font-signal);
+  font-size: 10px;
+  letter-spacing: var(--bsp-ls-caps, 0.14em);
+  text-transform: uppercase;
+  color: var(--bsp-mute);
+}

@@ -4,6 +4,7 @@ import { useAppStore } from '../../stores/appStore';
 import { DOCK_COMPONENTS, DOCKS, type DockId } from './docks';
 import { getDockApi, setDockApi, toggleDock } from './dockController';
 import { DockTab } from './DockTab';
+import { DockEmptyState } from './DockEmptyState';
 
 const LAYOUT_KEY = 'bsp_dockLayout';
 
@@ -43,7 +44,7 @@ function buildDefaultLayout(api: DockviewApi) {
   api.addPanel({
     id: 'bible',
     component: 'bible',
-    title: 'Bible',
+    title: 'Scripture',
     position: { referencePanel: 'output', direction: 'below' },
   });
 
@@ -64,6 +65,7 @@ function buildDefaultLayout(api: DockviewApi) {
 export function DockHost() {
   const apiRef = useRef<DockviewApi | null>(null);
   const setOpenDockIds = useAppStore((s) => s.setOpenDockIds);
+  const openDockIds = useAppStore((s) => s.openDockIds);
 
   const syncOpenDocks = useCallback((api: DockviewApi) => {
     const ids = api.panels.map((p) => p.id);
@@ -93,6 +95,21 @@ export function DockHost() {
       }
     }
     if (!restored) buildDefaultLayout(api);
+
+    /* Titles come from DOCKS, not from the saved file.
+     *
+     * dockview serialises each panel's title along with the arrangement, and
+     * fromJSON restores it verbatim — so a panel renamed in a later build kept
+     * the name it had on the day the operator last moved a splitter. Renaming
+     * Scripture to Bible would have reached nobody who had ever arranged their
+     * workspace, which is everybody.
+     *
+     * The id is the identity and the title is derived from it, so this simply
+     * restates the current one. The arrangement itself is untouched. */
+    for (const panel of api.panels) {
+      const dock = DOCKS.find((d) => d.id === panel.id);
+      if (dock && panel.title !== dock.title) panel.api.setTitle(dock.title);
+    }
 
     syncOpenDocks(api);
   }, [syncOpenDocks]);
@@ -140,18 +157,27 @@ export function DockHost() {
     };
   }, []);
 
+  /* Closing the last dock used to leave the window blank, which is
+     indistinguishable from a failed render. The empty state sits over
+     dockview rather than replacing it: dockview has to stay mounted or its
+     api — and every panel the chips are about to open — goes with it. */
+  const isEmpty = openDockIds.length === 0;
+
   return (
-    <DockviewReact
-      className="bsp-dock-root"
-      components={DOCK_COMPONENTS}
-      theme={BSP_THEME}
-      onReady={onReady}
-      defaultTabComponent={DockTab}
-      singleTabMode="fullwidth"
-      disableFloatingGroups={false}
-      floatingGroupDragHandle="titlebar"
-      floatingGroupBounds="boundedWithinViewport"
-    />
+    <div className="dock-stage">
+      <DockviewReact
+        className="bsp-dock-root"
+        components={DOCK_COMPONENTS}
+        theme={BSP_THEME}
+        onReady={onReady}
+        defaultTabComponent={DockTab}
+        singleTabMode="fullwidth"
+        disableFloatingGroups={false}
+        floatingGroupDragHandle="titlebar"
+        floatingGroupBounds="boundedWithinViewport"
+      />
+      {isEmpty && <DockEmptyState onRestoreLayout={resetDockLayout} />}
+    </div>
   );
 }
 

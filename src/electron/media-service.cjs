@@ -12,10 +12,26 @@ function kindFor(ext) {
 }
 
 /**
- * Owns the user's imported backgrounds. Files are copied into userData/media so a
- * service still resolves after the original is moved or deleted, and are served over
- * the app's HTTP server at /media/<file> so the display window and any browser/NDI
- * client can reach them.
+ * Owns the user's imported backgrounds.
+ *
+ * The library **references files where they already live**. It used to copy
+ * every import into userData/media, which quietly doubled the disk cost of a
+ * media folder — a single 173 MB loop costs 346 MB — and left the operator with
+ * two copies to keep in step. A church media drive is already organised; the
+ * app's job is to point at it, not to reorganise it.
+ *
+ * What that trades away is the guarantee that a service always resolves. So the
+ * library is honest instead: an entry whose file has moved or been deleted is
+ * reported `missing`, stays in the library rather than vanishing from it, and
+ * can be pointed at the file's new home with `relink`. Losing the path is a
+ * recoverable mistake; silently dropping the entry is not.
+ *
+ * Files are served over the app's HTTP server at /media/<id> so the display
+ * window and any browser or NDI client can reach them.
+ *
+ * Entries imported by older builds carry `file` and live in userData/media.
+ * They keep working: `resolve` falls back to that copy, and they are never
+ * reported missing while it exists.
  */
 function createMediaService({ app }) {
   const userData = app ? app.getPath('userData') : process.cwd();
@@ -43,12 +59,29 @@ function createMediaService({ app }) {
     fs.renameSync(tmp, indexPath);
   }
 
-  /** Drops entries whose file has vanished (user cleared the folder by hand). */
+  /** The path an entry actually plays from: its own location, or a legacy copy. */
+  function locate(item) {
+    if (!item) return null;
+    if (item.sourcePath && fs.existsSync(item.sourcePath)) return item.sourcePath;
+    if (item.file) {
+      const legacy = path.join(mediaDir, item.file);
+      if (fs.existsSync(legacy)) return legacy;
+    }
+    return null;
+  }
+
+  /**
+   * Every entry, each flagged with whether its file is reachable right now.
+   * Nothing is pruned — a missing file is a prompt to relink, not a reason to
+   * throw away the name, the type and the place it sits in the operator's
+   * library.
+   */
   function list() {
-    const items = readIndex();
-    const alive = items.filter((item) => fs.existsSync(path.join(mediaDir, item.file)));
-    if (alive.length !== items.length) writeIndex(alive);
-    return { ok: true, items: alive };
+    const items = readIndex().map((item) => ({
+      ...item,
+      missing: locate(item) === null,
+    }));
+    return { ok: true, items };
   }
 
   function importPaths(paths) {
@@ -76,22 +109,27 @@ function createMediaService({ app }) {
           return;
         }
 
-        const id = crypto.randomUUID();
-        const file = id + ext;
-        fs.copyFileSync(sourcePath, path.join(mediaDir, file));
+        const absolute = path.resolve(sourcePath);
+        /* Importing the same file twice would give the operator two rows that
+           relink and remove independently — one library entry per file. */
+        const existing = items.find((item) => item.sourcePath && path.resolve(item.sourcePath) === absolute);
+        if (existing) {
+          errors.push(`${path.basename(sourcePath)}: already in the library`);
+          return;
+        }
 
         const item = {
-          id,
-          file,
+          id: crypto.randomUUID(),
+          sourcePath: absolute,
           // strip using the on-disk extension, not the lowercased one, or "photo.PNG" keeps its suffix
           name: path.basename(sourcePath, rawExt),
           type: kind,
           size: stat.size,
           addedAt: Date.now(),
-          url: '/media/' + file,
         };
+        item.url = '/media/' + item.id;
         items.push(item);
-        added.push(item);
+        added.push({ ...item, missing: false });
       } catch (err) {
         errors.push(`${path.basename(String(sourcePath))}: ${err.message}`);
       }
@@ -101,15 +139,58 @@ function createMediaService({ app }) {
     return { ok: added.length > 0, items: added, errors };
   }
 
+  /**
+   * Point an entry at the file's new home — the fix for a drive that remounted
+   * somewhere else, or a folder someone tidied. Everything about the entry
+   * survives except the path, so scenes already built on it keep working.
+   */
+  function relink(id, newPath) {
+    const items = readIndex();
+    const target = items.find((item) => item.id === id);
+    if (!target) return { ok: false, error: 'Not found' };
+    if (!newPath || !fs.existsSync(newPath)) return { ok: false, error: 'That file does not exist' };
+
+    const stat = fs.statSync(newPath);
+    if (stat.isDirectory()) return { ok: false, error: 'Choose a file, not a folder' };
+
+    const kind = kindFor(path.extname(newPath).toLowerCase());
+    if (!kind) return { ok: false, error: 'Unsupported file type' };
+    /* Relinking a video to an image would leave every scene built on this entry
+       rendering the wrong element. Re-import instead — that is a new item. */
+    if (kind !== target.type) {
+      return { ok: false, error: `That is ${kind === 'image' ? 'an image' : 'a video'}, and this entry is ${target.type === 'image' ? 'an image' : 'a video'}` };
+    }
+
+    target.sourcePath = path.resolve(newPath);
+    target.size = stat.size;
+    /* A legacy copy is now dead weight — the entry plays from its own file. */
+    if (target.file) {
+      try {
+        const legacy = path.join(mediaDir, target.file);
+        if (fs.existsSync(legacy)) fs.unlinkSync(legacy);
+      } catch { /* leaving a stale copy behind is not worth failing the relink */ }
+      delete target.file;
+    }
+    target.url = '/media/' + target.id;
+    writeIndex(items);
+    return { ok: true, item: { ...target, missing: false } };
+  }
+
+  /**
+   * Drop an entry from the library. The operator's own file is left exactly
+   * where it is — the library never held the only copy, so deleting it here
+   * would be destroying something the app was only ever pointing at. A legacy
+   * copy inside userData/media is ours to clean up, and is.
+   */
   function remove(id) {
     const items = readIndex();
     const target = items.find((item) => item.id === id);
     if (!target) return { ok: false, error: 'Not found' };
-    try {
-      const filePath = path.join(mediaDir, target.file);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    } catch (err) {
-      return { ok: false, error: err.message };
+    if (target.file) {
+      try {
+        const legacy = path.join(mediaDir, target.file);
+        if (fs.existsSync(legacy)) fs.unlinkSync(legacy);
+      } catch { /* the index entry still goes */ }
     }
     writeIndex(items.filter((item) => item.id !== id));
     return { ok: true };
@@ -124,16 +205,26 @@ function createMediaService({ app }) {
     return { ok: true, item: target };
   }
 
-  /** Resolves a /media/<file> request to an on-disk path, refusing path traversal. */
-  function resolve(fileName) {
-    const safe = path.basename(String(fileName || ''));
-    if (!safe) return null;
-    const full = path.join(mediaDir, safe);
-    if (!full.startsWith(mediaDir)) return null;
-    return fs.existsSync(full) ? full : null;
+  /**
+   * Resolves a /media/<key> request to an on-disk path.
+   *
+   * The key is matched against the index — an id, or a legacy copy's filename —
+   * and never joined onto a path. That is the whole traversal defence now that
+   * entries can live anywhere on the disk: the only paths this can return are
+   * ones already in the library because the operator imported them.
+   */
+  function resolve(key) {
+    const raw = String(key || '');
+    if (!raw) return null;
+    const items = readIndex();
+    const byId = items.find((item) => item.id === raw);
+    if (byId) return locate(byId);
+    const safe = path.basename(raw);
+    const byFile = items.find((item) => item.file && item.file === safe);
+    return byFile ? locate(byFile) : null;
   }
 
-  return { list, importPaths, remove, rename, resolve, mediaDir, IMAGE_EXTS, VIDEO_EXTS };
+  return { list, importPaths, relink, remove, rename, resolve, mediaDir, IMAGE_EXTS, VIDEO_EXTS };
 }
 
 module.exports = { createMediaService, IMAGE_EXTS, VIDEO_EXTS };

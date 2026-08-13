@@ -29,7 +29,7 @@ export function StatusBar() {
           <span
             style={{
               ...styles.dot,
-              background: mode === 'basic' ? '#e74c3c' : '#3498db',
+              background: 'var(--tally-hold)',
             }}
           />
           {mode === 'basic' ? 'Basic — goes live instantly' : 'Studio — preview then take'}
@@ -39,7 +39,7 @@ export function StatusBar() {
           <span
             style={{
               ...styles.dot,
-              background: isExternalDisplayActive ? '#2ecc71' : 'var(--text-dim)',
+              background: isExternalDisplayActive ? 'var(--tally-program)' : 'var(--tally-hold)',
             }}
           />
           {isExternalDisplayActive ? 'Ext Display' : 'No Ext Display'}
@@ -49,7 +49,7 @@ export function StatusBar() {
           <span
             style={{
               ...styles.dot,
-              background: ndiStatus?.running ? '#2ecc71' : 'var(--text-dim)',
+              background: ndiStatus?.running ? 'var(--tally-link)' : 'var(--tally-hold)',
             }}
           />
           {ndiStatus?.running ? `NDI Stream (${ndiStatus.connections})` : 'NDI Off'}
@@ -80,8 +80,13 @@ export function StatusBar() {
           {platform === 'darwin' ? 'macOS' : platform === 'win32' ? 'Windows' : platform}
         </span>
         <span style={styles.separator} />
-        <span style={{ ...styles.item, color: 'var(--accent)' }}>
-          Bible Song Pro
+        {/* The wordmark is monochrome. Signal is reserved for program state —
+            on a bar that reports live status it must not be decorative. */}
+        <span style={styles.item}>
+          {/* styles.item is a flex container, so the wordmark needs its own
+              inline box — a bare <sup> becomes a flex item and vertical-align
+              is ignored. */}
+          <span>Bible Song Pro<sup style={styles.sup}>Studio</sup></span>
         </span>
       </div>
     </div>
@@ -89,6 +94,15 @@ export function StatusBar() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  sup: {
+    fontFamily: 'var(--font-signal)',
+    fontSize: 8,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    marginLeft: '0.4em',
+    verticalAlign: '0.3em',
+    lineHeight: 0,
+  },
   bar: {
     display: 'flex',
     alignItems: 'center',

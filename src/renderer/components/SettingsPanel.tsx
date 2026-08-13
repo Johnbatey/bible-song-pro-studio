@@ -382,7 +382,9 @@ export function SettingsPanel() {
                 <div style={{ ...type.heading, marginBottom: 8 }}>Local Engines</div>
 
                 <div style={styles.row}>
-                  <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>ONNX Whisper</span>
+                  {/* The ONNX engine, whichever model it is running — Moonshine
+                      by default. `whisper-onnx` remains its engine key. */}
+                  <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>On-device (ONNX)</span>
                   <span style={{ ...type.caption, color: aiStatus?.engines?.onnx?.ready ? '#4caf50' : 'var(--text-dim)' }}>
                     {aiStatus?.engines?.onnx?.warmupState || 'idle'}
                   </span>
@@ -391,7 +393,7 @@ export function SettingsPanel() {
                   </button>
                   <button className="btn btn-sm" onClick={async () => setAiStatus(await window.BSP?.ai?.dispose({ engine: 'onnx' }).catch((e) => ({ ok: false, error: String(e) })))}>Dispose</button>
                 </div>
-                <div style={{ ...type.caption, color: localModelAction === 'error' ? '#e74c3c' : 'var(--text-dim)', marginBottom: 8 }}>
+                <div style={{ ...type.caption, color: localModelAction === 'error' ? 'var(--tally-fault)' : 'var(--text-dim)', marginBottom: 8 }}>
                   {localModelAction === 'error'
                     ? 'Model download failed. Check your connection and try again.'
                     : 'Required for offline Live Scripture. It is downloaded once and cached on this computer.'}
@@ -481,7 +483,7 @@ export function SettingsPanel() {
               </div>
 
               {obsStatus?.lastError && (
-                <div style={{ ...type.caption, color: '#e74c3c', margin: '6px 0' }}>{obsStatus.lastError}</div>
+                <div style={{ ...type.caption, color: 'var(--tally-fault)', margin: '6px 0' }}>{obsStatus.lastError}</div>
               )}
 
               {obsStatus?.identified && (
@@ -558,7 +560,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   badgeLive: {
     ...type.label, fontWeight: fontWeight.bold, padding: '2px 6px', borderRadius: 4,
-    background: 'rgba(231,76,60,0.15)', color: '#e74c3c',
+    background: 'rgba(231,76,60,0.15)', color: 'var(--tally-fault)',
     border: '1px solid rgba(231,76,60,0.35)', whiteSpace: 'nowrap',
   },
   body: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 },
@@ -568,7 +570,7 @@ const styles: Record<string, React.CSSProperties> = {
   field: { display: 'flex', flexDirection: 'column', gap: 4, ...type.caption, color: 'var(--text-dim)' },
   check: { display: 'flex', alignItems: 'center', gap: 8, ...type.body, color: 'var(--text-secondary)' },
   meter: { height: 12, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)' },
+  meterFill: { height: '100%', background: 'linear-gradient(90deg,var(--tally-preview),var(--tally-preview),var(--tally-fault))' },
   providerRow: { display: 'grid', gridTemplateColumns: '220px minmax(0,1fr)', gap: 10, alignItems: 'center' },
   providerLabel: { display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', ...type.body },
   pre: { margin: 0, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', ...type.caption, fontFamily: 'var(--font-mono)', maxHeight: 180, overflow: 'auto' },

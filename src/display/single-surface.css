@@ -1,2 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; }
+
+/* Matches the audience page: the surface is a fixed 1920x1080 box and the
+   wrapper scales it. Without this the box collapses to its content and the
+   parity run compares two different layouts again. */
+.audience-program-surface { width: 1920px; height: 1080px; }

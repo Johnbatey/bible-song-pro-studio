@@ -24,6 +24,15 @@ import type { SlideProjection } from '../renderer/types';
 /** The most messages that fit before the block starts covering the lyrics. */
 const MAX_MESSAGES = 3;
 
+/** The live scene's own picture, when it has one. */
+export interface StageMedia {
+  kind: 'image' | 'video';
+  /** Already resolved against the asset origin — the zone just loads it. */
+  url: string;
+  fit?: 'cover' | 'contain' | 'fill';
+  loop?: boolean;
+}
+
 export interface StageZonesProps {
   layout: StageLayout;
   theme: StageTheme;
@@ -31,11 +40,44 @@ export interface StageZonesProps {
   /** The live slide, when what is on screen is a projected slide rather than
       text. The current-text zone draws it in place of the body. */
   currentSlide?: SlideProjection | null;
+  /** The live scene's image or video background. Drawn behind the words in the
+      current-text and slide zones, so the musicians see the same picture the
+      room does — and, when the scene is nothing but that picture, see it whole
+      rather than reading its file name off a coloured rectangle. */
+  currentMedia?: StageMedia | null;
   next: StageContent | null;
   songTitle: string;
   songSubtitle: string;
   timer: StageTimer;
   messages: StageMessage[];
+}
+
+/**
+ * The scene's picture, filling its zone.
+ *
+ * Muted and looping without exception: this is a confidence monitor at the
+ * side of a platform, and a second audio path out of the same clip would
+ * arrive a beat behind the one the room is hearing.
+ */
+function ZoneMedia({ media }: { media: StageMedia }) {
+  const objectFit = media.fit === 'contain' ? 'contain' : media.fit === 'fill' ? 'fill' : 'cover';
+  if (media.kind === 'video') {
+    return (
+      <video
+        className="zone-media"
+        /* Keyed on the url so a change of clip loads the new one rather than
+           leaving the element pointed at the old src. */
+        key={media.url}
+        src={media.url}
+        autoPlay
+        muted
+        playsInline
+        loop={media.loop !== false}
+        style={{ objectFit }}
+      />
+    );
+  }
+  return <img className="zone-media" src={media.url} alt="" style={{ objectFit }} />;
 }
 
 /**
@@ -104,6 +146,7 @@ export function StageZones({
   theme,
   current,
   currentSlide,
+  currentMedia,
   next,
   songTitle,
   songSubtitle,
@@ -135,14 +178,25 @@ export function StageZones({
              current-text zone draws, so the Slide layout is not a blank screen
              the moment the service moves off the deck. */
           const activeSlide = currentSlide || current?.slide || null;
-          const fullBleed = (zone.type === 'slide' || (zone.type === 'current-text' && !!activeSlide)) && !!activeSlide;
+          /* A designed slide already carries its own background, so the scene's
+             media would only be a second picture underneath one that covers
+             it. Media is what this zone falls back to when there is no slide. */
+          const activeMedia = activeSlide ? null : currentMedia || null;
+          /* Words the stage exists to show. A pure media scene has none — the
+             operator sent a picture, not a line — and that is the case where
+             the picture may take the cell whole. With lyrics or a verse over
+             it, the media stays a backdrop and the text keeps its inset. */
+          const hasWords = Boolean(current?.title || current?.body || current?.bodyHtml);
+          const fullBleed = !!activeSlide || (!!activeMedia && !hasWords);
           const classes = [
             'zone',
             zone.type === 'slide' ? 'zone-slide' : 'zone-current-text',
             fullBleed ? 'zone-slide-full' : '',
+            activeMedia ? 'zone-has-media' : '',
           ].filter(Boolean).join(' ');
           return (
             <div key={key} className={classes} data-zone={zone.type} style={frame}>
+              {activeMedia && <ZoneMedia media={activeMedia} />}
               <div className="zone-inner">
                 <div
                   className="zone-title zone-reference"

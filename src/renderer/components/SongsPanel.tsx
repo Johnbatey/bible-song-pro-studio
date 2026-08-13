@@ -7,6 +7,9 @@ import { Block, BlockButton, BlockSegment } from './Block';
 import { AppleToggle } from './AppleToggle';
 import { PanelSplitter } from './PanelSplitter';
 import { SongDeck } from './song/SongDeck';
+import { BackgroundPicker } from './BackgroundPicker';
+import { useMediaLibrary } from '../hooks/useMediaLibrary';
+import { backgroundSwatchCss, describeBackground } from '../utils/background';
 import { isFocusedDock } from './dock/dockFocus';
 
 const DEMO_SONGS: Song[] = [
@@ -55,10 +58,12 @@ export function SongsPanel() {
   const showSongCredits = useAppStore((s) => s.showSongCredits);
   const setShowSongCredits = useAppStore((s) => s.setShowSongCredits);
   const addToQueue = useAppStore((s) => s.addToQueue);
-  const triggerAlert = useAppStore((s) => s.triggerAlert);
+  const pushNotice = useAppStore((s) => s.notify);
 
   const [search, setSearch] = useState('');
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
+  const [bgOpen, setBgOpen] = useState(false);
+  const { items: mediaItems } = useMediaLibrary();
   const [isDragging, setIsDragging] = useState(false);
   const [importing, setImporting] = useState(false);
   /** The lyric a search sent us to, so the right block can point at it. */
@@ -78,8 +83,9 @@ export function SongsPanel() {
     setSongs(DEMO_SONGS);
   };
 
+  /* Import feedback is for the operator only. */
   const notify = (text: string, type: 'info' | 'warning' = 'info') => {
-    triggerAlert({ id: `import-${Date.now()}`, text, type, duration: 4, animation: 'slideDown' });
+    pushNotice({ id: `import-${Date.now()}`, text, type, duration: 4, animation: 'slideDown' });
   };
 
   const handleImport = async (files: File[]) => {
@@ -139,6 +145,11 @@ export function SongsPanel() {
     setSelectedSong(updated);
     setSongs(songs.map((s) => (s.id === updated.id ? updated : s)));
   };
+
+  /* Name the chosen clip in the summary row rather than its url — a background
+     reading `/media/a1b2c3.mp4` tells the operator nothing about which one. */
+  const mediaNameFor = (url: string | undefined) =>
+    url ? mediaItems.find((item) => item.url === url)?.name : undefined;
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -273,6 +284,49 @@ export function SongsPanel() {
             </div>
           )}
         </div>
+
+        {/* The selected song's ground. Below the list rather than in the deck,
+            because it belongs to the song and not to any one slide — and it is
+            set while planning a set, not while running one. */}
+        {selectedSong && (
+          <div style={styles.bgSection}>
+            <button
+              type="button"
+              onClick={() => setBgOpen((open) => !open)}
+              style={styles.bgHeader}
+              title={bgOpen ? 'Hide background options' : 'Set what this song sits on'}
+            >
+              <span>Background</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  aria-hidden
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 3,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: backgroundSwatchCss(selectedSong.background),
+                  }}
+                />
+                <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>
+                  {describeBackground(
+                    selectedSong.background,
+                    mediaNameFor(selectedSong.background?.mediaUrl),
+                  )}
+                </span>
+                <span style={{ color: 'var(--text-dim)' }}>{bgOpen ? '▾' : '▸'}</span>
+              </span>
+            </button>
+            {bgOpen && (
+              <div style={{ paddingTop: 8 }}>
+                <BackgroundPicker
+                  value={selectedSong.background}
+                  onChange={(background) => patchSelectedSong({ background })}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </Block>
 
       <PanelSplitter
@@ -294,6 +348,28 @@ export function SongsPanel() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  bgSection: {
+    flexShrink: 0,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTop: '1px solid var(--border-primary)',
+  },
+  bgHeader: {
+    ...type.label,
+    fontWeight: fontWeight.semibold,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: 'var(--text-secondary)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    width: '100%',
+    padding: '2px 0',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+  },
   matchHeading: {
     ...type.label,
     fontWeight: fontWeight.semibold,

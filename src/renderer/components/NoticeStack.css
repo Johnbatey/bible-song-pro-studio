@@ -1,0 +1,184 @@
+/* =========================================================================
+   Notices
+   -------------------------------------------------------------------------
+   Operator confirmations: imported a file, started a stream, copied a URL.
+
+   These used to be a tinted full-width banner pinned to the top centre of the
+   window, captioned with the word "INFO". Three things were wrong with that
+   and all three are the same mistake — it treated a routine confirmation as an
+   event worth interrupting the room for:
+
+     · centre top is where you look to work, not where you park an aside
+     · the severity was announced in words, in caps, above the message
+     · a saturated fill and a 22px close button gave a 4-second toast more
+       weight than the panel it was covering
+
+   So: bottom right, above the status bar, at the edge of vision. Surface
+   colour, one hairline of tally down the left edge, and a drain line showing
+   how long it has left. Nothing here is louder than the app it sits in.
+   ========================================================================= */
+
+.notice-stack {
+  position: fixed;
+  right: 12px;
+  /* Clear of the 28px status bar — a toast overlapping the very readouts an
+     operator checks mid-service is worse than no toast. */
+  bottom: 40px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  /* The stack is a viewport-height column; only the cards may take a click. */
+  pointer-events: none;
+  max-width: min(360px, calc(100vw - 24px));
+}
+
+.notice {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px 11px 13px;
+  background: var(--bsp-surface, #161414);
+  border: 1px solid var(--block-line);
+  border-radius: var(--bsp-r-base, 4px);
+  box-shadow: var(--bsp-e2);
+  cursor: default;
+  overflow: hidden;
+  /* Severity lives here, as a rail — not as a word above the message. */
+  --notice-tone: var(--bsp-mute);
+}
+
+.notice::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--notice-tone);
+}
+
+.notice--warning { --notice-tone: var(--bsp-tally-fault); }
+.notice--onscreen { --notice-tone: var(--bsp-signal); }
+
+/* Entry: in from the right, the direction it came from. Exit collapses its own
+   height so the ones above settle rather than jumping. */
+@keyframes notice-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes notice-out {
+  from { opacity: 1; transform: translateX(0); max-height: 120px; margin-bottom: 0; }
+  to   { opacity: 0; transform: translateX(16px); max-height: 0; margin-bottom: -8px; }
+}
+
+.notice--entering { animation: notice-in var(--d-panel, 240ms) var(--ease) both; }
+.notice--leaving  { animation: notice-out var(--d-state, 120ms) var(--ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .notice--entering,
+  .notice--leaving { animation-duration: 1ms; }
+}
+
+.notice__icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--notice-tone);
+  /* Info is the common case and wants no colour at all — the rail already
+     carries it and a second coloured element makes a routine confirmation
+     read as a state change. */
+}
+
+.notice--info .notice__icon { color: var(--text-dim); }
+
+.notice__text {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  /* Two lines, then ellipsis. A notice that needs a paragraph is a dialog. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* The one place a tag earns its keep: this notice is also on the projector. */
+.notice__tag {
+  display: inline-block;
+  margin-right: 6px;
+  font-family: var(--font-signal);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: var(--bsp-ls-caps, 0.14em);
+  text-transform: uppercase;
+  color: var(--bsp-signal);
+  vertical-align: 1px;
+}
+
+/* Dismiss appears on hover. A transient card does not need a permanent
+   close button — it closes itself, and until you reach for it the control is
+   just noise on a four-second card. */
+.notice__close {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: -1px -3px 0 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--bsp-mute);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--d-state) var(--ease), color var(--d-state) var(--ease),
+    background var(--d-state) var(--ease);
+}
+
+.notice:hover .notice__close,
+.notice__close:focus-visible {
+  opacity: 1;
+}
+
+.notice__close:hover {
+  background: var(--bsp-active);
+  color: var(--text-primary);
+}
+
+.notice__close:focus-visible {
+  outline: none;
+  box-shadow: var(--bsp-focus);
+}
+
+/* The drain. One hairline along the bottom edge, so the countdown is legible
+   without a number and without anything moving in the periphery. */
+.notice__timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  width: 100%;
+  transform-origin: left center;
+  background: var(--notice-tone);
+  opacity: 0.5;
+  animation: notice-drain linear both;
+}
+
+@keyframes notice-drain {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+/* Hovering holds the notice open — reading one should never be a race. */
+.notice:hover .notice__timer { animation-play-state: paused; }

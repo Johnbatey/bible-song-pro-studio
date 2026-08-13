@@ -314,7 +314,7 @@
 
    Font names that aren't web-loaded still work if the viewer has them
    installed as a system font; otherwise they fall back to the generic family.
-   Mirrors the reference font set (system list + Google families).
+   The editor's font set: a system list plus Google families.
    ========================================================================= */
 (function (BSPSlideEditor) {
     "use strict";
@@ -12069,7 +12069,7 @@
     /* =====================================================================
        DYNAMIC CANVAS VIEWPORT
        ---------------------------------------------------------------------
-       Reference-style free board: the 1280x720 slide floats in an infinite
+       A free board: the 1280x720 slide floats in an infinite
        viewport and is positioned by a single composed transform
        (translate(panX,panY) scale). It pans/zooms smoothly and is free to
        flow under the sidebars — nothing clamps it to the frame. All the

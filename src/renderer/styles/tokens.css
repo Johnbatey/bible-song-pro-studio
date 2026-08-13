@@ -1,0 +1,139 @@
+/* =========================================================================
+   BIBLE SONG PRO — DESIGN TOKENS v1.0
+   The single source of truth for colour, type, space, radius and motion.
+   Consumed by: the desktop app (src/renderer/styles/global.css), the OBS/vMix
+   plugin surfaces, the website, decks, and motion templates.
+   ========================================================================= */
+
+:root {
+  /* ---------------------------------------------------------------------
+     1. NEUTRALS — "the booth"
+     Warm-shifted blacks. Never pure #000, never blue-grey. The neutral is
+     biased toward the Signal hue so orange sits inside the palette, not on it.
+     --------------------------------------------------------------------- */
+  --bsp-booth:      #0C0B0B;  /* web ground, deepest surface, video letterbox */
+  --bsp-ground:     #111010;  /* app frame                                   */
+  --bsp-surface:    #161414;  /* panels, cards, blocks                       */
+  --bsp-raised:     #1D1B1C;  /* controls, inputs, inactive segments         */
+  --bsp-active:     #232221;  /* hover, pressed, selected row                */
+  --bsp-edge:       #262628;  /* 1px borders, block gutters, rules           */
+
+  --bsp-mute:       #6E6968;  /* disabled text, ghost icons                  */
+  --bsp-dim:        #A8A2A0;  /* secondary text, metadata                    */
+  --bsp-soft:       #D9D4D2;  /* tertiary headings on dark                   */
+  --bsp-screen:     #FFFFFF;  /* primary text on dark                        */
+
+  --bsp-paper:      #F4F2EF;  /* light-surface ground: print, docs, invoices */
+  --bsp-paper-edge: rgba(12, 11, 11, 0.12);
+  --bsp-ink:        #171514;  /* primary text on paper                       */
+
+  /* ---------------------------------------------------------------------
+     2. SIGNAL — the accent, and the on-air state. One hue, doing real work.
+     --------------------------------------------------------------------- */
+  --bsp-signal:      #FF5500; /* PRIMARY. On dark only. 5.9:1 on --bsp-ground */
+  --bsp-signal-lift: #FF7728; /* hover / focus lift                           */
+  --bsp-signal-deep: #B23E00; /* text + icons on --bsp-paper. 5.2:1           */
+  --bsp-signal-wash: rgba(255, 85, 0, 0.12);  /* fills, selected states       */
+  --bsp-signal-glow: rgba(255, 85, 0, 0.28);  /* tally bloom, focus ring      */
+
+  /* ---------------------------------------------------------------------
+     3. TALLY — functional state. Not decoration; these mean something.
+     Signal is reused for PROGRAM on purpose: if it is orange, it is on screen.
+     --------------------------------------------------------------------- */
+  --bsp-tally-program: var(--bsp-signal); /* live to audience / to air */
+  --bsp-tally-preview: #22C55E;           /* cued, next, safe to edit  */
+  --bsp-tally-hold:    var(--bsp-mute);   /* cleared, black, standby   */
+  --bsp-tally-fault:   #EF4444;           /* dropped source, no signal */
+  --bsp-tally-link:    #3B82F6;           /* remote / networked device */
+
+  /* ---------------------------------------------------------------------
+     4. TYPE — three roles, three faces.
+     Voice   = Source Serif 4  — scripture and exactly one line per surface
+     Interface = Inter         — every pixel of UI, every paragraph
+     Signal  = Geist Mono      — labels, timecode, latency, versions, keys
+     --------------------------------------------------------------------- */
+  --bsp-font-voice:     "Source Serif 4", "Source Serif Pro", Georgia, serif;
+  --bsp-font-interface: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --bsp-font-signal:    "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Marketing scale (web, decks, video) */
+  --bsp-t-hero:    clamp(2.75rem, 7vw, 5.25rem);  /* Voice, 1 line only    */
+  --bsp-t-section: clamp(1.75rem, 3.4vw, 2.5rem); /* Interface 600         */
+  --bsp-t-lead:    1.0625rem;
+  --bsp-t-body:    0.9375rem;
+  --bsp-t-meta:    0.8125rem;
+  --bsp-t-label:   0.6875rem;                     /* Signal, caps, .14em   */
+
+  /* Product scale (operator console — unchanged from shipping app) */
+  --bsp-ui-display: 20px; --bsp-ui-title: 15px; --bsp-ui-heading: 13px;
+  --bsp-ui-body: 13px;    --bsp-ui-secondary: 12px;
+  --bsp-ui-caption: 11px; --bsp-ui-label: 11px;
+
+  --bsp-ls-tight:  -0.022em;  /* >= 24px          */
+  --bsp-ls-normal:  0;
+  --bsp-ls-caps:    0.14em;   /* Signal caps only */
+  --bsp-lh-tight:   1.08;     /* hero             */
+  --bsp-lh-base:    1.45;
+  --bsp-lh-read:    1.65;     /* paragraphs       */
+
+  /* ---------------------------------------------------------------------
+     5. SPACE — 4px base. Every gap is a multiple of 4.
+     --------------------------------------------------------------------- */
+  --bsp-s1: 4px;  --bsp-s2: 8px;  --bsp-s3: 12px; --bsp-s4: 16px;
+  --bsp-s5: 24px; --bsp-s6: 32px; --bsp-s7: 48px; --bsp-s8: 64px;
+  --bsp-s9: 96px; --bsp-s10: 128px;
+
+  /* ---------------------------------------------------------------------
+     6. RADIUS — the instrument rule. Nothing exceeds 6px.
+     Two exemptions, and only two: the app icon squircle and the tally dot.
+     --------------------------------------------------------------------- */
+  --bsp-r-hair:  2px;
+  --bsp-r-base:  4px;   /* default: blocks, buttons, inputs, cards */
+  --bsp-r-max:   6px;   /* modals, the largest permitted corner    */
+  --bsp-r-dot:   999px; /* EXEMPT: tally dot only                  */
+
+  /* ---------------------------------------------------------------------
+     7. ELEVATION — shadow carries depth; borders carry structure.
+     --------------------------------------------------------------------- */
+  --bsp-e1: 0 1px 3px rgba(0, 0, 0, 0.40);
+  --bsp-e2: 0 4px 12px rgba(0, 0, 0, 0.50);
+  --bsp-e3: 0 12px 40px rgba(0, 0, 0, 0.60);
+  --bsp-focus: 0 0 0 2px var(--bsp-ground), 0 0 0 4px var(--bsp-signal);
+
+  /* ---------------------------------------------------------------------
+     8. MOTION — no bounce. A lower third that overshoots reads as amateur
+     on a broadcast, so nothing in this brand overshoots.
+     --------------------------------------------------------------------- */
+  --bsp-ease:      cubic-bezier(0.16, 1, 0.30, 1);  /* the house curve */
+  --bsp-ease-firm: cubic-bezier(0.65, 0, 0.35, 1);  /* symmetrical     */
+  --bsp-d-state:   120ms;  /* hover, toggle, tally change              */
+  --bsp-d-panel:   240ms;  /* panel, popover, modal                    */
+  --bsp-d-air:     400ms;  /* to-air transition, lower third in/out    */
+  --bsp-d-brand:   800ms;  /* mark animation, splash, outro            */
+}
+
+/* -------------------------------------------------------------------------
+   LIGHT SURFACES
+   BSP is dark-first. Light exists for print, documentation and invoices.
+   Signal is swapped for Signal Deep — #FF5500 fails contrast on paper.
+   ------------------------------------------------------------------------- */
+:root[data-bsp-surface="paper"] {
+  --bsp-booth:   var(--bsp-paper);
+  --bsp-ground:  var(--bsp-paper);
+  --bsp-surface: #FFFFFF;
+  --bsp-raised:  #FFFFFF;
+  --bsp-active:  #EAE6E1;
+  --bsp-edge:    var(--bsp-paper-edge);
+  --bsp-screen:  var(--bsp-ink);
+  --bsp-soft:    #3A3634;
+  --bsp-dim:     #5E5854;
+  --bsp-mute:    #8C8480;
+  --bsp-signal:  var(--bsp-signal-deep);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --bsp-d-state: 1ms; --bsp-d-panel: 1ms;
+    --bsp-d-air: 1ms;   --bsp-d-brand: 1ms;
+  }
+}

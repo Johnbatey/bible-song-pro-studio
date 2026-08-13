@@ -62,6 +62,8 @@ async function main() {
   // default layout is present, and none of them collapsed to nothing.
   assertBox('dock root', layout.dockRoot);
 
+  // "Bible", not "Scripture": the app is Bible Song Pro, so the panel carries
+  // the word the product name already teaches — see the note in docks.tsx.
   const EXPECTED = ['Live transcript', 'Output', 'History', 'Bible', 'Queue'];
   for (const title of EXPECTED) {
     if (!layout.tabTitles.some((t) => t.toLowerCase() === title.toLowerCase())) {

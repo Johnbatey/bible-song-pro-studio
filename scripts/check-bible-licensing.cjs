@@ -22,12 +22,21 @@ const path = require('path');
 
 // Vetted: public domain, 66-book Protestant canon, provenance recorded in BIBLES.md.
 // Adding to this list is a deliberate act — see BIBLES.md before you do.
-const ALLOWED_TRANSLATIONS = new Set(['ASV', 'Darby', 'KJV', 'LSG', 'YLT']);
+const ALLOWED_TRANSLATIONS = new Set(['ASV', 'Darby', 'KJV', 'LSG', 'OST', 'RV1909', 'YLT']);
 
 // Copyrighted. Never in this repository, in any file name, in any form.
 const FORBIDDEN_CODES = [
   'NIV', 'NKJV', 'NLT', 'NASB', 'ESV', 'MSG', 'AMP', 'AMPC', 'NRSV', 'RSV',
-  'CSB', 'HCSB', 'NCV', 'TLB', 'TPT', 'GNT', 'CEV', 'NET', 'NIrV', 'ERV'
+  'CSB', 'HCSB', 'NCV', 'TLB', 'TPT', 'GNT', 'CEV', 'NET', 'NIrV', 'ERV',
+  /* Versión Biblia Libre. Free to redistribute, but © 2018-2020 Jonathan
+     Gallagher y Shelly Barrios de Avila — not public domain, which is the bar
+     this project holds to. A settings mockup once advertised it as a Spanish
+     download; RV1909 is the public-domain Spanish text that shipped instead. */
+  'VBL',
+  /* La Bible Ostervald 1996 is a modern revision under copyright (Société
+     Biblique de Genève). The `OST` that ships here is eBible's `fra_fob`, the
+     public-domain Ostervald, and the two must not be confused. */
+  'OST1996', 'OSTERVALD1996',
 ];
 
 const REPO_ROOT = path.join(__dirname, '..');

@@ -13,6 +13,7 @@ import { CustomDropdown } from './CustomDropdown';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { usePptxImport } from '../hooks/usePptxImport';
 import { Block, BlockButton } from './Block';
+import { TallyBadge } from './TallyBadge';
 
 /** Card-shaped view of a deck. */
 interface SlideItem {
@@ -110,7 +111,7 @@ function ProjectSlideThumb({
             alignItems: 'center',
             justifyContent: 'center',
             textAlign: 'center',
-            background: fallbackBg || 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            background: fallbackBg || '#0C0B0B',
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, color: '#ffffff' }}>{fallbackTitle}</div>
@@ -185,6 +186,7 @@ export function PresentationPanel() {
   const deletePresentationDeck = useAppStore((s) => s.deletePresentationDeck);
 
   const currentScene = useAppStore((s) => s.display.currentScene);
+  const previewScene = useAppStore((s) => s.display.previewScene);
   const projectScene = useAppStore((s) => s.projectScene);
   const cutToScene = useAppStore((s) => s.cutToScene);
   const setPreviewScene = useAppStore((s) => s.setPreviewScene);
@@ -284,7 +286,7 @@ export function PresentationPanel() {
           hidden: false,
           buildCount: 0,
           buildStep: 0,
-          background: { type: 'gradient', value: 'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)' },
+          background: { type: 'color', value: '#0C0B0B' },
           elements: [
             {
               id: `text-${Date.now()}`,
@@ -443,11 +445,51 @@ export function PresentationPanel() {
     }
   }
 
-  function isSlideLive(index: number) {
-    if (!selectedDeck || !currentScene) return false;
-    if (currentScene.id === `deck-${selectedDeck.id}-slide-${index}`) return true;
-    if (currentScene.content?.reference === selectedDeck.title && currentScene.content?.slideId === String(index)) return true;
+  /* Step through the open deck.
+     Position comes from whichever slide is live, so the buttons follow the
+     deck even when the operator jumped by clicking a card. When nothing of
+     this deck is live yet, stepping starts from where they last stepped.
+
+     Both buttons go through handleProjectSlide, so they obey the mode the
+     same way a click does: Studio stages the slide for Take, Basic puts it
+     straight on screen. Advancing a deck must not be the one control in the
+     app that ignores preview. */
+  const lastStepPos = useRef(0);
+
+  function stepSlide(delta: 1 | -1) {
+    const list = filteredPage2Slides;
+    if (list.length === 0) return;
+    const livePos = list.findIndex((entry) => isSlideLive(entry.index));
+    const from = livePos >= 0 ? livePos : lastStepPos.current;
+    const nextPos = Math.min(list.length - 1, Math.max(0, from + delta));
+    if (livePos >= 0 && nextPos === livePos) return;
+    lastStepPos.current = nextPos;
+    const target = list[nextPos];
+    handleProjectSlide(target.slide, target.index, false);
+  }
+
+  /* A slide is recognised in a scene two ways: by the id this panel stamps on
+     it, and — for scenes that came back from the queue or a saved session
+     with their own id — by the deck title and slide number it carries. Both
+     surfaces ask the same question, so the match lives in one place. */
+  function sceneShowsSlide(scene: Scene | null, index: number) {
+    if (!selectedDeck || !scene) return false;
+    if (scene.id === `deck-${selectedDeck.id}-slide-${index}`) return true;
+    if (scene.content?.reference === selectedDeck.title && scene.content?.slideId === String(index)) return true;
     return false;
+  }
+
+  function isSlideLive(index: number) {
+    return sceneShowsSlide(currentScene, index);
+  }
+
+  /* Studio only, and never at the same time as live. In Basic mode a take sets
+     Preview and Program to the same scene so the deck can step from it — a
+     CUED badge there would be labelling the slide the operator is already
+     looking at on the projector. */
+  function isSlideCued(index: number) {
+    if (!isStudio || isSlideLive(index)) return false;
+    return sceneShowsSlide(previewScene, index);
   }
 
   const renderZoomPill = (
@@ -708,11 +750,33 @@ export function PresentationPanel() {
         /* PAGE 2: PROJECT SLIDES VIEW */
         <Block
           className="blk-fill"
-          title={<>Project: <span style={{ color: 'var(--f4621f, #ea580c)', cursor: 'pointer' }} title="Click to rename project" onClick={() => handleRenameDeck(selectedDeck.id)}>{selectedDeck.title} ✏</span></>}
+          title={<>Project: <span style={{ color: 'var(--accent)', cursor: 'pointer' }} title="Click to rename project" onClick={() => handleRenameDeck(selectedDeck.id)}>{selectedDeck.title} ✏</span></>}
           subtitle={`${page2SlidesList.length} ${page2SlidesList.length === 1 ? 'slide' : 'slides'}`}
           tools={(
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <BlockButton onClick={() => setSelectedDeckId(null)}>← Projects</BlockButton>
+              <BlockButton
+                icon
+                onClick={() => stepSlide(-1)}
+                disabled={filteredPage2Slides.length === 0}
+                title="Previous slide"
+                aria-label="Previous slide"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </BlockButton>
+              <BlockButton
+                icon
+                onClick={() => stepSlide(1)}
+                disabled={filteredPage2Slides.length === 0}
+                title="Next slide"
+                aria-label="Next slide"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </BlockButton>
               <BlockButton onClick={() => handleEditSlide(selectedDeck.id)}>✏ Open in Editor</BlockButton>
             </div>
           )}
@@ -732,6 +796,7 @@ export function PresentationPanel() {
 
           {filteredPage2Slides.map(({ slide, index, title, subtitle }) => {
             const live = isSlideLive(index);
+            const cued = isSlideCued(index);
             const slideBg = 'background' in slide && slide.background ? (slide.background as SlideBackground) : null;
             const fallbackBg = slideBg && (slideBg.type === 'color' || slideBg.type === 'gradient')
               ? String(slideBg.value)
@@ -743,12 +808,22 @@ export function PresentationPanel() {
                 className={`card card-hover ${live ? 'glass-accent' : ''}`}
                 style={{
                   ...styles.projectSlideCard,
-                  borderColor: live ? 'var(--border-accent, #f4621f)' : 'var(--block-line)',
-                  boxShadow: live ? '0 0 12px rgba(244, 98, 31, 0.4)' : undefined,
+                  borderColor: live
+                    ? 'var(--border-accent, #FF5500)'
+                    : cued
+                    ? 'var(--tally-preview)'
+                    : 'var(--block-line)',
+                  boxShadow: live
+                    ? '0 0 12px rgba(244, 98, 31, 0.4)'
+                    : cued
+                    ? '0 0 10px rgba(34, 197, 94, 0.28)'
+                    : undefined,
                 }}
                 onClick={() => handleProjectSlide(slide, index, false)}
                 onDoubleClick={() => handleProjectSlide(slide, index, true)}
-                title="Click to project live · double-click to force Go Live"
+                title={isStudio
+                  ? 'Click to stage in Preview · double-click to go straight to Program'
+                  : 'Click to project live · double-click to force Go Live'}
               >
                 {/* Slide Preview Miniature */}
                 <div style={{ position: 'relative', width: '100%' }}>
@@ -763,12 +838,10 @@ export function PresentationPanel() {
                   {/* Index Badge */}
                   <div style={styles.slideIndexBadge}>{index + 1}</div>
 
-                  {/* Live Status Badge */}
-                  {live && (
-                    <div style={styles.liveBadge}>
-                      <span style={styles.liveDot} /> LIVE
-                    </div>
-                  )}
+                  {/* Tally. LIVE is unchanged — same corner, same size; CUED is
+                      its green twin, so Studio's staged slide is as easy to
+                      find as the one already on the screen. */}
+                  {(live || cued) && <TallyBadge state={live ? 'live' : 'cued'} />}
                 </div>
 
                 {/* Footer Info */}
@@ -793,7 +866,7 @@ export function PresentationPanel() {
                     )}
                     <button
                       className={`btn btn-sm ${live ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ ...styles.miniActionBtn, background: live ? '#f4621f' : undefined }}
+                      style={{ ...styles.miniActionBtn, background: live ? '#FF5500' : undefined }}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleProjectSlide(slide, index, true);
@@ -834,7 +907,7 @@ export function PresentationPanel() {
               maxWidth: '90vw',
               background: '#161414',
               border: '1px solid var(--block-line, #262628)',
-              borderRadius: 12,
+              borderRadius: 6,
               padding: 24,
               boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
               display: 'flex',
@@ -849,13 +922,13 @@ export function PresentationPanel() {
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 18 }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 18 }}
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ fontSize: 13, color: 'var(--text-dim, #d4d4d8)' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
               Enter a name for your new presentation deck project:
             </div>
 
@@ -873,7 +946,7 @@ export function PresentationPanel() {
                 padding: '10px 14px',
                 background: '#111010',
                 border: '1px solid var(--block-line, #262628)',
-                borderRadius: 8,
+                borderRadius: 6,
                 color: '#ffffff',
                 fontSize: 14,
                 outline: 'none',
@@ -902,7 +975,7 @@ export function PresentationPanel() {
                 onClick={handleConfirmCreateProject}
                 style={{
                   padding: '8px 18px',
-                  background: 'var(--accent, #f4621f)',
+                  background: 'var(--accent, #FF5500)',
                   border: 'none',
                   borderRadius: 6,
                   color: '#ffffff',
@@ -941,7 +1014,7 @@ export function PresentationPanel() {
               maxWidth: '90vw',
               background: '#161414',
               border: '1px solid var(--block-line, #262628)',
-              borderRadius: 12,
+              borderRadius: 6,
               padding: 24,
               boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
               display: 'flex',
@@ -956,13 +1029,13 @@ export function PresentationPanel() {
               <button
                 type="button"
                 onClick={() => setRenameDeckTarget(null)}
-                style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', fontSize: 18 }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 18 }}
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ fontSize: 13, color: 'var(--text-dim, #d4d4d8)' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
               Enter a new title for this presentation project:
             </div>
 
@@ -981,7 +1054,7 @@ export function PresentationPanel() {
                 padding: '10px 14px',
                 background: '#111010',
                 border: '1px solid var(--block-line, #262628)',
-                borderRadius: 8,
+                borderRadius: 6,
                 color: '#ffffff',
                 fontSize: 14,
                 outline: 'none',
@@ -1010,7 +1083,7 @@ export function PresentationPanel() {
                 onClick={handleConfirmRenameProject}
                 style={{
                   padding: '8px 18px',
-                  background: 'var(--accent, #f4621f)',
+                  background: 'var(--accent, #FF5500)',
                   border: 'none',
                   borderRadius: 6,
                   color: '#ffffff',
@@ -1067,7 +1140,7 @@ export function PresentationPanel() {
               zIndex: 99999,
               background: '#18181b',
               border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: 8,
+              borderRadius: 6,
               boxShadow: '0 12px 36px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(0, 0, 0, 0.5)',
               padding: 4,
               display: 'flex',
@@ -1104,7 +1177,7 @@ export function PresentationPanel() {
               Duplicate project
             </button>
             <button
-              style={{ ...styles.menuItem, color: '#ef4444' }}
+              style={{ ...styles.menuItem, color: 'var(--tally-fault)' }}
               onClick={() => handleDeleteSlide(activeDeck.id)}
             >
               Delete project
@@ -1145,7 +1218,7 @@ const styles: Record<string, React.CSSProperties> = {
   addSlideBtn: {
     height: 30,
     padding: '0 10px',
-    background: 'var(--accent, #f4621f)',
+    background: 'var(--accent, #FF5500)',
     border: 'none',
     borderRadius: 6,
     color: '#ffffff',
@@ -1300,7 +1373,7 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 100,
     background: '#18181b',
     border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
+    borderRadius: 6,
     boxShadow: '0 10px 30px rgba(0, 0, 0, 0.8)',
     padding: 4,
     display: 'flex',
@@ -1371,27 +1444,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     border: '1px solid rgba(255, 255, 255, 0.15)',
   },
-  liveBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    background: '#f4621f',
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: 800,
-    padding: '2px 6px',
-    borderRadius: 4,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    boxShadow: '0 2px 6px rgba(244, 98, 31, 0.5)',
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: '50%',
-    background: '#ffffff',
-  },
+  /* liveBadge / liveDot moved to TallyBadge — Media shows the same lamp and
+     the two were drifting apart. */
   projectSlideFooter: {
     padding: '8px 10px',
     display: 'flex',

@@ -8,69 +8,124 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <style>
       @font-face {
+        font-family: 'Geist Mono';
+        src: url('/fonts/GeistMono-latin-400.woff2') format('woff2');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
         font-family: 'Inter';
         font-style: normal;
         font-weight: 100 900;
         font-display: swap;
         src: url('/fonts/InterVariable.woff2') format('woff2');
       }
+      /* Voice. Bundled since the icon work but never declared, so scripture in
+         the console was setting in Inter like the rest of the chrome. */
+      @font-face {
+        font-family: 'Source Serif 4';
+        font-style: normal;
+        font-weight: 200 900;
+        font-display: swap;
+        src: url('/fonts/SourceSerif4-latin-var.woff2') format('woff2');
+      }
 
-      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #060810; }
+      /* Booth — the brand's deepest surface. This was #060810, a blue-black,
+         which is the one thing the neutral ramp is not allowed to be: every
+         BSP grey is warm-shifted toward the accent so the orange sits inside
+         the palette rather than on top of it. */
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0C0B0B; }
       #splash-screen {
         position: fixed;
         inset: 0;
         z-index: 99999;
-        background: #060810;
+        background: #0C0B0B;
         display: flex;
         align-items: center;
         justify-content: center;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-        transition: opacity 0.4s ease, visibility 0.4s ease;
+        transition: opacity 400ms cubic-bezier(0.16, 1, 0.30, 1), visibility 400ms cubic-bezier(0.16, 1, 0.30, 1);
       }
       .sanctuary-loader {
-        text-align: center;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        gap: 16px;
+        align-items: stretch;
+        gap: 20px;
+        width: 260px;
       }
       .loader-logo {
-        width: 56px;
-        height: 56px;
-        filter: drop-shadow(0 6px 18px rgba(30, 58, 110, 0.6));
+        width: 44px;
+        height: 44px;
       }
-      .loader-spinner {
-        width: 28px;
-        height: 28px;
-        border: 2px solid rgba(96, 165, 250, 0.2);
-        border-top-color: #60a5fa;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
+      /* The rail, not a spinner. A spinning ring is the category's loader and
+         it claims progress it does not have; this eases toward the end and
+         holds there until the console is actually up. It is also the Cue Wipe
+         — the mark's live line, moving. */
+      .loader-rail {
+        position: relative;
+        height: 1px;
+        background: #262628;
+        overflow: hidden;
+      }
+      .loader-rail::after {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 100%;
+        background: #FF5500;
+        transform-origin: left center;
+        transform: scaleX(0);
+        animation: rail 4600ms cubic-bezier(0.16, 1, 0.30, 1) 160ms both;
       }
       .loader-title {
         font-size: 14px;
-        font-weight: 800;
-        letter-spacing: -0.01em;
-        color: #f8fafc;
-      }
-      .loader-sub {
-        font-size: 10px;
         font-weight: 600;
-        letter-spacing: 0.12em;
-        color: rgba(255, 255, 255, 0.45);
+        letter-spacing: -0.02em;
+        color: #FFFFFF;
+      }
+      /* Studio superscript: Signal face, monochrome, never coloured. */
+      .loader-title sup {
+        font-family: 'Geist Mono', ui-monospace, monospace;
+        font-size: 0.46em;
+        font-weight: 400;
+        letter-spacing: 0.10em;
+        text-transform: uppercase;
+        margin-left: 0.36em;
+        vertical-align: 0.9em;
+        line-height: 0;
+      }
+      /* Signal face: uppercase, 0.14em, never above 13px. */
+      .loader-sub {
+        font-family: 'Geist Mono', ui-monospace, monospace;
+        font-size: 10px;
+        font-weight: 400;
+        letter-spacing: 0.14em;
+        color: #6E6968;
         text-transform: uppercase;
       }
-      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes rail {
+        0%   { transform: scaleX(0);    }
+        30%  { transform: scaleX(0.42); }
+        62%  { transform: scaleX(0.71); }
+        100% { transform: scaleX(0.94); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .loader-rail::after { animation: none; transform: scaleX(0.94); }
+        #splash-screen { transition-duration: 1ms; }
+      }
       #root { width: 100%; height: 100%; }
     </style>
   </head>
   <body>
     <div id="splash-screen">
       <div class="sanctuary-loader">
-        <img src="./bible-song-pro-icon.svg" class="loader-logo" alt="Bible Song Pro Logo" />
-        <div class="loader-spinner"></div>
-        <div class="loader-title">Bible Song Pro</div>
-        <div class="loader-sub">Loading Sanctuary...</div>
+        <img src="./bible-song-pro-icon.svg" class="loader-logo" alt="Bible Song Pro" />
+        <div class="loader-title">Bible Song Pro<sup>Studio</sup></div>
+        <div class="loader-rail"></div>
+        <!-- Terse, verb-first, no ellipsis theatre. "Loading Sanctuary…" is
+             the register the brand reserves for scripture, not for the machine. -->
+        <div class="loader-sub">Starting console</div>
       </div>
     </div>
     <div id="root"></div>

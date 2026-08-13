@@ -115,7 +115,7 @@
   bottom: 5%;
   z-index: 2;
   padding: 24px 34px;
-  border-radius: 12px;
+  border-radius: var(--bsp-r-base, 4px);
   background: linear-gradient(135deg, rgba(10, 18, 32, .94), rgba(37, 52, 78, .94));
   box-shadow: 0 20px 60px rgba(0, 0, 0, .36);
 }
@@ -155,7 +155,7 @@
   z-index: 4;
   max-width: 80%;
   padding: 14px 22px;
-  border-radius: 10px;
+  border-radius: var(--bsp-r-base, 4px);
   background: rgba(232, 84, 26, .92);
   color: #fff;
   font-weight: 800;

@@ -18,8 +18,8 @@
    queue. There is no longer a load that can fail.
    ========================================================================= */
 import type { CSSProperties } from 'react';
-import { ProgramSurface, type ProgramSurfaceState } from '../renderer/components/display/ProgramSurface';
-import { StageZones } from './StageZones';
+import { ProgramSurface, assetUrl, type ProgramSurfaceState } from '../renderer/components/display/ProgramSurface';
+import { StageZones, type StageMedia } from './StageZones';
 import type { StageState } from './stage-state';
 import './stage.css';
 
@@ -53,10 +53,25 @@ export function StageSurface({
      already told. */
   const currentSlide = program.scene?.content?.slide || null;
 
+  /* The scene's own picture, read off the same feed and for the same reason.
+     Without this a media take reached the stage as its file name in the
+     reference line over the theme's ground colour: the one thing on the
+     projector the confidence monitor could not show was the thing filling it. */
+  const sceneBg = program.scene?.background;
+  const currentMedia: StageMedia | null =
+    (sceneBg?.type === 'image' || sceneBg?.type === 'video') && sceneBg.mediaUrl
+      ? {
+          kind: sceneBg.type,
+          url: assetUrl(sceneBg.mediaUrl, assetBaseUrl),
+          fit: sceneBg.fit,
+          loop: sceneBg.loop,
+        }
+      : null;
+
   const hasContent = !!(
     state.current?.title || state.current?.body ||
     state.next?.title || state.next?.body ||
-    currentSlide || cue
+    currentSlide || currentMedia || cue
   );
 
   const rootStyle = {
@@ -94,6 +109,7 @@ export function StageSurface({
           theme={theme}
           current={state.current}
           currentSlide={currentSlide}
+          currentMedia={currentMedia}
           next={state.next}
           songTitle={state.songTitle}
           songSubtitle={state.songSubtitle}

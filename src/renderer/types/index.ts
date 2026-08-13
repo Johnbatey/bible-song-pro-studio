@@ -178,7 +178,6 @@ export interface Background {
   mediaType?: 'image' | 'video';
   fit?: 'cover' | 'contain' | 'fill';
   loop?: boolean;
-  linkedMode?: boolean;
   opacity?: number;
 }
 
@@ -240,6 +239,12 @@ export interface FullScreenTheme {
   gradientEnd?: string;
   gradientDirection?: string;
   backgroundOpacity?: number;
+  /** Server-relative, e.g. `/media/<id>` — see MediaItem.url. An absolute url
+      would pin the theme to whatever port the server held when it was set. */
+  backgroundMediaUrl?: string;
+  backgroundMediaType?: 'image' | 'video';
+  backgroundFit?: 'cover' | 'contain' | 'fill';
+  backgroundLoop?: boolean;
   fontFamily: string;
   fontSize: number;
   fontWeight: number;
@@ -298,6 +303,10 @@ export interface Song {
   author?: string;
   copyright?: string;
   ccli?: string;
+  /** The song's own ground, carried onto every slide it projects. Absent means
+      it follows the theme, which is what Scripture does and what a song
+      imported from OpenLyrics or ChordPro will always do. */
+  background?: Background;
 }
 
 export interface SongSlide {
@@ -332,15 +341,24 @@ export interface AppSettings {
   deepgramModel: string;
   deepgramLanguage: string;
   sttEngine: 'local' | 'deepgram';
+  /** Which on-device recogniser runs. Empty means the service's own default. */
+  sttLocalModel: string;
+  /** The preacher's language. Only a multilingual model can honour it. */
+  sermonLanguage: SermonLanguage;
   obsUrl: string;
   obsAutoConnect: boolean;
 }
+
+/** 'auto' lets Whisper detect the language per utterance. */
+export type SermonLanguage = 'auto' | 'en' | 'fr' | 'es';
 
 export interface AppSettingsPatch {
   deepgramApiKey: string;
   deepgramModel: string;
   deepgramLanguage: string;
   sttEngine: 'local' | 'deepgram';
+  sttLocalModel: string;
+  sermonLanguage: SermonLanguage;
   obsUrl: string;
   obsPassword: string;
   obsAutoConnect: boolean;
@@ -400,13 +418,18 @@ export interface DisplayTarget {
 
 export interface MediaItem {
   id: string;
-  file: string;
+  /** Where the file actually lives. The library points at it; it is never copied. */
+  sourcePath?: string;
+  /** Only on entries imported by builds that copied into userData/media. */
+  file?: string;
   name: string;
   type: 'image' | 'video';
   size: number;
   addedAt: number;
-  /** Server-relative path, e.g. /media/<file>. Prefix with the app server origin to use. */
+  /** Server-relative path, e.g. /media/<id>. Prefix with the app server origin to use. */
   url: string;
+  /** True when the file is not at its path right now — offer a relink, not a delete. */
+  missing?: boolean;
 }
 
 export interface MediaImportResult {
@@ -464,6 +487,37 @@ export interface DisplayState {
   previewScene: Scene | null;
   isTransitioning: boolean;
   isExternalDisplayActive: boolean;
+  /** Transport for a video background. See VideoTransport. */
+  videoTransport: VideoTransport;
+  /** Where the transport's clock has got to. Local only — never sent out. */
+  videoClock: VideoClock;
+  /** BLACK: every audience surface covered, program held underneath. */
+  blackout: boolean;
+}
+
+/**
+ * The operator's command to whichever surface is playing a video background.
+ *
+ * `target` says which pane owns the video: a clip cued in Studio is on the
+ * preview surface and has not reached the audience, so scrubbing it must not
+ * touch what is on air. When the target is `program` this travels out to the
+ * audience, stage and browser surfaces with the rest of the display state.
+ *
+ * A seek is an event rather than a state — scrubbing back to the same second
+ * twice has to fire twice — so it carries a nonce and the surfaces act on the
+ * change in that, not on the value.
+ */
+export interface VideoTransport {
+  target: 'program' | 'preview' | null;
+  playing: boolean;
+  seekTo: number | null;
+  seekNonce: number;
+}
+
+/** What the playing surface reports back. Duration is 0 until metadata lands. */
+export interface VideoClock {
+  currentTime: number;
+  duration: number;
 }
 
 export interface AudioInputDevice {
@@ -523,12 +577,43 @@ export interface Alert {
   animation: string;
 }
 
+/**
+ * A named dock arrangement the operator saved.
+ *
+ * `layout` is dockview's own serialised tree, kept opaque on purpose: it is
+ * dockview's format to change, and nothing here has any business reading into
+ * it. The only contract is that whatever `api.toJSON()` produced goes back
+ * into `api.fromJSON()` unaltered.
+ */
+export interface Workspace {
+  id: string;
+  name: string;
+  layout: unknown;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** The on-disk shape of an exported workspace. */
+export interface WorkspaceFile {
+  format: 'bsp.workspace';
+  version: 1;
+  name: string;
+  layout: unknown;
+  exportedAt: number;
+  app?: string;
+}
+
 declare global {
   interface Window {
     BSP: {
       platform: () => Promise<string>;
       userDataPath: () => Promise<string>;
+      version: () => Promise<string>;
       getDisplayUrl: () => Promise<string>;
+      /** Cmd+Shift+B and POST /api/display/blackout arrive here. Returns an unsubscribe. */
+      onBlackoutToggle?: (cb: () => void) => (() => void);
+      /* Refused by the main process unless https and on its allowlist. */
+      openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>;
       window: {
         minimize: () => Promise<void>;
         maximize: () => Promise<void>;
@@ -575,9 +660,6 @@ declare global {
       verse: {
         detect: (payload: { text: string; options?: { versionId?: string; modes?: string[]; limit?: number; minConfidence?: number; isFinal?: boolean } }) => Promise<VerseDetectionResult>;
       };
-      audio: {
-        getInputDevices: () => Promise<AudioInputDevice[]>;
-      };
       ai: {
         // Unified API
         status: () => Promise<TranscriptionStatus>;
@@ -585,6 +667,7 @@ declare global {
         transcribe: (payload?: any) => Promise<TranscriptionResult>;
         dispose: (payload?: any) => Promise<any>;
         setEngine: (engine: string) => Promise<any>;
+        setLocalModel: (model: string) => Promise<any>;
         // Backward-compatible aliases
         getMlxWhisperStatus: () => Promise<any>;
         warmupMlxWhisper: (payload?: any) => Promise<any>;
@@ -649,11 +732,17 @@ declare global {
         import: (paths: string[]) => Promise<MediaImportResult>;
         remove: (id: string) => Promise<{ ok: boolean; error?: string }>;
         rename: (id: string, name: string) => Promise<{ ok: boolean; item?: MediaItem }>;
+        relink: (id: string, path: string) => Promise<{ ok: boolean; item?: MediaItem; error?: string }>;
+        pickRelink: (id: string, currentPath: string, name: string) => Promise<{ ok: boolean; item?: MediaItem; error?: string; canceled?: boolean }>;
+        reveal: (path: string) => Promise<{ ok: boolean; error?: string }>;
         baseUrl: () => Promise<string>;
         pathForFile: (file: File) => string;
       };
       openSlideEditor: () => Promise<boolean>;
       openStageDisplay: () => Promise<boolean>;
+      closeStageDisplay: () => Promise<{ ok: boolean; open: boolean }>;
+      isStageDisplayOpen: () => Promise<boolean>;
+      onStageDisplayState: (cb: (open: boolean) => void) => () => void;
       openStageDesigner: () => Promise<boolean>;
       stageDesigner: {
         setDirty: (dirty: boolean) => void;
@@ -676,8 +765,54 @@ declare global {
          */
         onResetLayout: (cb: () => void) => () => void;
       };
+      /** Named dock arrangements. See WorkspaceBridge. */
+      workspace?: {
+        /** Push the list and the active id so the Workspace menu can rebuild. */
+        sync: (payload: { list: Array<{ id: string; name: string }>; activeId: string | null }) => void;
+        /** Subscribe to Workspace menu clicks. Returns an unsubscribe function. */
+        onCommand: (cb: (payload: { action: string; id: string | null }) => void) => () => void;
+        exportFile: (payload: { name: string; json: string }) =>
+          Promise<{ ok: boolean; canceled?: boolean; filePath?: string; error?: string }>;
+        importFile: () =>
+          Promise<{ ok: boolean; canceled?: boolean; json?: string; filePath?: string; error?: string }>;
+      };
     };
   }
+}
+
+/** One of the on-device recognisers an operator can pick from. */
+export interface LocalModelChoice {
+  key: string;
+  /** The Hugging Face repo it comes from. */
+  id: string;
+  label: string;
+  note: string;
+  family: 'whisper' | 'moonshine';
+  /** Understands more than English, so the sermon language means something. */
+  multilingual: boolean;
+  /** Already on this computer, so switching to it needs no internet. */
+  downloaded: boolean;
+}
+
+export interface LocalModelStatus {
+  ok: boolean;
+  name: string;
+  modelId: string;
+  modelKey: string;
+  modelLabel: string;
+  family: 'whisper' | 'moonshine';
+  available: boolean;
+  ready: boolean;
+  warmupState: string;
+  /** 0–100 while the weights are coming down. */
+  downloadProgress: number;
+  cacheDir: string;
+  lastError: string;
+  /** Whether the running model can be told a language at all. */
+  multilingual: boolean;
+  /** Language codes a multilingual model may be locked to. */
+  supportedLanguages: string[];
+  models: LocalModelChoice[];
 }
 
 export interface TranscriptionStatus {
@@ -685,15 +820,7 @@ export interface TranscriptionStatus {
   activeEngine: string;
   platform: { os: string; arch: string; isAppleSilicon: boolean };
   engines: {
-    onnx: {
-      ok: boolean;
-      name: string;
-      modelId: string;
-      available: boolean;
-      ready: boolean;
-      warmupState: string;
-      lastError: string;
-    };
+    onnx: LocalModelStatus;
     mlx: {
       ok: boolean;
       name: string;

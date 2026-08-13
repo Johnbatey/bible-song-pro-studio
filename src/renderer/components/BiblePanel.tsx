@@ -18,6 +18,8 @@ const FALLBACK_VERSIONS: BibleVersion[] = [
   { id: 'Darby', name: 'Darby Translation', abbreviation: 'DBY', language: 'en', books: [] },
   { id: 'YLT', name: "Young's Literal Translation", abbreviation: 'YLT', language: 'en', books: [] },
   { id: 'LSG', name: 'Louis Segond 1910', abbreviation: 'LSG', language: 'fr', books: [] },
+  { id: 'OST', name: 'Ostervald', abbreviation: 'OST', language: 'fr', books: [] },
+  { id: 'RV1909', name: 'Reina-Valera 1909', abbreviation: 'RVR', language: 'es', books: [] },
 ];
 
 function normalizeSearchText(value: string) {
@@ -726,7 +728,7 @@ export function BiblePanel() {
     ? `Search results · ${results.length}`
     : selectedBook
     ? `${selectedBook} ${chapter}`
-    : 'Scripture';
+    : 'Bible';
 
   /**
    * Built once and rendered into whichever slot is chosen, rather than written
@@ -736,7 +738,7 @@ export function BiblePanel() {
   const toolbar = (
       <div className="blk blk--bar">
         <div style={styles.controlsRow}>
-          {/* Custom Dark Version Dropdown Popup matching the reference design */}
+          {/* Custom dark translation dropdown */}
           <CustomDropdown
             value={selectedVersion}
             options={versionOptions.map((v) => ({ value: v.id, label: v.abbreviation, sublabel: v.name }))}
@@ -796,7 +798,7 @@ export function BiblePanel() {
             placeholder="John 3:16 or keyword search..."
           />
 
-          {/* Previous & Next Chapter Navigation Buttons matching the reference design */}
+          {/* Previous and next chapter navigation */}
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
             <button
               style={{
@@ -884,7 +886,7 @@ export function BiblePanel() {
               const borderStyle = isLive
                 ? '1px solid #FF5500'
                 : isPreview
-                ? '1px solid #3b82f6'
+                ? '1px solid var(--tally-preview)'
                 : isSelectedMulti
                 ? '1px solid #FF5500'
                 : isHighlighted
@@ -951,7 +953,7 @@ export function BiblePanel() {
                   {isLive && <span style={styles.liveBadge}>LIVE</span>}
                   {isPreview && !isLive && <span style={styles.previewBadge}>PREVIEW</span>}
 
-                  {/* Verse Body Text (Single Line with Ellipsis matching the reference design) */}
+                  {/* Verse body text — single line, ellipsised */}
                   <span
                     style={{
                       flex: 1,
@@ -1119,7 +1121,7 @@ const styles: Record<string, React.CSSProperties> = {
   textMode: { minHeight: 360, height: '100%', resize: 'none', whiteSpace: 'pre-wrap', lineHeight: 1.55 },
   footerNote: { marginTop: 10, ...type.caption, color: 'var(--text-dim)' },
   liveBadge: { ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#FF5500', color: '#fff', flexShrink: 0, lineHeight: 1.4, whiteSpace: 'nowrap' },
-  previewBadge: { ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#3b82f6', color: '#fff', flexShrink: 0, lineHeight: 1.4, whiteSpace: 'nowrap' },
+  previewBadge: { ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: 'var(--tally-preview)', color: '#fff', flexShrink: 0, lineHeight: 1.4, whiteSpace: 'nowrap' },
   resultsHeading: {
     ...type.label,
     fontWeight: fontWeight.semibold,
@@ -1134,7 +1136,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
     fontSize: 12,
     fontWeight: 600,
-    color: '#22c55e',
+    color: 'var(--tally-preview)',
     minWidth: 52,
     flexShrink: 0,
   },
@@ -1142,17 +1144,17 @@ const styles: Record<string, React.CSSProperties> = {
     width: 6,
     height: 6,
     borderRadius: '50%',
-    background: '#22c55e',
+    background: 'var(--tally-preview)',
     flexShrink: 0,
   },
   resultRef: { fontSize: 12, fontWeight: 700, color: '#FF5500', flexShrink: 0, whiteSpace: 'nowrap' },
   versionChip: {
     fontSize: 10,
     fontWeight: 600,
-    color: '#a1a1aa',
+    color: 'var(--text-dim)',
     background: '#232221',
     border: '1px solid #262628',
-    borderRadius: 10,
+    borderRadius: 6,
     padding: '1px 7px',
     flexShrink: 0,
     whiteSpace: 'nowrap',

@@ -4,6 +4,7 @@ import { ShapeInspector } from '../ShapeInspector';
 import { SlideTextPanel } from '../SlideTextPanel';
 import { CustomDropdown } from '../CustomDropdown';
 import { AppleToggle } from '../AppleToggle';
+import { slideElementsFor } from '../NativeSlideBoard';
 import type { ParsedShape } from '../../slide-engine/parser/slide-parser';
 import type { PresentationSlide, SlideElement } from '../../types';
 
@@ -77,18 +78,75 @@ const FONT_WEIGHTS = [
   { value: '900', label: 'Black (900)' },
 ];
 
+/* The sizes the app's own templates and defaults actually use — 26, 32, 36,
+   48, 54, 64 — were missing from this list, so opening a stock slide showed a
+   size the menu could not offer back once you had moved off it. */
 const FONT_SIZES = [
-  { value: '16', label: '16' },
-  { value: '24', label: '24' },
-  { value: '32', label: '32' },
-  { value: '42', label: '42' },
-  { value: '48', label: '48' },
-  { value: '54', label: '54' },
-  { value: '64', label: '64' },
-  { value: '72', label: '72' },
-  { value: '96', label: '96' },
-  { value: '120', label: '120' },
-];
+  '12', '14', '16', '18', '20', '24', '26', '28', '32', '36', '40', '42',
+  '48', '54', '60', '64', '72', '80', '96', '120', '144',
+].map((v) => ({ value: v, label: v }));
+
+/**
+ * A CSS colour as a `#rrggbb` string, or null if it is not one yet.
+ *
+ * `<input type="color">` only accepts that exact form — hand it `rgba(255,
+ * 255, 255, 0.85)`, which is what the default body element carries, and
+ * Chromium silently shows black. Shorthand is expanded; anything else (a named
+ * colour, a partly-typed hex) returns null so the caller can decline to commit.
+ */
+function normalizeHex(value: string | undefined): string | null {
+  if (!value) return null;
+  const hex = value.trim();
+  if (/^#[0-9a-f]{6}$/i.test(hex)) return hex.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(hex)) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`.toLowerCase();
+  }
+  const rgb = hex.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgb) {
+    const to2 = (n: string) => Math.min(255, parseInt(n, 10)).toString(16).padStart(2, '0');
+    return `#${to2(rgb[1])}${to2(rgb[2])}${to2(rgb[3])}`;
+  }
+  return null;
+}
+
+/* Drawn rather than typed. The four horizontal buttons all rendered '≡' bar
+   one, so three of them were the same picture and the group looked inert
+   whichever you pressed. */
+function AlignIcon({ align }: { align: 'left' | 'center' | 'right' | 'justify' }) {
+  const rows: Array<[number, number]> = align === 'left'
+    ? [[1, 14], [1, 9], [1, 14], [1, 9]]
+    : align === 'right'
+    ? [[1, 14], [6, 9], [1, 14], [6, 9]]
+    : align === 'center'
+    ? [[1, 14], [3.5, 9], [1, 14], [3.5, 9]]
+    : [[1, 14], [1, 14], [1, 14], [1, 14]];
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      {rows.map(([x, w], i) => (
+        <rect key={i} x={x} y={2.5 + i * 3.2} width={w} height="1.6" rx="0.8" fill="currentColor" />
+      ))}
+    </svg>
+  );
+}
+
+function VAlignIcon({ vAlign }: { vAlign: 'top' | 'middle' | 'bottom' }) {
+  const barY = vAlign === 'top' ? 2 : vAlign === 'bottom' ? 12.4 : 7.2;
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="1" y={barY} width="14" height="1.6" rx="0.8" fill="currentColor" />
+      <rect
+        x="4.5"
+        y={vAlign === 'top' ? 5.2 : vAlign === 'bottom' ? 5.2 : 2}
+        width="7"
+        height={vAlign === 'middle' ? 4.4 : 8.4}
+        rx="1"
+        fill="currentColor"
+        opacity="0.45"
+      />
+      {vAlign === 'middle' && <rect x="4.5" y="9.6" width="7" height="4.4" rx="1" fill="currentColor" opacity="0.45" />}
+    </svg>
+  );
+}
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -139,14 +197,55 @@ export function SlideEditorRightSidebar({
   const bgType = slide.background?.type || 'color';
   const bgValue = slide.background?.value || '#18181b';
 
-  const nativeElements = slide.elements || [];
+  /* Through the same helper both canvases render with, so a slide that has
+     never been touched still shows its default title and body here — reading
+     `slide.elements` straight gave an empty list for exactly those slides, and
+     the inspector had nothing to point at. */
+  const nativeElements = slideElementsFor(slide);
   const nativeRows = nativeLayerRows(nativeElements, selectedElement?.id || null);
 
-  // Target element for text inspector (either explicitly selected text element or first text element)
+  /**
+   * Which element the Typography controls act on.
+   *
+   * This used to fall through to `elements.find(type === 'text')` whenever the
+   * selection was not text, which produced the two complaints this panel
+   * earns: select a shape and the font controls silently retype some other
+   * block, or — on a slide with no text at all — appear live and do nothing.
+   *
+   * Now it is one of three states, and the panel says which:
+   *   text selected      → edit that element
+   *   nothing selected   → edit the slide's first text element, named in the
+   *                        header so the operator knows what will change
+   *   non-text selected  → null, and Typography does not render at all
+   */
+  const firstTextElement = nativeElements.find((e) => e.type === 'text') || null;
   const targetTextElement =
-    selectedElement && selectedElement.type === 'text'
-      ? selectedElement
-      : nativeElements.find((e) => e.type === 'text') || null;
+    selectedElement
+      ? (selectedElement.type === 'text' ? selectedElement : null)
+      : firstTextElement;
+  const typographyScope = selectedElement
+    ? (selectedElement.type === 'text' ? 'selected' : 'unavailable')
+    : (firstTextElement ? 'default' : 'unavailable');
+
+  /** Every Typography control writes through here, so none of them can act on
+      a target that is not there. */
+  const setText = (updates: Partial<SlideElement>) => {
+    if (targetTextElement) onUpdateElement(targetTextElement.id, updates);
+  };
+
+  /* Free-typed fields — line height, letter spacing, the hex box — need
+     somewhere to hold a half-finished value. Without it `parseFloat('1.')` is
+     NaN and `#FF55` is not a colour, and committing either on every keystroke
+     is what made these three feel like they fought back. The draft is keyed by
+     element and field, so changing selection drops it. */
+  const [draft, setDraft] = useState<{ key: string; value: string } | null>(null);
+  const draftKey = (field: string) => `${targetTextElement?.id || 'none'}:${field}`;
+  const fieldValue = (field: string, actual: string | number) =>
+    draft && draft.key === draftKey(field) ? draft.value : String(actual);
+  const editField = (field: string, value: string, commit: (v: string) => void) => {
+    setDraft({ key: draftKey(field), value });
+    commit(value);
+  };
 
   function handleNativeReorder(from: number, to: number) {
     const order = [...nativeRows];
@@ -203,7 +302,7 @@ export function SlideEditorRightSidebar({
               padding: '10px 8px',
               background: activeTab === tab ? '#1c1e26' : 'transparent',
               border: 'none',
-              borderBottom: activeTab === tab ? '2px solid #f4621f' : '2px solid transparent',
+              borderBottom: activeTab === tab ? '2px solid #FF5500' : '2px solid transparent',
               color: activeTab === tab ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
               fontSize: 12,
               fontWeight: 700,
@@ -255,7 +354,7 @@ export function SlideEditorRightSidebar({
                           onClick={() => onUpdateSlide({ aspectRatio: ratio })}
                           style={{
                             ...styles.pillBtn,
-                            background: (slide.aspectRatio || '16:9') === ratio ? '#f4621f' : 'transparent',
+                            background: (slide.aspectRatio || '16:9') === ratio ? '#FF5500' : 'transparent',
                             color: (slide.aspectRatio || '16:9') === ratio ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
                           }}
                         >
@@ -272,7 +371,7 @@ export function SlideEditorRightSidebar({
                         type="checkbox"
                         checked={lockAspect}
                         onChange={(e) => setLockAspect(e.target.checked)}
-                        style={{ accentColor: '#f4621f', cursor: 'pointer' }}
+                        style={{ accentColor: '#FF5500', cursor: 'pointer' }}
                       />
                       Lock aspect ratio
                     </label>
@@ -333,7 +432,7 @@ export function SlideEditorRightSidebar({
                           background:
                             (type === 'none' && bgValue === 'transparent') ||
                             (type !== 'none' && bgType === type && bgValue !== 'transparent')
-                              ? '#f4621f'
+                              ? '#FF5500'
                               : 'transparent',
                           color:
                             (type === 'none' && bgValue === 'transparent') ||
@@ -384,7 +483,7 @@ export function SlideEditorRightSidebar({
                           style={{
                             height: 28,
                             background: grad,
-                            border: bgValue === grad ? '2px solid #f4621f' : '1px solid rgba(255, 255, 255, 0.1)',
+                            border: bgValue === grad ? '2px solid #FF5500' : '1px solid rgba(255, 255, 255, 0.1)',
                             borderRadius: 6,
                             cursor: 'pointer',
                           }}
@@ -428,11 +527,32 @@ export function SlideEditorRightSidebar({
               )}
             </div>
 
-            {/* Typography Section (Apple style) */}
+            {/* Typography. Hidden outright when the selection is a shape or an
+                image: a control that cannot act on what is selected is worse
+                than a control that is not there, because it invites the click
+                and then swallows it. */}
+            {typographyScope === 'unavailable' ? (
+              selectedElement && (
+                <div style={styles.sectionCard}>
+                  <div style={styles.sectionHeader}>
+                    <span style={{ ...styles.sectionTitle, color: 'var(--text-dim)' }}>Typography</span>
+                  </div>
+                  <div style={{ ...styles.sectionBody, color: 'var(--text-dim)', fontSize: 11 }}>
+                    {selectedElement.type === 'shape' ? 'A shape has no type.' : 'An image has no type.'} Select a
+                    text block to set its font.
+                  </div>
+                </div>
+              )
+            ) : (
             <div style={styles.sectionCard}>
               <div style={styles.sectionHeader} onClick={() => toggleSection('typography')}>
                 <span style={styles.sectionTitle}>
-                  Typography {targetTextElement ? '' : '(Default Slide Text)'}
+                  Typography
+                  {typographyScope === 'default' && targetTextElement && (
+                    <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>
+                      {' '}— {(targetTextElement.content || 'first text block').toString().trim().slice(0, 18) || 'first text block'}
+                    </span>
+                  )}
                 </span>
                 <ChevronIcon open={Boolean(openSections.typography)} />
               </div>
@@ -445,11 +565,7 @@ export function SlideEditorRightSidebar({
                     <CustomDropdown
                       value={targetTextElement?.fontFamily || 'Inter'}
                       options={FONT_FAMILIES}
-                      onChange={(font) => {
-                        if (targetTextElement) {
-                          onUpdateElement(targetTextElement.id, { fontFamily: font });
-                        }
-                      }}
+                      onChange={(font) => setText({ fontFamily: font })}
                     />
                   </div>
 
@@ -458,25 +574,20 @@ export function SlideEditorRightSidebar({
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Weight</span>
                       <CustomDropdown
-                        value={String(targetTextElement?.fontWeight || '600')}
+                        value={String(targetTextElement?.fontWeight ?? 600)}
                         options={FONT_WEIGHTS}
-                        onChange={(wt) => {
-                          if (targetTextElement) {
-                            onUpdateElement(targetTextElement.id, { fontWeight: wt });
-                          }
-                        }}
+                        /* As a number: the dropdown hands back a string, and a
+                           stored '700' failed the `fontWeight ?? 600` readback
+                           comparisons elsewhere that expect the numeric form. */
+                        onChange={(wt) => setText({ fontWeight: parseInt(wt, 10) })}
                       />
                     </div>
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Size</span>
                       <CustomDropdown
-                        value={String(targetTextElement?.fontSize || 42)}
+                        value={String(targetTextElement?.fontSize ?? 42)}
                         options={FONT_SIZES}
-                        onChange={(sz) => {
-                          if (targetTextElement) {
-                            onUpdateElement(targetTextElement.id, { fontSize: parseInt(sz, 10) });
-                          }
-                        }}
+                        onChange={(sz) => setText({ fontSize: parseInt(sz, 10) })}
                       />
                     </div>
                   </div>
@@ -491,13 +602,17 @@ export function SlideEditorRightSidebar({
                           type="number"
                           step="0.1"
                           min="0.5"
-                          max="3.0"
-                          value={targetTextElement?.lineHeight || 1.3}
-                          onChange={(e) => {
-                            if (targetTextElement) {
-                              onUpdateElement(targetTextElement.id, { lineHeight: parseFloat(e.target.value) });
-                            }
-                          }}
+                          max="3"
+                          value={fieldValue('lineHeight', targetTextElement?.lineHeight ?? 1.3)}
+                          onChange={(e) => editField('lineHeight', e.target.value, (v) => {
+                            const n = parseFloat(v);
+                            /* An empty box, or a half-typed '1.', parses to NaN
+                               — and NaN written into the element takes the text
+                               block's layout down with it. Held until the value
+                               is a number. */
+                            if (Number.isFinite(n) && n >= 0.5 && n <= 3) setText({ lineHeight: n });
+                          })}
+                          onBlur={() => setDraft(null)}
                           style={styles.iconInput}
                         />
                       </div>
@@ -509,12 +624,14 @@ export function SlideEditorRightSidebar({
                         <input
                           type="number"
                           step="1"
-                          value={targetTextElement?.letterSpacing || 0}
-                          onChange={(e) => {
-                            if (targetTextElement) {
-                              onUpdateElement(targetTextElement.id, { letterSpacing: parseInt(e.target.value, 10) });
-                            }
-                          }}
+                          min="-20"
+                          max="80"
+                          value={fieldValue('letterSpacing', targetTextElement?.letterSpacing ?? 0)}
+                          onChange={(e) => editField('letterSpacing', e.target.value, (v) => {
+                            const n = parseFloat(v);
+                            if (Number.isFinite(n) && n >= -20 && n <= 80) setText({ letterSpacing: n });
+                          })}
+                          onBlur={() => setDraft(null)}
                           style={styles.iconInput}
                         />
                         <span style={{ fontSize: 10, color: 'var(--text-dim)', paddingRight: 4 }}>px</span>
@@ -528,25 +645,36 @@ export function SlideEditorRightSidebar({
                     <div style={styles.colorPillRow}>
                       <input
                         type="color"
-                        value={targetTextElement?.color?.startsWith('#') ? targetTextElement.color : '#ffffff'}
+                        value={normalizeHex(targetTextElement?.color) || '#ffffff'}
                         onChange={(e) => {
-                          if (targetTextElement) {
-                            onUpdateElement(targetTextElement.id, { color: e.target.value });
-                          }
+                          setDraft(null);
+                          setText({ color: e.target.value });
                         }}
                         style={styles.colorSwatch}
                       />
                       <input
                         type="text"
-                        value={(targetTextElement?.color || '#FFFFFF').toUpperCase()}
-                        onChange={(e) => {
-                          if (targetTextElement) {
-                            onUpdateElement(targetTextElement.id, { color: e.target.value });
-                          }
+                        spellCheck={false}
+                        value={fieldValue('color', (targetTextElement?.color || '#FFFFFF').toUpperCase())}
+                        onChange={(e) => editField('color', e.target.value, (v) => {
+                          /* Six digits exactly while typing. Shorthand is a real
+                             colour, so accepting it here meant '#FF5500' flashed
+                             yellow on its way past '#FF5' — every prefix of a hex
+                             you are half-way through repainting the slide. Blur
+                             below still takes shorthand, so '#F50' typed and
+                             committed on its own works. */
+                          if (/^#[0-9a-f]{6}$/i.test(v.trim())) setText({ color: v.trim().toLowerCase() });
+                        })}
+                        onBlur={(e) => {
+                          const hex = normalizeHex(e.target.value);
+                          if (hex) setText({ color: hex });
+                          setDraft(null);
                         }}
                         style={styles.colorHexInput}
                       />
-                      <span style={styles.opacityBadge}>100%</span>
+                      <span style={styles.opacityBadge}>
+                        {Math.round((targetTextElement?.opacity ?? 1) * 100)}%
+                      </span>
                     </div>
                   </div>
 
@@ -556,48 +684,46 @@ export function SlideEditorRightSidebar({
                     <div style={{ display: 'flex', gap: 6 }}>
                       {/* Horizontal Alignment */}
                       <div style={{ ...styles.segmentGroup, flex: 1 }}>
-                        {(['left', 'center', 'right', 'justify'] as const).map((align) => (
-                          <button
-                            key={align}
-                            type="button"
-                            onClick={() => {
-                              if (targetTextElement) {
-                                onUpdateElement(targetTextElement.id, { textAlign: align });
-                              }
-                            }}
-                            style={{
-                              ...styles.segmentBtn,
-                              background: (targetTextElement?.textAlign || 'center') === align ? '#2c2c30' : 'transparent',
-                              color: (targetTextElement?.textAlign || 'center') === align ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
-                            }}
-                            title={`Align ${align}`}
-                          >
-                            {align === 'left' ? '≡' : align === 'center' ? '≣' : align === 'right' ? '≡' : '≡'}
-                          </button>
-                        ))}
+                        {(['left', 'center', 'right', 'justify'] as const).map((align) => {
+                          const on = (targetTextElement?.textAlign || 'center') === align;
+                          return (
+                            <button
+                              key={align}
+                              type="button"
+                              onClick={() => setText({ textAlign: align })}
+                              style={{
+                                ...styles.segmentBtn,
+                                background: on ? '#2c2c30' : 'transparent',
+                                color: on ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
+                              }}
+                              title={`Align ${align}`}
+                            >
+                              <AlignIcon align={align} />
+                            </button>
+                          );
+                        })}
                       </div>
 
                       {/* Vertical Alignment */}
                       <div style={{ ...styles.segmentGroup, width: 90 }}>
-                        {(['top', 'middle', 'bottom'] as const).map((vAlign) => (
-                          <button
-                            key={vAlign}
-                            type="button"
-                            onClick={() => {
-                              if (targetTextElement) {
-                                onUpdateElement(targetTextElement.id, { vAlign });
-                              }
-                            }}
-                            style={{
-                              ...styles.segmentBtn,
-                              background: (targetTextElement?.vAlign || 'middle') === vAlign ? '#2c2c30' : 'transparent',
-                              color: (targetTextElement?.vAlign || 'middle') === vAlign ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
-                            }}
-                            title={`Vertical ${vAlign}`}
-                          >
-                            {vAlign === 'top' ? '⤒' : vAlign === 'middle' ? '⤓' : '⤓'}
-                          </button>
-                        ))}
+                        {(['top', 'middle', 'bottom'] as const).map((vAlign) => {
+                          const on = (targetTextElement?.vAlign || 'middle') === vAlign;
+                          return (
+                            <button
+                              key={vAlign}
+                              type="button"
+                              onClick={() => setText({ vAlign })}
+                              style={{
+                                ...styles.segmentBtn,
+                                background: on ? '#2c2c30' : 'transparent',
+                                color: on ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
+                              }}
+                              title={`Vertical ${vAlign}`}
+                            >
+                              <VAlignIcon vAlign={vAlign} />
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -608,24 +734,25 @@ export function SlideEditorRightSidebar({
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Decoration</span>
                       <div style={styles.segmentGroup}>
-                        {(['none', 'underline', 'line-through'] as const).map((deco) => (
-                          <button
-                            key={deco}
-                            type="button"
-                            onClick={() => {
-                              if (targetTextElement) {
-                                onUpdateElement(targetTextElement.id, { textDecoration: deco });
-                              }
-                            }}
-                            style={{
-                              ...styles.segmentBtn,
-                              background: (targetTextElement?.textDecoration || 'none') === deco ? '#2c2c30' : 'transparent',
-                              color: (targetTextElement?.textDecoration || 'none') === deco ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
-                            }}
-                          >
-                            {deco === 'none' ? '―' : deco === 'underline' ? 'U' : 'S'}
-                          </button>
-                        ))}
+                        {(['none', 'underline', 'line-through'] as const).map((deco) => {
+                          const on = (targetTextElement?.textDecoration || 'none') === deco;
+                          return (
+                            <button
+                              key={deco}
+                              type="button"
+                              onClick={() => setText({ textDecoration: deco })}
+                              style={{
+                                ...styles.segmentBtn,
+                                background: on ? '#2c2c30' : 'transparent',
+                                color: on ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
+                                textDecoration: deco === 'none' ? undefined : deco,
+                              }}
+                              title={deco === 'none' ? 'No decoration' : deco === 'underline' ? 'Underline' : 'Strikethrough'}
+                            >
+                              {deco === 'none' ? '―' : deco === 'underline' ? 'U' : 'S'}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -633,32 +760,32 @@ export function SlideEditorRightSidebar({
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Case</span>
                       <div style={styles.segmentGroup}>
-                        {(['none', 'uppercase', 'capitalize', 'lowercase'] as const).map((tc) => (
-                          <button
-                            key={tc}
-                            type="button"
-                            onClick={() => {
-                              if (targetTextElement) {
-                                onUpdateElement(targetTextElement.id, { textTransform: tc });
-                              }
-                            }}
-                            style={{
-                              ...styles.segmentBtn,
-                              background: (targetTextElement?.textTransform || 'none') === tc ? '#2c2c30' : 'transparent',
-                              color: (targetTextElement?.textTransform || 'none') === tc ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
-                              fontWeight: tc === 'uppercase' ? 700 : 500,
-                            }}
-                            title={`Case: ${tc}`}
-                          >
-                            {tc === 'none' ? '―' : tc === 'uppercase' ? 'BS' : tc === 'capitalize' ? 'Bs' : 'bs'}
-                          </button>
-                        ))}
+                        {(['none', 'uppercase', 'capitalize', 'lowercase'] as const).map((tc) => {
+                          const on = (targetTextElement?.textTransform || 'none') === tc;
+                          return (
+                            <button
+                              key={tc}
+                              type="button"
+                              onClick={() => setText({ textTransform: tc })}
+                              style={{
+                                ...styles.segmentBtn,
+                                background: on ? '#2c2c30' : 'transparent',
+                                color: on ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
+                                fontWeight: tc === 'uppercase' ? 700 : 500,
+                              }}
+                              title={`Case: ${tc}`}
+                            >
+                              {tc === 'none' ? '―' : tc === 'uppercase' ? 'BS' : tc === 'capitalize' ? 'Bs' : 'bs'}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
                 </div>
               )}
             </div>
+            )}
 
             {/* Shape Style & Border Section */}
             {selectedElement && (selectedElement.type === 'shape' || selectedElement.type === 'image') && (
@@ -679,7 +806,7 @@ export function SlideEditorRightSidebar({
                         max="50"
                         value={selectedElement.borderRadius || 0}
                         onChange={(e) => onUpdateElement(selectedElement.id, { borderRadius: parseInt(e.target.value, 10) })}
-                        style={{ accentColor: '#f4621f' }}
+                        style={{ accentColor: '#FF5500' }}
                       />
                     </div>
 
@@ -690,13 +817,13 @@ export function SlideEditorRightSidebar({
                         <div style={styles.colorPillRow}>
                           <input
                             type="color"
-                            value={selectedElement.backgroundColor?.startsWith('#') ? selectedElement.backgroundColor : '#f4621f'}
+                            value={selectedElement.backgroundColor?.startsWith('#') ? selectedElement.backgroundColor : '#FF5500'}
                             onChange={(e) => onUpdateElement(selectedElement.id, { backgroundColor: e.target.value })}
                             style={styles.colorSwatch}
                           />
                           <input
                             type="text"
-                            value={(selectedElement.backgroundColor || '#F4621F').toUpperCase()}
+                            value={(selectedElement.backgroundColor || '#FF5500').toUpperCase()}
                             onChange={(e) => onUpdateElement(selectedElement.id, { backgroundColor: e.target.value })}
                             style={styles.colorHexInput}
                           />
@@ -837,7 +964,7 @@ export function SlideEditorRightSidebar({
               type="button"
               style={{
                 padding: '8px 12px',
-                background: '#f4621f',
+                background: '#FF5500',
                 border: 'none',
                 borderRadius: 6,
                 color: '#ffffff',
@@ -872,7 +999,7 @@ const styles: Record<string, React.CSSProperties> = {
   sectionCard: {
     background: '#1a1a1e',
     border: '1px solid rgba(255, 255, 255, 0.07)',
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: 'hidden',
   },
   sectionHeader: {

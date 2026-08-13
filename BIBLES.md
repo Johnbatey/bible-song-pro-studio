@@ -16,9 +16,26 @@ in `VERSION_META` in `src/electron/bible-service.cjs`.
 | `Darby` | Darby Translation | 1890 | English | eBible.org `engDBY` | Public domain |
 | `YLT` | Young's Literal Translation | 1862 / 1898 | English | eBible.org `engylt` | Public domain |
 | `LSG` | Louis Segond | 1910 | French | eBible.org `fraLSG` | Public domain |
+| `OST` | Ostervald | 1881 | French | eBible.org `fra_fob` | Public domain |
+| `RV1909` | Reina-Valera | 1909 | Spanish | eBible.org `spaRV1909` | Public domain |
 
 eBible.org lists each of these as `public domain`, `Redistributable: True`, with
 39 Old Testament books, 27 New Testament books and **0 deuterocanonical books**.
+
+## Why not VBL, or Ostervald 1996
+
+Both were advertised by a Settings mockup ("Language packs") that downloaded
+nothing. Neither qualifies:
+
+- **VBL** (Versión Biblia Libre) is redistributable but **not public domain** —
+  eBible lists it as `Copyright © 2018-2020 Jonathan Gallagher y Shelly Barrios
+  de Avila`. Free to pass on is not the same as free of copyright, and this list
+  is public domain only. `RV1909` is the public-domain Spanish text, and it is
+  what ships.
+- **Ostervald 1996** is a modern revision under copyright (Société Biblique de
+  Genève). The `OST` here is eBible's `fra_fob`, the public-domain Ostervald.
+
+Both are in `FORBIDDEN_CODES` so neither can be added back by mistake.
 
 ## Why not NIV, NKJV, NLT, NASB or ESV
 

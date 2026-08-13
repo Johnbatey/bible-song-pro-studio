@@ -113,7 +113,7 @@ export function CustomDropdown<T extends string = string>({
           style={{
             transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 0.15s ease',
-            color: 'var(--text-dim, #d4d4d8)',
+            color: 'var(--text-dim)',
             flexShrink: 0,
           }}
         >
@@ -134,7 +134,7 @@ export function CustomDropdown<T extends string = string>({
             maxWidth: 360,
             background: 'var(--bg-secondary, #161414)',
             border: '1px solid var(--border-primary, #262628)',
-            borderRadius: 8,
+            borderRadius: 6,
             boxShadow: '0 16px 40px rgba(0, 0, 0, 0.85)',
             padding: 4,
             display: 'flex',
@@ -184,7 +184,7 @@ export function CustomDropdown<T extends string = string>({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
                   {opt.sublabel && (
-                    <span style={{ fontSize: 11, color: 'var(--text-dim, #d4d4d8)', fontWeight: 400 }}>{opt.sublabel}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 400 }}>{opt.sublabel}</span>
                   )}
                 </div>
                 {isSelected && (

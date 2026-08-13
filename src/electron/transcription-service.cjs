@@ -68,7 +68,14 @@ function createTranscriptionService({ app }) {
     return { ...result, activeEngine: payload.engine || activeEngine };
   }
 
-  return { status, setActiveEngine, warmup, transcribe, dispose };
+  /* Which on-device model runs. Only the ONNX engine has a choice — the MLX
+     path loads whatever the operator put in its folder — so this addresses it
+     directly rather than going through getEngine(). */
+  function setLocalModel(value) {
+    return onnx.setModel(value);
+  }
+
+  return { status, setActiveEngine, warmup, transcribe, dispose, setLocalModel };
 }
 
 module.exports = { createTranscriptionService };

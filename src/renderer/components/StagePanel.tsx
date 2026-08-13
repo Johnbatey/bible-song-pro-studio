@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Block } from './Block';
 import { fontWeight } from '../styles/type';
-import { useAppStore } from '../stores/appStore';
 import { CustomDropdown } from './CustomDropdown';
 import { StageSettingsPopover } from './StageSettingsPopover';
 import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
@@ -47,7 +46,35 @@ function clampZoom(v: number) {
 }
 
 export function StagePanel() {
-  const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
+  /* Whether a stage screen is up — asked for once, then kept current by the
+     main process. This deliberately does not read `isExternalDisplayActive`:
+     that is the projector, and the lamp on this pill answers for the stage.
+     A control that lit when a different output came on was reporting the
+     wrong signal, which is the one thing a tally may never do. */
+  const [stageOpen, setStageOpen] = useState(false);
+  const [stageBusy, setStageBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    window.BSP?.isStageDisplayOpen?.().then((open) => { if (alive) setStageOpen(open); }).catch(() => {});
+    const off = window.BSP?.onStageDisplayState?.((open) => setStageOpen(open));
+    return () => { alive = false; off?.(); };
+  }, []);
+
+  /* Guarded, because opening a BrowserWindow is not instant and a second
+     click during the gap would ask for a second stage screen. */
+  const toggleStageDisplay = useCallback(async () => {
+    if (stageBusy) return;
+    setStageBusy(true);
+    try {
+      if (stageOpen) await window.BSP?.closeStageDisplay?.();
+      else await window.BSP?.openStageDisplay?.();
+    } catch {
+      /* The broadcast is the source of truth either way — nothing to repair. */
+    } finally {
+      setStageBusy(false);
+    }
+  }, [stageOpen, stageBusy]);
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; ox: number; oy: number } | null>(null);
@@ -210,22 +237,33 @@ export function StagePanel() {
       bodyStyle={{ display: 'flex', overflow: 'hidden' }}
       footer={(
         <div style={styles.footerGrid}>
-          {/* Left: live STAGE status pill */}
+          {/* Left: the STAGE lamp, which is also the switch.
+              Orange when a stage screen is up — the brand's one rule is that
+              if it is orange it is on a screen — and Hold grey when there is
+              none, the same pairing the status bar uses for the projector.
+              Green is not the off state: in this app green means cued, and a
+              stage that is not up is not cued, it is standby. */}
           <div style={styles.footerLeft}>
-            <div
+            <button
+              type="button"
+              onClick={toggleStageDisplay}
+              aria-pressed={stageOpen}
+              title={stageOpen ? 'Close the stage display' : 'Open the stage display'}
               style={{
                 ...styles.stagePill,
-                background: isExternalDisplayActive ? 'rgba(34,197,94,0.15)' : 'var(--chrome-control)',
-                borderColor: isExternalDisplayActive ? 'rgba(34,197,94,0.4)' : 'var(--block-line)',
+                background: stageOpen ? 'rgba(255,85,0,0.15)' : 'var(--chrome-control)',
+                borderColor: stageOpen ? 'rgba(255,85,0,0.45)' : 'var(--block-line)',
+                cursor: stageBusy ? 'progress' : 'pointer',
+                opacity: stageBusy ? 0.7 : 1,
               }}
             >
               <span style={{
                 ...styles.pillDot,
-                background: isExternalDisplayActive ? '#22c55e' : 'var(--text-dim)',
-                boxShadow: isExternalDisplayActive ? '0 0 6px rgba(34,197,94,0.8)' : 'none',
+                background: stageOpen ? 'var(--tally-program)' : 'var(--tally-hold)',
+                boxShadow: stageOpen ? '0 0 6px rgba(255,85,0,0.8)' : 'none',
               }} />
               STAGE
-            </div>
+            </button>
 
             {/* The stage's service timer. The zone has always been on the
                 default layout; until now nothing in the app could start it. */}
@@ -378,6 +416,10 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '3px 10px', borderRadius: 6, border: '1px solid',
     fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: '#ffffff',
     userSelect: 'none', transition: 'background 0.2s ease, border-color 0.2s ease',
+    /* A <button> now, so the two properties a button would otherwise supply
+       for itself have to be stated. Everything else it inherits or is set
+       above. */
+    fontFamily: 'var(--font-ui)', lineHeight: 1.6,
   },
   pillDot: {
     width: 6, height: 6, borderRadius: '50%',

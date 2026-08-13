@@ -1,5 +1,28 @@
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog, systemPreferences, session, Menu, MenuItem, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog, systemPreferences, session, Menu, MenuItem, nativeTheme, shell } = require('electron');
 nativeTheme.themeSource = 'dark';
+
+/* -------------------------------------------------------------------------
+   Nothing on the projector is allowed to pause because nobody is looking at
+   the operator's window.
+
+   Chromium assumes a window nobody can see is a window nobody is watching, and
+   it is right about every window except ours. Three separate mechanisms stop a
+   backgrounded page: timers are throttled to once a second, the renderer
+   process itself is deprioritised, and — the one that actually froze the video
+   here — a window the compositor believes is occluded stops being painted at
+   all. `backgroundThrottling: false` on the window answers only the first.
+
+   The audience display spends the whole service behind the operator's app or
+   on a screen the Mac counts as covered, so all three had to go. The NDI feed
+   is captured off that window's frames, which is why the stream froze with it:
+   there were no new frames to send.
+
+   Set here because switches are read when Chromium starts, and app.whenReady()
+   is already too late.
+   ------------------------------------------------------------------------- */
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -65,28 +88,51 @@ let verseDetectionService = null;
  * process doesn't need to parse the renderer bundle.
  */
 const DOCK_DEFS = [
-  // Workspace panels — always present; no TitleBar pill for some of these,
-  // so the native menu is the primary way to re-open them.
-  { id: 'output', label: 'Output' },
-  { id: 'transcript', label: 'Live Transcript' },
-  { id: 'history', label: 'History' },
-  { id: 'queue', label: 'Queue' },
-  null, // separator
-  // Content panels — all have TitleBar pill tabs too.
-  { id: 'bible', label: 'Bible' },
+  /* Sources — what goes on the screen. */
+  { id: 'bible', label: 'Scripture' },
   { id: 'songs', label: 'Songs' },
   { id: 'presentation', label: 'Pro Slides' },
-  { id: 'live', label: 'Live Scripture' },
   { id: 'media', label: 'Media' },
+  null, // separator
+  /* Displays — the screens it goes to. */
+  { id: 'output', label: 'Output' },
   { id: 'stage', label: 'Stage Display' },
+  null,
+  /* Service — what is running right now. */
+  { id: 'live', label: 'Live Scripture' },
+  { id: 'transcript', label: 'Live Transcript' },
+  { id: 'queue', label: 'Queue' },
+  { id: 'history', label: 'History' },
+  null,
+  /* Looks — how all of it is dressed. */
   { id: 'scenes', label: 'Scenes' },
   { id: 'themes', label: 'Themes' },
 ];
 
 /**
+/**
+ * What the renderer last told us about saved arrangements. Held here because
+ * the Menu is rebuilt from scratch on every sync and both halves — the Dock
+ * checkmarks and the Workspace list — have to be present each time.
+ */
+let menuWorkspaces = { list: [], activeId: null };
+
+/* The last dock ids the renderer reported. Kept because the Menu is rebuilt
+   whole on every sync, and a Workspace sync must not wipe the Dock ticks. */
+let menuOpenIds = [];
+
+/** Sends a Workspace menu action to the renderer, which owns the layout. */
+function sendWorkspaceCommand(action, id) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('workspace:command', { action, id: id || null });
+  }
+}
+
+/**
  * Rebuilds and installs the full application Menu. Called once at startup
  * (with an empty openIds list) and again every time the renderer pushes a
- * `dock:syncMenu` event so checkmarks stay in sync with the dockview layout.
+ * `dock:syncMenu` or `workspace:sync` event, so the Dock checkmarks and the
+ * Workspace list both stay in step with what the renderer actually holds.
  */
 function buildAppMenu(openIds) {
   const openSet = new Set(openIds || []);
@@ -114,6 +160,91 @@ function buildAppMenu(openIds) {
         mainWindow.webContents.send('dock:resetLayout');
       }
     },
+  }));
+
+  /* The Workspace menu.
+     
+     Saved arrangements come first so the list reads as the thing this menu is
+     about; the verbs sit underneath. The default is a menu item rather than a
+     stored record because it is generated in code — there is nothing on disk
+     to update, rename or delete, and the items that would act on it are
+     disabled accordingly. */
+  const active = menuWorkspaces.list.find((w) => w.id === menuWorkspaces.activeId) || null;
+  const activeLabel = active ? `“${active.name}”` : 'Default Layout';
+
+  const workspaceItems = [
+    new MenuItem({
+      label: 'Default Layout',
+      type: 'checkbox',
+      checked: !active,
+      click() { sendWorkspaceCommand('activate', null); },
+    }),
+  ];
+
+  if (menuWorkspaces.list.length > 0) {
+    workspaceItems.push(new MenuItem({ type: 'separator' }));
+    for (const ws of menuWorkspaces.list) {
+      workspaceItems.push(new MenuItem({
+        label: ws.name,
+        type: 'checkbox',
+        checked: ws.id === menuWorkspaces.activeId,
+        click() { sendWorkspaceCommand('activate', ws.id); },
+      }));
+    }
+  }
+
+  workspaceItems.push(new MenuItem({ type: 'separator' }));
+  workspaceItems.push(new MenuItem({
+    label: 'Save Layout…',
+    accelerator: process.platform === 'darwin' ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
+    click() { sendWorkspaceCommand('save'); },
+  }));
+  workspaceItems.push(new MenuItem({
+    label: 'Save as New Layout…',
+    click() { sendWorkspaceCommand('saveAs'); },
+  }));
+  workspaceItems.push(new MenuItem({
+    label: `Update ${activeLabel}`,
+    // Nothing to update while the default is showing: it is rebuilt from code
+    // every time, so a write would have nowhere to land.
+    enabled: Boolean(active),
+    click() { sendWorkspaceCommand('update'); },
+  }));
+
+  workspaceItems.push(new MenuItem({ type: 'separator' }));
+  workspaceItems.push(new MenuItem({
+    label: `Rename ${activeLabel}…`,
+    enabled: Boolean(active),
+    click() { sendWorkspaceCommand('rename'); },
+  }));
+  workspaceItems.push(new MenuItem({
+    label: `Delete ${activeLabel}`,
+    enabled: Boolean(active),
+    click() { sendWorkspaceCommand('delete'); },
+  }));
+
+  workspaceItems.push(new MenuItem({ type: 'separator' }));
+  workspaceItems.push(new MenuItem({
+    label: 'Import Workspace…',
+    click() { sendWorkspaceCommand('import'); },
+  }));
+  workspaceItems.push(new MenuItem({
+    // Export works off whatever is on screen, so the default layout is
+    // exportable too — that is often exactly what someone wants to send.
+    label: `Export ${activeLabel}…`,
+    click() { sendWorkspaceCommand('export'); },
+  }));
+
+  workspaceItems.push(new MenuItem({ type: 'separator' }));
+  workspaceItems.push(new MenuItem({
+    /* Where the layouts actually live. Workspaces are records inside the app's
+       store file and stage layouts are stage-layouts.json beside it, so there
+       is one folder to show and it answers for both. Worth a menu item because
+       the path is per-platform, buried in a Library folder macOS hides by
+       default, and the usual reason for wanting it — copy this machine's setup
+       onto the other two in the booth — is not a rare one. */
+    label: 'Show Layouts Folder',
+    click() { revealLayoutsFolder(); },
   }));
 
   const template = [
@@ -159,6 +290,10 @@ function buildAppMenu(openIds) {
       submenu: dockItems,
     },
     {
+      label: 'Workspace',
+      submenu: workspaceItems,
+    },
+    {
       label: 'Window',
       submenu: [
         { role: 'minimize' },
@@ -171,6 +306,26 @@ function buildAppMenu(openIds) {
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+/**
+ * Opens the folder the app keeps its layouts in.
+ *
+ * `stage-layouts.json` gets picked out by name when it exists, so the window
+ * lands with the file selected rather than on a folder of a dozen JSON files
+ * the operator now has to read. When it does not exist yet — a machine where
+ * nobody has saved a stage layout — the folder itself is still the answer,
+ * because the workspaces are in the store file next to it.
+ */
+function revealLayoutsFolder() {
+  const userData = app.getPath('userData');
+  const stageLayouts = path.join(userData, 'stage-layouts.json');
+  if (fs.existsSync(stageLayouts)) {
+    shell.showItemInFolder(stageLayouts);
+    return { ok: true, path: userData };
+  }
+  shell.openPath(userData);
+  return { ok: true, path: userData };
 }
 
 /** Every live stage window, pruned of any that have since closed. */
@@ -361,8 +516,12 @@ const apiHandlers = {
     return { ok: true };
   },
   'POST /api/display/blackout': () => {
-    displayState.blackout = !displayState.blackout;
-    setDisplayState({ blackout: displayState.blackout });
+    // Same reason as the Cmd+Shift+B shortcut: the renderer owns the flag.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('shortcut:blackout');
+      return { ok: true, blackout: !displayState.blackout };
+    }
+    setDisplayState({ blackout: !displayState.blackout });
     return { ok: true, blackout: displayState.blackout };
   },
   'GET /api/display/state': () => ({ ok: true, state: displayState }),
@@ -465,19 +624,29 @@ function startHttpServer() {
 }
 
 function createSplashWindow() {
-  const s = new BrowserWindow({ width: 700, height: 500, frame: false, transparent: true, resizable: false, alwaysOnTop: true, backgroundColor: '#03040a', webPreferences: { nodeIntegration: false, contextIsolation: true } });
-  s.loadURL(isDev ? 'http://localhost:5173/splash.html' : `file://${path.join(__dirname, '../../dist/splash.html')}`);
+  const s = new BrowserWindow({ width: 1000, height: 620, frame: false, transparent: true, resizable: false, alwaysOnTop: true, backgroundColor: '#0C0B0B', webPreferences: { nodeIntegration: false, contextIsolation: true } });
+  /* The splash has no preload and no node access, so the version is passed in
+     the URL. It is read from the running build, never hardcoded in the page. */
+  const v = `?v=${encodeURIComponent(app.getVersion())}`;
+  s.loadURL(isDev
+    ? `http://localhost:5173/splash.html${v}`
+    : `file://${path.join(__dirname, '../../dist/splash.html')}${v}`);
   s.center();
   return s;
 }
 
-function createMainWindow() {
-  const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 640, minHeight: 480, frame: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0c0e14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true } });
+function createMainWindow({ autoShow = true } = {}) {
+  /* backgroundThrottling off here too: the operator's own Program pane plays
+     the same clip, and an operator who alt-tabs to their notes and back should
+     not find their preview a minute behind the room. */
+  const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 640, minHeight: 480, frame: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0c0e14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false } });
   win.setResizable(true);
   win.setMinimumSize(640, 480);
   win.loadURL(isDev ? 'http://localhost:5173' : `file://${path.join(__dirname, '../../dist/index.html')}`);
   if (isDev) win.webContents.openDevTools();
-  win.once('ready-to-show', () => { win.show(); win.focus(); });
+  /* Bring-up passes autoShow:false and shows the window itself, so the
+     console cannot appear from behind the splash mid-animation. */
+  if (autoShow) win.once('ready-to-show', () => { win.show(); win.focus(); });
   return win;
 }
 
@@ -537,6 +706,20 @@ function broadcastDisplayList() {
   }
 }
 
+/**
+ * Whether any stage screen is up, pushed to the operator window.
+ *
+ * The Stage panel used to read `isExternalDisplayActive` for this, which is
+ * the projector's state — so its lamp lit when the audience output came on,
+ * whether or not a stage screen existed. The stage is its own output and
+ * needs its own answer.
+ */
+function broadcastStageWindows() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('stage-display:state', { open: liveStageWindows().size > 0 });
+  }
+}
+
 function resizableOutputBounds(bounds) {
   const margin = 48;
   const width = Math.max(640, Math.min(1280, bounds.width - margin * 2));
@@ -574,11 +757,22 @@ function createStageDisplayWindow() {
      file:// stage page could embed http://localhost:8942/display.html in an
      iframe for its program pane; the pane is a React component now, so there
      is nothing cross-origin left to allow. */
-  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#000000', title: 'BSP Stage Display', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true } });
+  /* The stage is a screen someone is standing in front of for the whole
+     service, and it is almost never the focused window. It plays the scene's
+     video in its own zones now, so it needs the same exemption the projector
+     has. */
+  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#000000', title: 'BSP Stage Display', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false } });
   win.loadURL(isDev ? 'http://localhost:5173/stage-display.html' : `file://${path.join(__dirname, '../../dist/stage-display.html')}`);
 
   stageWindows.add(win);
-  win.on('closed', () => stageWindows.delete(win));
+  broadcastStageWindows();
+  win.on('closed', () => {
+    stageWindows.delete(win);
+    /* Closing the stage from its own red button has to reach the panel's lamp
+       exactly as the panel's own toggle does — an indicator that only tracks
+       one of the two ways a window can go away is an indicator that lies. */
+    broadcastStageWindows();
+  });
 
   // Catch the window up on both feeds the moment it can receive them, so one
   // opened mid-service shows the service rather than an idle screen.
@@ -725,6 +919,12 @@ app.whenReady().then(async () => {
     model: settingsService.get('deepgramModel'),
     language: settingsService.get('deepgramLanguage'),
   });
+  /* Restore the operator's on-device recogniser. Only when they chose one —
+     an empty setting leaves the service on its own default, so the default is
+     stated in exactly one place. An unknown key (a model dropped from a later
+     build) is refused by setModel and simply leaves the default standing. */
+  const savedLocalModel = settingsService.get('sttLocalModel');
+  if (savedLocalModel) transcriptionService.setLocalModel(savedLocalModel);
   obsService = createObsService({
     emit: (event) => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('obs:event', event);
@@ -756,11 +956,34 @@ app.whenReady().then(async () => {
 
   // Renderer pushes the current open-dock id list on every layout change so
   // the native menu checkmarks stay in sync without polling.
-  ipcMain.on('dock:syncMenu', (_, openIds) => buildAppMenu(openIds));
+  ipcMain.on('dock:syncMenu', (_, openIds) => {
+    menuOpenIds = Array.isArray(openIds) ? openIds : [];
+    buildAppMenu(menuOpenIds);
+  });
+
+  /* And the saved arrangements, whenever one is added, renamed, deleted or
+     switched to. Only id and name travel — the layout tree is the renderer's
+     business and would be dead weight on this side. */
+  ipcMain.on('workspace:sync', (_, payload) => {
+    const list = Array.isArray(payload?.list)
+      ? payload.list
+          .filter((w) => w && w.id)
+          .map((w) => ({ id: String(w.id), name: String(w.name || 'Untitled layout') }))
+      : [];
+    menuWorkspaces = { list, activeId: payload?.activeId ? String(payload.activeId) : null };
+    buildAppMenu(menuOpenIds);
+  });
 
   // ── Keyboard Shortcuts ──
   globalShortcut.register('CommandOrControl+Shift+F', () => { mainWindow?.webContents.send('shortcut:fullscreen'); });
-  globalShortcut.register('CommandOrControl+Shift+B', () => { setDisplayState({ blackout: !displayState.blackout }); });
+  /* Asks the renderer to flip its own blackout rather than writing this
+     process's copy: the renderer owns the flag and pushes it out with the rest
+     of the display state, so a value set here alone was reverted by the next
+     push. Falls back to the local toggle if the window is gone. */
+  globalShortcut.register('CommandOrControl+Shift+B', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut:blackout');
+    else setDisplayState({ blackout: !displayState.blackout });
+  });
   globalShortcut.register('CommandOrControl+Shift+N', () => { ndiService?.start('Bible Song Pro'); });
   globalShortcut.register('CommandOrControl+Shift+E', () => sessionHistory?.endSession());
   globalShortcut.register('CommandOrControl+Shift+P', () => { sessionHistory?.startSession('Session ' + new Date().toLocaleString()); });
@@ -805,6 +1028,14 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('slide-editor:open', () => { createSlideEditorWindow(); return true; });
   ipcMain.handle('stage-display:open', () => { createStageDisplayWindow(); return true; });
+  /* Closing every stage screen, not just one: the panel's control is a single
+     lamp for "the stage is up", so the off state it promises has to be the
+     whole of it. `close`, not `destroy` — the window's own teardown runs. */
+  ipcMain.handle('stage-display:close', () => {
+    for (const win of [...liveStageWindows()]) win.close();
+    return { ok: true, open: false };
+  });
+  ipcMain.handle('stage-display:isOpen', () => liveStageWindows().size > 0);
   ipcMain.handle('stage-designer:open', () => { createStageDesignerWindow(); return true; });
   ipcMain.on('stage-designer:dirty', (event, dirty) => dirtyDesigners.set(event.sender.id, !!dirty));
 
@@ -862,7 +1093,35 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('get:platform', () => process.platform);
   ipcMain.handle('get:userDataPath', () => app.getPath('userData'));
+  ipcMain.handle('get:version', () => app.getVersion());
   ipcMain.handle('get:displayUrl', () => `http://localhost:${displayPort}/display.html`);
+
+  /* Opening a link hands control to the operator's browser, so the renderer
+     does not get to choose freely: https only, and only hosts we ship links
+     to. Anything else is refused and reported rather than opened. */
+  const EXTERNAL_HOSTS = new Set([
+    'www.youtube.com',
+    'youtube.com',
+    'github.com',
+    'www.github.com',
+  ]);
+
+  ipcMain.handle('shell:openExternal', async (_, rawUrl) => {
+    let url;
+    try {
+      url = new URL(String(rawUrl));
+    } catch {
+      return { ok: false, error: 'Not a valid URL.' };
+    }
+    if (url.protocol !== 'https:') {
+      return { ok: false, error: `Refused ${url.protocol} — https only.` };
+    }
+    if (!EXTERNAL_HOSTS.has(url.hostname)) {
+      return { ok: false, error: `Refused ${url.hostname} — host is not on the allowlist.` };
+    }
+    await shell.openExternal(url.toString());
+    return { ok: true };
+  });
 
   ipcMain.handle('bible:getVersions', () => bibleService.getVersions());
   ipcMain.handle('bible:getBooks', (_, v) => bibleService.getBooks(v));
@@ -878,6 +1137,13 @@ app.whenReady().then(async () => {
   ipcMain.handle('ai:transcribe', (_, p) => transcriptionService.transcribe(p));
   ipcMain.handle('ai:dispose', (_, p) => transcriptionService.dispose(p));
   ipcMain.handle('ai:setEngine', (_, e) => transcriptionService.setActiveEngine(e));
+  /* Remember the pick. The weights are a download, so a choice that did not
+     survive a restart would cost the operator the fetch again. */
+  ipcMain.handle('ai:setLocalModel', (_, m) => {
+    const result = transcriptionService.setLocalModel(m);
+    if (result?.ok) settingsService?.set({ sttLocalModel: m });
+    return result;
+  });
 
   // NDI IPC
   ipcMain.handle('ndi:start', async (_, p) => {
@@ -957,6 +1223,32 @@ app.whenReady().then(async () => {
   ipcMain.handle('media:list', () => mediaService?.list() || { ok: false, items: [] });
   ipcMain.handle('media:import', (_, p) => mediaService?.importPaths(p?.paths) || { ok: false, items: [], errors: ['Media service unavailable'] });
   ipcMain.handle('media:remove', (_, p) => mediaService?.remove(p?.id) || { ok: false });
+  ipcMain.handle('media:relink', (_, p) => mediaService?.relink(p?.id, p?.path) || { ok: false, error: 'Media service unavailable' });
+  /* Relink opens on the file's last known folder, because the usual cause is a
+     drive that came back on a different mount point and the file is sitting
+     right where the operator expects it. */
+  ipcMain.handle('media:pickRelink', async (_, p) => {
+    const current = String(p?.currentPath || '');
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Relink Media',
+      message: p?.name ? `Find "${p.name}"` : 'Find the file',
+      defaultPath: current ? path.dirname(current) : undefined,
+      properties: ['openFile'],
+      filters: [
+        { name: 'Media', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif', 'mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true };
+    return mediaService?.relink(p?.id, result.filePaths[0]) || { ok: false, error: 'Media service unavailable' };
+  });
+  /* Show the file in Finder/Explorer — the fastest way for an operator to see
+     where a library entry actually points. */
+  ipcMain.handle('media:reveal', (_, p) => {
+    const target = String(p?.path || '');
+    if (!target || !fs.existsSync(target)) return { ok: false, error: 'File not found' };
+    shell.showItemInFolder(target);
+    return { ok: true };
+  });
   ipcMain.handle('media:rename', (_, p) => mediaService?.rename(p?.id, p?.name) || { ok: false });
   ipcMain.handle('media:baseUrl', () => `http://localhost:${displayPort}`);
   ipcMain.handle('media:pick', async () => {
@@ -989,13 +1281,62 @@ app.whenReady().then(async () => {
     return { ok: true, filePath: result.filePaths[0] };
   });
 
+  /* Workspace files.
+     
+     The dialogs live here because only the main process can raise them, but
+     nothing about a layout is interpreted on this side: the renderer hands
+     over finished JSON and gets a string back. That keeps the file format a
+     single concern of the code that actually knows what a dock tree is. */
+  ipcMain.handle('workspace:export', async (_, p) => {
+    const suggested = String(p?.name || 'Workspace').replace(/[\\/:*?"<>|]/g, '-').trim() || 'Workspace';
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Workspace',
+      defaultPath: `${suggested}.bspworkspace`,
+      filters: [
+        { name: 'Bible Song Pro Workspace', extensions: ['bspworkspace'] },
+        { name: 'JSON', extensions: ['json'] },
+      ],
+    });
+    if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+    try {
+      fs.writeFileSync(result.filePath, String(p?.json || ''), 'utf8');
+      return { ok: true, filePath: result.filePath };
+    } catch (err) {
+      return { ok: false, error: err?.message || 'Could not write the file' };
+    }
+  });
+
+  ipcMain.handle('workspace:import', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Workspace',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Bible Song Pro Workspace', extensions: ['bspworkspace', 'json'] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true };
+    try {
+      // Capped: a dock tree is a few KB, and anything of this name that is
+      // megabytes long is not one.
+      const stat = fs.statSync(result.filePaths[0]);
+      if (stat.size > 4 * 1024 * 1024) return { ok: false, error: 'That file is too large to be a workspace' };
+      return { ok: true, json: fs.readFileSync(result.filePaths[0], 'utf8'), filePath: result.filePaths[0] };
+    } catch (err) {
+      return { ok: false, error: err?.message || 'Could not read the file' };
+    }
+  });
+
   // Persisted renderer state IPC
   ipcMain.handle('store:load', () => appStoreService?.load() || { ok: false, state: null });
   ipcMain.handle('store:save', (_, p) => appStoreService?.save(p?.value) || { ok: false });
   ipcMain.handle('store:clear', () => appStoreService?.clear() || { ok: false });
 
-  // Audio
-  ipcMain.handle('audio:getInputDevices', () => []);
+  /* No audio:getInputDevices handler, deliberately.
+     It used to return a hardcoded [] — and because that resolves rather than
+     throws, the renderer's fallback to enumerateDevices never ran and the
+     microphone picker was empty on every machine. The main process cannot
+     answer this question anyway: device enumeration is a renderer API. The
+     Settings modal asks Chromium directly now. */
 
   // Keep the monitor picker in step with the hardware — projectors get plugged in
   // mid-service, and a stale list is worse than none.
@@ -1014,15 +1355,39 @@ app.whenReady().then(async () => {
 
   /* ── Bring-up ───────────────────────────────────────────────────────────
      Last, so that every handler above is in place before a renderer can call
-     one. The splash holds the screen for its own animation; the operator
-     window is only built once that wait is over. */
-  let splash = createSplashWindow();
-  await new Promise((r) => setTimeout(r, 3500));
-  mainWindow = createMainWindow();
+     one — the console starts loading immediately below, so its first IPC
+     call can land at any time.
 
-  mainWindow.webContents.on('did-finish-load', () => { if (splash && !splash.isDestroyed()) { splash.close(); splash = null; } });
-  mainWindow.webContents.on('did-fail-load', (e, c, d) => console.error('Load fail:', c, d));
-  setTimeout(() => { if (splash && !splash.isDestroyed()) splash.close(); }, 5000);
+     The splash gets a floor and a ceiling. The console loads *behind* it
+     rather than after it, so the floor costs nothing the boot was not
+     already spending — and the operator gets a screen that settles and can
+     be read instead of one that is pulled the moment the window is ready. */
+  const SPLASH_FLOOR_MS = 6000;
+  const SPLASH_CEILING_MS = 15000;
+  const splashUpAt = Date.now();
+
+  let splash = createSplashWindow();
+  mainWindow = createMainWindow({ autoShow: false });
+
+  let handedOver = false;
+  const handOver = () => {
+    if (handedOver) return;
+    handedOver = true;
+    if (splash && !splash.isDestroyed()) splash.close();
+    splash = null;
+    if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus(); }
+  };
+  const handOverAfterFloor = () => {
+    setTimeout(handOver, Math.max(0, SPLASH_FLOOR_MS - (Date.now() - splashUpAt)));
+  };
+
+  mainWindow.webContents.on('did-finish-load', handOverAfterFloor);
+  mainWindow.webContents.on('did-fail-load', (e, c, d) => {
+    console.error('Load fail:', c, d);
+    handOverAfterFloor();
+  });
+  /* A hung load must never leave the operator staring at a splash. */
+  setTimeout(handOver, SPLASH_CEILING_MS);
 
   mainWindow.on('closed', () => { mainWindow = null; ndiService?.stop(); if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close(); });
 

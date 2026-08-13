@@ -36,7 +36,7 @@ export function QueuePanel() {
       }
     >
       {queue.length === 0 ? (
-        <div style={{ color: '#a1a1aa', fontSize: 12, padding: '24px 16px', textAlign: 'center' }}>
+        <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '24px 16px', textAlign: 'center' }}>
           Queue is empty. Click the <strong style={{ color: '#FF5500' }}>+</strong> button on any scripture or song to queue it.
         </div>
       ) : (
@@ -72,7 +72,7 @@ export function QueuePanel() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: isLive ? '#FF5500' : '#ffffff' }}>
                     {item.reference}
                   </div>
-                  <div style={{ fontSize: 11, color: '#a1a1aa' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
                     {item.source || 'Manual'}
                   </div>
                 </div>
@@ -131,7 +131,7 @@ export function QueuePanel() {
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: '#a1a1aa',
+                      color: 'var(--text-dim)',
                       cursor: 'pointer',
                       padding: 4,
                       display: 'flex',

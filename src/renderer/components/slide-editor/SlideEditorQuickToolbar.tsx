@@ -59,7 +59,7 @@ export function SlideEditorQuickToolbar({
   const [scriptureVerses, setScriptureVerses] = useState<BibleVerse[]>([]);
   const [scriptureLoading, setScriptureLoading] = useState(false);
   const [verseColor, setVerseColor] = useState('#ffffff');
-  const [refColor, setRefColor] = useState('#f4621f');
+  const [refColor, setRefColor] = useState('#FF5500');
 
   /* Song Tool states */
   const [songQuery, setSongQuery] = useState('');
@@ -301,20 +301,20 @@ export function SlideEditorQuickToolbar({
             <span>Text</span>
           </button>
 
-          {/* 2. Scripture Tool Button (Proper SVG Bible Icon) */}
+          {/* 2. Bible Tool Button (Proper SVG Bible Icon) */}
           <div style={{ position: 'relative' }}>
             <button
               type="button"
               onClick={() => setActiveDropdown(activeDropdown === 'scripture' ? null : 'scripture')}
               style={activeDropdown === 'scripture' ? PILL_BTN_ACTIVE : PILL_BTN}
-              title="Scripture Tool"
+              title="Bible Tool"
             >
               <svg viewBox="0 0 24 24" style={ICON}>
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 <path d="M12 6v6M9 9h6" />
               </svg>
-              <span>Scripture</span>
+              <span>Bible</span>
             </button>
 
             {/* Scripture Popover */}
@@ -332,7 +332,7 @@ export function SlideEditorQuickToolbar({
                       padding: '8px 10px',
                       background: '#1a1a1c',
                       border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: 8,
+                      borderRadius: 6,
                       color: '#ffffff',
                       fontSize: 13,
                       fontWeight: 700,
@@ -357,7 +357,7 @@ export function SlideEditorQuickToolbar({
                       padding: '8px 12px',
                       background: '#1a1a1c',
                       border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: 8,
+                      borderRadius: 6,
                       color: '#ffffff',
                       fontSize: 13,
                       fontWeight: 600,
@@ -385,7 +385,7 @@ export function SlideEditorQuickToolbar({
                         onClick={() => handleSelectVerse(v)}
                         style={{
                           padding: '10px 12px',
-                          borderRadius: 8,
+                          borderRadius: 6,
                           background: 'rgba(255, 255, 255, 0.04)',
                           border: '1px solid rgba(255, 255, 255, 0.08)',
                           color: '#ffffff',
@@ -405,7 +405,7 @@ export function SlideEditorQuickToolbar({
                           e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
                         }}
                       >
-                        <span style={{ fontSize: 13, fontWeight: 800, color: '#f4621f', marginTop: 1, minWidth: 16 }}>{v.verse}</span>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: '#FF5500', marginTop: 1, minWidth: 16 }}>{v.verse}</span>
                         <span style={{ fontSize: 13, color: '#ffffff', lineHeight: 1.4, flex: 1 }}>{v.text}</span>
                       </button>
                     ))
@@ -599,7 +599,7 @@ export function SlideEditorQuickToolbar({
                       padding: '8px 12px',
                       background: '#1a1a1c',
                       border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: 8,
+                      borderRadius: 6,
                       color: '#ffffff',
                       fontSize: 13,
                       outline: 'none',
@@ -615,7 +615,7 @@ export function SlideEditorQuickToolbar({
                           key={s.id}
                           style={{
                             padding: '8px 10px',
-                            borderRadius: 8,
+                            borderRadius: 6,
                             background: 'rgba(255, 255, 255, 0.04)',
                             border: '1px solid rgba(255, 255, 255, 0.08)',
                             display: 'flex',
@@ -667,7 +667,7 @@ export function SlideEditorQuickToolbar({
                     <button
                       type="button"
                       onClick={() => setShowSectionDetail(false)}
-                      style={{ background: 'none', border: 'none', color: '#f4621f', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
+                      style={{ background: 'none', border: 'none', color: '#FF5500', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
                     >
                       ‹ Back
                     </button>
@@ -687,7 +687,7 @@ export function SlideEditorQuickToolbar({
                           padding: '6px 12px',
                           borderRadius: 6,
                           border: 'none',
-                          background: selectedSection === sec ? '#f4621f' : 'rgba(255, 255, 255, 0.08)',
+                          background: selectedSection === sec ? '#FF5500' : 'rgba(255, 255, 255, 0.08)',
                           color: '#ffffff',
                           fontSize: 11,
                           fontWeight: 700,
@@ -759,7 +759,7 @@ const TOOLBAR_CARD: React.CSSProperties = {
   padding: '4px 8px 6px',
   background: 'rgba(20, 20, 22, 0.95)',
   border: '1px solid rgba(255, 255, 255, 0.12)',
-  borderRadius: 12,
+  borderRadius: 6,
   boxShadow: '0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
   backdropFilter: 'blur(20px)',
 };
@@ -779,7 +779,7 @@ const TOOLBAR_PILL: React.CSSProperties = {
   padding: '3px 6px',
   background: 'rgba(20, 20, 22, 0.92)',
   border: '1px solid rgba(255, 255, 255, 0.12)',
-  borderRadius: 10,
+  borderRadius: 6,
   boxShadow: '0 16px 40px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05)',
   backdropFilter: 'blur(16px)',
 };
@@ -792,7 +792,7 @@ const PILL_BTN: React.CSSProperties = {
   gap: 5,
   background: 'rgba(255, 255, 255, 0.06)',
   border: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: 7,
+  borderRadius: 6,
   color: 'rgba(255, 255, 255, 0.9)',
   fontSize: 12,
   fontWeight: 600,
@@ -845,7 +845,7 @@ const POPOVER_SHELL: React.CSSProperties = {
   transform: 'translateX(-50%)',
   background: '#161618',
   border: '1px solid rgba(255, 255, 255, 0.15)',
-  borderRadius: 12,
+  borderRadius: 6,
   padding: 10,
   boxShadow: '0 24px 48px rgba(0, 0, 0, 0.85)',
   backdropFilter: 'blur(20px)',
@@ -858,7 +858,7 @@ const DROPDOWN_ITEM: React.CSSProperties = {
   padding: '10px 12px',
   background: 'rgba(255, 255, 255, 0.05)',
   border: '1px solid rgba(255, 255, 255, 0.08)',
-  borderRadius: 8,
+  borderRadius: 6,
   color: '#ffffff',
   fontSize: 13,
   fontWeight: 600,
@@ -873,7 +873,7 @@ const DROPDOWN_ITEM_CLEAN: React.CSSProperties = {
   padding: '8px 12px',
   background: 'transparent',
   border: 'none',
-  borderRadius: 8,
+  borderRadius: 6,
   color: '#ffffff',
   fontSize: 13,
   fontWeight: 600,

@@ -1,371 +1,472 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self';">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
 <title>Bible Song Pro</title>
 <style>
+/* =========================================================================
+   BIBLE SONG PRO ˢᵗᵘᵈⁱᵒ — SPLASH
+
+   Two halves, the way a gallery is laid out.
+
+   LEFT is the brand block. The mark draws itself: three utterance bars
+   arrive live, settle to rest, and three lines of scripture set left to
+   right. The centre line — the live verse — lights Signal last. That is
+   the whole product in one gesture, and this is the only surface where the
+   mark is permitted to move.
+
+   RIGHT is the console itself, arriving as a monitor feed behind a Cue
+   Wipe: the desk mid-service, straight and legible, bleeding off the frame.
+
+   Nothing overshoots, nothing pulses, nothing floats. A lower third that
+   bounces reads as amateur on air, so nothing in this brand bounces.
+   ========================================================================= */
+
 @font-face {
   font-family: 'Inter';
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
   src: url('/fonts/InterVariable.woff2') format('woff2');
+  font-weight: 100 900; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url('/fonts/SourceSerif4-latin-var.woff2') format('woff2');
+  font-weight: 200 900; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-latin-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+
+  --booth:   #0C0B0B;
+  --edge:    #262628;
+  --screen:  #FFFFFF;
+  --soft:    #D9D4D2;
+  --dim:     #A8A2A0;
+  --mute:    #6E6968;
+  --signal:  #FF5500;
+  --preview: #22C55E;
+  --glow:    rgba(255, 85, 0, 0.28);
+
+  --ease:      cubic-bezier(0.16, 1, 0.30, 1);
+  --ease-firm: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Where the mark opens, relative to where it rests. The script below
+     measures the exact delta once layout is up; these are close enough that
+     the first painted frame is already right. */
+  --mark-dx: 40vw;
+  --mark-dy: 9vh;
+  --mark-scale: 1.5;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 html, body {
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
+  background: transparent;
   overflow: hidden;
-  background: #0f0f11;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  user-select: none;
+  -webkit-user-select: none; user-select: none;
+  cursor: default;
 }
 
-/* Ambient Background Lighting & Perspective Grid */
-.bg-mesh {
-  position: fixed;
-  inset: 0;
-  background: 
-    radial-gradient(circle at 50% 28%, rgba(255, 85, 0, 0.18) 0%, rgba(24, 24, 27, 0.15) 50%, transparent 80%),
-    radial-gradient(circle at 18% 75%, rgba(255, 85, 0, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 82% 75%, rgba(255, 119, 40, 0.05) 0%, transparent 40%);
+/* 6px is the largest corner this brand permits. The category ships 16-24px;
+   hardware does not. */
+.panel {
+  position: relative;
+  width: 100%; height: 100%;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--booth);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 372px 1fr;
+  animation: panel-in 220ms var(--ease) both;
+}
+
+@keyframes panel-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Practical light only — one warm source, off-centre, as if from a monitor
+   just out of frame. No mesh, no starfield, no particles. */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: -40% 30% auto -30%;
+  height: 560px;
+  background: radial-gradient(56% 56% at 30% 0%, rgba(255,85,0,0.12), transparent 70%);
+  pointer-events: none;
   z-index: 0;
 }
 
-.bg-grid {
-  position: fixed;
-  inset: 0;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 32px 32px;
-  mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
-  z-index: 0;
-  opacity: 0.8;
+/* ------------------------------------------------------------------ TALLY */
+
+/* The app coming on air, in the app's own language: hold, preview, program. */
+.tally {
+  position: absolute;
+  top: 18px; left: 44px;
+  z-index: 6;
+  display: flex; align-items: center; gap: 7px;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--mute);
+  transition: color 240ms var(--ease);
 }
 
-.particles-canvas {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
+.tally__dot {
+  width: 7px; height: 7px;
+  border-radius: 999px; /* EXEMPT: it is a lamp */
+  background: var(--mute);
+  transition: background-color 240ms var(--ease), box-shadow 240ms var(--ease);
+}
+
+.tally[data-state="preview"] { color: var(--preview); }
+.tally[data-state="preview"] .tally__dot { background: var(--preview); }
+.tally[data-state="program"] { color: var(--signal); }
+.tally[data-state="program"] .tally__dot {
+  background: var(--signal);
+  box-shadow: 0 0 10px var(--glow);
+}
+
+/* ------------------------------------------------------------------ BRIEF */
+
+.brief {
+  position: relative;
+  z-index: 2;
+  padding: 46px 0 26px 44px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 24px;
+}
+
+.brief__top { display: grid; align-content: center; justify-items: start; gap: 26px; }
+
+/* ------------------------------------------------------------------- MARK */
+
+/* The resolve. The mark opens at the centre of the frame, holds while it
+   draws itself, and travels to its place at the exact moment the Cue Wipe
+   brings the desk up behind it — the wipe is what motivates the move.
+
+   `both` fill is doing real work here: it holds the centred start from the
+   first frame, so nothing has to be hidden and nothing jumps. */
+.mark-slot {
+  display: block;
+  animation: mark-resolve 600ms var(--ease) 1440ms both;
+}
+
+.mark { width: 108px; height: 108px; display: block; overflow: visible; }
+
+@keyframes mark-resolve {
+  from {
+    transform: translate(var(--mark-dx), var(--mark-dy)) scale(var(--mark-scale));
+  }
+  to { transform: none; }
+}
+
+/* Utterance — three bars. Scaling about the centre is what a level meter
+   does; growing from a baseline is what a bar chart does, and this is not a
+   bar chart. */
+.mark .bar {
+  fill: var(--screen);
+  transform-box: fill-box; transform-origin: center;
+  animation: utterance 900ms var(--ease-firm) both;
+}
+.mark .bar--1 { animation-delay: 0ms; }
+.mark .bar--2 { animation-delay: 60ms; }
+.mark .bar--3 { animation-delay: 30ms; }
+
+@keyframes utterance {
+  0%   { transform: scaleY(0.18); opacity: 0; }
+  12%  { transform: scaleY(1.00); opacity: 1; }
+  26%  { transform: scaleY(0.34); }
+  40%  { transform: scaleY(0.86); }
+  54%  { transform: scaleY(0.42); }
+  68%  { transform: scaleY(0.72); }
+  82%  { transform: scaleY(0.52); }
+  100% { transform: scaleY(1);    opacity: 1; }
+}
+
+/* Scripture — three lines, set left to right. Square ends: the rounded
+   waveform is the most-drawn logo of the last decade; ours is cut. */
+.mark .line {
+  fill: var(--screen);
+  transform-box: fill-box; transform-origin: left center;
+  animation: set-line 260ms var(--ease) both;
+}
+.mark .line--1 { animation-delay: 720ms; }
+.mark .line--3 { animation-delay: 840ms; }
+
+/* The live verse lights last. This is the whole idea in one beat. */
+.mark .line--2 {
+  animation:
+    set-line 260ms var(--ease) 960ms  both,
+    go-live  200ms var(--ease) 1240ms both;
+}
+
+@keyframes set-line { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+@keyframes go-live {
+  from { fill: var(--screen); filter: none; }
+  to   { fill: var(--signal); filter: drop-shadow(0 0 6px var(--glow)); }
+}
+
+/* --------------------------------------------------------------- WORDMARK */
+
+.brand { display: grid; gap: 13px; justify-items: start; }
+
+/* The Cue Wipe: content enters behind a hard-edged Signal bar that sweeps
+   across and dissolves, leaving the content set. */
+.wipe { position: relative; display: inline-block; }
+.wipe > * { animation: cue-set 300ms var(--ease) both; }
+
+.wipe::after {
+  content: '';
+  position: absolute;
+  inset: -0.14em -3px;
+  background: var(--signal);
+  transform-origin: left center;
+  animation: cue-wipe 700ms var(--ease-firm) both;
   pointer-events: none;
 }
 
-/* Center Stage Layout */
-.stage {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 46px 40px 36px;
-  z-index: 2;
+.wipe--word > *, .wipe--word::after { animation-delay: 2140ms; }
+.wipe--line > *, .wipe--line::after { animation-delay: 2380ms; }
+
+@keyframes cue-wipe {
+  0%   { transform: scaleX(0); opacity: 1; }
+  40%  { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
 }
 
-/* Top Section: Emblem & Pure Metallic Brand Title */
-.hero-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+@keyframes cue-set { 0%, 44% { opacity: 0; } 100% { opacity: 1; } }
+
+.wordmark {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 29px; font-weight: 600;
+  letter-spacing: -0.02em; line-height: 1;
+  color: var(--screen); white-space: nowrap;
 }
 
-.logo-container {
+/* Studio: Signal face, uppercase, monochrome. The mark carries the orange;
+   no part of the wordmark ever does. An explicit raise, not `super` — the
+   browser's super lands it at mid-height, which reads as a trailing word. */
+.wordmark sup {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 0.37em; font-weight: 400;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  margin-left: 0.42em;
+  vertical-align: 1.4em; line-height: 0;
+  color: var(--dim);
+}
+
+/* The one Voice line this surface is allowed. */
+.voice {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 19px; font-weight: 400;
+  letter-spacing: -0.022em; line-height: 1.1;
+  color: var(--soft); white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------- RAIL */
+
+.rail { display: grid; gap: 11px; padding-right: 44px; }
+
+.rail__track { position: relative; height: 1px; background: var(--edge); overflow: hidden; }
+
+/* Indeterminate, and honest about it: it eases toward the end and holds
+   there until the console is actually up. No percentage is claimed. */
+.rail__fill {
+  position: absolute; inset: 0 auto 0 0;
+  width: 100%; background: var(--signal);
+  transform-origin: left center; transform: scaleX(0);
+  animation: rail 4600ms var(--ease) 260ms both;
+}
+
+@keyframes rail {
+  0%   { transform: scaleX(0);    }
+  30%  { transform: scaleX(0.42); }
+  62%  { transform: scaleX(0.71); }
+  100% { transform: scaleX(0.94); }
+}
+
+.rail__row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.rail__stage { color: var(--dim); transition: opacity 140ms var(--ease); }
+.rail__version { color: var(--mute); }
+
+/* ------------------------------------------------------------------ STAGE */
+
+.gallery {
   position: relative;
-  width: 92px;
-  height: 92px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 22px;
-}
-
-.logo-pulse-ring {
-  position: absolute;
-  inset: -14px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 85, 0, 0.35);
-  box-shadow: 0 0 24px rgba(255, 85, 0, 0.25);
-  animation: pulseRing 4s ease-in-out infinite alternate;
-}
-
-.logo-rotate-ticks {
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  animation: rotateClockwise 25s linear infinite;
-}
-
-.logo-backglow {
-  position: absolute;
-  inset: -10px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 85, 0, 0.4) 0%, rgba(30, 20, 15, 0.1) 60%, transparent 75%);
-  filter: blur(10px);
-}
-
-.logo-img {
-  width: 78px;
-  height: 78px;
-  position: relative;
-  z-index: 2;
-  object-fit: contain;
-  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 14px rgba(255, 85, 0, 0.4));
-  animation: floatLogo 3s ease-in-out infinite alternate;
-}
-
-.app-title {
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  background: linear-gradient(180deg, #FFFFFF 0%, #E4E4E7 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  line-height: 1.1;
-  margin-bottom: 6px;
-  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
-  opacity: 0;
-}
-
-.app-subtitle {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.42);
-  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
-  opacity: 0;
-}
-
-/* Middle Section: Minimalist Glass Quote Plate */
-.scripture-plate {
-  position: relative;
-  width: 100%;
-  max-width: 560px;
-  padding: 16px 28px;
-  border-radius: 12px;
-  background: rgba(24, 24, 27, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(16px);
-  text-align: center;
-  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
-  opacity: 0;
-}
-
-.scripture-text {
-  font-size: 13px;
-  font-weight: 300;
-  font-style: italic;
-  color: rgba(255, 255, 255, 0.9);
-  line-height: 1.6;
-  letter-spacing: 0.01em;
-}
-
-.scripture-ref {
-  margin-top: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  font-style: normal;
-  letter-spacing: 0.12em;
-  color: #FF5500;
-  text-transform: uppercase;
-}
-
-/* Bottom Section: 2px Hairline Progress & Diagnostics */
-.footer-section {
-  width: 100%;
-  max-width: 380px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
-  opacity: 0;
-}
-
-.progress-track {
-  width: 100%;
-  height: 2px;
-  border-radius: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  z-index: 1;
   overflow: hidden;
-  position: relative;
 }
 
-.progress-fill {
-  height: 100%;
-  width: 0%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #FF5500, #FF7728, #FFA066);
-  box-shadow: 0 0 10px rgba(255, 85, 0, 0.7);
-  animation: loadProgress 3.5s cubic-bezier(0.1, 0.7, 0.1, 1) 0.2s forwards;
+/* The wide shot. Straight and legible, bleeding off the frame — never a
+   floating perspective mockup on a gradient. */
+.shot {
+  position: absolute;
+  top: 62px; left: 22px;
+  width: 820px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.62);
+  animation: shot-in 320ms var(--ease) 1480ms both;
 }
 
-.status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0 2px;
+.shot img { display: block; width: 100%; height: auto; }
+
+@keyframes shot-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* The Cue Wipe that puts the feed up: a hard Signal edge crossing the frame. */
+.shot::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--signal);
+  transform-origin: left center;
+  animation: cue-wipe 760ms var(--ease-firm) 1440ms both;
+  pointer-events: none;
 }
 
-.status-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  color: rgba(255, 255, 255, 0.42);
-  text-transform: uppercase;
-  transition: opacity 0.15s ease;
-}
-
-.status-version {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.22);
-}
-
-/* Keyframe Animations */
-@keyframes pulseRing {
-  0% { transform: scale(0.96); opacity: 0.4; }
-  50% { transform: scale(1.04); opacity: 0.8; }
-  100% { transform: scale(0.96); opacity: 0.4; }
-}
-
-@keyframes rotateClockwise {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes floatLogo {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(-6px); }
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes loadProgress {
-  0% { width: 0%; }
-  35% { width: 45%; }
-  70% { width: 80%; }
-  100% { width: 100%; }
+/* Everything honours the operator's system preference. The mark still sets
+   and the feed still shows — they simply arrive already there. */
+@media (prefers-reduced-motion: reduce) {
+  .panel, .mark .bar, .mark .line, .wipe > *,
+  .rail__fill, .shot, .mark-slot { animation: none !important; }
+  .mark .line--2 { fill: var(--signal); }
+  .wipe::after, .shot::after { display: none; }
+  .rail__fill { transform: scaleX(0.94); }
 }
 </style>
 </head>
 <body>
-<div class="bg-mesh"></div>
-<div class="bg-grid"></div>
-<canvas id="particles-canvas" class="particles-canvas"></canvas>
 
-<div class="stage">
-  <!-- Top Hero Section -->
-  <div class="hero-section">
-    <div class="logo-container">
-      <div class="logo-backglow"></div>
-      <div class="logo-pulse-ring"></div>
-      <div class="logo-rotate-ticks"></div>
-      <img src="./bible-song-pro-icon.svg" class="logo-img" alt="Bible Song Pro Emblem" />
-    </div>
+<div class="panel">
 
-    <h1 class="app-title">Bible Song Pro</h1>
-    <div class="app-subtitle">Presentation & Media Sanctuary</div>
+  <div class="tally" id="tally" data-state="hold">
+    <span class="tally__dot"></span>
+    <span id="tallyLabel">Hold</span>
   </div>
 
-  <!-- Middle Scripture Quote Glass Plate -->
-  <div class="scripture-plate">
-    <div class="scripture-text">
-      "He was wounded for our transgressions, He was bruised for our iniquities; the chastisement of our peace was upon Him, and by His stripes we are healed."
+  <!-- ------------------------------------------------------------ BRIEF -->
+  <div class="brief">
+    <div class="brief__top">
+
+      <!-- The Verse Mark. Utterance resolving into set text: the only image
+           in this category that is not a book, a dove, a beam or a cross. -->
+      <span class="mark-slot">
+      <svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Bible Song Pro">
+        <rect class="bar bar--1"   x="4"    y="11"    width="2.5"  height="10"/>
+        <rect class="bar bar--2"   x="8.5"  y="5"     width="2.5"  height="22"/>
+        <rect class="bar bar--3"   x="13"   y="9.5"   width="2.5"  height="13"/>
+        <rect class="line line--1" x="17.5" y="8.5"   width="10.5" height="2.5"/>
+        <rect class="line line--2" x="17.5" y="14.75" width="10.5" height="2.5"/>
+        <rect class="line line--3" x="17.5" y="21"    width="6.5"  height="2.5"/>
+      </svg>
+      </span>
+
+      <div class="brand">
+        <span class="wipe wipe--word">
+          <span class="wordmark">Bible Song Pro<sup>Studio</sup></span>
+        </span>
+        <span class="wipe wipe--line">
+          <span class="voice">The word, on cue.</span>
+        </span>
+      </div>
+
     </div>
-    <div class="scripture-ref">— ISAIAH 53:5</div>
+
+    <div class="rail">
+      <div class="rail__track"><div class="rail__fill"></div></div>
+      <div class="rail__row">
+        <span class="rail__stage" id="stage">Starting</span>
+        <span class="rail__version" id="version"></span>
+      </div>
+    </div>
   </div>
 
-  <!-- Bottom Hairline Progress & Diagnostics -->
-  <div class="footer-section">
-    <div class="progress-track">
-      <div class="progress-fill"></div>
+  <!-- ---------------------------------------------------------- GALLERY -->
+  <div class="gallery">
+
+    <div class="shot">
+      <img src="./console-shot.png" alt="" draggable="false">
     </div>
-    <div class="status-row">
-      <span class="status-label" id="statusText">INITIALIZING SANCTUARY CORE...</span>
-      <span class="status-version">v1.0.0</span>
-    </div>
+
   </div>
+
 </div>
 
 <script>
-// Floating Constellation Dust Particles
-const pCanvas = document.getElementById('particles-canvas');
-const pCtx = pCanvas.getContext('2d');
+(function () {
+  'use strict';
 
-function resizeCanvas() {
-  pCanvas.width = window.innerWidth;
-  pCanvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+  /* The version comes from the main process so this screen can never drift
+     from the build it is booting. */
+  var version = new URLSearchParams(location.search).get('v');
+  document.getElementById('version').textContent = version ? 'v' + version : '';
 
-const particles = [];
-for (let i = 0; i < 55; i++) {
-  particles.push({
-    x: Math.random() * window.innerWidth,
-    y: Math.random() * window.innerHeight,
-    r: Math.random() * 1.8 + 0.6,
-    dx: (Math.random() - 0.5) * 0.25,
-    dy: -Math.random() * 0.4 - 0.1,
-    opacity: Math.random() * 0.5 + 0.15,
+  var reduced = window.matchMedia &&
+                window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Measure the mark's resting place and work out how far it has to travel
+     from the centre of the frame. offsetLeft/offsetTop are used rather than
+     getBoundingClientRect because the fill-mode has already applied the
+     centred transform — a rect would measure where it starts, not where it
+     belongs. The wrapper is measured rather than the <svg> itself: SVG
+     elements are not HTMLElements and have no offset* properties at all. */
+  (function placeMark() {
+    var mark = document.querySelector('.mark-slot');
+    if (!mark) { return; }
+    var cx = mark.offsetLeft + mark.offsetWidth / 2;
+    var cy = mark.offsetTop + mark.offsetHeight / 2;
+    var root = document.documentElement.style;
+    root.setProperty('--mark-dx', Math.round(window.innerWidth / 2 - cx) + 'px');
+    root.setProperty('--mark-dy', Math.round(window.innerHeight / 2 - cy) + 'px');
+  }());
+
+  var stageEl = document.getElementById('stage');
+  var tally   = document.getElementById('tally');
+  var label   = document.getElementById('tallyLabel');
+
+  /* Stage names are the operator's verbs, and they name what the app is
+     genuinely doing — scripture, then the library, then the outputs. */
+  var STAGES = [
+    { at:  260, text: 'Loading scripture' },
+    { at: 1500, text: 'Loading songs and decks' },
+    { at: 2600, text: 'Opening outputs' },
+    { at: 3700, text: 'Ready' }
+  ];
+
+
+  function setStage(text) {
+    if (reduced) { stageEl.textContent = text; return; }
+    stageEl.style.opacity = '0';
+    window.setTimeout(function () {
+      stageEl.textContent = text;
+      stageEl.style.opacity = '1';
+    }, 140);
+  }
+
+  STAGES.forEach(function (s) {
+    window.setTimeout(function () { setStage(s.text); }, reduced ? 0 : s.at);
   });
-}
 
-function drawParticles() {
-  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-  particles.forEach((p) => {
-    p.x += p.dx;
-    p.y += p.dy;
-    if (p.y < 0) {
-      p.y = pCanvas.height + 10;
-      p.x = Math.random() * pCanvas.width;
-    }
-    if (p.x < 0) p.x = pCanvas.width;
-    if (p.x > pCanvas.width) p.x = 0;
+  /* Hold → Preview → Program, the same three states the desk uses. By the
+     time the console appears, the app has taken itself to air. */
+  window.setTimeout(function () { setTally('preview', 'Preview'); }, reduced ? 0 : 1240);
+  window.setTimeout(function () { setTally('program', 'Program'); }, reduced ? 0 : 3700);
 
-    pCtx.beginPath();
-    pCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    pCtx.fillStyle = `rgba(147, 197, 253, ${p.opacity})`;
-    pCtx.fill();
-  });
-  requestAnimationFrame(drawParticles);
-}
-drawParticles();
-
-// Broadcast initialization status stages
-const stages = [
-  { time: 600, text: 'LOADING SCRIPTURE ENGINE...' },
-  { time: 1400, text: 'PREPARING MEDIA & DISPLAY SERVICES...' },
-  { time: 2200, text: 'CONNECTING NDI & HARDWARE OUTPUTS...' },
-  { time: 2900, text: 'READY — ENTER THE SANCTUARY' },
-];
-
-stages.forEach((s) => {
-  setTimeout(() => {
-    const el = document.getElementById('statusText');
-    if (el) {
-      el.style.opacity = '0.4';
-      setTimeout(() => {
-        el.textContent = s.text;
-        el.style.opacity = '1';
-      }, 100);
-    }
-  }, s.time);
-});
+  function setTally(state, text) {
+    tally.setAttribute('data-state', state);
+    label.textContent = text;
+  }
+}());
 </script>
 </body>
 </html>

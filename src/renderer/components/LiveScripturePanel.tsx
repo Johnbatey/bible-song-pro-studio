@@ -21,11 +21,11 @@ const TRANSCRIPT_MAX_CHARS = 20000;
 
 const STATE_LABELS: Record<SttState, { text: string; color: string }> = {
   idle: { text: 'Idle', color: 'var(--text-dim)' },
-  connecting: { text: 'Connecting…', color: 'var(--amber, #f1c40f)' },
-  live: { text: 'Live', color: 'var(--green, #2ecc71)' },
-  reconnecting: { text: 'Reconnecting…', color: 'var(--amber, #f1c40f)' },
-  stalled: { text: 'Stalled', color: 'var(--red, #e74c3c)' },
-  error: { text: 'Error', color: 'var(--red, #e74c3c)' },
+  connecting: { text: 'Connecting…', color: 'var(--tally-hold)' },
+  live: { text: 'Live', color: 'var(--tally-preview)' },
+  reconnecting: { text: 'Reconnecting…', color: 'var(--tally-hold)' },
+  stalled: { text: 'Stalled', color: 'var(--tally-fault)' },
+  error: { text: 'Error', color: 'var(--tally-fault)' },
 };
 
 export function LiveScripturePanel() {
@@ -41,7 +41,12 @@ export function LiveScripturePanel() {
   const [engine, setEngine] = useState<'local' | 'deepgram'>('local');
   const [sttStatus, setSttStatus] = useState<SttStatus | null>(null);
   const [keyConfigured, setKeyConfigured] = useState(false);
-  const [notice, setNotice] = useState('');
+  // A notice reports either a fault or a plain fact, and it is coloured as
+  // whichever it is. There is no warning colour in this system and inventing
+  // one would put a sixth hue next to a five-state tally.
+  const [notice, setNotice] = useState<{ text: string; tone: 'fault' | 'info' }>({ text: '', tone: 'info' });
+  const reportFault = (text: string) => setNotice({ text, tone: 'fault' });
+  const reportInfo = (text: string) => setNotice({ text, tone: 'info' });
   const [rankedDetections, setRankedDetections] = useState<VerseDetection[]>([]);
   const [detectionIsFinal, setDetectionIsFinal] = useState(false);
   const [detectionLatencyMs, setDetectionLatencyMs] = useState(0);
@@ -68,6 +73,10 @@ export function LiveScripturePanel() {
   const detectSequenceRef = useRef(0);
   const lastDetectionTextRef = useRef('');
   const lastProjectedRef = useRef({ key: '', at: 0 });
+  /* A ref, not state: this is read inside the transcription loop, which must
+     not be re-created — and re-rendering the panel every time Settings is
+     touched would restart the recogniser mid-service. */
+  const sermonLanguageRef = useRef<string>('auto');
 
   useEffect(() => {
     refreshInputs();
@@ -76,6 +85,7 @@ export function LiveScripturePanel() {
       if (!res?.ok) return;
       setKeyConfigured(Boolean(res.settings.deepgramApiKeySet));
       if (res.settings.sttEngine) setEngine(res.settings.sttEngine);
+      if (res.settings.sermonLanguage) sermonLanguageRef.current = res.settings.sermonLanguage;
     }).catch(() => {});
     window.BSP?.stt?.status().then(setSttStatus).catch(() => {});
 
@@ -83,14 +93,14 @@ export function LiveScripturePanel() {
       if (event.type === 'state') {
         setSttStatus(event.status);
         if (event.state === 'stalled' || event.state === 'error') {
-          setNotice(event.status.lastError || event.detail);
+          reportFault(event.status.lastError || event.detail);
           teardownCapture();
           setLive({ isActive: false });
         }
       } else if (event.type === 'transcript') {
         handleTranscript(event.text, event.isFinal);
       } else if (event.type === 'error') {
-        setNotice(event.error);
+        reportFault(event.error);
       }
     });
 
@@ -124,7 +134,7 @@ export function LiveScripturePanel() {
       if (!live.selectedInputId && inputs[0]) setLive({ selectedInputId: inputs[0].deviceId });
     } catch {
       setDevices([]);
-      setNotice('Microphone access was denied. Grant it in System Settings → Privacy → Microphone.');
+      reportFault('Microphone access was denied. Grant it in System Settings → Privacy → Microphone.');
     }
   }
 
@@ -178,10 +188,10 @@ export function LiveScripturePanel() {
         detectionVersion = versionRequest.versionId;
         if (detectionVersion !== version) setVersion(detectionVersion);
         setLive({ requestedVersion: null });
-        setNotice(`Bible version switched to ${versionRequest.label}.`);
+        reportInfo(`Bible version switched to ${versionRequest.label}.`);
       } else {
         setLive({ requestedVersion: versionRequest.versionId });
-        setNotice(`${versionRequest.label} was requested. Enable Auto version switch or select it manually.`);
+        reportInfo(`${versionRequest.label} was requested. Enable Auto version switch or select it manually.`);
       }
     }
     const result = await window.BSP?.verse?.detect({
@@ -240,11 +250,17 @@ export function LiveScripturePanel() {
     try {
       // Sent as a typed array — structured clone handles it, and Array.from() on
       // ~80k samples per pass is pure overhead.
-      const result = await window.BSP?.ai?.transcribe({ audioData: merged, language: 'en' });
+      /* The operator's sermon language, not a hardcoded 'en'. An English-only
+         model ignores it — generationOptions only passes it on for a
+         multilingual checkpoint — so sending it is safe whatever is loaded. */
+      const result = await window.BSP?.ai?.transcribe({
+        audioData: merged,
+        language: sermonLanguageRef.current,
+      });
       if (result?.ok && result.text?.trim()) handleTranscript(result.text.trim(), true);
-      else if (result && !result.ok) setNotice(result.error || 'Local transcription failed');
+      else if (result && !result.ok) reportFault(result.error || 'Local transcription failed');
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : String(err));
+      reportFault(err instanceof Error ? err.message : String(err));
     } finally {
       localBusyRef.current = false;
     }
@@ -259,7 +275,16 @@ export function LiveScripturePanel() {
   }
 
   async function startLive() {
-    setNotice('');
+    /* Re-read the sermon language here rather than only on mount. Settings has
+       no change broadcast, and this panel can sit open across a whole morning
+       — an operator who switched to French between services would otherwise
+       still be transcribing the last one's language. */
+    window.BSP?.settings?.get().then((res) => {
+      if (res?.ok && res.settings.sermonLanguage) {
+        sermonLanguageRef.current = res.settings.sermonLanguage;
+      }
+    }).catch(() => {});
+    setNotice({ text: '', tone: 'info' });
     finalTranscriptRef.current = '';
     interimTranscriptRef.current = '';
     lastDetectionTextRef.current = '';
@@ -270,7 +295,7 @@ export function LiveScripturePanel() {
     if (engine === 'deepgram') {
       const started = await window.BSP?.stt?.start({});
       if (!started?.ok) {
-        setNotice(started?.error || 'Could not start Deepgram');
+        reportFault(started?.error || 'Could not start Deepgram');
         setSttStatus(started?.status || null);
         return;
       }
@@ -296,14 +321,14 @@ export function LiveScripturePanel() {
             if (localSamplesRef.current >= STT_SAMPLE_RATE * LOCAL_CHUNK_SECONDS) flushLocalBuffer();
           }
         },
-        onError: (err) => setNotice(err.message),
+        onError: (err) => reportFault(err.message),
       });
       setLive({ isActive: true, provider: engine === 'deepgram' ? 'deepgram' : 'local' });
       const providerType = engine === 'deepgram' ? 'deepgram' : 'local';
       const provider = useAppStore.getState().aiProviders.find((entry) => entry.type === providerType) || null;
       setTranscription({ isActive: true, provider });
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : 'Could not open the microphone');
+      reportFault(err instanceof Error ? err.message : 'Could not open the microphone');
       if (engine === 'deepgram') window.BSP?.stt?.stop();
     }
   }
@@ -327,7 +352,17 @@ export function LiveScripturePanel() {
         reference: `${hit.reference} (${hit.version})`,
         version: hit.version,
       },
-      background: { type: 'gradient', gradient: 'linear-gradient(135deg,#0f172a,#1e1b4b,#312e81)' },
+      /* No background on purpose.
+       *
+       * A scene's own background beats the theme's — that is the rule the
+       * output renderer works to, and it is the right one: an operator who
+       * puts a picture behind a verse means it. But this scene named a flat
+       * near-black nobody chose, on every verse the detector fired, so the
+       * theme's ground never got a look in and Live sent black to the screen
+       * while the Bible panel sent the same verse on the theme.
+       *
+       * The Bible panel's scenes carry no background either. Detection is a
+       * different way to reach a verse, not a different way to dress one. */
       transition: { type: 'fade', duration: 0.15 },
     };
     // Auto-project means Program/Audience, including in Studio mode. Without `direct`
@@ -363,7 +398,7 @@ export function LiveScripturePanel() {
     if (!requested) return;
     setVersion(requested.id);
     setLive({ requestedVersion: null });
-    setNotice(`Bible version switched to ${requested.abbreviation}.`);
+    reportInfo(`Bible version switched to ${requested.abbreviation}.`);
   }
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -402,7 +437,7 @@ export function LiveScripturePanel() {
           options={[
             {
               value: 'bible',
-              label: 'Bible',
+              label: 'Scripture',
               title: 'Detect scripture references in speech',
               icon: (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -436,7 +471,7 @@ export function LiveScripturePanel() {
               gap: 6,
               height: 30,
               padding: '0 12px',
-              background: '#ef4444',
+              background: 'var(--tally-fault)',
               border: 'none',
               borderRadius: 6,
               color: '#ffffff',
@@ -462,7 +497,7 @@ export function LiveScripturePanel() {
               gap: 6,
               height: 30,
               padding: '0 12px',
-              background: '#22c55e',
+              background: 'var(--tally-preview)',
               border: 'none',
               borderRadius: 6,
               color: '#ffffff',
@@ -538,16 +573,18 @@ export function LiveScripturePanel() {
       {barPosition === 'top' && toolbar}
 
       {deepgramUnavailable && (
-        <div style={styles.warn}>
+        <div style={styles.noticeFault}>
           Deepgram needs an API key — add one under <strong>Settings → Transcription</strong>, or switch to Local.
         </div>
       )}
-      {notice && <div style={styles.warn}>{notice}</div>}
+      {notice.text && (
+        <div style={notice.tone === 'fault' ? styles.noticeFault : styles.notice}>{notice.text}</div>
+      )}
 
       {/* Config Popup Window */}
       {isConfigOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: 520, maxWidth: '92vw', background: '#161414', border: '1px solid #262628', borderRadius: 10, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.85)' }}>
+          <div style={{ width: 520, maxWidth: '92vw', background: '#161414', border: '1px solid #262628', borderRadius: 6, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.85)' }}>
             {/* Modal Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #262628', background: '#141416' }}>
               <h3 style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', margin: 0, letterSpacing: '-0.01em' }}>Live Scripture Config</h3>
@@ -556,7 +593,7 @@ export function LiveScripturePanel() {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: 'var(--text-dim, #d4d4d8)',
+                  color: 'var(--text-dim)',
                   fontSize: 16,
                   cursor: 'pointer',
                   display: 'flex',
@@ -572,7 +609,7 @@ export function LiveScripturePanel() {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--text-dim, #d4d4d8)';
+                  e.currentTarget.style.color = 'var(--text-dim)';
                   e.currentTarget.style.background = 'transparent';
                 }}
                 title="Close"
@@ -587,7 +624,7 @@ export function LiveScripturePanel() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Audio Input Microphone</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Hardware device used for speech transcription
                   </div>
                 </div>
@@ -637,7 +674,7 @@ export function LiveScripturePanel() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>AI Speech Model Engine</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Engine used for live speech recognition
                   </div>
                 </div>
@@ -654,7 +691,10 @@ export function LiveScripturePanel() {
                     }
                   }}
                   options={[
-                    { value: 'local', label: 'Local (Whisper AI)', sublabel: 'On-device model' },
+                    /* Not "Whisper" any more — Moonshine is the default and
+                       Whisper is one of three choices. Which one is running is
+                       named in Settings; this row is about local vs cloud. */
+                    { value: 'local', label: 'Local (On-device AI)', sublabel: 'Runs offline on this computer' },
                     { value: 'deepgram', label: 'Deepgram (Cloud API)', sublabel: 'Fast cloud engine' },
                   ]}
                   buttonStyle={{ width: 220, justifyContent: 'space-between' }}
@@ -666,7 +706,7 @@ export function LiveScripturePanel() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Bible Version</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Default Bible version for verse detection
                   </div>
                 </div>
@@ -689,7 +729,7 @@ export function LiveScripturePanel() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Auto project direct references</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Automatically project scripture references when detected
                   </div>
                 </div>
@@ -703,7 +743,7 @@ export function LiveScripturePanel() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Project quoted matches</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Project verbatim spoken matches in continuous speech
                   </div>
                 </div>
@@ -717,7 +757,7 @@ export function LiveScripturePanel() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Auto-version switch</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim, #d4d4d8)', marginTop: 2, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Automatically switch Bible version when spoken in speech
                   </div>
                 </div>
@@ -984,7 +1024,7 @@ const styles: Record<string, React.CSSProperties> = {
   moveBarBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, background: 'transparent', border: 'none', borderRadius: 6, color: '#ffffff', cursor: 'pointer', flexShrink: 0, padding: 0 },
   statusCluster: { display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 },
   meter: { position: 'relative', flexShrink: 0, width: 96, height: 6, background: 'rgba(255,255,255,0.10)', borderRadius: 999, overflow: 'hidden' },
-  meterFill: { height: '100%', background: 'linear-gradient(90deg,#2ecc71,#f1c40f,#e74c3c)', borderRadius: 999, transition: 'width 90ms linear' },
+  meterFill: { height: '100%', background: 'linear-gradient(90deg,var(--tally-preview),var(--tally-preview),var(--tally-fault))', borderRadius: 999, transition: 'width 90ms linear' },
   meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: '#fff', transition: 'left 140ms ease-out' },
   check: { display: 'flex', alignItems: 'center', gap: 6, ...type.caption, color: 'var(--text-secondary)' },
   emptyHint: { ...type.secondary, color: 'var(--text-dim)', textAlign: 'center', padding: 20 },
@@ -998,26 +1038,26 @@ const styles: Record<string, React.CSSProperties> = {
   songCandidateTitle: { ...type.secondary, fontWeight: fontWeight.semibold, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   songCandidateMeta: { ...type.caption, color: 'var(--text-dim)' },
   songCandidateExcerpt: { ...type.caption, color: 'var(--text-secondary)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  songConfidence: { display: 'inline-flex', alignItems: 'center', gap: 5, ...numeric, ...type.caption, color: '#22c55e', fontWeight: fontWeight.semibold, flexShrink: 0 },
-  songConfidenceDot: { width: 6, height: 6, borderRadius: '50%', background: '#22c55e' },
+  songConfidence: { display: 'inline-flex', alignItems: 'center', gap: 5, ...numeric, ...type.caption, color: 'var(--tally-preview)', fontWeight: fontWeight.semibold, flexShrink: 0 },
+  songConfidenceDot: { width: 6, height: 6, borderRadius: '50%', background: 'var(--tally-preview)' },
   matchDashboard: { flex: '1 1 auto', minHeight: 0, overflow: 'hidden' },
   primaryColumn: { minWidth: 220 },
   indexColumn: { flex: '1 1 0%', minWidth: 220 },
-  finalBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(46,204,113,.25)', ...type.label, fontWeight: fontWeight.bold },
-  trackingBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--blue-dim)', color: 'var(--blue)', border: '1px solid rgba(52,152,219,.25)', ...type.label, fontWeight: fontWeight.bold },
-  countBadge: { padding: '3px 7px', borderRadius: 999, background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', ...type.caption, ...numeric, whiteSpace: 'nowrap' },
-  hit: { width: '100%', border: '1px solid var(--border-accent)', background: 'var(--accent-dim)', color: 'var(--text-primary)', borderRadius: 10, padding: 14, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 9, cursor: 'pointer', fontFamily: 'var(--font-ui)' },
+  finalBadge: { padding: '3px 7px', borderRadius: 4, background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(46,204,113,.25)', ...type.label, fontWeight: fontWeight.bold },
+  trackingBadge: { padding: '3px 7px', borderRadius: 4, background: 'var(--blue-dim)', color: 'var(--blue)', border: '1px solid rgba(52,152,219,.25)', ...type.label, fontWeight: fontWeight.bold },
+  countBadge: { padding: '3px 7px', borderRadius: 4, background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', ...type.caption, ...numeric, whiteSpace: 'nowrap' },
+  hit: { width: '100%', border: '1px solid var(--border-accent)', background: 'var(--accent-dim)', color: 'var(--text-primary)', borderRadius: 6, padding: 14, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 9, cursor: 'pointer', fontFamily: 'var(--font-ui)' },
   primaryReferenceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   primaryReference: { color: 'var(--accent-light)', ...type.title },
   versionBadge: { ...type.caption, color: 'var(--text-secondary)', background: 'rgba(0,0,0,.18)', borderRadius: 4, padding: '2px 5px' },
   primaryText: { ...type.body },
   primaryMetrics: { marginTop: 'auto', paddingTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 },
-  metric: { background: 'var(--bg-elevated)', border: '1px solid var(--border-primary)', borderRadius: 7, padding: '8px 9px', display: 'flex', flexDirection: 'column', gap: 2 },
+  metric: { background: 'var(--bg-elevated)', border: '1px solid var(--border-primary)', borderRadius: 6, padding: '8px 9px', display: 'flex', flexDirection: 'column', gap: 2 },
   metricLabel: { color: 'var(--text-dim)', ...type.label, fontWeight: fontWeight.regular },
   metricValue: { color: 'var(--text-primary)', ...type.caption, ...numeric, fontWeight: fontWeight.semibold },
   placeholder: { color: 'var(--text-dim)', ...type.secondary, padding: 18, textAlign: 'center' },
   suggestions: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', scrollbarGutter: 'stable', paddingRight: 4, alignContent: 'start', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
-  suggestionCard: { minWidth: 0, border: '1px solid var(--border-primary)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', borderRadius: 8, padding: '10px 11px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 7, cursor: 'pointer', fontFamily: 'var(--font-ui)', overflow: 'hidden' },
+  suggestionCard: { minWidth: 0, border: '1px solid var(--border-primary)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', borderRadius: 6, padding: '10px 11px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 7, cursor: 'pointer', fontFamily: 'var(--font-ui)', overflow: 'hidden' },
   candidateTopRow: { display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr) auto', alignItems: 'center', gap: 6 },
   rankBadge: { ...type.caption, ...numeric, color: 'var(--text-dim)' },
   suggestionReference: { ...type.secondary, fontWeight: fontWeight.semibold, color: 'var(--accent)' },
@@ -1026,5 +1066,6 @@ const styles: Record<string, React.CSSProperties> = {
   candidateFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, color: 'var(--text-dim)', ...type.label, fontWeight: fontWeight.regular },
   confidenceTrack: { display: 'block', height: 3, borderRadius: 999, background: 'rgba(255,255,255,.06)', overflow: 'hidden' },
   confidenceFill: { display: 'block', height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,var(--blue),var(--green))' },
-  warn: { flex: '0 0 auto', ...type.caption, color: 'var(--amber, #f1c40f)', background: 'rgba(241,196,15,0.08)', border: '1px solid rgba(241,196,15,0.25)', borderRadius: 'var(--block-radius)', padding: '8px 10px' },
+  notice: { flex: '0 0 auto', ...type.caption, color: 'var(--text-dim)', background: 'var(--bsp-raised)', border: '1px solid var(--border-primary)', borderRadius: 'var(--block-radius)', padding: '8px 10px' },
+  noticeFault: { flex: '0 0 auto', ...type.caption, color: 'var(--tally-fault)', background: 'rgba(239, 68, 68, 0.10)', border: '1px solid rgba(239, 68, 68, 0.28)', borderRadius: 'var(--block-radius)', padding: '8px 10px' },
 };

@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
-import { type, fontWeight } from '../styles/type';
-import { NAV_DOCKS } from './dock/docks';
+import { type, fontSize, fontWeight } from '../styles/type';
+import { NAV_DOCK_SECTIONS } from './dock/docks';
 import { toggleDock } from './dock/dockController';
-import { resetDockLayout } from './dock/DockHost';
 
 export function TitleBar() {
   const mode = useAppStore((s) => s.display.mode);
@@ -13,10 +12,20 @@ export function TitleBar() {
   const setExternalDisplay = useAppStore((s) => s.setExternalDisplay);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
+  const notify = useAppStore((s) => s.notify);
   const openDockIds = useAppStore((s) => s.openDockIds);
-  
+
+  /* Blackout lives in the store, not in this component.
+   *
+   * It was `useState` here, which is why the button did nothing: the title bar
+   * turned red and no surface ever heard about it. ProgramSurface has always
+   * drawn `state.blackout`, and the display window and NDI feed have always
+   * been fed from the store — the one thing missing was the button writing
+   * there. */
+  const isBlackout = useAppStore((s) => s.display.blackout);
+  const setBlackout = useAppStore((s) => s.setBlackout);
+
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isBlackout, setIsBlackout] = useState(false);
   const isStudio = mode === 'studio';
   const hasPendingTake = isStudio && Boolean(previewScene) && currentScene?.id !== previewScene?.id;
 
@@ -41,7 +50,7 @@ export function TitleBar() {
   const toggleNdi = async () => {
     if (ndiStatus?.running) {
       await window.BSP?.ndi?.stop?.();
-      triggerAlert({
+      notify({
         id: `ndi-${Date.now()}`,
         text: 'NDI Stream Stopped',
         type: 'info',
@@ -51,7 +60,7 @@ export function TitleBar() {
     } else {
       const res = await window.BSP?.ndi?.start?.();
       if (res?.ok) {
-        triggerAlert({
+        notify({
           id: `ndi-${Date.now()}`,
           text: 'NDI Stream Live (OBS / vMix)',
           type: 'info',
@@ -59,7 +68,7 @@ export function TitleBar() {
           animation: 'slideDown',
         });
       } else if (res?.error) {
-        triggerAlert({
+        notify({
           id: `ndi-${Date.now()}`,
           text: `NDI Error: ${res.error}`,
           type: 'warning',
@@ -73,47 +82,60 @@ export function TitleBar() {
 
 
   const toggleBlackout = () => {
-    const nextState = !isBlackout;
-    setIsBlackout(nextState);
-    if (nextState) {
-      triggerAlert({
-        id: String(Date.now()),
-        text: 'BLACKOUT ACTIVE',
-        type: 'warning',
-        duration: 4000,
-        animation: 'slide',
-      });
-    }
+    const next = !isBlackout;
+    setBlackout(next);
+    /* The operator's own confirmation. It must not go out as a room alert —
+       painting "BLACKOUT ACTIVE" across the screen you just blacked out is
+       the one thing blackout exists to prevent. */
+    notify({
+      id: `blackout-${Date.now()}`,
+      text: next ? 'Blackout active — audience screens are black' : 'Blackout cleared',
+      type: next ? 'warning' : 'info',
+      duration: 3,
+      animation: 'slideDown',
+    });
   };
 
   return (
     <div className="titlebar" style={styles.titlebar}>
-      {/* Left: Window Drag Region & pill tabs */}
+      {/* Left: window drag region and the dock pill tabs */}
       <div className="titlebar-drag" style={styles.dragLeft}>
         <div style={styles.brand}>
-          <img src="./bible-song-pro-icon.svg" alt="" style={styles.logo} />
+          {/* The small cut: at 24px the six-element mark collapses into a blob. */}
+          <img src="./bible-song-pro-icon-small.svg" alt="" style={styles.logo} />
+          <span style={styles.wordmark}>
+            Bible Song Pro<sup style={styles.sup}>Studio</sup>
+          </span>
         </div>
 
-        {/* Dock visibility — a lit tab means that dock is on screen */}
+        {/* Dock visibility — a lit tab means that dock is on screen.
+            Sectioned by a hairline rather than a heading: the groups are worth
+            seeing at a glance, and this bar has no room to name them. The
+            section is in the tooltip for anyone who wants it spelled out. */}
         <div style={styles.pillContainer}>
-          {NAV_DOCKS.map((dock) => {
-            const isOpen = openDockIds.includes(dock.id);
-            return (
-              <button
-                key={dock.id}
-                style={{
-                  ...styles.pillBtn,
-                  background: isOpen ? 'var(--chrome-control-active)' : 'transparent',
-                  color: isOpen ? '#ffffff' : 'var(--text-dim)',
-                  fontWeight: isOpen ? fontWeight.semibold : fontWeight.medium,
-                }}
-                onClick={() => toggleDock(dock.id)}
-                title={isOpen ? `Close the ${dock.title} dock` : `Open the ${dock.title} dock`}
-              >
-                {dock.title}
-              </button>
-            );
-          })}
+          {NAV_DOCK_SECTIONS.map((section, index) => (
+            <div key={section.id} style={styles.pillGroup}>
+              {index > 0 && <span style={styles.pillDivider} aria-hidden="true" />}
+              {section.docks.map((dock) => {
+                const isOpen = openDockIds.includes(dock.id);
+                return (
+                  <button
+                    key={dock.id}
+                    style={{
+                      ...styles.pillBtn,
+                      background: isOpen ? 'var(--chrome-control-active)' : 'transparent',
+                      color: isOpen ? '#ffffff' : 'var(--text-dim)',
+                      fontWeight: isOpen ? fontWeight.semibold : fontWeight.medium,
+                    }}
+                    onClick={() => toggleDock(dock.id)}
+                    title={`${section.label} · ${isOpen ? `Close the ${dock.title} dock` : `Open the ${dock.title} dock`}`}
+                  >
+                    {dock.title}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -149,17 +171,19 @@ export function TitleBar() {
         <button
           style={{
             ...styles.blackBtn,
-            background: isBlackout ? '#ef4444' : 'var(--chrome-control)',
+            background: isBlackout ? 'var(--tally-fault)' : 'var(--chrome-control)',
             color: isBlackout ? '#ffffff' : 'var(--text-secondary)',
           }}
           onClick={toggleBlackout}
+          title={isBlackout ? 'Blackout is ON — click to restore the audience screens' : 'Black out every audience screen'}
+          aria-pressed={isBlackout}
         >
           BLACK
         </button>
 
         <div style={styles.divider} />
 
-        {/* Quick Toolbar Action Buttons: Outputs, Copy URL, Design, Themes, Alerts, Settings */}
+        {/* Quick Toolbar Action Buttons: Outputs, NDI, Alerts, Settings */}
         <div style={styles.toolbarGroup}>
           {/* Outputs Button */}
           <button
@@ -190,9 +214,9 @@ export function TitleBar() {
           <button
             style={{
               ...styles.toolbarBtn,
-              background: ndiStatus?.running ? 'rgba(34, 197, 94, 0.18)' : styles.toolbarBtn.background,
-              borderColor: ndiStatus?.running ? '#22c55e' : 'transparent',
-              color: ndiStatus?.running ? '#22c55e' : 'var(--text-secondary)',
+              background: ndiStatus?.running ? 'rgba(59, 130, 246, 0.18)' : styles.toolbarBtn.background,
+              borderColor: ndiStatus?.running ? 'var(--tally-link)' : 'transparent',
+              color: ndiStatus?.running ? 'var(--tally-link)' : 'var(--text-secondary)',
               fontWeight: ndiStatus?.running ? 700 : 500,
             }}
             onClick={toggleNdi}
@@ -206,67 +230,9 @@ export function TitleBar() {
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               NDI
               {ndiStatus?.running && (
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--tally-preview)', boxShadow: '0 0 6px var(--tally-preview)' }} />
               )}
             </span>
-          </button>
-
-          {/* Copy Display URL — sits with Outputs, the control it relates to */}
-          <button
-            style={{ ...styles.toolbarBtn, color: 'var(--text-secondary)' }}
-            onClick={() => {
-              navigator.clipboard?.writeText(window.location.href);
-              triggerAlert({
-                id: `url-${Date.now()}`,
-                text: 'Display URL copied to clipboard',
-                type: 'info',
-                duration: 3,
-                animation: 'slideDown',
-              });
-            }}
-            title="Copy Display URL"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" />
-              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-            </svg>
-            Copy URL
-          </button>
-
-          {/* Design Button (Opens Full Page Theme Designer) */}
-          <button
-            style={{
-              ...styles.toolbarBtn,
-              color: 'var(--text-secondary)',
-            }}
-            onClick={() => useAppStore.getState().openThemeDesigner()}
-            title="Open Full Page Theme Designer"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a10 10 0 0 0-10 10c0 4.42 3.58 8 8 8 1.1 0 2-.9 2-2 0-.46-.17-.88-.44-1.21-.26-.33-.44-.75-.44-1.22 0-1.1.9-2 2-2h2.8a5.2 5.2 0 0 0 5.2-5.2A10 10 0 0 0 12 2z" />
-              <circle cx="7.5" cy="11.5" r="1.5" fill="currentColor" />
-              <circle cx="12" cy="7.5" r="1.5" fill="currentColor" />
-              <circle cx="16.5" cy="11.5" r="1.5" fill="currentColor" />
-            </svg>
-            Design
-          </button>
-
-          {/* Themes Button */}
-          <button
-            style={{
-              ...styles.toolbarBtn,
-              background: openDockIds.includes('themes') ? 'var(--chrome-control-active)' : styles.toolbarBtn.background,
-              color: openDockIds.includes('themes') ? '#ffffff' : 'var(--text-secondary)',
-            }}
-            onClick={() => toggleDock('themes')}
-            title="Themes Library"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" />
-              <path d="M12 7a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
-              <path d="M12 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
-            </svg>
-            Themes
           </button>
 
           {/* Alerts Button */}
@@ -291,19 +257,6 @@ export function TitleBar() {
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
             Alerts
-          </button>
-
-          {/* Reset the dock arrangement back to the shipped layout */}
-          <button
-            style={{ ...styles.toolbarBtn, color: 'var(--text-secondary)' }}
-            onClick={() => resetDockLayout()}
-            title="Reset panel layout"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-            </svg>
-            Layout
           </button>
 
           {/* Settings Button */}
@@ -348,21 +301,60 @@ const styles: Record<string, React.CSSProperties> = {
   brand: {
     display: 'flex',
     alignItems: 'center',
+    gap: 8,
   },
   logo: {
     width: 24,
     height: 24,
-    borderRadius: 6,
     objectFit: 'contain',
+  },
+  wordmark: {
+    fontSize: fontSize.caption,
+    fontWeight: fontWeight.semibold,
+    letterSpacing: '-0.02em',
+    color: 'var(--text-primary)',
+    whiteSpace: 'nowrap',
+  },
+  /* Studio superscript — Signal face, monochrome. */
+  sup: {
+    fontFamily: 'var(--font-signal)',
+    /* Fixed, not relative: 0.62em of an 11px wordmark lands at 6.8px. */
+    fontSize: 8,
+    fontWeight: fontWeight.regular,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    marginLeft: '0.4em',
+    verticalAlign: '0.3em',
+    lineHeight: 0,
+    color: 'var(--text-dim)',
   },
   pillContainer: {
     display: 'flex',
     alignItems: 'center',
     background: 'var(--chrome-control)',
-    borderRadius: 8,
+    borderRadius: 6,
     padding: 3,
     gap: 2,
     border: '1px solid var(--chrome-control)',
+  },
+  pillGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+  },
+  /* A hairline, not a rule: enough to read as a break between groups from a
+     metre away, not enough to look like a control. */
+  pillDivider: {
+    width: 1,
+    height: 16,
+    margin: '0 6px',
+    /* Not --border-primary: that rule is #262628, which is a hairline against
+       the app's ground but all but invisible on the raised fill this pill
+       strip sits on. Mute, held back, is the same idea at a contrast the
+       operator can actually see from where they sit. */
+    background: 'var(--bsp-mute)',
+    opacity: 0.5,
+    flexShrink: 0,
   },
   pillBtn: {
     padding: '5px 14px',
@@ -405,7 +397,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 7,
     height: 7,
     borderRadius: '50%',
-    background: '#22c55e',
+    background: 'var(--tally-preview)',
     boxShadow: '0 0 8px rgba(34, 197, 94, 0.8)',
   },
   blackBtn: {

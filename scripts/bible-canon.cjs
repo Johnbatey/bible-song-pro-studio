@@ -13,46 +13,86 @@
 // array. The plugin and the desktop app can then share one guard.
 
 // Each row is one canonical book: the English name first, then every spelling we
-// accept for it. French is included because Louis Segond ships in the bundle — a
-// guard that only speaks English would reject a perfectly canonical French bible.
+// accept for it. French and Spanish are included because Louis Segond, Ostervald
+// and Reina-Valera ship in the bundle — a guard that only speaks English would
+// reject a perfectly canonical bible in either.
+//
+// Two editions of one language do not necessarily agree: Ostervald calls the
+// Song of Songs "Cantique" where Segond writes "Cantique des Cantiques", and
+// writes "1 Thessalonicien" singular. Both spellings are listed, because the
+// guard's job is to recognise the canon, not to arbitrate French.
+//
 // Diacritics are folded during comparison, so accents here are for readability.
 const CANON = [
   // Old Testament — 39
-  ['Genesis', 'Genèse'], ['Exodus', 'Exode'], ['Leviticus', 'Lévitique'],
-  ['Numbers', 'Nombres'], ['Deuteronomy', 'Deutéronome'],
-  ['Joshua', 'Josué'], ['Judges', 'Juges'], ['Ruth'],
-  ['1 Samuel'], ['2 Samuel'],
-  ['1 Kings', '1 Rois'], ['2 Kings', '2 Rois'],
-  ['1 Chronicles', '1 Chroniques'], ['2 Chronicles', '2 Chroniques'],
-  ['Ezra', 'Esdras'], ['Nehemiah', 'Néhémie'], ['Esther'], ['Job'],
-  ['Psalms', 'Psalm', 'Psalter', 'Psaumes'],
-  ['Proverbs', 'Proverbes'],
-  ['Ecclesiastes', 'Qoheleth', 'Preacher', 'Ecclésiaste'],
-  ['Song of Solomon', 'Song of Songs', 'Canticles', 'Song', 'Cantique des Cantiques'],
-  ['Isaiah', 'Ésaïe'], ['Jeremiah', 'Jérémie'], ['Lamentations'],
-  ['Ezekiel', 'Ézéchiel'], ['Daniel'],
-  ['Hosea', 'Osée'], ['Joel', 'Joël'], ['Amos'], ['Obadiah', 'Abdias'],
-  ['Jonah', 'Jonas'], ['Micah', 'Michée'], ['Nahum'], ['Habakkuk', 'Habacuc'],
-  ['Zephaniah', 'Sophonie'], ['Haggai', 'Aggée'], ['Zechariah', 'Zacharie'],
-  ['Malachi', 'Malachie'],
+  ['Genesis', 'Genèse'],
+  ['Exodus', 'Exode', 'Éxodo'],
+  ['Leviticus', 'Lévitique', 'Levítico'],
+  ['Numbers', 'Nombres', 'Números'],
+  ['Deuteronomy', 'Deutéronome', 'Deuteronomio'],
+  ['Joshua', 'Josué'],
+  ['Judges', 'Juges', 'Jueces'],
+  ['Ruth', 'Rut'],
+  ['1 Samuel'],
+  ['2 Samuel'],
+  ['1 Kings', '1 Rois', '1 Reyes'],
+  ['2 Kings', '2 Rois', '2 Reyes'],
+  ['1 Chronicles', '1 Chroniques', '1 Crónicas'],
+  ['2 Chronicles', '2 Chroniques', '2 Crónicas'],
+  ['Ezra', 'Esdras'],
+  ['Nehemiah', 'Néhémie', 'Nehemías'],
+  ['Esther', 'Ester'],
+  ['Job'],
+  ['Psalms', 'Psalm', 'Psalter', 'Psaumes', 'Salmos'],
+  ['Proverbs', 'Proverbes', 'Proverbios'],
+  ['Ecclesiastes', 'Qoheleth', 'Preacher', 'Ecclésiaste', 'Eclesiastés'],
+  ['Song of Solomon', 'Song of Songs', 'Canticles', 'Song', 'Cantique des Cantiques', 'Cantique', 'Cantar de Los Cantares'],
+  ['Isaiah', 'Ésaïe', 'Isaías'],
+  ['Jeremiah', 'Jérémie', 'Jeremías'],
+  ['Lamentations', 'Lamentaciones'],
+  ['Ezekiel', 'Ézéchiel', 'Ezequiel'],
+  ['Daniel'],
+  ['Hosea', 'Osée', 'Oseas'],
+  ['Joel', 'Joël'],
+  ['Amos'],
+  ['Obadiah', 'Abdias'],
+  ['Jonah', 'Jonas'],
+  ['Micah', 'Michée', 'Miqueas'],
+  ['Nahum'],
+  ['Habakkuk', 'Habacuc'],
+  ['Zephaniah', 'Sophonie', 'Sofonías'],
+  ['Haggai', 'Aggée', 'Hageo'],
+  ['Zechariah', 'Zacharie', 'Zacarías'],
+  ['Malachi', 'Malachie', 'Malaquías'],
 
   // New Testament — 27
-  ['Matthew', 'Matthieu'], ['Mark', 'Marc'], ['Luke', 'Luc'], ['John', 'Jean'],
-  ['Acts', 'Acts of the Apostles', 'Actes'],
-  ['Romans', 'Romains'],
-  ['1 Corinthians', '1 Corinthiens'], ['2 Corinthians', '2 Corinthiens'],
-  ['Galatians', 'Galates'], ['Ephesians', 'Éphésiens'],
-  ['Philippians', 'Philippiens'], ['Colossians', 'Colossiens'],
-  ['1 Thessalonians', '1 Thessaloniciens'], ['2 Thessalonians', '2 Thessaloniciens'],
-  // "Thimothée" is a typo in some upstream data; accepted so a source typo cannot
-  // fail a build, while usfx-to-zefania.js corrects it for display.
-  ['1 Timothy', '1 Timothée', '1 Thimothée'], ['2 Timothy', '2 Timothée', '2 Thimothée'],
-  ['Titus', 'Tite'], ['Philemon', 'Philémon'], ['Hebrews', 'Hébreux'],
-  ['James', 'Jacques'],
-  ['1 Peter', '1 Pierre'], ['2 Peter', '2 Pierre'],
-  ['1 John', '1 Jean'], ['2 John', '2 Jean'], ['3 John', '3 Jean'],
-  ['Jude'],
-  ['Revelation', 'Revelation of John', 'Revelation of Jesus Christ', 'Apocalypse']
+  ['Matthew', 'Matthieu', 'San Mateo'],
+  ['Mark', 'Marc', 'Marcos'],
+  ['Luke', 'Luc', 'San Lucas'],
+  ['John', 'Jean', 'Juan'],
+  ['Acts', 'Acts of the Apostles', 'Actes', 'Hechos'],
+  ['Romans', 'Romains', 'Romanos'],
+  ['1 Corinthians', '1 Corinthiens', '1 Corintios'],
+  ['2 Corinthians', '2 Corinthiens', '2 Corintios'],
+  ['Galatians', 'Galates', 'Gálatas'],
+  ['Ephesians', 'Éphésiens', 'Efesios'],
+  ['Philippians', 'Philippiens', 'Filipenses'],
+  ['Colossians', 'Colossiens', 'Colosenses'],
+  ['1 Thessalonians', '1 Thessaloniciens', '1 Thessalonicien', '1 Tesalonicenses'],
+  ['2 Thessalonians', '2 Thessaloniciens', '2 Thessalonicien', '2 Tesalonicenses'],
+  ['1 Timothy', '1 Timothée', '1 Thimothée', '1 Timoteo'],
+  ['2 Timothy', '2 Timothée', '2 Thimothée', '2 Timoteo'],
+  ['Titus', 'Tite', 'Tito'],
+  ['Philemon', 'Philémon', 'Filemón'],
+  ['Hebrews', 'Hébreux', 'Hebreos'],
+  ['James', 'Jacques', 'Santiago'],
+  ['1 Peter', '1 Pierre', '1 Pedro'],
+  ['2 Peter', '2 Pierre', '2 Pedro'],
+  ['1 John', '1 Jean', '1 Juan'],
+  ['2 John', '2 Jean', '2 Juan'],
+  ['3 John', '3 Jean', '3 Juan'],
+  ['Jude', 'Judas'],
+  ['Revelation', 'Revelation of John', 'Revelation of Jesus Christ', 'Apocalypse', 'Apocalipsis']
 ];
 
 // Anything here fails the build outright, whatever else the file contains.
