@@ -636,7 +636,7 @@ export function SettingsModal() {
                       style={modalStyles.textInput}
                     />
                     <button
-                      style={{ ...modalStyles.actionBtn, background: '#FF5500', color: '#fff', border: 'none' }}
+                      style={{ ...modalStyles.actionBtn, background: '#FF5500', color: '#fff', border: 'none', whiteSpace: 'nowrap' }}
                       onClick={() => {
                         if (deepgramKeyDraft.trim()) {
                           saveSettings({ deepgramApiKey: deepgramKeyDraft.trim() });
@@ -1395,6 +1395,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     fontWeight: 600,
     cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   shortcutRow: {
     display: 'flex',
