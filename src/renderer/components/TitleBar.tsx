@@ -173,17 +173,17 @@ export function TitleBar() {
             background: isBlackout
               ? 'rgba(239, 68, 68, 0.15)'
               : currentScene
-              ? 'rgba(16, 185, 129, 0.15)'
+              ? 'var(--bsp-signal-wash)'
               : 'var(--chrome-control)',
             borderColor: isBlackout
               ? 'rgba(239, 68, 68, 0.4)'
               : currentScene
-              ? 'rgba(16, 185, 129, 0.4)'
+              ? 'var(--bsp-signal-glow)'
               : 'var(--border-primary)',
             color: isBlackout
               ? '#EF4444'
               : currentScene
-              ? '#10B981'
+              ? 'var(--bsp-signal)'
               : 'var(--text-secondary)',
             transition: 'all 0.2s ease',
           }}
@@ -205,11 +205,11 @@ export function TitleBar() {
           <span
             style={{
               ...styles.liveDot,
-              background: isBlackout ? '#EF4444' : currentScene ? '#10B981' : '#6B7280',
+              background: isBlackout ? '#EF4444' : currentScene ? 'var(--bsp-signal)' : 'var(--bsp-tally-hold)',
               boxShadow: isBlackout
                 ? '0 0 8px rgba(239, 68, 68, 0.8)'
                 : currentScene
-                ? '0 0 8px rgba(16, 185, 129, 0.8)'
+                ? '0 0 8px var(--bsp-signal-glow)'
                 : 'none',
             }}
           />
