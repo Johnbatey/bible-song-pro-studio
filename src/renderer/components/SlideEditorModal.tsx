@@ -641,7 +641,7 @@ export function SlideEditorModal() {
         width: 31.3,
         height: isLine ? 1 : 33.3,
         content: tool,
-        backgroundColor: isLine ? '#FF5500' : 'rgba(244, 98, 31, 0.25)',
+        backgroundColor: '#FF5500',
         borderColor: '#FF5500',
         borderWidth: isLine ? 0 : 3,
         borderRadius: isCircle ? 300 : isRounded ? 12 : 0,

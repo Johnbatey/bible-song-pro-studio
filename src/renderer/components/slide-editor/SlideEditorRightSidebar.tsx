@@ -954,7 +954,7 @@ export function SlideEditorRightSidebar({
                         {!pptxShape && selectedElement && (
                           <button
                             type="button"
-                            onClick={() => onUpdateElement(selectedElement.id, { backgroundColor: selectedElement.backgroundColor === 'transparent' ? 'rgba(244, 98, 31, 0.25)' : 'transparent' })}
+                            onClick={() => onUpdateElement(selectedElement.id, { backgroundColor: selectedElement.backgroundColor === 'transparent' ? '#FF5500' : 'transparent' })}
                             style={{
                               background: selectedElement.backgroundColor === 'transparent' ? 'var(--accent-dim)' : 'transparent',
                               border: '1px solid var(--border-primary)',
@@ -990,7 +990,7 @@ export function SlideEditorRightSidebar({
                           value={
                             pptxShape
                               ? ((typeof pptxShape.fillColor === 'string' ? pptxShape.fillColor : '#FF5500')).toUpperCase()
-                              : ((selectedElement?.backgroundColor && selectedElement.backgroundColor !== 'transparent') ? selectedElement.backgroundColor : '#FF5500').toUpperCase()
+                              : ((selectedElement?.backgroundColor && selectedElement.backgroundColor !== 'transparent') ? (normalizeHex(selectedElement.backgroundColor) || selectedElement.backgroundColor) : '#FF5500').toUpperCase()
                           }
                           onChange={(e) => {
                             const val = e.target.value;

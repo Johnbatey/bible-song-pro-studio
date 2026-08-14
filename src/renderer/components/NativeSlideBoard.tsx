@@ -138,7 +138,7 @@ function ElementBox({ el }: { el: SlideElement }) {
           style={{
             width: '100%',
             height: '100%',
-            backgroundColor: el.backgroundColor !== undefined ? el.backgroundColor : 'rgba(244, 98, 31, 0.25)',
+            backgroundColor: el.backgroundColor !== undefined ? el.backgroundColor : '#FF5500',
             borderColor: el.borderColor || '#FF5500',
             borderWidth: `${borderWidth}px`,
             borderStyle: borderWidth > 0 ? 'solid' : 'none',
