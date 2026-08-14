@@ -277,6 +277,8 @@ export function SlideEditorRightSidebar({
     ? (typeof firstPptxText?.opacity === 'number' ? firstPptxText.opacity : 1)
     : (targetTextElement?.opacity ?? 1);
 
+  const pptxShape = pptx && pptx.selected && pptx.selected.length > 0 ? pptx.selected[0] : null;
+
   /** Every Typography control writes through here, so none of them can act on
       a target that is not there. */
   const setText = (updates: Partial<SlideElement>) => {
@@ -838,55 +840,181 @@ export function SlideEditorRightSidebar({
             </div>
             )}
 
-            {/* Shape Style & Border Section */}
-            {selectedElement && (selectedElement.type === 'shape' || selectedElement.type === 'image') && (
+            {/* Shape, Fill & Border Section */}
+            {(selectedElement || pptxShape) && (
               <div style={styles.sectionCard}>
                 <div style={styles.sectionHeader} onClick={() => toggleSection('shape')}>
-                  <span style={styles.sectionTitle}>Shape & Border</span>
+                  <span style={styles.sectionTitle}>Shape, Fill & Border</span>
                   <ChevronIcon open={Boolean(openSections.shape)} />
                 </div>
 
                 {openSections.shape && (
                   <div style={styles.sectionBody}>
-                    {/* Border Radius Slider */}
+                    {/* Fill Color & Transparent Toggle */}
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>Corner Radius ({selectedElement.borderRadius || 0}px)</span>
-                      <input
-                        type="range"
-                        min="0"
-                        max="50"
-                        value={selectedElement.borderRadius || 0}
-                        onChange={(e) => onUpdateElement(selectedElement.id, { borderRadius: parseInt(e.target.value, 10) })}
-                        style={{ accentColor: '#FF5500' }}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={styles.propLabel}>Fill Color</span>
+                        {!pptxShape && selectedElement && (
+                          <button
+                            type="button"
+                            onClick={() => onUpdateElement(selectedElement.id, { backgroundColor: selectedElement.backgroundColor === 'transparent' ? 'rgba(244, 98, 31, 0.25)' : 'transparent' })}
+                            style={{
+                              background: selectedElement.backgroundColor === 'transparent' ? 'var(--accent-dim)' : 'transparent',
+                              border: '1px solid var(--border-primary)',
+                              borderRadius: 4,
+                              color: selectedElement.backgroundColor === 'transparent' ? 'var(--accent)' : 'var(--text-dim)',
+                              fontSize: 10,
+                              fontWeight: 600,
+                              padding: '2px 6px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {selectedElement.backgroundColor === 'transparent' ? 'No Fill (Active)' : 'Clear Fill'}
+                          </button>
+                        )}
+                      </div>
+                      <div style={styles.colorPillRow}>
+                        <input
+                          type="color"
+                          value={
+                            pptxShape
+                              ? (normalizeHex(typeof pptxShape.fillColor === 'string' ? pptxShape.fillColor : undefined) || '#FF5500')
+                              : (normalizeHex(selectedElement?.backgroundColor) || '#FF5500')
+                          }
+                          onChange={(e) => {
+                            if (pptxShape) (pptx as PptxInspector | null)?.onFill(e.target.value);
+                            else if (selectedElement) onUpdateElement(selectedElement.id, { backgroundColor: e.target.value });
+                          }}
+                          style={styles.colorSwatch}
+                        />
+                        <input
+                          type="text"
+                          spellCheck={false}
+                          value={
+                            pptxShape
+                              ? ((typeof pptxShape.fillColor === 'string' ? pptxShape.fillColor : '#FF5500')).toUpperCase()
+                              : ((selectedElement?.backgroundColor && selectedElement.backgroundColor !== 'transparent') ? selectedElement.backgroundColor : '#FF5500').toUpperCase()
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (pptxShape) (pptx as PptxInspector | null)?.onFill(val);
+                            else if (selectedElement) onUpdateElement(selectedElement.id, { backgroundColor: val });
+                          }}
+                          style={styles.colorHexInput}
+                        />
+                      </div>
                     </div>
 
-                    {/* Fill Color */}
-                    {selectedElement.type === 'shape' && (
-                      <div style={styles.propRowCol}>
-                        <span style={styles.propLabel}>Fill Color</span>
-                        <div style={styles.colorPillRow}>
-                          <input
-                            type="color"
-                            value={selectedElement.backgroundColor?.startsWith('#') ? selectedElement.backgroundColor : '#FF5500'}
-                            onChange={(e) => onUpdateElement(selectedElement.id, { backgroundColor: e.target.value })}
-                            style={styles.colorSwatch}
-                          />
-                          <input
-                            type="text"
-                            value={(selectedElement.backgroundColor || '#FF5500').toUpperCase()}
-                            onChange={(e) => onUpdateElement(selectedElement.id, { backgroundColor: e.target.value })}
-                            style={styles.colorHexInput}
-                          />
-                        </div>
+                    {/* Border Color */}
+                    <div style={styles.propRowCol}>
+                      <span style={styles.propLabel}>Border Color</span>
+                      <div style={styles.colorPillRow}>
+                        <input
+                          type="color"
+                          value={
+                            pptxShape
+                              ? (normalizeHex(typeof pptxShape.strokeColor === 'string' ? pptxShape.strokeColor : undefined) || '#FF5500')
+                              : (normalizeHex(selectedElement?.borderColor) || '#FF5500')
+                          }
+                          onChange={(e) => {
+                            if (pptxShape) (pptx as PptxInspector | null)?.onStroke(e.target.value, (pptxShape?.strokeWidthPx as number) || 2);
+                            else if (selectedElement) onUpdateElement(selectedElement.id, { borderColor: e.target.value });
+                          }}
+                          style={styles.colorSwatch}
+                        />
+                        <input
+                          type="text"
+                          spellCheck={false}
+                          value={
+                            pptxShape
+                              ? ((typeof pptxShape.strokeColor === 'string' ? pptxShape.strokeColor : '#FF5500')).toUpperCase()
+                              : (selectedElement?.borderColor || '#FF5500').toUpperCase()
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (pptxShape) (pptx as PptxInspector | null)?.onStroke(val);
+                            else if (selectedElement) onUpdateElement(selectedElement.id, { borderColor: val });
+                          }}
+                          style={styles.colorHexInput}
+                        />
                       </div>
-                    )}
+                    </div>
+
+                    {/* Border Width Slider */}
+                    <div style={styles.propRowCol}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={styles.propLabel}>Border Width</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (selectedElement ? (selectedElement.borderWidth ?? (selectedElement.type === 'shape' ? 3 : 0)) : 0)}px
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="range"
+                          min="0"
+                          max="30"
+                          value={pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (selectedElement ? (selectedElement.borderWidth ?? (selectedElement.type === 'shape' ? 3 : 0)) : 0)}
+                          onChange={(e) => {
+                            const bw = parseInt(e.target.value, 10);
+                            if (pptxShape) (pptx as PptxInspector | null)?.onStroke((typeof pptxShape?.strokeColor === 'string' ? pptxShape.strokeColor : '#FF5500'), bw);
+                            else if (selectedElement) onUpdateElement(selectedElement.id, { borderWidth: bw });
+                          }}
+                          style={{ flex: 1, accentColor: '#FF5500' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Corner Radius Slider (Works on All Shapes, Text Boxes & Images!) */}
+                    <div style={styles.propRowCol}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={styles.propLabel}>Corner Radius</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {selectedElement?.borderRadius ?? 0}px
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="range"
+                          min="0"
+                          max="50"
+                          value={selectedElement?.borderRadius ?? 0}
+                          onChange={(e) => {
+                            const radius = parseInt(e.target.value, 10);
+                            if (selectedElement) onUpdateElement(selectedElement.id, { borderRadius: radius });
+                          }}
+                          style={{ flex: 1, accentColor: '#FF5500' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Opacity Slider */}
+                    <div style={styles.propRowCol}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={styles.propLabel}>Opacity</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {Math.round((selectedElement?.opacity ?? 1) * 100)}%
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={Math.round((selectedElement?.opacity ?? 1) * 100)}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) / 100;
+                            if (selectedElement) onUpdateElement(selectedElement.id, { opacity: val });
+                          }}
+                          style={{ flex: 1, accentColor: '#FF5500' }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Geometry & Position Section */}
+            {/* Geometry & Transform Section */}
             {selectedElement && (
               <div style={styles.sectionCard}>
                 <div style={styles.sectionHeader} onClick={() => toggleSection('geometry')}>
@@ -901,7 +1029,7 @@ export function SlideEditorRightSidebar({
                         <span style={styles.propLabel}>X Position (%)</span>
                         <input
                           type="number"
-                          value={selectedElement.x === 0 ? '' : (selectedElement.x ?? '')}
+                          value={selectedElement.x === 0 ? '0' : (selectedElement.x ?? '')}
                           onChange={(e) => onUpdateElement(selectedElement.id, { x: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
                           style={styles.numberInput}
                         />
@@ -910,7 +1038,7 @@ export function SlideEditorRightSidebar({
                         <span style={styles.propLabel}>Y Position (%)</span>
                         <input
                           type="number"
-                          value={selectedElement.y === 0 ? '' : (selectedElement.y ?? '')}
+                          value={selectedElement.y === 0 ? '0' : (selectedElement.y ?? '')}
                           onChange={(e) => onUpdateElement(selectedElement.id, { y: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
                           style={styles.numberInput}
                         />
@@ -922,7 +1050,7 @@ export function SlideEditorRightSidebar({
                         <span style={styles.propLabel}>Width (%)</span>
                         <input
                           type="number"
-                          value={selectedElement.width === 0 ? '' : (selectedElement.width ?? '')}
+                          value={selectedElement.width === 0 ? '0' : (selectedElement.width ?? '')}
                           onChange={(e) => onUpdateElement(selectedElement.id, { width: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
                           style={styles.numberInput}
                         />
@@ -931,11 +1059,44 @@ export function SlideEditorRightSidebar({
                         <span style={styles.propLabel}>Height (%)</span>
                         <input
                           type="number"
-                          value={selectedElement.height === 0 ? '' : (selectedElement.height ?? '')}
+                          value={selectedElement.height === 0 ? '0' : (selectedElement.height ?? '')}
                           onChange={(e) => onUpdateElement(selectedElement.id, { height: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
                           style={styles.numberInput}
                         />
                       </div>
+                    </div>
+
+                    {/* Rotation Control */}
+                    <div style={styles.propRowCol}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={styles.propLabel}>Rotation Angle ({selectedElement.rotation || 0}°)</span>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateElement(selectedElement.id, { rotation: ((selectedElement.rotation || 0) - 90) % 360 })}
+                            style={{ background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', borderRadius: 4, color: 'var(--text-primary)', padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}
+                            title="Rotate 90° Left"
+                          >
+                            ↺ -90°
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateElement(selectedElement.id, { rotation: ((selectedElement.rotation || 0) + 90) % 360 })}
+                            style={{ background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', borderRadius: 4, color: 'var(--text-primary)', padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}
+                            title="Rotate 90° Right"
+                          >
+                            ↻ +90°
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        min="-180"
+                        max="180"
+                        value={selectedElement.rotation || 0}
+                        onChange={(e) => onUpdateElement(selectedElement.id, { rotation: parseInt(e.target.value, 10) })}
+                        style={{ accentColor: '#FF5500' }}
+                      />
                     </div>
                   </div>
                 )}

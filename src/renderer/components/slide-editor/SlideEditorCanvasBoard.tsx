@@ -556,40 +556,51 @@ export function SlideEditorCanvasBoard({
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    borderRadius: el.borderRadius || 0,
+                    borderRadius: el.borderRadius !== undefined ? `${el.borderRadius}px` : '0px',
+                    borderColor: el.borderColor || 'transparent',
+                    borderWidth: el.borderWidth !== undefined ? `${el.borderWidth}px` : '0px',
+                    borderStyle: (el.borderWidth ?? 0) > 0 ? 'solid' : 'none',
                     opacity: el.opacity ?? 1,
+                    boxSizing: 'border-box',
                   }}
                 />
               )}
 
               {/* Shape Element */}
-              {el.type === 'shape' && (
-                <div
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    backgroundColor: el.backgroundColor || 'rgba(244, 98, 31, 0.25)',
-                    borderColor: el.borderColor || '#FF5500',
-                    borderWidth: el.borderWidth !== undefined ? el.borderWidth : 3,
-                    borderStyle: 'solid',
-                    borderRadius:
-                      el.content === 'circle'
-                        ? '50%'
-                        : el.content === 'rectangle'
-                        ? 0
-                        : el.borderRadius !== undefined
-                        ? el.borderRadius
-                        : 12,
-                    clipPath:
-                      el.content === 'triangle'
-                        ? 'polygon(50% 0%, 0% 100%, 100% 100%)'
-                        : el.content === 'star'
-                        ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
-                        : undefined,
-                    opacity: el.opacity ?? 1,
-                  }}
-                />
-              )}
+              {el.type === 'shape' && (() => {
+                const computedRadius =
+                  el.content === 'circle'
+                    ? '50%'
+                    : el.borderRadius !== undefined
+                    ? `${el.borderRadius}px`
+                    : el.content === 'rectangle'
+                    ? '0px'
+                    : '12px';
+
+                const borderWidth = el.borderWidth !== undefined ? el.borderWidth : 3;
+
+                return (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      backgroundColor: el.backgroundColor !== undefined ? el.backgroundColor : 'rgba(244, 98, 31, 0.25)',
+                      borderColor: el.borderColor || '#FF5500',
+                      borderWidth: `${borderWidth}px`,
+                      borderStyle: borderWidth > 0 ? 'solid' : 'none',
+                      borderRadius: computedRadius,
+                      clipPath:
+                        el.content === 'triangle'
+                          ? 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                          : el.content === 'star'
+                          ? 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)'
+                          : undefined,
+                      opacity: el.opacity ?? 1,
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                );
+              })()}
 
               {/* PowerPoint-style 8 Handle Resizing HUD */}
               {isSelected && !isEditing && (
