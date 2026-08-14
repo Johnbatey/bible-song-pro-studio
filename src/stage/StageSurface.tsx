@@ -91,6 +91,9 @@ export function StageSurface({
     className || '',
   ].filter(Boolean).join(' ');
 
+  const wordStudy = program.scene?.content?.wordStudy || null;
+  const secondaryVerse = program.scene?.content?.secondaryVerse || null;
+
   return (
     <main className={classes} style={rootStyle}>
       {/* Rendered in every mode but hidden by CSS in confidence, so switching
@@ -110,6 +113,8 @@ export function StageSurface({
           current={state.current}
           currentSlide={currentSlide}
           currentMedia={currentMedia}
+          wordStudy={wordStudy}
+          secondaryVerse={secondaryVerse}
           next={state.next}
           songTitle={state.songTitle}
           songSubtitle={state.songSubtitle}
@@ -120,12 +125,6 @@ export function StageSurface({
           <div className="idle-ring"><div className="idle-dot" /></div>
           <p className="idle-label">Stage Ready</p>
         </div>
-        {chrome && (
-          <footer className="stage-watermark">
-            <span className="watermark-left">Bible Song Pro · {layout.name}</span>
-            <span className="watermark-right">L = layout · Esc = clear</span>
-          </footer>
-        )}
       </section>
     </main>
   );

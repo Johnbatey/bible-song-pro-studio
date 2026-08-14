@@ -429,7 +429,7 @@ export function PresentationPanel() {
         text,
         slide: projection,
         slideId: String(index),
-        slides: selectedDeck.slides?.map((s, idx) => ({
+        slides: selectedDeck.slides?.map((s: any, idx: number) => ({
           id: s.id || String(idx),
           text: s.body || s.title || s.label || `Slide ${idx + 1}`,
           notes: s.notes || '',
@@ -546,12 +546,24 @@ export function PresentationPanel() {
         value="create"
         options={[
           { value: 'create', label: '+ Create new' },
-          { value: 'manual', label: '✏ Create manually' },
-          { value: 'import', label: '📥 Import presentation' },
-          { value: 'ai', label: '✨ Generate with AI' },
+          {
+            value: 'manual',
+            label: 'Create manually',
+            icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
+          },
+          {
+            value: 'import',
+            label: 'Import presentation',
+            icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+          },
+          {
+            value: 'ai',
+            label: 'Generate with AI',
+            icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/></svg>,
+          },
         ]}
         onChange={handleCreateNew}
-        buttonStyle={{ background: '#202024', height: 34, padding: '0 14px', borderRadius: 6, fontWeight: 700 }}
+        buttonStyle={{ background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', height: 34, padding: '0 14px', borderRadius: 6, fontWeight: 700, color: 'var(--text-primary)' }}
       />
       <input
         ref={inputRef}
@@ -562,7 +574,7 @@ export function PresentationPanel() {
       />
 
       <div style={styles.searchBox}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input
           placeholder="Search for slide title or content"
           value={searchQuery}
@@ -586,7 +598,7 @@ export function PresentationPanel() {
   const page2Toolbar = (
     <div className="blk blk--bar">
       <div style={styles.searchBox}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input
           placeholder="Search slides in this project..."
           value={searchQuery}
@@ -640,7 +652,7 @@ export function PresentationPanel() {
       });
     }
 
-    return (selectedDeck.slides || []).map((s, idx) => ({
+    return (selectedDeck.slides || []).map((s: any, idx: number) => ({
       slide: s,
       index: idx,
       title: s.title || s.label || `Slide ${idx + 1}`,
@@ -750,7 +762,7 @@ export function PresentationPanel() {
         /* PAGE 2: PROJECT SLIDES VIEW */
         <Block
           className="blk-fill"
-          title={<>Project: <span style={{ color: 'var(--accent)', cursor: 'pointer' }} title="Click to rename project" onClick={() => handleRenameDeck(selectedDeck.id)}>{selectedDeck.title} ✏</span></>}
+          title={<>Project: <span style={{ color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Click to rename project" onClick={() => handleRenameDeck(selectedDeck.id)}>{selectedDeck.title} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span></>}
           subtitle={`${page2SlidesList.length} ${page2SlidesList.length === 1 ? 'slide' : 'slides'}`}
           tools={(
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -777,7 +789,12 @@ export function PresentationPanel() {
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </BlockButton>
-              <BlockButton onClick={() => handleEditSlide(selectedDeck.id)}>✏ Open in Editor</BlockButton>
+              <BlockButton onClick={() => handleEditSlide(selectedDeck.id)}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                  Open in Editor
+                </span>
+              </BlockButton>
             </div>
           )}
           bodyStyle={dynamicProjectSlidesGridStyle}
@@ -1138,10 +1155,10 @@ export function PresentationPanel() {
               top,
               left,
               zIndex: 99999,
-              background: '#18181b',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
               borderRadius: 6,
-              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(0, 0, 0, 0.5)',
+              boxShadow: 'var(--shadow-lg, 0 12px 36px rgba(0, 0, 0, 0.4))',
               padding: 4,
               display: 'flex',
               flexDirection: 'column',
@@ -1156,31 +1173,36 @@ export function PresentationPanel() {
                 setSelectedDeckId(activeDeck.id);
               }}
             >
-              👁 View project slides
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span>View project slides</span>
             </button>
             <button
               style={styles.menuItem}
               onClick={() => handleEditSlide(activeDeck.id)}
             >
-              ✏ Edit design in editor
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <span>Edit design in editor</span>
             </button>
             <button
               style={styles.menuItem}
               onClick={() => handleRenameDeck(activeDeck.id)}
             >
-              Rename project
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              <span>Rename project</span>
             </button>
             <button
               style={styles.menuItem}
               onClick={() => handleDuplicateDeck(activeDeck.id)}
             >
-              Duplicate project
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>Duplicate project</span>
             </button>
             <button
               style={{ ...styles.menuItem, color: 'var(--tally-fault)' }}
               onClick={() => handleDeleteSlide(activeDeck.id)}
             >
-              Delete project
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--tally-fault)' }}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              <span>Delete project</span>
             </button>
           </div>,
           document.body
@@ -1236,7 +1258,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     borderRadius: 6,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     cursor: 'pointer',
     flexShrink: 0,
     padding: 0,
@@ -1274,15 +1296,15 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     height: 34,
     padding: '0 12px',
-    background: 'var(--block-active)',
-    border: '1px solid var(--block-line)',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
   },
   searchInput: {
     flex: 1,
     background: 'transparent',
     border: 'none',
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 12,
     outline: 'none',
   },
@@ -1295,14 +1317,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     borderRadius: 4,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     cursor: 'pointer',
   },
-  /* gridAutoRows is max-content, not auto: the cards clip their own overflow,
-     so an auto row has a zero automatic minimum and Chromium squeezes every
-     row to fit the scroller's height the moment the grid is taller than the
-     body — which stacks the cards on top of one another. max-content pins each
-     row to the card it holds and lets the body scroll instead. */
   gridContainer: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
@@ -1350,7 +1367,7 @@ const styles: Record<string, React.CSSProperties> = {
   cardTitle: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
   },
   cardSubtitle: {
     fontSize: 11,
@@ -1371,21 +1388,24 @@ const styles: Record<string, React.CSSProperties> = {
     bottom: 'calc(100% + 4px)',
     right: 0,
     zIndex: 100,
-    background: '#18181b',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.8)',
+    boxShadow: 'var(--shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.4))',
     padding: 4,
     display: 'flex',
     flexDirection: 'column',
     minWidth: 140,
   },
   menuItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     padding: '8px 12px',
     background: 'transparent',
     border: 'none',
     borderRadius: 4,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 12,
     fontWeight: 500,
     textAlign: 'left',
@@ -1395,8 +1415,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--block-bg)',
     border: '1px solid var(--block-line)',
     borderRadius: 6,
-    /* The .card class carries 16px of padding for text cards. These hold a
-       thumbnail that runs edge to edge, so it has to go. */
     padding: 0,
     overflow: 'hidden',
     cursor: 'pointer',
@@ -1421,7 +1439,7 @@ const styles: Record<string, React.CSSProperties> = {
   nativeSlideThumbTitle: {
     fontSize: 13,
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
   },
   nativeSlideThumbSubtitle: {
     fontSize: 11,
@@ -1444,8 +1462,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     border: '1px solid rgba(255, 255, 255, 0.15)',
   },
-  /* liveBadge / liveDot moved to TallyBadge — Media shows the same lamp and
-     the two were drifting apart. */
   projectSlideFooter: {
     padding: '8px 10px',
     display: 'flex',
@@ -1456,7 +1472,7 @@ const styles: Record<string, React.CSSProperties> = {
   projectSlideTitle: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',

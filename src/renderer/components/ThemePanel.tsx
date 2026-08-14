@@ -10,18 +10,83 @@ import { gradientCss, parseBackgroundInfo } from '../utils/background';
 
 const PRESET_THEMES: Theme[] = [
   {
+    id: 'theme-bsp-studio-pro',
+    name: 'BSP Studio Pro',
+    lowerThird: {
+      background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(5, 7, 13, 0.95))',
+      backgroundType: 'gradient',
+      backgroundColor: '#0f172a',
+      gradientStart: '#0f172a',
+      gradientEnd: '#05070d',
+      gradientDirection: '135deg',
+      backgroundOpacity: 0.95,
+      accentColor: '#FF5500',
+      referenceColor: '#FF5500',
+      fontFamily: 'Inter, -apple-system, SF Pro Display, sans-serif',
+      fontSize: 36,
+      referenceFontSize: 24,
+      fontWeight: 700,
+      fontColor: '#ffffff',
+      textAlign: 'center',
+      padding: 20,
+      borderRadius: 6,
+      animation: 'slideInLeft',
+      position: 'bottom-center',
+      width: 75,
+      offsetX: 0,
+      offsetY: 0,
+    },
+    fullScreen: {
+      background: 'linear-gradient(135deg, #0f172a, #05070d)',
+      backgroundType: 'gradient',
+      backgroundColor: '#0f172a',
+      gradientStart: '#0f172a',
+      gradientEnd: '#05070d',
+      gradientDirection: '135deg',
+      fontFamily: 'Inter, -apple-system, SF Pro Display, sans-serif',
+      fontSize: 60,
+      referenceFontSize: 36,
+      fontWeight: 700,
+      fontColor: '#ffffff',
+      referenceColor: '#FF5500',
+      textAlign: 'center',
+      animation: 'fadeIn',
+      offsetX: 0,
+      offsetY: 0,
+    },
+    slideTheme: {
+      backgroundColor: '#0f172a',
+      fontFamily: 'Inter, -apple-system, SF Pro Display, sans-serif',
+      fontSize: 40,
+      fontWeight: 600,
+      fontColor: '#ffffff',
+      accentColor: '#FF5500',
+      transition: 'fade',
+    },
+  },
+  {
     id: 'theme-1',
     name: 'Classic Gold',
     lowerThird: {
-      background: 'linear-gradient(135deg, rgba(201,169,110,0.95), rgba(244,228,176,0.95))',
-      backgroundColor: '#C9A96E',
+      background: 'linear-gradient(135deg, #9A1312, #000000)',
+      backgroundType: 'gradient',
+      backgroundColor: '#9A1312',
+      gradientStart: '#9A1312',
+      gradientEnd: '#000000',
+      gradientDirection: '135deg',
+      savedGradientStart: '#9A1312',
+      savedGradientEnd: '#000000',
+      savedGradientDir: '135deg',
+      savedSolidColor: '#9A1312',
       backgroundOpacity: 0.95,
-      accentColor: '#F4E4B0',
+      accentColor: '#FFCF66',
+      referenceColor: '#FFCF66',
+      savedRefColor: '#FFCF66',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 36,
       referenceFontSize: 24,
       fontWeight: 700,
-      fontColor: '#1a1a1a',
+      fontColor: '#ffffff',
       textAlign: 'left',
       padding: 20,
       borderRadius: 6,
@@ -31,26 +96,35 @@ const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
-      background: '#9c1a1a',
-      backgroundColor: '#9c1a1a',
+      background: 'linear-gradient(135deg, #9A1312, #000000)',
+      backgroundType: 'gradient',
+      backgroundColor: '#9A1312',
+      gradientStart: '#9A1312',
+      gradientEnd: '#000000',
+      gradientDirection: '135deg',
+      savedGradientStart: '#9A1312',
+      savedGradientEnd: '#000000',
+      savedGradientDir: '135deg',
+      savedSolidColor: '#9A1312',
       fontFamily: 'Georgia, serif',
       fontSize: 65,
       referenceFontSize: 50,
       fontWeight: 700,
       fontColor: '#ffffff',
-      referenceColor: '#F4E4B0',
+      referenceColor: '#FFCF66',
+      savedRefColor: '#FFCF66',
       textAlign: 'center',
       animation: 'fadeIn',
       offsetX: 0,
       offsetY: 0,
     },
     slideTheme: {
-      backgroundColor: '#0c0e14',
+      backgroundColor: '#9A1312',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 36,
       fontWeight: 500,
-      fontColor: '#f0ece4',
-      accentColor: '#C9A96E',
+      fontColor: '#ffffff',
+      accentColor: '#FFCF66',
       transition: 'crossfade',
     },
   },
@@ -62,6 +136,7 @@ const PRESET_THEMES: Theme[] = [
       backgroundColor: '#0f0c29',
       backgroundOpacity: 0.95,
       accentColor: '#3498db',
+      referenceColor: '#3498db',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 32,
       referenceFontSize: 22,
@@ -83,6 +158,7 @@ const PRESET_THEMES: Theme[] = [
       referenceFontSize: 26,
       fontWeight: 600,
       fontColor: '#ffffff',
+      referenceColor: '#3498db',
       textAlign: 'center',
       animation: 'zoomIn',
       offsetX: 0,
@@ -106,6 +182,7 @@ const PRESET_THEMES: Theme[] = [
       backgroundColor: '#00411C',
       backgroundOpacity: 0.95,
       accentColor: '#2ecc71',
+      referenceColor: '#2ecc71',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 36,
       referenceFontSize: 24,
@@ -127,6 +204,7 @@ const PRESET_THEMES: Theme[] = [
       referenceFontSize: 28,
       fontWeight: 700,
       fontColor: '#ffffff',
+      referenceColor: '#2ecc71',
       textAlign: 'center',
       animation: 'fadeIn',
       offsetX: 0,
@@ -150,6 +228,7 @@ const PRESET_THEMES: Theme[] = [
       backgroundColor: '#781414',
       backgroundOpacity: 0.95,
       accentColor: '#e74c3c',
+      referenceColor: '#e74c3c',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 34,
       referenceFontSize: 24,
@@ -171,6 +250,7 @@ const PRESET_THEMES: Theme[] = [
       referenceFontSize: 28,
       fontWeight: 700,
       fontColor: '#ffffff',
+      referenceColor: '#e74c3c',
       textAlign: 'center',
       animation: 'zoomIn',
       offsetX: 0,
@@ -194,6 +274,7 @@ const PRESET_THEMES: Theme[] = [
       backgroundColor: '#ffffff',
       backgroundOpacity: 0.95,
       accentColor: '#C9A96E',
+      referenceColor: '#C9A96E',
       fontFamily: '-apple-system, SF Pro Display, sans-serif',
       fontSize: 36,
       referenceFontSize: 24,
@@ -215,6 +296,7 @@ const PRESET_THEMES: Theme[] = [
       referenceFontSize: 28,
       fontWeight: 700,
       fontColor: '#1a1a1a',
+      referenceColor: '#C9A96E',
       textAlign: 'center',
       animation: 'fadeIn',
       offsetX: 0,
@@ -238,6 +320,7 @@ const PRESET_THEMES: Theme[] = [
       backgroundColor: '#4a148c',
       backgroundOpacity: 0.95,
       accentColor: '#e1bee7',
+      referenceColor: '#e1bee7',
       fontFamily: 'Inter, sans-serif',
       fontSize: 34,
       referenceFontSize: 22,
@@ -259,6 +342,7 @@ const PRESET_THEMES: Theme[] = [
       referenceFontSize: 26,
       fontWeight: 700,
       fontColor: '#ffffff',
+      referenceColor: '#e1bee7',
       textAlign: 'center',
       animation: 'fadeIn',
       offsetX: 0,
@@ -282,6 +366,7 @@ const PRESET_THEMES: Theme[] = [
       backgroundColor: '#0277bd',
       backgroundOpacity: 0.95,
       accentColor: '#80deea',
+      referenceColor: '#80deea',
       fontFamily: 'Montserrat, sans-serif',
       fontSize: 34,
       referenceFontSize: 22,
@@ -303,6 +388,7 @@ const PRESET_THEMES: Theme[] = [
       referenceFontSize: 26,
       fontWeight: 700,
       fontColor: '#ffffff',
+      referenceColor: '#80deea',
       textAlign: 'center',
       animation: 'zoomIn',
       offsetX: 0,
@@ -316,50 +402,6 @@ const PRESET_THEMES: Theme[] = [
       fontColor: '#e0f7fa',
       accentColor: '#26c6da',
       transition: 'slide',
-    },
-  },
-  {
-    id: 'theme-8',
-    name: 'Sunset Warmth',
-    lowerThird: {
-      background: 'linear-gradient(135deg, rgba(230,81,0,0.95), rgba(245,124,0,0.95))',
-      backgroundColor: '#e65100',
-      backgroundOpacity: 0.95,
-      accentColor: '#ffe0b2',
-      fontFamily: 'Inter, sans-serif',
-      fontSize: 34,
-      referenceFontSize: 22,
-      fontWeight: 700,
-      fontColor: '#ffffff',
-      textAlign: 'left',
-      padding: 18,
-      borderRadius: 6,
-      animation: 'slideInLeft',
-      position: 'bottom-left',
-      offsetX: 0,
-      offsetY: 0,
-    },
-    fullScreen: {
-      background: 'linear-gradient(135deg, #1b0000, #4a1500, #e65100)',
-      backgroundColor: '#1b0000',
-      fontFamily: 'Inter, sans-serif',
-      fontSize: 48,
-      referenceFontSize: 28,
-      fontWeight: 700,
-      fontColor: '#ffcc80',
-      textAlign: 'center',
-      animation: 'fadeIn',
-      offsetX: 0,
-      offsetY: 0,
-    },
-    slideTheme: {
-      backgroundColor: '#1b0000',
-      fontFamily: 'Inter, sans-serif',
-      fontSize: 36,
-      fontWeight: 500,
-      fontColor: '#fff3e0',
-      accentColor: '#ff9800',
-      transition: 'crossfade',
     },
   },
 ];
@@ -679,15 +721,18 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
   const lt = theme.lowerThird;
 
   const fsBg = fs.background || fs.backgroundColor || '#0c0e14';
-  const ltBg = lt.background || lt.backgroundColor || 'rgba(0,0,0,0.85)';
-  const ltOpacity = typeof lt.backgroundOpacity === 'number' ? lt.backgroundOpacity : 0.95;
-  const ltRadius = lt.borderRadius ? Math.min(6, lt.borderRadius / 2) : 4;
-  const ltWidth = lt.width ? `${lt.width}%` : '92%';
+  const ltBg = lt.background || lt.backgroundColor || 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(5, 7, 13, 0.95))';
+  const ltRadius = lt.borderRadius ? Math.min(6, Math.max(2, lt.borderRadius / 4)) : 4;
+  const ltWidth = lt.width ? `${lt.width}%` : '75%';
   const textAlign = fs.textAlign || 'center';
   const ltTextAlign = lt.textAlign || 'left';
 
-  const fsRefColor = fs.syncRefColor ? fs.fontColor : (fs.referenceColor || lt.accentColor || fs.fontColor || '#ffffff');
-  const ltRefColor = lt.syncRefColor ? lt.fontColor : (lt.referenceColor || lt.accentColor || '#C9A96E');
+  const fsRefColor = fs.syncRefColor
+    ? (fs.fontColor || '#ffffff')
+    : (fs.referenceColor || lt.referenceColor || lt.accentColor || fs.fontColor || '#ffffff');
+  const ltRefColor = lt.syncRefColor
+    ? (lt.fontColor || '#ffffff')
+    : (lt.referenceColor || fs.referenceColor || lt.accentColor || '#FF5500');
 
   const fsShadowCss = fs.textShadowEnabled ? '0px 1px 4px rgba(0,0,0,0.9)' : undefined;
   const ltShadowCss = lt.textShadowEnabled ? '0px 1px 3px rgba(0,0,0,0.9)' : undefined;
@@ -708,10 +753,8 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
         marginBottom: 8,
         display: 'flex',
         flexDirection: 'column',
-        /* Full screen centres its verse in the frame; a lower third sits where
-           it sits, near the bottom, over nothing. */
         justifyContent: showFull ? 'center' : 'flex-end',
-        padding: '8px 10px 6px 10px',
+        padding: showFull ? '8px 10px 6px 10px' : '0 0 8px 0',
         boxSizing: 'border-box',
       }}
     >
@@ -761,34 +804,34 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
       </div>
       )}
 
-      {/* Mini Lower Third Preview */}
+      {/* Mini Lower Third Preview — Exact match to ProgramSurface.tsx */}
       {!showFull && (
       <div
         style={{
           width: ltWidth,
           margin: '0 auto',
           background: ltBg,
-          opacity: ltOpacity,
           borderRadius: ltRadius,
-          padding: '3px 6px',
+          padding: '4px 8px',
           boxSizing: 'border-box',
-          borderLeft: lt.accentColor ? `3px solid ${lt.accentColor}` : undefined,
           display: 'flex',
           flexDirection: 'column',
           alignItems: ltTextAlign === 'right' ? 'flex-end' : ltTextAlign === 'center' ? 'center' : 'flex-start',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
         }}
       >
         <div
           style={{
             fontFamily: lt.fontFamily || fs.fontFamily,
-            fontWeight: 700,
+            fontWeight: lt.fontWeight || 700,
             color: lt.fontColor || '#ffffff',
             fontSize: 8,
-            lineHeight: 1.1,
+            lineHeight: 1.15,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             maxWidth: '100%',
+            textAlign: ltTextAlign,
             textShadow: ltShadowCss,
           }}
         >
@@ -797,11 +840,12 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
         <div
           style={{
             fontFamily: lt.fontFamily || fs.fontFamily,
-            fontWeight: 600,
+            fontWeight: 700,
             color: ltRefColor,
             fontSize: 7,
             lineHeight: 1.1,
-            marginTop: 1,
+            marginTop: 2,
+            textAlign: ltTextAlign,
             textShadow: ltShadowCss,
           }}
         >
@@ -818,8 +862,9 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
    a second video behind the band and on top of the one already playing. */
 function ThemeFormSection({ values, onChange, allowMedia = false }: { values: any; onChange: (updates: any) => void; allowMedia?: boolean }) {
   const safeInt = (val: string, fallback = 0) => {
+    if (val === '' || val === undefined || val === null) return 0;
     const parsed = parseInt(val, 10);
-    return isNaN(parsed) ? fallback : parsed;
+    return isNaN(parsed) ? 0 : parsed;
   };
 
   const bgInfo = parseBackgroundInfo(values.background, values.backgroundColor);
@@ -829,10 +874,18 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
   const currentBgType = values.backgroundMediaUrl && values.backgroundMediaType
     ? values.backgroundMediaType
     : values.backgroundType || bgInfo.type;
-  const currentStart = values.gradientStart || bgInfo.start;
-  const currentEnd = values.gradientEnd || bgInfo.end;
-  const currentDir = values.gradientDirection || bgInfo.dir;
-  const currentSolid = values.backgroundColor || bgInfo.color;
+
+  // Preserve gradient properties across background type switches so switching back to Gradient restores previous colors
+  const lastGradStart = values.gradientStart || (bgInfo.type === 'gradient' ? bgInfo.start : undefined) || values.savedGradientStart || '#0f172a';
+  const lastGradEnd = values.gradientEnd || (bgInfo.type === 'gradient' ? bgInfo.end : undefined) || values.savedGradientEnd || '#312e81';
+  const lastGradDir = values.gradientDirection || (bgInfo.type === 'gradient' ? bgInfo.dir : undefined) || values.savedGradientDir || '135deg';
+
+  const currentStart = lastGradStart;
+  const currentEnd = lastGradEnd;
+  const currentDir = lastGradDir;
+  const currentSolid = values.backgroundColor && values.backgroundColor !== 'transparent'
+    ? values.backgroundColor
+    : values.savedSolidColor || (bgInfo.type === 'solid' ? bgInfo.color : undefined) || '#0c0e14';
   const currentOpacity = typeof values.backgroundOpacity === 'number' ? values.backgroundOpacity : 0.95;
 
   /* Leaving media behind has to erase it, not just stop pointing at it: the
@@ -844,24 +897,57 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
     if (newType === 'image' || newType === 'video') {
       /* No file yet — the grid below asks. Type is staged so the grid knows
          which half of the library to show. */
-      onChange({ backgroundMediaType: newType, backgroundMediaUrl: values.backgroundMediaUrl || '' });
+      onChange({
+        backgroundMediaType: newType,
+        backgroundMediaUrl: values.backgroundMediaUrl || '',
+        savedGradientStart: currentStart,
+        savedGradientEnd: currentEnd,
+        savedGradientDir: currentDir,
+        savedSolidColor: currentSolid,
+      });
     } else if (newType === 'transparent') {
-      onChange({ ...CLEAR_MEDIA, backgroundType: 'transparent', background: 'transparent', backgroundColor: 'transparent' });
+      onChange({
+        ...CLEAR_MEDIA,
+        backgroundType: 'transparent',
+        background: 'transparent',
+        backgroundColor: 'transparent',
+        savedGradientStart: currentStart,
+        savedGradientEnd: currentEnd,
+        savedGradientDir: currentDir,
+        savedSolidColor: currentSolid,
+      });
     } else if (newType === 'solid') {
-      const solidColor = currentSolid && currentSolid !== 'transparent' ? currentSolid : (values.gradientStart || '#0f172a');
-      onChange({ ...CLEAR_MEDIA, backgroundType: 'solid', background: solidColor, backgroundColor: solidColor });
+      const solidColor = currentSolid && currentSolid !== 'transparent' ? currentSolid : currentStart;
+      onChange({
+        ...CLEAR_MEDIA,
+        backgroundType: 'solid',
+        background: solidColor,
+        backgroundColor: solidColor,
+        gradientStart: currentStart,
+        gradientEnd: currentEnd,
+        gradientDirection: currentDir,
+        savedGradientStart: currentStart,
+        savedGradientEnd: currentEnd,
+        savedGradientDir: currentDir,
+        savedSolidColor: solidColor,
+      });
     } else if (newType === 'gradient') {
-      const start = currentStart && currentStart !== 'transparent' ? currentStart : '#0f172a';
-      const end = currentEnd && currentEnd !== 'transparent' ? currentEnd : '#312e81';
-      const dir = currentDir || '135deg';
+      const start = currentStart;
+      const end = currentEnd;
+      const dir = currentDir;
+      const gradCss = gradientCss(start, end, dir);
       onChange({
         ...CLEAR_MEDIA,
         backgroundType: 'gradient',
-        background: gradientCss(start, end, dir),
+        background: gradCss,
         backgroundColor: start,
         gradientStart: start,
         gradientEnd: end,
         gradientDirection: dir,
+        savedGradientStart: start,
+        savedGradientEnd: end,
+        savedGradientDir: dir,
+        savedSolidColor: currentSolid,
       });
     }
   };
@@ -878,6 +964,9 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
       gradientStart: s,
       gradientEnd: e,
       gradientDirection: d,
+      savedGradientStart: s,
+      savedGradientEnd: e,
+      savedGradientDir: d,
     });
   };
 
@@ -903,7 +992,7 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
           <input
             className="input"
             type="number"
-            value={values.fontSize ?? 32}
+            value={values.fontSize === 0 ? '' : (values.fontSize ?? '')}
             onChange={(e) => onChange({ fontSize: safeInt(e.target.value, 32) })}
           />
         </div>
@@ -969,7 +1058,7 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
           <input
             className="input"
             type="number"
-            value={values.referenceFontSize ?? 26}
+            value={values.referenceFontSize === 0 ? '' : (values.referenceFontSize ?? '')}
             onChange={(e) => onChange({ referenceFontSize: safeInt(e.target.value, 26) })}
           />
         </div>
@@ -995,8 +1084,8 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
             className="input"
             type="color"
             disabled={Boolean(values.syncRefColor)}
-            value={values.syncRefColor ? (values.fontColor || '#ffffff') : (values.referenceColor || values.accentColor || '#C9A96E')}
-            onChange={(e) => onChange({ referenceColor: e.target.value, syncRefColor: false })}
+            value={values.syncRefColor ? (values.fontColor || '#ffffff') : (values.referenceColor || values.savedRefColor || values.accentColor || '#C9A96E')}
+            onChange={(e) => onChange({ referenceColor: e.target.value, savedRefColor: e.target.value, syncRefColor: false })}
             style={{ height: 34, padding: 2, opacity: values.syncRefColor ? 0.4 : 1, cursor: values.syncRefColor ? 'not-allowed' : 'pointer' }}
           />
         </div>
@@ -1005,9 +1094,13 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
             label="Sync to Verse"
             checked={Boolean(values.syncRefColor)}
             onChange={(checked) => {
+              const rememberedRefColor = values.referenceColor && values.referenceColor !== values.fontColor
+                ? values.referenceColor
+                : (values.savedRefColor || values.accentColor || '#FFCF66');
               onChange({
                 syncRefColor: checked,
-                referenceColor: checked ? (values.fontColor || '#ffffff') : (values.referenceColor || values.accentColor || '#C9A96E'),
+                savedRefColor: rememberedRefColor,
+                referenceColor: checked ? (values.fontColor || '#ffffff') : rememberedRefColor,
               });
             }}
           />
@@ -1258,7 +1351,7 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
           <input
             className="input"
             type="number"
-            value={values.borderRadius ?? 0}
+            value={values.borderRadius === 0 ? '' : (values.borderRadius ?? '')}
             onChange={(e) => onChange({ borderRadius: safeInt(e.target.value, 0) })}
           />
         </div>
@@ -1269,10 +1362,9 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
           <input
             className="input"
             type="number"
-            min="40"
             max="100"
-            value={values.width ?? 92}
-            onChange={(e) => onChange({ width: safeInt(e.target.value, 92) })}
+            value={values.width === 0 ? '' : (values.width ?? '')}
+            onChange={(e) => onChange({ width: safeInt(e.target.value, 75) })}
           />
         </div>
         <div style={{ flex: 1 }}>
@@ -1280,7 +1372,7 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
           <input
             className="input"
             type="number"
-            value={values.offsetX ?? 0}
+            value={values.offsetX === 0 ? '' : (values.offsetX ?? '')}
             onChange={(e) => onChange({ offsetX: safeInt(e.target.value, 0) })}
           />
         </div>
@@ -1289,7 +1381,7 @@ function ThemeFormSection({ values, onChange, allowMedia = false }: { values: an
           <input
             className="input"
             type="number"
-            value={values.offsetY ?? 0}
+            value={values.offsetY === 0 ? '' : (values.offsetY ?? '')}
             onChange={(e) => onChange({ offsetY: safeInt(e.target.value, 0) })}
           />
         </div>

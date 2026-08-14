@@ -35,8 +35,8 @@ export function SlideEditorHeader({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 16px',
-        borderBottom: '1px solid var(--block-line, #262628)',
-        background: 'var(--bg-surface, #161414)',
+        borderBottom: '1px solid var(--border-primary)',
+        background: 'var(--bg-secondary)',
         backdropFilter: 'saturate(180%) blur(20px)',
         userSelect: 'none',
         height: 54,
@@ -51,7 +51,7 @@ export function SlideEditorHeader({
             fontSize: 15,
             fontWeight: 700,
             letterSpacing: '-0.01em',
-            color: '#f3f5f8',
+            color: 'var(--text-primary)',
             fontFamily: 'var(--font-ui)',
           }}
         >
@@ -69,10 +69,10 @@ export function SlideEditorHeader({
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'var(--chrome-control)',
+              border: '1px solid var(--border-primary)',
               borderRadius: 6,
-              color: canUndo ? '#ffffff' : 'rgba(255, 255, 255, 0.3)',
+              color: canUndo ? 'var(--text-primary)' : 'var(--text-dim)',
               cursor: canUndo ? 'pointer' : 'not-allowed',
             }}
             title="Undo (⌘/Ctrl+Z)"
@@ -93,10 +93,10 @@ export function SlideEditorHeader({
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'var(--chrome-control)',
+              border: '1px solid var(--border-primary)',
               borderRadius: 6,
-              color: canRedo ? '#ffffff' : 'rgba(255, 255, 255, 0.3)',
+              color: canRedo ? 'var(--text-primary)' : 'var(--text-dim)',
               cursor: canRedo ? 'pointer' : 'not-allowed',
             }}
             title="Redo (⌘/Ctrl+Shift+Z)"
@@ -115,10 +115,10 @@ export function SlideEditorHeader({
           onChange={(e) => onUpdateTitle(e.target.value)}
           placeholder="Untitled Deck"
           style={{
-            background: 'rgba(0, 0, 0, 0.25)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            background: 'var(--chrome-control)',
+            border: '1px solid var(--border-primary)',
             borderRadius: 6,
-            color: '#ffffff',
+            color: 'var(--text-primary)',
             padding: '5px 10px',
             fontSize: 13,
             fontWeight: 600,
@@ -130,43 +130,6 @@ export function SlideEditorHeader({
 
       {/* Right: Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <input
-          type="file"
-          id="slide-import-file-input"
-          accept=".pptx,.pdf,.json,.txt,.md,image/*"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              onImportFile(file);
-              e.target.value = '';
-            }
-          }}
-        />
-
-        <button
-          type="button"
-          onClick={() => document.getElementById('slide-import-file-input')?.click()}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 12px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: 6,
-            color: '#f3f5f8',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-          title="Import PPTX, PDF, JSON, TXT, MD or Images"
-        >
-          <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}>
-            <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" />
-          </svg>
-          Import Presentation
-        </button>
 
         <button
           type="button"
@@ -176,10 +139,10 @@ export function SlideEditorHeader({
             alignItems: 'center',
             gap: 6,
             padding: '6px 12px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            background: 'var(--chrome-control)',
+            border: '1px solid var(--border-primary)',
             borderRadius: 6,
-            color: '#f3f5f8',
+            color: 'var(--text-primary)',
             fontSize: 12,
             fontWeight: 600,
             cursor: 'pointer',
@@ -235,10 +198,10 @@ export function SlideEditorHeader({
           }}
           title="Save and export presentation file"
         >
-          <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2.2 }}>
+          <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <path d="m7 10 5 5 5-5" />
-            <path d="M12 15V3" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
           Save / Export
         </button>

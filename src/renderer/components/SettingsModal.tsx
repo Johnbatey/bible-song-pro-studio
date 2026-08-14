@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { AppleToggle } from './AppleToggle';
 import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, LocalModelStatus, NdiStatus, SermonLanguage } from '../types';
 import { SongPacks } from './settings/SongPacks';
+import { BackupSystem } from './settings/BackupSystem';
 
 export type SettingsCategory =
   | 'system'
@@ -500,14 +501,16 @@ export function SettingsModal() {
           <div style={modalStyles.scrollBody}>
             {/* 1. System */}
             {activeCategory === 'system' && (
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={modalStyles.formRow}>
                   <div>
                     <div style={modalStyles.rowTitle}>System Engine Specs</div>
                     <div style={modalStyles.rowSub}>macOS Metal Hardware Acceleration • Port 8942</div>
                   </div>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Active</span>
+                  <span style={{ fontSize: 12, color: '#2ecc71', fontWeight: 600 }}>Active</span>
                 </div>
+
+                <BackupSystem />
               </div>
             )}
 
@@ -851,7 +854,7 @@ export function SettingsModal() {
                   )}
 
                   {/* NDI Stream Configuration Options */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, background: '#161414', padding: 12, borderRadius: 6, border: '1px solid #262628' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, background: 'var(--settings-card)', padding: 12, borderRadius: 6, border: '1px solid var(--settings-line)' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>NDI Source Name</label>
                       <input
@@ -896,9 +899,9 @@ export function SettingsModal() {
 
                   {/* Diagnostic / Status Bar */}
                   {ndiStatus && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', background: 'var(--bsp-ground)', padding: '6px 10px', borderRadius: 6 }}>
-                      <span>Frames Sent: <strong style={{ color: '#ffffff' }}>{ndiStatus.framesSent || 0}</strong></span>
-                      <span>Connections: <strong style={{ color: '#ffffff' }}>{ndiStatus.connections || 0}</strong></span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', background: 'var(--settings-card)', border: '1px solid var(--settings-line)', padding: '6px 10px', borderRadius: 6 }}>
+                      <span>Frames Sent: <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.framesSent || 0}</strong></span>
+                      <span>Connections: <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.connections || 0}</strong></span>
                       <span>Runtime: <strong style={{ color: ndiStatus.available ? 'var(--text-primary)' : 'var(--tally-fault)' }}>{ndiStatus.available ? 'NDI SDK Loaded' : 'NDI Runtime Missing'}</strong></span>
                     </div>
                   )}
@@ -936,7 +939,7 @@ export function SettingsModal() {
                     >
                       -
                     </button>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', width: 36, textAlign: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', width: 36, textAlign: 'center' }}>
                       {activeTheme?.fullScreen.referenceFontSize || 30}pt
                     </span>
                     <button
@@ -960,7 +963,7 @@ export function SettingsModal() {
                     >
                       -
                     </button>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', width: 36, textAlign: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', width: 36, textAlign: 'center' }}>
                       {activeTheme?.fullScreen.fontSize || 50}pt
                     </span>
                     <button
@@ -1047,7 +1050,7 @@ export function SettingsModal() {
                     >
                       -
                     </button>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', width: 36, textAlign: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', width: 36, textAlign: 'center' }}>
                       {activeTheme?.lowerThird.fontSize || 32}pt
                     </span>
                     <button
@@ -1141,7 +1144,7 @@ export function SettingsModal() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 18 }}>{row.flag}</span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>{row.label}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{row.label}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{row.texts}</div>
                           </div>
                         </div>
@@ -1157,31 +1160,31 @@ export function SettingsModal() {
             {activeCategory === 'hotkeys' && (
               <div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: '#ffffff' }}>Toggle Fullscreen Output</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Toggle Fullscreen Output</span>
                   <span style={modalStyles.keyBadge}>Cmd + Shift + F</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: '#ffffff' }}>Toggle Blackout Screen</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Toggle Blackout Screen</span>
                   <span style={modalStyles.keyBadge}>Cmd + Shift + B</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: '#ffffff' }}>Start NDI Video Stream</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Start NDI Video Stream</span>
                   <span style={modalStyles.keyBadge}>Cmd + Shift + N</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: '#ffffff' }}>Toggle search mode</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Toggle search mode</span>
                   <span style={modalStyles.keyBadge}>Tab</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: '#ffffff' }}>Toggle live sync</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Toggle live sync</span>
                   <span style={modalStyles.keyBadge}>L</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: '#ffffff' }}>Go live / Take to Program</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Go live / Take to Program</span>
                   <span style={modalStyles.keyBadge}>Enter x2</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: '#ffffff' }}>Close Settings / Modals</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Close Settings / Modals</span>
                   <span style={modalStyles.keyBadge}>Esc</span>
                 </div>
               </div>
@@ -1244,7 +1247,7 @@ export function SettingsModal() {
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
                     Email <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
                   </div>
                   <input
@@ -1257,7 +1260,7 @@ export function SettingsModal() {
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#ffffff', marginBottom: 4 }}>Report a bug</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>Report a bug</div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>A clear report helps us reproduce it quickly.</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
                     <span style={modalStyles.chipBadge}>What you were doing</span>
@@ -1334,7 +1337,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     padding: '0 20px',
     fontSize: 16,
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     borderBottom: '1px solid var(--settings-line)',
     marginBottom: 8,
   },
@@ -1365,7 +1368,8 @@ const modalStyles: Record<string, React.CSSProperties> = {
   },
   versionText: {
     fontSize: 11,
-    color: 'var(--text-dim)',
+    fontWeight: 500,
+    color: 'var(--text-secondary)',
   },
   contentArea: {
     flex: 1,
@@ -1385,7 +1389,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   contentTitle: {
     fontSize: 15,
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
   },
   closeBtn: {
     border: 'none',
@@ -1422,7 +1426,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
   rowTitle: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
   },
   rowSub: {
     fontSize: 12,
@@ -1449,7 +1453,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     background: 'var(--settings-card)',
     border: '1px solid var(--settings-line)',
     borderRadius: 6,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 13,
     padding: '6px 12px',
     outline: 'none',
@@ -1472,7 +1476,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     background: 'var(--settings-card)',
     border: '1px solid var(--settings-line)',
     borderRadius: 6,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 12,
     fontWeight: 600,
     cursor: 'pointer',
@@ -1490,7 +1494,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     background: 'var(--settings-card)',
     border: '1px solid var(--settings-line)',
     borderRadius: 4,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 11,
     fontWeight: 600,
   },
@@ -1500,7 +1504,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     background: 'var(--settings-card)',
     border: '1px solid var(--settings-line)',
     borderRadius: 6,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 13,
     outline: 'none',
   },
@@ -1510,7 +1514,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     background: 'var(--settings-card)',
     border: '1px solid var(--settings-line)',
     borderRadius: 6,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 13,
     outline: 'none',
     resize: 'vertical',

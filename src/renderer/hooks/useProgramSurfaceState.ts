@@ -9,13 +9,15 @@
 import { useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { resolveBgVideoLoop } from '../utils/background';
+import { ensureTheme } from '../utils/defaultTheme';
 import type { ProgramSurfaceState } from '../components/display/ProgramSurface';
 
 /** What the audience is seeing now. */
 export function useProgramSurfaceState(): ProgramSurfaceState {
   const scene = useAppStore((s) => s.display.currentScene);
   const outputMode = useAppStore((s) => s.display.outputMode);
-  const theme = useAppStore((s) => s.activeTheme);
+  const rawTheme = useAppStore((s) => s.activeTheme);
+  const theme = useMemo(() => ensureTheme(rawTheme), [rawTheme]);
   const activeAlert = useAppStore((s) => s.activeAlert);
   const transcription = useAppStore((s) => s.transcription.text);
   /* The operator's Program pane is a claim about what the room is seeing, so

@@ -6,6 +6,7 @@
   background: #000;
   color: #fff;
   isolation: isolate;
+  container-type: inline-size;
 }
 
 .program-surface-bg,
@@ -42,6 +43,19 @@
 .program-surface-standby-title {
   font-size: 72px;
   font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.program-surface-standby-title sup {
+  font-family: var(--font-signal, monospace);
+  font-size: 0.36em;
+  vertical-align: 0.4em;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim, #8C8480);
+  opacity: 0.85;
+  margin-left: 6px;
 }
 
 .program-surface-standby-sub {
@@ -106,6 +120,10 @@
 
 .program-surface-lt {
   background: transparent;
+}
+
+.program-surface-preview.program-surface-lt {
+  background: repeating-conic-gradient(#262628 0% 25%, #161414 0% 50%) 50% / 24px 24px;
 }
 
 .program-lower-third {

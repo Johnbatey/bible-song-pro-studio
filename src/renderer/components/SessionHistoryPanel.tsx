@@ -76,7 +76,7 @@ export function SessionHistoryPanel() {
       )}
     >
       {/* Session Switcher & Export Bar — scrolls sideways in a narrow dock */}
-      <div className="bar-scroll" style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #262628' }}>
+      <div className="bar-scroll" style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid var(--border-primary)' }}>
         <CustomDropdown
           value={selectedSession}
           onChange={(val) => loadSession(val)}
@@ -114,8 +114,8 @@ export function SessionHistoryPanel() {
               key={entry.id || i}
               style={{
                 padding: '8px 10px',
-                background: '#141416',
-                border: '1px solid #262628',
+                background: 'var(--chrome-control)',
+                border: '1px solid var(--border-primary)',
                 borderRadius: 6,
                 display: 'flex',
                 flexDirection: 'column',
@@ -127,7 +127,7 @@ export function SessionHistoryPanel() {
                 <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(entry.timestamp).toLocaleTimeString()}</span>
               </div>
               {entry.text && (
-                <div style={{ fontSize: 12, color: '#ffffff', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                   {entry.text}
                 </div>
               )}

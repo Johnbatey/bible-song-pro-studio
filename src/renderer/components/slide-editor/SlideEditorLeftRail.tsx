@@ -80,8 +80,8 @@ export function SlideEditorLeftRail({
       style={{
         width: 240,
         minWidth: 240,
-        background: 'var(--bg-surface, #161414)',
-        borderRight: '1px solid var(--block-line, #262628)',
+        background: 'var(--bg-secondary)',
+        borderRight: '1px solid var(--border-primary)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -90,11 +90,12 @@ export function SlideEditorLeftRail({
       }}
     >
       {/* Rail Nav Segmented Switcher */}
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-primary)' }}>
         <div
           style={{
             display: 'flex',
-            background: 'rgba(0, 0, 0, 0.3)',
+            background: 'var(--chrome-control)',
+            border: '1px solid var(--border-primary)',
             padding: 3,
             borderRadius: 6,
             gap: 2,
@@ -109,7 +110,7 @@ export function SlideEditorLeftRail({
               background: activeTab === 'slides' ? '#FF5500' : 'transparent',
               border: 'none',
               borderRadius: 6,
-              color: '#ffffff',
+              color: activeTab === 'slides' ? '#ffffff' : 'var(--text-secondary)',
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
@@ -134,7 +135,7 @@ export function SlideEditorLeftRail({
               background: activeTab === 'templates' ? '#FF5500' : 'transparent',
               border: 'none',
               borderRadius: 6,
-              color: '#ffffff',
+              color: activeTab === 'templates' ? '#ffffff' : 'var(--text-secondary)',
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
@@ -168,7 +169,7 @@ export function SlideEditorLeftRail({
               borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
             }}
           >
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
               Slides Deck
             </span>
             {!readOnlyDeck && (
@@ -258,14 +259,14 @@ export function SlideEditorLeftRail({
                     <div
                       style={{
                         padding: '4px 8px',
-                        background: 'var(--bg-surface, #161414)',
-                        borderTop: '1px solid var(--block-line, #262628)',
+                        background: 'var(--bg-secondary)',
+                        borderTop: '1px solid var(--border-primary)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                       }}
                     >
-                      <span style={{ fontSize: 9, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 600 }}>
                         {slide.transition || 'fade'}
                       </span>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -347,15 +348,15 @@ export function SlideEditorLeftRail({
           <div
             style={{
               padding: '8px 12px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-              background: '#15171d',
+              borderTop: '1px solid var(--border-primary)',
+              background: 'var(--bg-primary)',
               fontSize: 11,
-              color: 'rgba(255, 255, 255, 0.5)',
+              color: 'var(--text-secondary)',
               display: 'flex',
               justifyContent: 'space-between',
             }}
           >
-            <span>Active Slide: <strong style={{ color: '#ffffff' }}>{activeSlideIndex + 1}</strong></span>
+            <span>Active Slide: <strong style={{ color: 'var(--text-primary)' }}>{activeSlideIndex + 1}</strong></span>
             <span>Total: {slides.length}</span>
           </div>
         </div>

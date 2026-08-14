@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHandle } from '../services/audio-capture';
-import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection } from '../types';
+import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection, WordStudyEntry } from '../types';
+import { WordStudyCard } from './WordStudyCard';
 import { type, fontWeight, numeric } from '../styles/type';
 import { Block } from './Block';
 import { SlidingSwitch } from './SlidingSwitch';
@@ -52,10 +53,11 @@ export function LiveScripturePanel() {
   const [detectionLatencyMs, setDetectionLatencyMs] = useState(0);
   const [songMatches, setSongMatches] = useState<SongDetection[]>([]);
   const [pickedSongId, setPickedSongId] = useState<string | null>(null);
-  const { position: barPosition, move: moveBar } = useBarPosition('bsp_liveBarPosition');
+  const [activeWordStudy, setActiveWordStudy] = useState<WordStudyEntry | null>(null);
+  const { position: barPosition, move: moveBar } = useBarPosition('bsp_liveBarPosition', 'top');
   const [primaryWidth, setPrimaryWidth] = useState<number>(() => {
     const saved = localStorage.getItem('bsp_livePrimaryWidth');
-    return saved ? parseInt(saved, 10) : 340;
+    return saved ? parseInt(saved, 10) : 230;
   });
 
   const setPrimaryWidthPersisted = (next: number) => {
@@ -216,6 +218,11 @@ export function LiveScripturePanel() {
     setDetectionLatencyMs(Math.max(0, Math.round(performance.now() - detectionStartedAt)));
     setLive({ bestHit, suggestions });
     setTranscription({ isActive: true, confidence: detections[0]?.confidence ?? (bestHit ? 0.65 : 0.45) });
+
+    // Live Word Study / Lexicon term detection
+    window.BSP?.lexicon?.detect(cleaned).then((match) => {
+      if (match) setActiveWordStudy(match);
+    }).catch(() => {});
     // Keep Program accuracy tied to Deepgram's final transcript. Fast endpointing
     // makes this final arrive promptly without projecting a revisable hypothesis.
     if (isFinal && bestHit && detections[0]) {
@@ -437,10 +444,10 @@ export function LiveScripturePanel() {
           options={[
             {
               value: 'bible',
-              label: 'Scripture',
+              label: 'Bible',
               title: 'Detect scripture references in speech',
               icon: (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 </svg>
@@ -451,7 +458,7 @@ export function LiveScripturePanel() {
               label: 'Song',
               title: 'Detect song lyrics in speech',
               icon: (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18V5l12-2v13" />
                   <circle cx="6" cy="18" r="3" />
                   <circle cx="18" cy="16" r="3" />
@@ -525,10 +532,10 @@ export function LiveScripturePanel() {
             gap: 6,
             height: 30,
             padding: '0 12px',
-            background: '#232221',
-            border: 'none',
+            background: 'var(--chrome-control)',
+            border: '1px solid var(--border-primary)',
             borderRadius: 6,
-            color: '#ffffff',
+            color: 'var(--text-primary)',
             fontSize: 12,
             fontWeight: 600,
             cursor: 'pointer',
@@ -536,11 +543,9 @@ export function LiveScripturePanel() {
             transition: 'all 0.15s ease',
             flexShrink: 0,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#2e2c2b'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = '#232221'; }}
           title="Live Scripture Settings & Audio Inputs"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg>
@@ -581,13 +586,50 @@ export function LiveScripturePanel() {
         <div style={notice.tone === 'fault' ? styles.noticeFault : styles.notice}>{notice.text}</div>
       )}
 
-      {/* Config Popup Window */}
+      {/* Professional Live Scripture Configuration Modal */}
       {isConfigOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: 520, maxWidth: '92vw', background: '#161414', border: '1px solid #262628', borderRadius: 6, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.85)' }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={() => setIsConfigOpen(false)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 12,
+              width: '100%',
+              maxWidth: 580,
+              boxShadow: 'var(--shadow-lg)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              animation: 'scaleIn 0.15s ease-out',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #262628', background: '#141416' }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', margin: 0, letterSpacing: '-0.01em' }}>Live Scripture Config</h3>
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--border-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                Live Scripture Config
+              </div>
               <button
                 onClick={() => setIsConfigOpen(false)}
                 style={{
@@ -596,6 +638,7 @@ export function LiveScripturePanel() {
                   color: 'var(--text-dim)',
                   fontSize: 16,
                   cursor: 'pointer',
+                  padding: 4,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -605,8 +648,8 @@ export function LiveScripturePanel() {
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#ffffff';
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                  e.currentTarget.style.color = 'var(--text-primary)';
+                  e.currentTarget.style.background = 'var(--bg-hover)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = 'var(--text-dim)';
@@ -621,9 +664,9 @@ export function LiveScripturePanel() {
             {/* Modal Body with Parallel Horizontal Section Lines */}
             <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column' }}>
               {/* Row 1: Audio Input Microphone */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border-primary)', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Audio Input Microphone</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Audio Input Microphone</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Hardware device used for speech transcription
                   </div>
@@ -651,18 +694,16 @@ export function LiveScripturePanel() {
                     style={{
                       padding: '0 12px',
                       height: 34,
-                      background: '#232221',
-                      border: '1px solid #262628',
+                      background: 'var(--chrome-control)',
+                      border: '1px solid var(--border-primary)',
                       borderRadius: 6,
-                      color: '#ffffff',
+                      color: 'var(--text-primary)',
                       fontSize: 12,
                       fontWeight: 600,
                       cursor: 'pointer',
                       flexShrink: 0,
                       transition: 'all 0.15s ease',
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = '#2e2c2b'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = '#232221'; }}
                     title="Refresh audio inputs"
                   >
                     Refresh
@@ -671,9 +712,9 @@ export function LiveScripturePanel() {
               </div>
 
               {/* Row 2: AI Speech Model Engine */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border-primary)', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>AI Speech Model Engine</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>AI Speech Model Engine</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Engine used for live speech recognition
                   </div>
@@ -703,9 +744,9 @@ export function LiveScripturePanel() {
               </div>
 
               {/* Row 3: Bible Version */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border-primary)', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Bible Version</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Bible Version</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Default Bible version for verse detection
                   </div>
@@ -726,9 +767,9 @@ export function LiveScripturePanel() {
               </div>
 
               {/* Row 4: Auto project direct references */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border-primary)', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Auto project direct references</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Auto project direct references</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Automatically project scripture references when detected
                   </div>
@@ -740,9 +781,9 @@ export function LiveScripturePanel() {
               </div>
 
               {/* Row 5: Project quoted matches */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #262628', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border-primary)', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Project quoted matches</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Project quoted matches</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Project verbatim spoken matches in continuous speech
                   </div>
@@ -756,7 +797,7 @@ export function LiveScripturePanel() {
               {/* Row 6: Auto-version switch */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>Auto-version switch</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Auto-version switch</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
                     Automatically switch Bible version when spoken in speech
                   </div>
@@ -769,7 +810,7 @@ export function LiveScripturePanel() {
             </div>
 
             {/* Modal Footer */}
-            <div style={{ padding: '14px 20px', borderTop: '1px solid #262628', background: '#141416', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-primary)', background: 'var(--bg-primary)', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setIsConfigOpen(false)}
                 style={{
@@ -891,6 +932,9 @@ export function LiveScripturePanel() {
                 <Metric label="Search time" value={`${detectionLatencyMs} ms`} />
               </div>
             )}
+            {activeWordStudy && (
+              <WordStudyCard entry={activeWordStudy} onClose={() => setActiveWordStudy(null)} />
+            )}
           </Block>
 
           <PanelSplitter
@@ -917,15 +961,15 @@ export function LiveScripturePanel() {
                       <div style={styles.candidateTopRow}>
                         <span style={styles.rankBadge}>#{index + 2}</span>
                         <strong style={styles.suggestionReference}>{hit.reference}</strong>
-                        <span style={styles.candidateConfidence}>{confidence != null ? `${confidencePercent(confidence)}%` : 'Candidate'}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', flexShrink: 0 }}>
+                          {confidence != null && <span style={styles.candidateConfidence}>{confidencePercent(confidence)}%</span>}
+                          <span style={styles.abbrevBadge}>{formatMatchModeAbbrev(detection?.mode || 'search')}</span>
+                          <span style={styles.candidateVersionBadge}>{hit.version || version}</span>
+                        </div>
                       </div>
                       <span style={styles.suggestionText}>
                         {hit.text || detection?.text || 'Verse content is unavailable for this Bible version.'}
                       </span>
-                      <div style={styles.candidateFooter}>
-                        <span>{formatMatchMode(detection?.mode || 'search')}</span>
-                        <span>{hit.version || version}</span>
-                      </div>
                       {confidence != null && (
                         <span style={styles.confidenceTrack}>
                           <span style={{ ...styles.confidenceFill, width: `${Math.max(4, Math.min(100, confidence * 100))}%` }} />
@@ -963,6 +1007,24 @@ function formatMatchMode(mode: string) {
     search: 'Text search',
   };
   return labels[mode] || mode.replace(/-/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatMatchModeAbbrev(mode: string) {
+  const abbrevs: Record<string, string> = {
+    direct: 'REF',
+    'direct-reference': 'REF',
+    'spoken-reference': 'REF',
+    'phonetic-reference': 'REF',
+    'context-verse-reference': 'CTX',
+    contextual: 'CTX',
+    verbatim: 'VQ',
+    'quoted-verse-exact': 'VQ',
+    'quoted-verse-interim': 'VQ',
+    'quoted-verse-bm25': 'KM',
+    semantic: 'SM',
+    search: 'KM',
+  };
+  return abbrevs[mode] || 'MATCH';
 }
 
 function classifyProjectionMode(mode: string): 'direct' | 'quoted' | 'none' {
@@ -1021,11 +1083,11 @@ function Metric({ label, value }: { label: string; value: string }) {
 const styles: Record<string, React.CSSProperties> = {
   root: { height: '100%', minHeight: 0, overflow: 'hidden' },
   controlBar: { flexWrap: 'nowrap', minWidth: '100%' },
-  moveBarBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, background: 'transparent', border: 'none', borderRadius: 6, color: '#ffffff', cursor: 'pointer', flexShrink: 0, padding: 0 },
+  moveBarBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, background: 'transparent', border: 'none', borderRadius: 6, color: 'var(--text-primary)', cursor: 'pointer', flexShrink: 0, padding: 0 },
   statusCluster: { display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 },
-  meter: { position: 'relative', flexShrink: 0, width: 96, height: 6, background: 'rgba(255,255,255,0.10)', borderRadius: 999, overflow: 'hidden' },
+  meter: { position: 'relative', flexShrink: 0, width: 96, height: 6, background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', borderRadius: 999, overflow: 'hidden' },
   meterFill: { height: '100%', background: 'linear-gradient(90deg,var(--tally-preview),var(--tally-preview),var(--tally-fault))', borderRadius: 999, transition: 'width 90ms linear' },
-  meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: '#fff', transition: 'left 140ms ease-out' },
+  meterPeak: { position: 'absolute', top: 0, width: 2, height: '100%', background: 'var(--text-primary)', transition: 'left 140ms ease-out' },
   check: { display: 'flex', alignItems: 'center', gap: 6, ...type.caption, color: 'var(--text-secondary)' },
   emptyHint: { ...type.secondary, color: 'var(--text-dim)', textAlign: 'center', padding: 20 },
   songCandidate: {
@@ -1058,12 +1120,13 @@ const styles: Record<string, React.CSSProperties> = {
   placeholder: { color: 'var(--text-dim)', ...type.secondary, padding: 18, textAlign: 'center' },
   suggestions: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', scrollbarGutter: 'stable', paddingRight: 4, alignContent: 'start', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
   suggestionCard: { minWidth: 0, border: '1px solid var(--border-primary)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', borderRadius: 6, padding: '10px 11px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 7, cursor: 'pointer', fontFamily: 'var(--font-ui)', overflow: 'hidden' },
-  candidateTopRow: { display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr) auto', alignItems: 'center', gap: 6 },
+  candidateTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, width: '100%' },
   rankBadge: { ...type.caption, ...numeric, color: 'var(--text-dim)' },
-  suggestionReference: { ...type.secondary, fontWeight: fontWeight.semibold, color: 'var(--accent)' },
-  suggestionText: { ...type.secondary, color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+  suggestionReference: { ...type.secondary, fontWeight: fontWeight.semibold, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  suggestionText: { ...type.secondary, color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.4, fontSize: 12, marginTop: 2 },
   candidateConfidence: { color: 'var(--green)', ...type.caption, ...numeric, fontWeight: fontWeight.bold },
-  candidateFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, color: 'var(--text-dim)', ...type.label, fontWeight: fontWeight.regular },
+  abbrevBadge: { fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', padding: '1px 4px', borderRadius: 3, letterSpacing: '0.04em' },
+  candidateVersionBadge: { fontSize: 9, fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', padding: '1px 4px', borderRadius: 3, letterSpacing: '0.04em' },
   confidenceTrack: { display: 'block', height: 3, borderRadius: 999, background: 'rgba(255,255,255,.06)', overflow: 'hidden' },
   confidenceFill: { display: 'block', height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,var(--blue),var(--green))' },
   notice: { flex: '0 0 auto', ...type.caption, color: 'var(--text-dim)', background: 'var(--bsp-raised)', border: '1px solid var(--border-primary)', borderRadius: 'var(--block-radius)', padding: '8px 10px' },

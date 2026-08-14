@@ -232,7 +232,7 @@ export function SongDeck({ song, title, emptyLabel, targetText }: SongDeckProps)
                           scene: buildSongScene(song, slide, { includeCredits }),
                         });
                       }}
-                      style={{ background: 'transparent', border: 'none', color: '#ffffff', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}
                       title="Add slide to Queue"
                     >
                       +

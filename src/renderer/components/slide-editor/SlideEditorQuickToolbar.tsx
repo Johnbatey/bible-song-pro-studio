@@ -279,8 +279,8 @@ export function SlideEditorQuickToolbar({
           }}
           title="Drag to move toolbar"
         >
-          <div style={{ width: 28, height: 3, background: 'rgba(255, 255, 255, 0.25)', borderRadius: 2, marginBottom: 3 }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255, 255, 255, 0.55)', letterSpacing: '0.01em' }}>Add content</span>
+          <div style={{ width: 28, height: 3, background: 'var(--border-primary)', borderRadius: 2, marginBottom: 4 }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.04em', textTransform: 'uppercase', background: 'var(--bg-secondary)', padding: '2px 10px', borderRadius: 12, border: '1px solid var(--border-primary)', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>Add content</span>
         </div>
 
         {/* Floating Toolbar Buttons Row */}
@@ -757,18 +757,13 @@ const TOOLBAR_CARD: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   padding: '4px 8px 6px',
-  background: 'rgba(20, 20, 22, 0.95)',
-  border: '1px solid rgba(255, 255, 255, 0.12)',
-  borderRadius: 6,
-  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-  backdropFilter: 'blur(20px)',
 };
 
 const HEADER_LABEL: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 600,
-  color: 'rgba(255, 255, 255, 0.45)',
-  letterSpacing: '0.02em',
+  fontSize: 11,
+  fontWeight: 700,
+  color: 'var(--text-primary)',
+  letterSpacing: '0.04em',
   marginBottom: 3,
 };
 
@@ -777,10 +772,10 @@ const TOOLBAR_PILL: React.CSSProperties = {
   alignItems: 'center',
   gap: 3,
   padding: '3px 6px',
-  background: 'rgba(20, 20, 22, 0.92)',
-  border: '1px solid rgba(255, 255, 255, 0.12)',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-primary)',
   borderRadius: 6,
-  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+  boxShadow: 'var(--shadow-md)',
   backdropFilter: 'blur(16px)',
 };
 
@@ -790,10 +785,10 @@ const PILL_BTN: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 5,
-  background: 'rgba(255, 255, 255, 0.06)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
+  background: 'var(--chrome-control)',
+  border: '1px solid var(--border-primary)',
   borderRadius: 6,
-  color: 'rgba(255, 255, 255, 0.9)',
+  color: 'var(--text-primary)',
   fontSize: 12,
   fontWeight: 600,
   cursor: 'pointer',
@@ -802,10 +797,10 @@ const PILL_BTN: React.CSSProperties = {
 
 const PILL_BTN_ACTIVE: React.CSSProperties = {
   ...PILL_BTN,
-  background: 'rgba(255, 255, 255, 0.15)',
-  borderColor: 'rgba(255, 255, 255, 0.3)',
-  color: '#ffffff',
-  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+  background: 'var(--chrome-control-active)',
+  borderColor: 'var(--accent)',
+  color: 'var(--text-primary)',
+  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
 };
 
 const DANGER_BTN: React.CSSProperties = {
@@ -824,7 +819,7 @@ const DISABLED_BTN: React.CSSProperties = {
 const DIVIDER: React.CSSProperties = {
   width: 1,
   height: 16,
-  background: 'rgba(255, 255, 255, 0.12)',
+  background: 'var(--border-primary)',
   margin: '0 2px',
 };
 
@@ -843,11 +838,11 @@ const POPOVER_SHELL: React.CSSProperties = {
   top: 36,
   left: '50%',
   transform: 'translateX(-50%)',
-  background: '#161618',
-  border: '1px solid rgba(255, 255, 255, 0.15)',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-primary)',
   borderRadius: 6,
   padding: 10,
-  boxShadow: '0 24px 48px rgba(0, 0, 0, 0.85)',
+  boxShadow: 'var(--shadow-lg)',
   backdropFilter: 'blur(20px)',
   zIndex: 100,
   display: 'flex',
@@ -856,10 +851,10 @@ const POPOVER_SHELL: React.CSSProperties = {
 
 const DROPDOWN_ITEM: React.CSSProperties = {
   padding: '10px 12px',
-  background: 'rgba(255, 255, 255, 0.05)',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
+  background: 'var(--chrome-control)',
+  border: '1px solid var(--border-primary)',
   borderRadius: 6,
-  color: '#ffffff',
+  color: 'var(--text-primary)',
   fontSize: 13,
   fontWeight: 600,
   display: 'flex',

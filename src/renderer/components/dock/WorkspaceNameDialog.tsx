@@ -129,7 +129,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--chrome-control)',
     border: '1px solid var(--block-line)',
     borderRadius: 'var(--bsp-r-base, 4px)',
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 13,
     fontFamily: 'var(--font-ui)',
     outline: 'none',

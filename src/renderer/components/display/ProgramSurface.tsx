@@ -28,6 +28,7 @@ export interface ProgramSurfaceState {
   referenceFontSize?: number;
   showTranslation?: boolean;
   showReference?: boolean;
+  dualVersionTextAlign?: 'left' | 'center' | 'right';
   bgVideo?: string;
   bgCustomImage?: string;
   bgFill?: string;
@@ -97,6 +98,9 @@ function referenceFontSize(state: ProgramSurfaceState, preview: boolean) {
 }
 
 function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lowerThird', assetBaseUrl?: string): React.CSSProperties {
+  if (mode === 'lowerThird') {
+    return { backgroundColor: 'transparent', backgroundImage: 'none' };
+  }
   const fit = state.bgFit === 'fill' ? '100% 100%' : state.bgFit || 'cover';
   const opacity = typeof state.bgOpacity === 'number' ? state.bgOpacity : 1;
   const style: React.CSSProperties = {
@@ -329,17 +333,19 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
 
   const ltOffsetX = state.theme?.lowerThird?.offsetX || 0;
   const ltOffsetY = state.theme?.lowerThird?.offsetY || 0;
-  const ltWidth = state.theme?.lowerThird?.width;
+  const ltWidth = state.theme?.lowerThird?.width ?? 75;
   const ltTransform = [
     ltWidth ? 'translateX(-50%)' : '',
     ltOffsetX ? `translateX(${ltOffsetX}px)` : '',
     ltOffsetY ? `translateY(${ltOffsetY}px)` : '',
   ].filter(Boolean).join(' ') || undefined;
 
+  const dualTextAlign = state.dualVersionTextAlign || 'left';
+
   return (
-    <div className={`program-surface ${mode === 'lowerThird' ? 'program-surface-lt' : 'program-surface-full'} ${className}`}>
-      {showStageBackground && <div className="program-surface-bg" style={backgroundStyle(state, mode, assetBaseUrl)} />}
-      {showStageBackground && video && (
+    <div className={`program-surface ${mode === 'lowerThird' ? 'program-surface-lt' : 'program-surface-full'} ${preview ? 'program-surface-preview' : ''} ${className}`}>
+      {mode === 'fullscreen' && showStageBackground && <div className="program-surface-bg" style={backgroundStyle(state, mode, assetBaseUrl)} />}
+      {mode === 'fullscreen' && showStageBackground && video && (
         <video
           ref={videoRef}
           className="program-surface-video"
@@ -349,22 +355,6 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           loop={state.bgVideoLoop !== false}
           playsInline
           onPlay={() => onVideoPlayState?.(true)}
-          /* Not every pause is the operator's.
-           *
-           * The only surface that reports play state is the operator's small
-           * Program preview, and that preview lives in the window they leave
-           * the moment they need anything else. Chromium suspends a window
-           * nobody is looking at, its <video> pauses, this handler called it a
-           * pause — and because the transport it wrote to is pushed straight to
-           * the projector, the audience screen and the NDI feed off it stopped
-           * with it, until the operator came back and the preview resumed.
-           *
-           * So a pause is passed on only when it is one somebody asked for:
-           * the transport already intended it, or the clip genuinely ran out.
-           * Anything else is the environment interfering with a preview, and
-           * the answer is to start it playing again and leave what is on air
-           * alone. Intent stays with the operator, where it belongs.
-           */
           onPause={(e) => {
             const el = e.currentTarget;
             const ranOut = el.ended
@@ -389,16 +379,12 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
 
       {!scene && state.showStandbyBrand !== false && (
         <div className="program-surface-standby">
-          {/* The brand, deliberately without "Studio" — unlike the title bar,
-              the status bar and the NDI source name, this one is projected to a
-              congregation. "Studio" is operator language, and which edition the
-              operator runs is not the room's business. Leave it. */}
-          <div className="program-surface-standby-title">Bible Song Pro</div>
+          <div className="program-surface-standby-title">Bible Song Pro<sup>STUDIO</sup></div>
           <div className="program-surface-standby-sub">Waiting for signal...</div>
         </div>
       )}
 
-      {scene && mode === 'lowerThird' && (
+      {scene && mode === 'lowerThird' && !content?.wordStudy && (
         <div
           className="program-lower-third"
           style={{
@@ -408,16 +394,212 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
             left: ltWidth ? '50%' : undefined,
             right: ltWidth ? 'auto' : undefined,
             transform: ltTransform,
-            textAlign,
+            textAlign: isCompare ? dualTextAlign : textAlign,
           }}
         >
-          <div className="program-lt-text" style={textStyle}>{content?.text || ''}</div>
-          {showReference && formattedRef && (
-            <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign }}>
-              {formattedRef}
+          {isCompare ? (
+            <div
+              className="program-compare-lt"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '2cqw',
+                width: '100%',
+                alignItems: 'start',
+                textAlign: dualTextAlign,
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', borderRight: '1px solid rgba(255,255,255,0.18)', paddingRight: '1.5cqw' }}>
+                {showReference && primaryRef && (
+                  <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign: dualTextAlign }}>
+                    {primaryRef}
+                  </div>
+                )}
+                <div className="program-lt-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{content?.text || ''}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', paddingLeft: '0.5cqw' }}>
+                {showReference && secondaryRef && (
+                  <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign: dualTextAlign }}>
+                    {secondaryRef}
+                  </div>
+                )}
+                <div className="program-lt-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{secondaryVerse?.text || ''}</div>
+              </div>
             </div>
+          ) : (
+            <>
+              <div className="program-lt-text" style={textStyle}>{content?.text || ''}</div>
+              {showReference && formattedRef && (
+                <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign }}>
+                  {formattedRef}
+                </div>
+              )}
+              {songCredit(scene) && <div className="program-song-credit" style={{ textAlign }}>{songCredit(scene)}</div>}
+            </>
           )}
-          {songCredit(scene) && <div className="program-song-credit" style={{ textAlign }}>{songCredit(scene)}</div>}
+        </div>
+      )}
+
+      {scene && content?.wordStudy && (
+        <div
+          className="program-wordstudy-layout"
+          style={{
+            position: 'absolute',
+            inset: mode === 'lowerThird' ? 'auto 0 0 0' : '0',
+            width: '100%',
+            height: mode === 'lowerThird' ? 'auto' : '100%',
+            maxHeight: mode === 'lowerThird' ? '85%' : '100%',
+            background: 'linear-gradient(135deg, rgba(14, 14, 18, 0.98) 0%, rgba(26, 18, 14, 0.98) 100%)',
+            borderTop: mode === 'lowerThird' ? '2px solid rgba(255, 85, 0, 0.5)' : 'none',
+            padding: mode === 'lowerThird' ? '3cqw 5cqw' : '4cqw 5.5cqw',
+            boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(30px)',
+            color: '#ffffff',
+            display: 'grid',
+            gridTemplateColumns: mode === 'lowerThird' ? '1fr 1.6fr' : '1fr 1.35fr',
+            gap: mode === 'lowerThird' ? '3cqw' : '4.5cqw',
+            alignItems: 'center',
+            zIndex: 30,
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+          }}
+        >
+          {/* LEFT COLUMN: Main Focused Word & Translation Usage Panel */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: mode === 'lowerThird' ? '1cqw' : '1.4cqw',
+              alignItems: 'flex-start',
+              borderRight: '1px solid rgba(255, 255, 255, 0.14)',
+              paddingRight: mode === 'lowerThird' ? '3cqw' : '4.5cqw',
+              height: '100%',
+              justifyContent: 'center',
+            }}
+          >
+            <span
+              style={{
+                fontSize: mode === 'lowerThird' ? 'clamp(32px, 5cqw, 64px)' : 'clamp(54px, 7.5cqw, 120px)',
+                fontWeight: 900,
+                color: '#FF5500',
+                fontFamily: content.wordStudy.language === 'Hebrew' ? 'serif' : 'inherit',
+                lineHeight: 1.02,
+                textShadow: '0 4px 30px rgba(255, 85, 0, 0.5)',
+              }}
+            >
+              {content.wordStudy.lemma}
+            </span>
+            <span
+              style={{
+                fontSize: mode === 'lowerThird' ? 'clamp(16px, 2.5cqw, 28px)' : 'clamp(24px, 3.2cqw, 42px)',
+                fontWeight: 500,
+                color: '#f4f4f5',
+                fontStyle: 'italic',
+              }}
+            >
+              / {content.wordStudy.transliteration.toLowerCase()} /
+            </span>
+            <span
+              style={{
+                fontSize: mode === 'lowerThird' ? 'clamp(13px, 1.8cqw, 22px)' : 'clamp(18px, 2.4cqw, 30px)',
+                fontWeight: 800,
+                padding: '0.5cqw 1.4cqw',
+                borderRadius: '0.6cqw',
+                background: 'rgba(255, 85, 0, 0.25)',
+                color: '#FF5500',
+                border: '1px solid rgba(255, 85, 0, 0.5)',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {content.wordStudy.strongs} ({content.wordStudy.language})
+            </span>
+            <div
+              style={{
+                fontSize: mode === 'lowerThird' ? 'clamp(16px, 2.5cqw, 28px)' : 'clamp(24px, 3.2cqw, 42px)',
+                fontWeight: 800,
+                color: '#ffffff',
+                lineHeight: 1.2,
+              }}
+            >
+              {content.wordStudy.gloss}
+            </div>
+
+            {/* KJV Translation Usage Box on Left Column */}
+            {content.wordStudy.kjvUsage && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', width: '100%', marginTop: '0.8cqw' }}>
+                <div style={{ fontSize: mode === 'lowerThird' ? 'clamp(11px, 1.4cqw, 16px)' : 'clamp(14px, 1.8cqw, 24px)', fontWeight: 800, letterSpacing: '0.08em', color: '#FF5500' }}>
+                  🏷️ KJV TRANSLATION USAGE
+                </div>
+                <div
+                  style={{
+                    background: 'rgba(255, 85, 0, 0.12)',
+                    border: '1px solid rgba(255, 85, 0, 0.35)',
+                    borderRadius: '0.8cqw',
+                    padding: mode === 'lowerThird' ? '0.8cqw 1.4cqw' : '1.2cqw 1.8cqw',
+                    fontSize: mode === 'lowerThird' ? 'clamp(14px, 2cqw, 24px)' : 'clamp(18px, 2.6cqw, 34px)',
+                    color: '#ffffff',
+                    fontWeight: 600,
+                    lineHeight: 1.35,
+                  }}
+                >
+                  {content.wordStudy.kjvUsage}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: Derivation & Exhaustive Strong's Concordance Definition */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: mode === 'lowerThird' ? '1.5cqw' : '2.5cqw',
+              justifyContent: 'center',
+              overflowY: 'auto',
+              maxHeight: '100%',
+              paddingRight: '0.5cqw',
+            }}
+          >
+            {/* Derivation & Etymology */}
+            {content.wordStudy.etymology && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5cqw' }}>
+                <div style={{ fontSize: mode === 'lowerThird' ? 'clamp(12px, 1.8cqw, 20px)' : 'clamp(16px, 2.4cqw, 30px)', fontWeight: 800, letterSpacing: '0.1em', color: '#a1a1aa' }}>
+                  🔗 DERIVATION & ETYMOLOGY
+                </div>
+                <div
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.07)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '0.8cqw',
+                    padding: mode === 'lowerThird' ? '1cqw 1.8cqw' : '1.4cqw 2.2cqw',
+                    fontSize: mode === 'lowerThird' ? 'clamp(16px, 2.5cqw, 28px)' : 'clamp(20px, 3cqw, 38px)',
+                    fontStyle: 'italic',
+                    color: '#ffffff',
+                  }}
+                >
+                  {content.wordStudy.etymology}
+                </div>
+              </div>
+            )}
+
+            {/* Strong's Definition */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5cqw' }}>
+              <div style={{ fontSize: mode === 'lowerThird' ? 'clamp(12px, 1.8cqw, 20px)' : 'clamp(16px, 2.4cqw, 30px)', fontWeight: 800, letterSpacing: '0.1em', color: '#a1a1aa' }}>
+                📖 STRONGS DEFINITION
+              </div>
+              <div
+                style={{
+                  fontSize: mode === 'lowerThird' ? 'clamp(16px, 2.8cqw, 32px)' : 'clamp(24px, 3.8cqw, 48px)',
+                  lineHeight: 1.45,
+                  color: '#ffffff',
+                  fontFamily: 'serif',
+                  fontWeight: 500,
+                }}
+              >
+                {content.wordStudy.definition}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -425,28 +607,28 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           type and layout, so it goes edge to edge and the theme's text styling
           sits this one out. Lower third keeps the text — a whole slide crammed
           into a strap across the bottom is nobody's intent. */}
-      {scene && mode === 'fullscreen' && content?.slide && (
+      {scene && mode === 'fullscreen' && content?.slide && !content?.wordStudy && (
         <SlideStage projection={content.slide} className="program-slide-stage" />
       )}
 
-      {scene && mode === 'fullscreen' && !content?.slide && (
+      {scene && mode === 'fullscreen' && !content?.slide && !content?.wordStudy && (
         <div className="program-fullscreen-content" style={fullscreenStyle}>
           {content?.html ? (
             <div className="program-slide-html" dangerouslySetInnerHTML={{ __html: content.html }} />
           ) : isCompare ? (
-            <div className="program-compare">
-              <div className="program-compare-pane">
-                <div className="program-ref-row" style={refRowStyle}>
-                  {showReference && primaryRef && <span style={refStyle}>{primaryRef}</span>}
+            <div className="program-compare" style={{ textAlign: dualTextAlign }}>
+              <div className="program-compare-pane" style={{ textAlign: dualTextAlign }}>
+                <div className="program-ref-row" style={{ ...refRowStyle, justifyContent: alignmentJustify(dualTextAlign), textAlign: dualTextAlign }}>
+                  {showReference && primaryRef && <span style={{ ...refStyle, textAlign: dualTextAlign }}>{primaryRef}</span>}
                 </div>
-                <div className="program-main-text" style={textStyle}>{content?.text || ''}</div>
+                <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{content?.text || ''}</div>
               </div>
               <div className="program-compare-divider" />
-              <div className="program-compare-pane">
-                <div className="program-ref-row" style={refRowStyle}>
-                  {showReference && secondaryRef && <span style={refStyle}>{secondaryRef}</span>}
+              <div className="program-compare-pane" style={{ textAlign: dualTextAlign }}>
+                <div className="program-ref-row" style={{ ...refRowStyle, justifyContent: alignmentJustify(dualTextAlign), textAlign: dualTextAlign }}>
+                  {showReference && secondaryRef && <span style={{ ...refStyle, textAlign: dualTextAlign }}>{secondaryRef}</span>}
                 </div>
-                <div className="program-main-text" style={textStyle}>{secondaryVerse?.text || ''}</div>
+                <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{secondaryVerse?.text || ''}</div>
               </div>
             </div>
           ) : (

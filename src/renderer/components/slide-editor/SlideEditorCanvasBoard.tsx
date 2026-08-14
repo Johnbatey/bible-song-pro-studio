@@ -257,9 +257,9 @@ export function SlideEditorCanvasBoard({
       onPointerLeave={() => setIsPanning(false)}
       style={{
         flex: 1,
-        backgroundColor: '#111010',
+        backgroundColor: 'var(--bg-primary)',
         backgroundImage:
-          'linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px)',
+          'linear-gradient(var(--border-primary) 1px, transparent 1px), linear-gradient(90deg, var(--border-primary) 1px, transparent 1px)',
         backgroundSize: '24px 24px',
         position: 'relative',
         overflow: 'hidden',
@@ -277,13 +277,13 @@ export function SlideEditorCanvasBoard({
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          background: 'rgba(21, 23, 29, 0.85)',
+          background: 'var(--bg-secondary)',
           padding: '6px 12px',
           borderRadius: 6,
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: '1px solid var(--border-primary)',
           backdropFilter: 'blur(12px)',
           fontSize: 12,
-          color: 'rgba(255, 255, 255, 0.65)',
+          color: 'var(--text-secondary)',
         }}
       >
         <span

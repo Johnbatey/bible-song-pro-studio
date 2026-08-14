@@ -5,6 +5,7 @@ import type {
   DisplayState, AIProvider, TranscriptionState, Alert, LiveScriptureState, AudioInputDevice,
   OperatingMode, QueueItem, PresentationDeck, Workspace
 } from '../types';
+import { createDefaultTheme } from '../utils/defaultTheme';
 
 /**
  * Persisted slices live in a JSON file under the app's userData dir (via store:* IPC),
@@ -233,6 +234,12 @@ interface AppState {
   updatePresentationDeck: (id: string, updates: Partial<PresentationDeck>) => void;
   addPresentationDeck: (deck: PresentationDeck) => void;
   deletePresentationDeck: (id: string) => void;
+
+  uiThemeMode: 'dark' | 'light';
+  isThemeTransitioning: boolean;
+  themeTransitionTarget: 'dark' | 'light';
+  setUIThemeMode: (mode: 'dark' | 'light') => void;
+  toggleUIThemeMode: () => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -240,7 +247,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   platform: 'darwin',
 
   display: {
-    mode: 'studio',
+    mode: 'basic',
     outputMode: 'fullscreen',
     outputStatus: {
       isOpen: false,
@@ -395,7 +402,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     }),
 
   themes: [],
-  activeTheme: null,
+  activeTheme: createDefaultTheme(),
   setActiveTheme: (theme) => set({ activeTheme: theme }),
   addTheme: (theme) => set((s) => ({ themes: [...s.themes, theme] })),
   updateTheme: (id, updates) =>
@@ -568,6 +575,28 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     set((s) => ({
       presentationDecks: s.presentationDecks.filter((d) => d.id !== id),
     })),
+
+  uiThemeMode: 'dark',
+  isThemeTransitioning: false,
+  themeTransitionTarget: 'light',
+  setUIThemeMode: (uiThemeMode) => {
+    document.documentElement.setAttribute('data-ui-theme', uiThemeMode);
+    if (uiThemeMode === 'light') document.body.classList.add('light-theme');
+    else document.body.classList.remove('light-theme');
+    set({ uiThemeMode });
+  },
+  toggleUIThemeMode: () => {
+    const current = get().uiThemeMode;
+    const next = current === 'dark' ? 'light' : 'dark';
+
+    // Trigger brand signature curtain animation first
+    set({ isThemeTransitioning: true, themeTransitionTarget: next });
+
+    // Swap actual DOM theme state right at the peak of the Cue Wipe cover (260ms)
+    setTimeout(() => {
+      get().setUIThemeMode(next);
+    }, 260);
+  },
 }), {
   name: 'bsp-app-state',
   version: 1,

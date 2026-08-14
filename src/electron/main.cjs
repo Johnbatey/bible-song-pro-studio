@@ -23,6 +23,10 @@ nativeTheme.themeSource = 'dark';
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('force-color-profile', 'srgb');
 
 /* ── Where the operator's data lives, and why renaming is expensive ─────────
  *
@@ -68,6 +72,7 @@ const { createSettingsService } = require('./settings-service.cjs');
 const { createDeepgramService } = require('./deepgram-service.cjs');
 const { createObsService } = require('./obs-service.cjs');
 const { listenWithFallback } = require('./listen-with-fallback.cjs');
+const lexiconService = require('./lexicon-service.cjs');
 
 const isDev = !app.isPackaged && !fs.existsSync(path.join(__dirname, '../../dist/index.html'));
 let mainWindow = null;
@@ -569,7 +574,7 @@ const apiHandlers = {
       }
       if (displayWindow && !displayWindow.isDestroyed()) {
         ndiService.setDisplayWindow(displayWindow);
-        ndiService.startCapture(15, { width: 1280, height: 720 });
+        ndiService.startCapture(30, { width: 1920, height: 1080 });
       }
     }
     return result || { ok: false, error: 'NDI not available' };
@@ -760,10 +765,39 @@ function resizableOutputBounds(bounds) {
   };
 }
 
-function createDisplayWindow(bounds) {
-  if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
+function createDisplayWindow(bounds, options = {}) {
+  if (displayWindow && !displayWindow.isDestroyed()) {
+    if (options.show !== undefined) {
+      if (options.show) displayWindow.show();
+      else displayWindow.hide();
+    }
+    return displayWindow;
+  }
   const d = resizableOutputBounds(bounds || screen.getPrimaryDisplay().workArea || screen.getPrimaryDisplay().bounds);
-  displayWindow = new BrowserWindow({ x: d.x, y: d.y, width: d.width, height: d.height, minWidth: 640, minHeight: 360, frame: true, autoHideMenuBar: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#000000', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, backgroundThrottling: false } });
+  const showWindow = options.show !== false;
+  displayWindow = new BrowserWindow({
+    x: d.x,
+    y: d.y,
+    width: d.width,
+    height: d.height,
+    minWidth: 640,
+    minHeight: 360,
+    frame: true,
+    autoHideMenuBar: true,
+    resizable: true,
+    maximizable: true,
+    fullscreenable: true,
+    thickFrame: true,
+    transparent: true,
+    backgroundColor: '#00000000',
+    show: showWindow,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false,
+    },
+  });
   displayWindow.setResizable(true);
   displayWindow.setMinimumSize(640, 360);
   displayWindow.setAspectRatio(16 / 9);
@@ -1028,16 +1062,32 @@ app.whenReady().then(async () => {
     const displayId = (arg && typeof arg === 'object') ? arg.displayId : arg;
     const target = chooseDisplay(displayId);
     if (!target) return { ok: false, error: 'No displays available' };
-    createDisplayWindow(target.bounds);
     activeDisplayId = String(target.id);
+    if (displayWindow && !displayWindow.isDestroyed()) {
+      displayWindow.setBounds(resizableOutputBounds(target.bounds));
+      displayWindow.show();
+    } else {
+      createDisplayWindow(target.bounds, { show: true });
+    }
     return { ok: true, displayId: activeDisplayId, label: getDisplayPayload().find((d) => d.id === activeDisplayId)?.label || '' };
   });
-  ipcMain.handle('display:close', () => { if (displayWindow && !displayWindow.isDestroyed()) { displayWindow.close(); displayWindow = null; } activeDisplayId = null; return { ok: true }; });
+  ipcMain.handle('display:close', () => {
+    activeDisplayId = null;
+    if (displayWindow && !displayWindow.isDestroyed()) {
+      if (ndiService && ndiService.status().running) {
+        displayWindow.hide();
+      } else {
+        displayWindow.close();
+        displayWindow = null;
+      }
+    }
+    return { ok: true };
+  });
   ipcMain.handle('display:getDisplays', () => getDisplayPayload());
-  ipcMain.handle('display:getActive', () => ({ ok: true, displayId: activeDisplayId, isOpen: !!(displayWindow && !displayWindow.isDestroyed()) }));
+  ipcMain.handle('display:getActive', () => ({ ok: true, displayId: activeDisplayId, isOpen: Boolean(activeDisplayId && displayWindow && !displayWindow.isDestroyed() && displayWindow.isVisible()) }));
   ipcMain.handle('display:sendState', (_, s) => setDisplayState(s));
   ipcMain.handle('display:getState', () => displayState);
-  ipcMain.handle('display:isOpen', () => !!(displayWindow && !displayWindow.isDestroyed()));
+  ipcMain.handle('display:isOpen', () => Boolean(activeDisplayId && displayWindow && !displayWindow.isDestroyed() && displayWindow.isVisible()));
   ipcMain.handle('display:getStatus', () => ({
     isOpen: !!(displayWindow && !displayWindow.isDestroyed()),
     url: 'Electron IPC display',
@@ -1159,6 +1209,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('verse:warmIndex', (_, p) => verseDetectionService.warmIndex(p?.versionId || 'KJV'));
   ipcMain.handle('verse:indexStatus', () => verseDetectionService.indexStatus());
 
+  ipcMain.handle('lexicon:lookup', (_, query) => lexiconService.lookup(query));
+  ipcMain.handle('lexicon:detect', (_, text) => lexiconService.detectWordStudyTerms(text));
+  ipcMain.handle('lexicon:annotate', (_, p) => lexiconService.annotateVerseWithStrongs(p?.text, p?.book));
+
   ipcMain.handle('ai:status', () => transcriptionService.status());
   ipcMain.handle('ai:warmup', (_, p) => transcriptionService.warmup(p));
   ipcMain.handle('ai:transcribe', (_, p) => transcriptionService.transcribe(p));
@@ -1177,16 +1231,24 @@ app.whenReady().then(async () => {
     const r = ndiService?.start(p?.name || DEFAULT_NDI_NAME);
     if (r?.ok) {
       if (!displayWindow || displayWindow.isDestroyed()) {
-        createDisplayWindow();
+        const show = Boolean(activeDisplayId);
+        createDisplayWindow(null, { show });
       }
       if (displayWindow && !displayWindow.isDestroyed()) {
         ndiService.setDisplayWindow(displayWindow);
-        ndiService.startCapture(p?.fps || 15, { width: p?.width || 1280, height: p?.height || 720 });
+        ndiService.startCapture(p?.fps || 30, { width: p?.width || 1920, height: p?.height || 1080 });
       }
     }
     return r || { ok: false, error: 'NDI service unavailable' };
   });
-  ipcMain.handle('ndi:stop', () => ndiService?.stop() || { ok: true });
+  ipcMain.handle('ndi:stop', () => {
+    const r = ndiService?.stop() || { ok: true };
+    if (!activeDisplayId && displayWindow && !displayWindow.isDestroyed()) {
+      displayWindow.close();
+      displayWindow = null;
+    }
+    return r;
+  });
   ipcMain.handle('ndi:status', () => ndiService?.status() || { ok: false });
 
   // Session history IPC

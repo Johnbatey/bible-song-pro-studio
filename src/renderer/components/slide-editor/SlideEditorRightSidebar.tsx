@@ -273,8 +273,8 @@ export function SlideEditorRightSidebar({
       style={{
         width: 290,
         minWidth: 290,
-        background: '#141416',
-        borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+        background: 'var(--bg-secondary)',
+        borderLeft: '1px solid var(--border-primary)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -291,7 +291,7 @@ export function SlideEditorRightSidebar({
       />
 
       {/* Tri-Tab Header */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: '#111010' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-primary)', background: 'var(--bg-primary)' }}>
         {(['design', 'layer', 'ai'] as const).map((tab) => (
           <button
             key={tab}
@@ -300,10 +300,10 @@ export function SlideEditorRightSidebar({
             style={{
               flex: 1,
               padding: '10px 8px',
-              background: activeTab === tab ? '#1c1e26' : 'transparent',
+              background: activeTab === tab ? 'var(--chrome-control)' : 'transparent',
               border: 'none',
               borderBottom: activeTab === tab ? '2px solid #FF5500' : '2px solid transparent',
-              color: activeTab === tab ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
+              color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
@@ -355,7 +355,7 @@ export function SlideEditorRightSidebar({
                           style={{
                             ...styles.pillBtn,
                             background: (slide.aspectRatio || '16:9') === ratio ? '#FF5500' : 'transparent',
-                            color: (slide.aspectRatio || '16:9') === ratio ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
+                            color: (slide.aspectRatio || '16:9') === ratio ? '#ffffff' : 'var(--text-secondary)',
                           }}
                         >
                           {ratio}
@@ -366,7 +366,7 @@ export function SlideEditorRightSidebar({
 
                   {/* Lock Aspect Ratio */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, color: '#ffffff', fontWeight: 600 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, color: 'var(--text-primary)', fontWeight: 600 }}>
                       <input
                         type="checkbox"
                         checked={lockAspect}
@@ -438,7 +438,7 @@ export function SlideEditorRightSidebar({
                             (type === 'none' && bgValue === 'transparent') ||
                             (type !== 'none' && bgType === type && bgValue !== 'transparent')
                               ? '#ffffff'
-                              : 'rgba(255, 255, 255, 0.7)',
+                              : 'var(--text-secondary)',
                         }}
                       >
                         {type === 'none' ? 'Off / Trans' : type}
@@ -566,6 +566,7 @@ export function SlideEditorRightSidebar({
                       value={targetTextElement?.fontFamily || 'Inter'}
                       options={FONT_FAMILIES}
                       onChange={(font) => setText({ fontFamily: font })}
+                      style={{ width: '100%' }}
                     />
                   </div>
 
@@ -576,10 +577,8 @@ export function SlideEditorRightSidebar({
                       <CustomDropdown
                         value={String(targetTextElement?.fontWeight ?? 600)}
                         options={FONT_WEIGHTS}
-                        /* As a number: the dropdown hands back a string, and a
-                           stored '700' failed the `fontWeight ?? 600` readback
-                           comparisons elsewhere that expect the numeric form. */
                         onChange={(wt) => setText({ fontWeight: parseInt(wt, 10) })}
+                        style={{ width: '100%' }}
                       />
                     </div>
                     <div style={styles.propRowCol}>
@@ -588,6 +587,7 @@ export function SlideEditorRightSidebar({
                         value={String(targetTextElement?.fontSize ?? 42)}
                         options={FONT_SIZES}
                         onChange={(sz) => setText({ fontSize: parseInt(sz, 10) })}
+                        style={{ width: '100%' }}
                       />
                     </div>
                   </div>
@@ -693,8 +693,8 @@ export function SlideEditorRightSidebar({
                               onClick={() => setText({ textAlign: align })}
                               style={{
                                 ...styles.segmentBtn,
-                                background: on ? '#2c2c30' : 'transparent',
-                                color: on ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
+                                background: on ? 'var(--chrome-control-active)' : 'transparent',
+                                color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                               }}
                               title={`Align ${align}`}
                             >
@@ -715,8 +715,8 @@ export function SlideEditorRightSidebar({
                               onClick={() => setText({ vAlign })}
                               style={{
                                 ...styles.segmentBtn,
-                                background: on ? '#2c2c30' : 'transparent',
-                                color: on ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
+                                background: on ? 'var(--chrome-control-active)' : 'transparent',
+                                color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                               }}
                               title={`Vertical ${vAlign}`}
                             >
@@ -743,8 +743,8 @@ export function SlideEditorRightSidebar({
                               onClick={() => setText({ textDecoration: deco })}
                               style={{
                                 ...styles.segmentBtn,
-                                background: on ? '#2c2c30' : 'transparent',
-                                color: on ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
+                                background: on ? 'var(--chrome-control-active)' : 'transparent',
+                                color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                                 textDecoration: deco === 'none' ? undefined : deco,
                               }}
                               title={deco === 'none' ? 'No decoration' : deco === 'underline' ? 'Underline' : 'Strikethrough'}
@@ -769,8 +769,8 @@ export function SlideEditorRightSidebar({
                               onClick={() => setText({ textTransform: tc })}
                               style={{
                                 ...styles.segmentBtn,
-                                background: on ? '#2c2c30' : 'transparent',
-                                color: on ? '#ffffff' : 'rgba(255, 255, 255, 0.5)',
+                                background: on ? 'var(--chrome-control-active)' : 'transparent',
+                                color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                                 fontWeight: tc === 'uppercase' ? 700 : 500,
                               }}
                               title={`Case: ${tc}`}
@@ -850,8 +850,8 @@ export function SlideEditorRightSidebar({
                         <span style={styles.propLabel}>X Position (%)</span>
                         <input
                           type="number"
-                          value={selectedElement.x}
-                          onChange={(e) => onUpdateElement(selectedElement.id, { x: parseFloat(e.target.value) })}
+                          value={selectedElement.x === 0 ? '' : (selectedElement.x ?? '')}
+                          onChange={(e) => onUpdateElement(selectedElement.id, { x: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
                           style={styles.numberInput}
                         />
                       </div>
@@ -859,8 +859,8 @@ export function SlideEditorRightSidebar({
                         <span style={styles.propLabel}>Y Position (%)</span>
                         <input
                           type="number"
-                          value={selectedElement.y}
-                          onChange={(e) => onUpdateElement(selectedElement.id, { y: parseFloat(e.target.value) })}
+                          value={selectedElement.y === 0 ? '' : (selectedElement.y ?? '')}
+                          onChange={(e) => onUpdateElement(selectedElement.id, { y: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
                           style={styles.numberInput}
                         />
                       </div>
@@ -871,8 +871,8 @@ export function SlideEditorRightSidebar({
                         <span style={styles.propLabel}>Width (%)</span>
                         <input
                           type="number"
-                          value={selectedElement.width}
-                          onChange={(e) => onUpdateElement(selectedElement.id, { width: parseFloat(e.target.value) })}
+                          value={selectedElement.width === 0 ? '' : (selectedElement.width ?? '')}
+                          onChange={(e) => onUpdateElement(selectedElement.id, { width: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
                           style={styles.numberInput}
                         />
                       </div>
@@ -880,8 +880,8 @@ export function SlideEditorRightSidebar({
                         <span style={styles.propLabel}>Height (%)</span>
                         <input
                           type="number"
-                          value={selectedElement.height}
-                          onChange={(e) => onUpdateElement(selectedElement.id, { height: parseFloat(e.target.value) })}
+                          value={selectedElement.height === 0 ? '' : (selectedElement.height ?? '')}
+                          onChange={(e) => onUpdateElement(selectedElement.id, { height: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
                           style={styles.numberInput}
                         />
                       </div>
@@ -986,10 +986,10 @@ function groupButtonStyle(enabled: boolean): React.CSSProperties {
   return {
     flex: 1,
     height: 28,
-    background: '#1c2029',
-    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 5,
-    color: enabled ? '#fff' : 'rgba(255,255,255,0.3)',
+    color: enabled ? 'var(--text-primary)' : 'var(--text-dim)',
     fontSize: 11,
     cursor: enabled ? 'pointer' : 'default',
   };
@@ -997,14 +997,14 @@ function groupButtonStyle(enabled: boolean): React.CSSProperties {
 
 const styles: Record<string, React.CSSProperties> = {
   sectionCard: {
-    background: '#1a1a1e',
-    border: '1px solid rgba(255, 255, 255, 0.07)',
+    background: 'var(--block-bg)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
     overflow: 'hidden',
   },
   sectionHeader: {
     padding: '10px 12px',
-    background: '#1d1d22',
+    background: 'var(--chrome-control)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1014,7 +1014,7 @@ const styles: Record<string, React.CSSProperties> = {
   sectionTitle: {
     fontSize: 12,
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
   },
   sectionBody: {
     padding: 12,
@@ -1030,7 +1030,7 @@ const styles: Record<string, React.CSSProperties> = {
   propLabel: {
     fontSize: 11,
     fontWeight: 600,
-    color: 'rgba(255, 255, 255, 0.65)',
+    color: 'var(--text-secondary)',
   },
   twoColRow: {
     display: 'grid',
@@ -1040,8 +1040,8 @@ const styles: Record<string, React.CSSProperties> = {
   pillGroup: {
     display: 'flex',
     gap: 4,
-    background: '#141416',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
     padding: 3,
   },
@@ -1058,8 +1058,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    background: '#141416',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
     padding: '4px 8px',
     height: 32,
@@ -1078,7 +1078,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     background: 'transparent',
     border: 'none',
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 12,
     fontWeight: 600,
     outline: 'none',
@@ -1086,14 +1086,14 @@ const styles: Record<string, React.CSSProperties> = {
   opacityBadge: {
     fontSize: 11,
     fontWeight: 600,
-    color: 'rgba(255, 255, 255, 0.45)',
+    color: 'var(--text-secondary)',
   },
   iconInputBox: {
     display: 'flex',
     alignItems: 'center',
     gap: 4,
-    background: '#141416',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
     padding: '0 8px',
     height: 32,
@@ -1101,21 +1101,21 @@ const styles: Record<string, React.CSSProperties> = {
   iconInputBadge: {
     fontSize: 11,
     fontWeight: 700,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: 'var(--text-secondary)',
   },
   iconInput: {
     flex: 1,
     width: '100%',
     background: 'transparent',
     border: 'none',
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 12,
     outline: 'none',
   },
   segmentGroup: {
     display: 'flex',
-    background: '#141416',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
     padding: 2,
   },
@@ -1132,10 +1132,10 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   numberInput: {
-    background: '#141416',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     padding: '6px 8px',
     fontSize: 12,
     outline: 'none',

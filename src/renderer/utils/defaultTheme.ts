@@ -19,48 +19,59 @@ import type { Theme } from '../types';
  */
 export function createDefaultTheme(): Theme {
   return {
-    id: 'settings-live-theme',
-    name: 'Live Settings Theme',
+    id: 'theme-bsp-studio-pro',
+    name: 'BSP Studio Pro',
     lowerThird: {
-      // Flat booth, not a gradient. No effect exists to show that an effect exists.
-      background: 'rgba(12, 11, 11, 0.94)',
-      backgroundColor: '#0C0B0B',
-      backgroundOpacity: 0.94,
+      background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(5, 7, 13, 0.95))',
+      backgroundType: 'gradient',
+      backgroundColor: '#0f172a',
+      gradientStart: '#0f172a',
+      gradientEnd: '#05070d',
+      gradientDirection: '135deg',
+      backgroundOpacity: 0.95,
       accentColor: '#FF5500',
-      fontFamily: '"Source Serif 4", Georgia, serif',
+      referenceColor: '#FF5500',
+      fontFamily: 'Inter, -apple-system, SF Pro Display, sans-serif',
       fontSize: 36,
-      fontWeight: 400,
-      fontColor: '#FFFFFF',
-      textAlign: 'left',
+      referenceFontSize: 24,
+      fontWeight: 700,
+      fontColor: '#ffffff',
+      textAlign: 'center',
       padding: 20,
-      borderRadius: 4,
-      animation: 'slideInUp',
+      borderRadius: 6,
+      animation: 'slideInLeft',
       position: 'bottom-center',
-      width: 92,
+      width: 75,
       offsetX: 0,
       offsetY: 0,
       scale: 100,
       anchor: 'bottom',
     },
     fullScreen: {
-      backgroundColor: '#0C0B0B',
-      fontFamily: '"Source Serif 4", Georgia, serif',
-      fontSize: 56,
-      fontWeight: 400,
-      fontColor: '#FFFFFF',
+      background: 'linear-gradient(135deg, #0f172a, #05070d)',
+      backgroundType: 'gradient',
+      backgroundColor: '#0f172a',
+      gradientStart: '#0f172a',
+      gradientEnd: '#05070d',
+      gradientDirection: '135deg',
+      fontFamily: 'Inter, -apple-system, SF Pro Display, sans-serif',
+      fontSize: 60,
+      fontWeight: 700,
+      fontColor: '#ffffff',
+      referenceColor: '#FF5500',
+      referenceFontSize: 36,
       textAlign: 'center',
       animation: 'fade',
-      referenceFontSize: 26,
       lineHeight: 1.25,
       verticalAlign: 'middle',
       autoResize: 'shrink',
     },
     slideTheme: {
-      backgroundColor: '#0C0B0B',
-      fontFamily: '"Source Serif 4", Georgia, serif',
+      backgroundColor: '#0f172a',
+      fontFamily: 'Inter, -apple-system, SF Pro Display, sans-serif',
       fontSize: 40,
-      fontWeight: 400,
-      fontColor: '#FFFFFF',
+      fontWeight: 600,
+      fontColor: '#ffffff',
       accentColor: '#FF5500',
       transition: 'fade',
     },
@@ -80,5 +91,22 @@ export function createDefaultTheme(): Theme {
 }
 
 export function ensureTheme(theme: Theme | null | undefined): Theme {
-  return theme || createDefaultTheme();
+  const def = createDefaultTheme();
+  if (!theme) return def;
+  const isDefaultTheme = theme.id === 'theme-bsp-studio-pro' || theme.id === 'settings-live-theme';
+  return {
+    ...def,
+    ...theme,
+    lowerThird: {
+      ...def.lowerThird,
+      ...theme.lowerThird,
+      width: isDefaultTheme && (theme.lowerThird?.width === 92 || theme.lowerThird?.width === 95 || !theme.lowerThird?.width)
+        ? 75
+        : (theme.lowerThird?.width ?? 75),
+    },
+    fullScreen: {
+      ...def.fullScreen,
+      ...theme.fullScreen,
+    },
+  };
 }

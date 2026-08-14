@@ -24,42 +24,158 @@ const BSP_THEME: DockviewTheme = {
  * Reproduces the fixed layout the app shipped with, so a first run (or a reset)
  * lands somewhere familiar rather than on an empty grid.
  */
+const DEFAULT_LAYOUT_JSON = {
+  grid: {
+    root: {
+      type: 'branch',
+      data: [
+        {
+          type: 'branch',
+          data: [
+            {
+              type: 'branch',
+              data: [
+                {
+                  type: 'leaf',
+                  data: {
+                    views: ['transcript'],
+                    activeView: 'transcript',
+                    id: '1',
+                  },
+                  size: 292.3333333333333,
+                },
+                {
+                  type: 'leaf',
+                  data: {
+                    views: ['bible', 'songs'],
+                    activeView: 'bible',
+                    id: '3',
+                  },
+                  size: 718.3333333333334,
+                },
+                {
+                  type: 'leaf',
+                  data: {
+                    views: ['output'],
+                    activeView: 'output',
+                    id: '5',
+                  },
+                  size: 653.3333333333334,
+                },
+              ],
+              size: 535,
+            },
+            {
+              type: 'branch',
+              data: [
+                {
+                  type: 'leaf',
+                  data: {
+                    views: ['history'],
+                    activeView: 'history',
+                    id: '2',
+                  },
+                  size: 292,
+                },
+                {
+                  type: 'leaf',
+                  data: {
+                    views: ['live'],
+                    activeView: 'live',
+                    id: '4',
+                  },
+                  size: 624,
+                },
+                {
+                  type: 'leaf',
+                  data: {
+                    views: ['media'],
+                    activeView: 'media',
+                    id: '6',
+                  },
+                  size: 400,
+                },
+                {
+                  type: 'leaf',
+                  data: {
+                    views: ['queue'],
+                    activeView: 'queue',
+                    id: '7',
+                  },
+                  size: 344,
+                },
+              ],
+              size: 421,
+            },
+          ],
+          size: 1672,
+        },
+      ],
+      size: 960,
+    },
+    width: 1672,
+    height: 960,
+    orientation: 'HORIZONTAL',
+  },
+  panels: {
+    transcript: {
+      id: 'transcript',
+      contentComponent: 'transcript',
+      tabComponent: 'props.defaultTabComponent',
+      title: 'Live transcript',
+    },
+    bible: {
+      id: 'bible',
+      contentComponent: 'bible',
+      tabComponent: 'props.defaultTabComponent',
+      title: 'Bible',
+    },
+    songs: {
+      id: 'songs',
+      contentComponent: 'songs',
+      tabComponent: 'props.defaultTabComponent',
+      title: 'Songs',
+    },
+    output: {
+      id: 'output',
+      contentComponent: 'output',
+      tabComponent: 'props.defaultTabComponent',
+      title: 'Output',
+    },
+    history: {
+      id: 'history',
+      contentComponent: 'history',
+      tabComponent: 'props.defaultTabComponent',
+      title: 'History',
+    },
+    live: {
+      id: 'live',
+      contentComponent: 'live',
+      tabComponent: 'props.defaultTabComponent',
+      title: 'Live',
+    },
+    media: {
+      id: 'media',
+      contentComponent: 'media',
+      tabComponent: 'props.defaultTabComponent',
+      title: 'Media',
+    },
+    queue: {
+      id: 'queue',
+      contentComponent: 'queue',
+      tabComponent: 'props.defaultTabComponent',
+      title: 'Queue',
+    },
+  },
+  activeGroup: '4',
+};
+
 function buildDefaultLayout(api: DockviewApi) {
-  api.addPanel({ id: 'transcript', component: 'transcript', title: 'Live transcript' });
-
-  api.addPanel({
-    id: 'output',
-    component: 'output',
-    title: 'Output',
-    position: { referencePanel: 'transcript', direction: 'right' },
-  });
-
-  api.addPanel({
-    id: 'history',
-    component: 'history',
-    title: 'History',
-    position: { referencePanel: 'transcript', direction: 'below' },
-  });
-
-  api.addPanel({
-    id: 'bible',
-    component: 'bible',
-    title: 'Scripture',
-    position: { referencePanel: 'output', direction: 'below' },
-  });
-
-  api.addPanel({
-    id: 'queue',
-    component: 'queue',
-    title: 'Queue',
-    position: { referencePanel: 'bible', direction: 'right' },
-  });
-
-  // Roughly the proportions of the old grid: a narrow left column, and a
-  // program dock deeper than the panel beneath it.
-  api.getPanel('transcript')?.api.setSize({ width: 320 });
-  api.getPanel('output')?.api.setSize({ height: 380 });
-  api.getPanel('queue')?.api.setSize({ width: 340 });
+  try {
+    api.fromJSON(DEFAULT_LAYOUT_JSON as any);
+  } catch {
+    // If deserialization fails, fallback to fresh API clears
+  }
 }
 
 export function DockHost() {
@@ -94,7 +210,10 @@ export function DockHost() {
         api.clear();
       }
     }
-    if (!restored) buildDefaultLayout(api);
+    // On first launch, start with empty workspace canvas so the user sees the
+    // DockEmptyState welcome canvas and can choose "Start from default layout"
+    // or open individual panels.
+    // (Restoring previous user arrangement continues to work whenever saved layout exists).
 
     /* Titles come from DOCKS, not from the saved file.
      *
@@ -184,6 +303,7 @@ export function DockHost() {
 /** Throws away the saved tree and rebuilds the shipped arrangement. */
 export function resetDockLayout() {
   localStorage.removeItem(LAYOUT_KEY);
+  useAppStore.getState().setMode('basic');
   const api = getDockApi();
   if (!api) return;
   api.clear();

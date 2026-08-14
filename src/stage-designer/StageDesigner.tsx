@@ -221,26 +221,37 @@ export function StageDesigner() {
     bootstrapped.current = true;
 
     const liveLayout = feeds.stage.layout;
-    if (liveLayout && !isPresetId(liveLayout.id) && liveLayout.zones.length > 0) {
-      const match = library.layouts.find((item) => item.id === liveLayout.id);
-      openLayout(
-        normalizeLayout(liveLayout),
-        match?.id || null,
-        match ? `Editing “${match.name}”, live on the stage` : 'Editing the layout currently on the stage',
-        true,
-      );
-      return;
+    if (liveLayout && liveLayout.id) {
+      if (!isPresetId(liveLayout.id) && liveLayout.zones?.length > 0) {
+        const match = library.layouts.find((item) => item.id === liveLayout.id);
+        openLayout(
+          normalizeLayout(liveLayout),
+          match?.id || null,
+          match ? `Editing “${match.name}”, live on the stage` : 'Editing the layout currently on the stage',
+          true,
+        );
+        return;
+      } else if (isPresetId(liveLayout.id)) {
+        const preset = LAYOUTS[liveLayout.id] || LAYOUTS.default;
+        openLayout(
+          cloneLayout(preset, { name: `${preset.name} copy` }),
+          null,
+          `Started from active ${preset.name} preset`,
+          true,
+        );
+        return;
+      }
     }
     const active = library.layouts.find((item) => item.id === library.activeId) || library.layouts[0];
     if (active) {
       openLayout(active, active.id, `Opened “${active.name}”`, true);
       return;
     }
-    const preset = LAYOUTS[liveLayout?.id] || LAYOUTS.default;
+    const preset = LAYOUTS.default;
     openLayout(
       cloneLayout(preset, { name: `${preset.name} copy` }),
       null,
-      `Started from the ${preset.name} preset — presets themselves are read-only`,
+      `Started from the ${preset.name} preset`,
       true,
     );
   }, [library.loaded, library.layouts, library.activeId, feeds.stage.layout, openLayout]);

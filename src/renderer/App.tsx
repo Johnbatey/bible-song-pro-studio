@@ -7,6 +7,7 @@ import { SlideEditorModal } from './components/SlideEditorModal';
 import { NoticeStack } from './components/NoticeStack';
 import { WorkspaceBridge } from './components/dock/WorkspaceBridge';
 import { StatusBar } from './components/StatusBar';
+import { ThemeTransitionOverlay } from './components/ThemeTransitionOverlay';
 import { useBroadcastSync } from './hooks/useBroadcastSync';
 import { useStageSync } from './hooks/useStageSync';
 /* Flattening for the browser display lives in its own module: it is pure, it
@@ -14,9 +15,23 @@ import { useStageSync } from './hooks/useStageSync';
    there without pulling the store and the component tree in behind it. */
 export { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
 import { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
+import { ensureTheme } from './utils/defaultTheme';
 
 export function App() {
   const platform = useAppStore((s) => s.platform);
+  const uiThemeMode = useAppStore((s) => s.uiThemeMode);
+
+  useEffect(() => {
+    const mode = uiThemeMode || 'dark';
+    document.documentElement.setAttribute('data-ui-theme', mode);
+    if (mode === 'light') {
+      document.documentElement.setAttribute('data-bsp-surface', 'paper');
+      document.body.classList.add('light-theme');
+    } else {
+      document.documentElement.removeAttribute('data-bsp-surface');
+      document.body.classList.remove('light-theme');
+    }
+  }, [uiThemeMode]);
 
   useEffect(() => {
     async function init() {
@@ -50,10 +65,11 @@ export function App() {
     if (!window.BSP?.display?.sendState) return;
     const sendState = () => {
       const state = useAppStore.getState();
+      const activeTheme = ensureTheme(state.activeTheme);
       window.BSP.display.sendState({
         scene: state.display.currentScene,
         outputMode: state.display.outputMode,
-        theme: state.activeTheme,
+        theme: activeTheme,
         /* Only a room announcement travels. Operator notices live in
            `state.notice` and are deliberately absent from this payload. */
         activeAlert: state.activeAlert,
@@ -65,8 +81,8 @@ export function App() {
         videoTransport: state.display.videoTransport.target === 'program'
           ? state.display.videoTransport
           : null,
-        ...displayFieldsFor(state.activeTheme, state.display.outputMode),
-        ...backgroundFieldsFor(state.display.currentScene, state.activeTheme, state.display.outputMode),
+        ...displayFieldsFor(activeTheme, state.display.outputMode),
+        ...backgroundFieldsFor(state.display.currentScene, activeTheme, state.display.outputMode),
       }).then((nextState) => {
         useAppStore.getState().setOutputStatus({
           updatedAt: nextState?.updatedAt || Date.now(),
@@ -109,6 +125,7 @@ export function App() {
       {/* One notification surface for the whole app. It reads activeAlert and
           the notice list out of the store itself. */}
       <NoticeStack />
+      <ThemeTransitionOverlay />
     </div>
   );
 }

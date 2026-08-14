@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
-import type { BibleBook, BibleSearchResult, BibleVerse, BibleVersion, Scene } from '../types';
+import type { BibleBook, BibleSearchResult, BibleVerse, BibleVersion, Scene, WordStudyEntry } from '../types';
+import { WordStudyCard } from './WordStudyCard';
+import { annotateTextWithStrongsSync } from '../services/lexicon-annotator';
 import { type, fontWeight, numeric } from '../styles/type';
 import { CustomDropdown } from './CustomDropdown';
 import { SlidingSwitch } from './SlidingSwitch';
@@ -210,6 +212,87 @@ function parseReferenceQuery(query: string, books: BibleBook[]) {
   };
 }
 
+interface AnnotatedVerseTextProps {
+  text: string;
+  book?: string;
+  showStrongs: boolean;
+  enableHoverLookup?: boolean;
+  isPinned?: boolean;
+  onHoverStrongs?: (entry: WordStudyEntry | null, event?: React.MouseEvent) => void;
+  onContextMenuStrongs?: (entry: WordStudyEntry, event: React.MouseEvent) => void;
+  onClickStrongs?: (entry: WordStudyEntry, event: React.MouseEvent) => void;
+}
+
+function AnnotatedVerseText({
+  text,
+  book,
+  showStrongs,
+  enableHoverLookup = true,
+  isPinned,
+  onHoverStrongs,
+  onContextMenuStrongs,
+  onClickStrongs,
+}: AnnotatedVerseTextProps) {
+  const tokens = useMemo(() => {
+    if (!showStrongs) return [];
+    return annotateTextWithStrongsSync(text, book);
+  }, [text, book, showStrongs]);
+
+  if (!showStrongs || tokens.length === 0) {
+    return <span>{text}</span>;
+  }
+
+  return (
+    <span>
+      {tokens.map((t, idx) => {
+        if (!t.strongs) return <span key={idx}>{t.word} </span>;
+        return (
+          <span key={idx} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+            <span
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={(e) => !isPinned && enableHoverLookup && onHoverStrongs?.(t.strongs!, e)}
+              onMouseLeave={() => !isPinned && onHoverStrongs?.(null)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onContextMenuStrongs?.(t.strongs!, e);
+              }}
+            >
+              {t.word}
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: '#FF5500',
+                cursor: 'pointer',
+                marginLeft: 2,
+                marginRight: 4,
+                opacity: 0.9,
+                userSelect: 'none',
+              }}
+              onMouseEnter={(e) => !isPinned && enableHoverLookup && onHoverStrongs?.(t.strongs!, e)}
+              onMouseLeave={() => !isPinned && onHoverStrongs?.(null)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onContextMenuStrongs?.(t.strongs!, e);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClickStrongs?.(t.strongs!, e);
+              }}
+              title={`Click to queue / Double-click to project ${t.strongs.transliteration} (${t.strongs.strongs}) • Right-click to pin lookup`}
+            >
+              {t.strongs.strongs}
+            </span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 export function BiblePanel() {
   const projectScene = useAppStore((s) => s.projectScene);
   const currentScene = useAppStore((s) => s.display.currentScene);
@@ -236,8 +319,13 @@ export function BiblePanel() {
   const [selectedVerseNumbers, setSelectedVerseNumbers] = useState<number[]>([]);
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [pinned, setPinned] = useState<BibleVerse[]>([]);
+  const [lexiconResult, setLexiconResult] = useState<WordStudyEntry | null>(null);
+  const [showStrongs, setShowStrongs] = useState(false);
+  const [enableHoverLookup, setEnableHoverLookup] = useState(true);
+  const [hoveredStrongs, setHoveredStrongs] = useState<{ entry: WordStudyEntry; x: number; y: number } | null>(null);
+  const [pinnedStrongs, setPinnedStrongs] = useState<{ entry: WordStudyEntry; x: number; y: number } | null>(null);
   /** Where the control bar sits — above the verse list, or under it. */
-  const { position: barPosition, move: moveBar } = useBarPosition('bsp_bibleBarPosition');
+  const { position: barPosition, move: moveBar } = useBarPosition('bsp_bibleBarPosition', 'bottom');
   const [isLoading, setIsLoading] = useState(false);
   const searchTimerRef = useRef<number | null>(null);
   /* Keyed by reference, not verse number: search results span books, so verse
@@ -294,9 +382,14 @@ export function BiblePanel() {
     const normalized = normalizeSearchText(query);
     if (!normalized) {
       setResults([]);
+      setLexiconResult(null);
       setHighlightedVerse(null);
       return;
     }
+
+    window.BSP?.lexicon?.lookup(normalized).then((res) => {
+      setLexiconResult(res);
+    }).catch(() => {});
 
     const parsedRef = parseReferenceQuery(query, bookOptions);
     if (parsedRef) {
@@ -387,12 +480,13 @@ export function BiblePanel() {
   }
 
   /** Fetches the same reference in the comparison translation, if one is selected. */
-  async function fetchSecondary(verse: BibleVerse) {
-    if (!dualVersion) return undefined;
-    const secondary = await window.BSP?.bible?.search({ versionId: secondaryVersion, query: verse.reference, limit: 1 }).catch(() => []);
+  async function fetchSecondary(verse: BibleVerse, customVer?: string, isDualActive = dualVersion) {
+    if (!isDualActive) return undefined;
+    const verToFetch = customVer || secondaryVersion;
+    const secondary = await window.BSP?.bible?.search({ versionId: verToFetch, query: verse.reference, limit: 1 }).catch(() => []);
     const second = secondary?.[0];
     if (!second) return undefined;
-    return { text: second.text, reference: second.reference, version: secondaryVersion };
+    return { text: second.text, reference: second.reference, version: verToFetch };
   }
 
   const visibleVerses = results.length ? results : chapterVerses;
@@ -424,16 +518,63 @@ export function BiblePanel() {
     verseRefs.current[activeReference]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [activeReference, visibleVerses]);
 
-  function bibleSceneId(verse: BibleVerse) {
-    return `bible-${verse.version}-${verse.reference}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
+  /* ESC key unpins / closes the pinned Lexicon lookup popover card */
+  useEffect(() => {
+    if (!pinnedStrongs) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPinnedStrongs(null);
+        setHoveredStrongs(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pinnedStrongs]);
+
+  /* When Strong's mode is toggled, preserve focus on highlighted/active verse (e.g. Gen 1:9) */
+  useEffect(() => {
+    let targetRef: string | null = null;
+    if (highlightedVerse) {
+      const v = chapterVerses.find((item) => item.verse === highlightedVerse);
+      if (v) targetRef = v.reference;
+    }
+    if (!targetRef && activeReference) {
+      targetRef = activeReference;
+    }
+    if (!targetRef && selectedVerseNumbers.length > 0) {
+      const v = chapterVerses.find((item) => item.verse === selectedVerseNumbers[0]);
+      if (v) targetRef = v.reference;
+    }
+
+    if (targetRef) {
+      const refToScroll = targetRef;
+      const timer = window.setTimeout(() => {
+        verseRefs.current[refToScroll]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 60);
+      return () => window.clearTimeout(timer);
+    }
+  }, [showStrongs]);
+
+  function bibleSceneId(verse: BibleVerse, isDual = dualVersion, secVer = secondaryVersion) {
+    return isDual
+      ? `bible-${verse.version}-${verse.reference}-dual-${secVer}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '')
+      : `bible-${verse.version}-${verse.reference}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
   }
 
-  async function sendVerse(verse: BibleVerse, opts: { direct?: boolean } = {}) {
-    const secondaryVerse = await fetchSecondary(verse);
-    const sceneId = bibleSceneId(verse);
+  async function sendVerse(
+    verse: BibleVerse,
+    opts: { direct?: boolean; forceUpdate?: boolean } = {},
+    customSecondaryVer?: string,
+    overrideDual?: boolean
+  ) {
+    const isDualActive = overrideDual !== undefined ? overrideDual : dualVersion;
+    const secVerToUse = customSecondaryVer || secondaryVersion;
+    const secondaryVerse = isDualActive ? await fetchSecondary(verse, secVerToUse, isDualActive) : undefined;
+    const sceneId = bibleSceneId(verse, isDualActive, secVerToUse);
     const goesLive = opts.direct || operatingMode === 'basic';
     const activeScene = goesLive ? currentScene : previewScene;
-    if (activeScene?.id === sceneId) {
+
+    if (!opts.forceUpdate && activeScene?.id === sceneId) {
       if (goesLive) {
         setCurrentScene(null);
         setPreviewScene(null);
@@ -443,7 +584,7 @@ export function BiblePanel() {
       return;
     }
     const primaryVer = verse.version || selectedVersion;
-    const secondaryVer = secondaryVerse?.version || secondaryVersion;
+    const secondaryVer = secondaryVerse?.version || secVerToUse;
     const verseText = `${toSuperscript(verse.verse)}\u00A0${verse.text}`;
     const scene: Scene = {
       id: sceneId,
@@ -466,6 +607,52 @@ export function BiblePanel() {
     };
     addVerseToHistory(verse);
     projectScene(scene, { direct: opts.direct });
+  }
+
+  function handleDualVersionToggle(isDual: boolean) {
+    setDualVersion(isDual);
+    // In Basic Mode, switching between Single and Dual Version immediately updates the live display output.
+    // In Studio Mode, the live display output is held until the operator selects/projects.
+    if (operatingMode === 'basic' && currentScene?.type === 'bible') {
+      const activeRef = currentScene.name;
+      const visibleVerses = results.length ? results : chapterVerses;
+      const activeVerse = visibleVerses.find((v) => v.reference === activeRef || activeRef.includes(v.reference));
+      if (activeVerse) {
+        void sendVerse(activeVerse, { direct: true, forceUpdate: true }, undefined, isDual);
+      } else if (currentScene.content) {
+        if (!isDual) {
+          const singleScene: Scene = {
+            ...currentScene,
+            id: `bible-${currentScene.content.version || selectedVersion}-${currentScene.name}`,
+            content: {
+              ...currentScene.content,
+              secondaryVerse: undefined,
+            },
+          };
+          projectScene(singleScene, { direct: true });
+        } else {
+          void (async () => {
+            const secVerToUse = secondaryVersion;
+            const dummyVerse: BibleVerse = { chapter: 1, verse: 1, text: '', book: '', reference: currentScene.name, version: currentScene.content?.version || selectedVersion };
+            const sec = await fetchSecondary(dummyVerse, secVerToUse, true);
+            const dualScene: Scene = {
+              ...currentScene,
+              id: `bible-${currentScene.content?.version || selectedVersion}-${currentScene.name}-dual-${secVerToUse}`,
+              content: {
+                ...currentScene.content,
+                secondaryVerse: sec
+                  ? {
+                      ...sec,
+                      reference: `${sec.reference || currentScene.name} (${secVerToUse})`,
+                    }
+                  : undefined,
+              },
+            };
+            projectScene(dualScene, { direct: true });
+          })();
+        }
+      }
+    }
   }
 
   async function sendVerses(verses: BibleVerse[], opts: { direct?: boolean } = {}) {
@@ -750,14 +937,14 @@ export function BiblePanel() {
           {/* Segmented Pill Switcher with Smooth Sliding Animation */}
           <SlidingSwitch
             value={dualVersion ? 'dual' : 'single'}
-            onChange={(val) => setDualVersion(val === 'dual')}
+            onChange={(val) => handleDualVersionToggle(val === 'dual')}
             options={[
               {
                 value: 'single',
                 label: 'Single Version',
                 title: 'Show one translation',
                 icon: (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                   </svg>
@@ -768,7 +955,7 @@ export function BiblePanel() {
                 label: 'Dual Version',
                 title: 'Show a parallel translation alongside',
                 icon: (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
                     <path d="M16 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
                   </svg>
@@ -776,6 +963,57 @@ export function BiblePanel() {
               },
             ]}
           />
+
+          {/* Strong's Lexicon Toggle Button */}
+          <button
+            onClick={() => setShowStrongs((v) => !v)}
+            style={{
+              height: 38,
+              padding: '0 14px',
+              background: showStrongs ? '#141416' : 'var(--chrome-control)',
+              border: showStrongs ? 'none' : '1px solid var(--border-primary)',
+              borderRadius: 6,
+              color: showStrongs ? '#ffffff' : 'var(--text-primary)',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+            }}
+            title="Toggle inline Strong's concordance numbers"
+          >
+            <span>📜</span> Strong
+          </button>
+
+          {/* Hover Lookup Toggle Button (subtle, non-distracting) */}
+          {showStrongs && (
+            <button
+              onClick={() => setEnableHoverLookup((v) => !v)}
+              style={{
+                height: 38,
+                padding: '0 10px',
+                background: enableHoverLookup ? 'rgba(255, 85, 0, 0.15)' : 'var(--chrome-control)',
+                border: enableHoverLookup ? '1px solid rgba(255, 85, 0, 0.4)' : '1px solid var(--border-primary)',
+                borderRadius: 6,
+                color: enableHoverLookup ? '#FF5500' : 'var(--text-secondary)',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+              title={enableHoverLookup ? "Hover lookup active (Click to disable hover popovers; right-click still works)" : "Hover lookup disabled (Right-click still works)"}
+            >
+              <span>{enableHoverLookup ? '👁️' : '🙈'}</span>
+              <span>Hover: {enableHoverLookup ? 'ON' : 'OFF'}</span>
+            </button>
+          )}
 
           {/* Secondary Version Selector when Dual Version is active */}
           {dualVersion && (
@@ -810,7 +1048,7 @@ export function BiblePanel() {
               onClick={() => sendAdjacentVerse(-1)}
               title="Previous verse / chapter"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
@@ -824,7 +1062,7 @@ export function BiblePanel() {
               onClick={() => sendAdjacentVerse(1)}
               title="Next verse / chapter"
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 18 15 12 9 6" />
               </svg>
             </button>
@@ -874,6 +1112,9 @@ export function BiblePanel() {
           />
         ) : (
           <div style={styles.grid}>
+            {lexiconResult && (
+              <WordStudyCard entry={lexiconResult} onClose={() => setLexiconResult(null)} />
+            )}
             {results.length > 0 && (
               <div style={styles.resultsHeading}>Search results</div>
             )}
@@ -884,24 +1125,24 @@ export function BiblePanel() {
               const isSelectedMulti = selectedVerseNumbers.length > 1 && selectedVerseNumbers.includes(verse.verse);
 
               const borderStyle = isLive
-                ? '1px solid #FF5500'
+                ? '2px solid #FF5500'
                 : isPreview
                 ? '1px solid var(--tally-preview)'
                 : isSelectedMulti
                 ? '1px solid #FF5500'
                 : isHighlighted
                 ? '1px solid var(--chrome-control-active)'
-                : '1px solid #262628';
+                : '1px solid var(--border-primary)';
 
               const backgroundStyle = isLive
-                ? '#3d1403'
+                ? 'var(--accent-dim)'
                 : isPreview
-                ? '#232221'
+                ? 'rgba(59, 130, 246, 0.08)'
                 : isSelectedMulti
-                ? 'rgba(255, 85, 0, 0.22)'
+                ? 'var(--accent-glow)'
                 : isHighlighted
                 ? 'var(--chrome-control-active)'
-                : '#141416';
+                : 'var(--bg-surface)';
 
               return (
                 <div
@@ -911,14 +1152,14 @@ export function BiblePanel() {
                   onClick={(e) => handleRowClick(verse, index, e, false)}
                   onDoubleClick={(e) => handleRowClick(verse, index, e, true)}
                   style={{
-                    height: 38,
+                    height: showStrongs ? 'auto' : 38,
                     minHeight: 38,
-                    padding: '0 12px',
+                    padding: showStrongs ? '8px 12px' : '0 12px',
                     background: backgroundStyle,
                     border: borderStyle,
                     borderRadius: 6,
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: showStrongs ? 'flex-start' : 'center',
                     gap: 10,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
@@ -931,12 +1172,12 @@ export function BiblePanel() {
                 >
                   {/* Confidence when searching, plain verse number when browsing */}
                   {results.length > 0 ? (
-                    <span style={styles.confidence}>
+                    <span style={{ ...styles.confidence, marginTop: showStrongs ? 2 : 0 }}>
                       <span style={styles.confidenceDot} />
                       {confidenceFor(verse, index)}%
                     </span>
                   ) : (
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-dim)', minWidth: 22, flexShrink: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-dim)', minWidth: 22, flexShrink: 0, marginTop: showStrongs ? 2 : 0 }}>
                       {verse.verse}
                     </span>
                   )}
@@ -944,29 +1185,72 @@ export function BiblePanel() {
                   {/* Reference and translation chip when displaying search results */}
                   {results.length > 0 && (
                     <>
-                      <span style={styles.resultRef}>{verse.reference.toUpperCase()}</span>
-                      <span style={styles.versionChip}>{verse.version || selectedVersion}</span>
+                      <span style={{ ...styles.resultRef, marginTop: showStrongs ? 2 : 0 }}>{verse.reference.toUpperCase()}</span>
+                      <span style={{ ...styles.versionChip, marginTop: showStrongs ? 2 : 0 }}>{verse.version || selectedVersion}</span>
                     </>
                   )}
 
                   {/* Inline Status Badges */}
-                  {isLive && <span style={styles.liveBadge}>LIVE</span>}
-                  {isPreview && !isLive && <span style={styles.previewBadge}>PREVIEW</span>}
+                  {isLive && <span style={{ ...styles.liveBadge, marginTop: showStrongs ? 2 : 0 }}>LIVE</span>}
+                  {isPreview && !isLive && <span style={{ ...styles.previewBadge, marginTop: showStrongs ? 2 : 0 }}>PREVIEW</span>}
 
-                  {/* Verse body text — single line, ellipsised */}
+                  {/* Verse body text — single line when normal, multi-line when Strong is enabled */}
                   <span
                     style={{
                       flex: 1,
                       fontSize: 13,
-                      color: '#ffffff',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      lineHeight: '38px',
+                      color: 'var(--text-primary)',
+                      whiteSpace: showStrongs ? 'normal' : 'nowrap',
+                      overflow: showStrongs ? 'visible' : 'hidden',
+                      textOverflow: showStrongs ? 'clip' : 'ellipsis',
+                      lineHeight: showStrongs ? '1.5' : '38px',
                     }}
                     title={verse.text}
                   >
-                    {highlightTerm(verse.text, searchTerm)}
+                    {showStrongs ? (
+                      <AnnotatedVerseText
+                        text={verse.text}
+                        book={verse.book}
+                        showStrongs={showStrongs}
+                        enableHoverLookup={enableHoverLookup}
+                        isPinned={!!pinnedStrongs}
+                        onHoverStrongs={(entry, e) => {
+                          if (pinnedStrongs || !enableHoverLookup) return;
+                          if (entry && e) {
+                            setHoveredStrongs({ entry, x: e.clientX, y: e.clientY });
+                          } else {
+                            setHoveredStrongs(null);
+                          }
+                        }}
+                        onContextMenuStrongs={(entry, e) => {
+                          setPinnedStrongs({ entry, x: e.clientX, y: e.clientY });
+                          setHoveredStrongs(null);
+                        }}
+                        onClickStrongs={(entry, e) => {
+                          e.stopPropagation();
+                          const isDoubleClick = e.detail === 2;
+                          const scene: Scene = {
+                            id: `wordstudy-${Date.now()}`,
+                            name: `Word Study: ${entry.transliteration}`,
+                            type: 'bible',
+                            content: {
+                              text: `${entry.lemma} (${entry.transliteration} • ${entry.strongs}) — ${entry.gloss}: ${entry.definition}`,
+                              reference: `Word Study: ${entry.transliteration} (${entry.strongs})`,
+                              wordStudy: entry,
+                            },
+                            transition: { type: 'fade', duration: 0.15 },
+                          };
+                          projectScene(scene, { direct: isDoubleClick });
+                          window.BSP?.display?.sendState?.({
+                            mode: 'lowerthird',
+                            lowerThirdText: `${entry.lemma} (${entry.transliteration} • ${entry.strongs})`,
+                            lowerThirdSub: `${entry.gloss}: ${entry.definition}`,
+                          });
+                        }}
+                      />
+                    ) : (
+                      highlightTerm(verse.text, searchTerm)
+                    )}
                   </span>
 
                   {/* Queue Plus (+) Button — revealed on row hover */}
@@ -997,7 +1281,7 @@ export function BiblePanel() {
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: '#ffffff',
+                      color: 'var(--text-secondary)',
                       fontSize: 16,
                       fontWeight: 400,
                       cursor: 'pointer',
@@ -1019,11 +1303,74 @@ export function BiblePanel() {
         )}
 
         <div style={styles.footerNote}>
-          Click a verse card to load it into Preview.
+          Click a verse card to load it into Preview. Right-click any Strong's tag or word to pin lookup.
         </div>
       </Block>
 
       {barPosition === 'bottom' && toolbar}
+
+      {(pinnedStrongs || hoveredStrongs) && (() => {
+        const activePopover = pinnedStrongs || hoveredStrongs!;
+        const isPinned = !!pinnedStrongs;
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              left: Math.min(activePopover.x + 12, window.innerWidth - 380),
+              top: Math.min(activePopover.y + 12, window.innerHeight - 480),
+              zIndex: 9999,
+              width: 360,
+              maxHeight: 'calc(100vh - 80px)',
+              overflowY: 'auto',
+              pointerEvents: isPinned ? 'auto' : 'none',
+              background: 'rgba(20, 20, 26, 0.98)',
+              border: isPinned ? '1px solid #FF5500' : '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: 14,
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.85)',
+              backdropFilter: 'blur(20px)',
+            }}
+          >
+            {isPinned && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 14px',
+                  background: 'rgba(255, 85, 0, 0.2)',
+                  borderBottom: '1px solid rgba(255, 85, 0, 0.35)',
+                  borderRadius: '13px 13px 0 0',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#FF5500',
+                  userSelect: 'none',
+                }}
+              >
+                <span>📌 PINNED LOOKUP (Press ESC to close)</span>
+                <button
+                  onClick={() => {
+                    setPinnedStrongs(null);
+                    setHoveredStrongs(null);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#FF5500',
+                    fontWeight: 800,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                  }}
+                  title="Unpin / Close (ESC)"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            <WordStudyCard entry={activePopover.entry} />
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1075,9 +1422,9 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: 140,
     padding: '0 14px',
     background: 'var(--chrome-control)',
-    border: '1px solid var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 13,
     outline: 'none',
     boxSizing: 'border-box',
@@ -1090,9 +1437,9 @@ const styles: Record<string, React.CSSProperties> = {
     width: 40,
     height: 38,
     background: 'var(--chrome-control)',
-    border: '1px solid var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     fontSize: 16,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -1103,9 +1450,9 @@ const styles: Record<string, React.CSSProperties> = {
   chips: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 },
   grid: { display: 'flex', flexDirection: 'column', gap: 6 },
   verseButton: {
-    border: '1px solid #262628',
-    background: '#161414',
-    color: '#ffffff',
+    border: '1px solid var(--border-primary)',
+    background: 'var(--block-bg)',
+    color: 'var(--text-primary)',
     borderRadius: 6,
     padding: '8px 12px',
     textAlign: 'left',
@@ -1117,7 +1464,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'var(--font-ui)',
   },
   verseRef: { ...type.caption, ...numeric, color: '#FF5500', fontWeight: fontWeight.bold },
-  verseText: { fontSize: 13, lineHeight: 1.45, color: '#ffffff' },
+  verseText: { fontSize: 13, lineHeight: 1.45, color: 'var(--text-primary)' },
   textMode: { minHeight: 360, height: '100%', resize: 'none', whiteSpace: 'pre-wrap', lineHeight: 1.55 },
   footerNote: { marginTop: 10, ...type.caption, color: 'var(--text-dim)' },
   liveBadge: { ...type.label, fontWeight: fontWeight.bold, padding: '2px 5px', borderRadius: 4, background: '#FF5500', color: '#fff', flexShrink: 0, lineHeight: 1.4, whiteSpace: 'nowrap' },

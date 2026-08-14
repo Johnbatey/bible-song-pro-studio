@@ -12,11 +12,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 import type { CSSProperties, RefObject } from 'react';
 import { fontWeight } from '../styles/type';
-import { defaultTheme, type StageTheme } from '../../stage/theme';
+import { defaultTheme, persistTheme, type StageTheme } from '../../stage/theme';
 
 const ACCENTS = ['#fbbf24', '#0a84ff', '#30d158', '#ff453a', '#bf5af2', '#ff9f0a'];
 const BACKGROUNDS = ['#000000', '#05070d', '#0a0a0a', '#0d1b2a', '#1a1a1a'];
-const TEXTS = ['#ffffff', '#f5f5f7', '#fbbf24', 'var(--text-dim)'];
+const TEXTS = ['#ffffff', '#f5f5f7', '#fbbf24', '#a1a1aa'];
 
 const TOGGLES: Array<{ key: 'showClock' | 'showTimer' | 'showLabels'; label: string }> = [
   { key: 'showClock', label: 'Clock' },
@@ -28,32 +28,34 @@ export interface StageSettingsPopoverProps {
   theme: StageTheme;
   onChange: (patch: Partial<StageTheme>) => void;
   onClose: () => void;
-  /** The control this hangs off, for positioning. */
   anchorRef: RefObject<HTMLElement | null>;
 }
 
-const POPOVER_WIDTH = 268;
+const POPOVER_WIDTH = 270;
 
 export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: StageSettingsPopoverProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [rect, setRect] = useState<{ top: number; left: number } | null>(null);
 
-  /* Portalled to the body and positioned from the button's own rect. A dock
-     panel clips its overflow, and a popover anchored inside the footer is
-     clipped with it — which is exactly what happened the first time. */
+  const handlePatch = (patch: Partial<StageTheme>) => {
+    const next = { ...theme, ...patch };
+    persistTheme(next);
+    onChange(patch);
+  };
+
   const measure = useCallback(() => {
     const anchor = anchorRef.current?.getBoundingClientRect();
     if (!anchor) return;
-    setRect({
-      top: anchor.top - 8,
-      left: Math.max(8, Math.min(anchor.right - POPOVER_WIDTH, window.innerWidth - POPOVER_WIDTH - 8)),
-    });
+    const estimatedHeight = 360;
+    const computedTop = anchor.top - estimatedHeight - 8;
+    const safeTop = Math.max(12, Math.min(computedTop, window.innerHeight - estimatedHeight - 12));
+    const safeLeft = Math.max(12, Math.min(anchor.right - POPOVER_WIDTH, window.innerWidth - POPOVER_WIDTH - 12));
+    setRect({ top: safeTop, left: safeLeft });
   }, [anchorRef]);
 
   useLayoutEffect(() => {
     measure();
     window.addEventListener('resize', measure);
-    // Capture phase so scrolling any ancestor repositions this too.
     window.addEventListener('scroll', measure, true);
     return () => {
       window.removeEventListener('resize', measure);
@@ -61,7 +63,6 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
     };
   }, [measure]);
 
-  // Click-away and Escape, the two ways anyone expects a popover to close.
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -69,7 +70,6 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
       onClose();
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    // Deferred: the click that opened this must not immediately close it.
     const id = window.setTimeout(() => document.addEventListener('mousedown', onDown), 0);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -84,31 +84,45 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
     colors: string[],
     current: string,
     key: 'accent' | 'background' | 'text',
-    wide = false,
   ) => (
     <div style={styles.section}>
       <div style={styles.label}>{label}</div>
       <div style={styles.row}>
-        {colors.map((color) => (
-          <button
-            key={color}
-            type="button"
-            onClick={() => onChange({ [key]: color } as Partial<StageTheme>)}
-            title={color}
-            aria-label={`${label} ${color}`}
-            style={{
-              ...styles.swatch,
-              width: wide ? 34 : 22,
-              background: color,
-              borderColor: current.toLowerCase() === color.toLowerCase() ? '#fff' : 'rgba(255,255,255,0.18)',
-              boxShadow: current.toLowerCase() === color.toLowerCase() ? '0 0 0 2px rgba(255,255,255,0.35)' : 'none',
-            }}
-          />
-        ))}
+        {colors.map((color) => {
+          const isSelected = current.toLowerCase() === color.toLowerCase();
+          const isLight = color.toLowerCase() === '#ffffff' || color.toLowerCase() === '#fbbf24' || color.toLowerCase() === '#f5f5f7';
+          return (
+            <button
+              key={color}
+              type="button"
+              onClick={() => handlePatch({ [key]: color } as Partial<StageTheme>)}
+              title={color}
+              aria-label={`${label} ${color}`}
+              style={{
+                ...styles.swatch,
+                background: color,
+                borderColor: isSelected ? '#FF5500' : 'rgba(255,255,255,0.18)',
+                boxShadow: isSelected ? '0 0 0 2px rgba(255,85,0,0.5)' : 'none',
+              }}
+            >
+              {isSelected && (
+                <span
+                  style={{
+                    color: isLight ? '#000000' : '#ffffff',
+                    fontSize: 10,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  ✓
+                </span>
+              )}
+            </button>
+          );
+        })}
         <input
           type="color"
           value={/^#[0-9a-f]{6}$/i.test(current) ? current : '#000000'}
-          onChange={(e) => onChange({ [key]: e.currentTarget.value } as Partial<StageTheme>)}
+          onChange={(e) => handlePatch({ [key]: e.currentTarget.value } as Partial<StageTheme>)}
           style={styles.nativeColor}
           title={`Custom ${label.toLowerCase()}`}
         />
@@ -125,53 +139,83 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
       role="dialog"
       aria-label="Stage display appearance"
     >
-      <div style={styles.title}>Stage Display</div>
-
-      {swatchRow('Accent', ACCENTS, theme.accent, 'accent')}
-      {swatchRow('Background', BACKGROUNDS, theme.background, 'background', true)}
-      {swatchRow('Text', TEXTS, theme.text, 'text')}
-
-      <div style={styles.section}>
-        <div style={styles.label}>Font scale</div>
-        <div style={styles.row}>
-          <input
-            type="range"
-            min={0.5}
-            max={2}
-            step={0.1}
-            value={theme.fontScale}
-            onChange={(e) => onChange({ fontScale: Number(e.currentTarget.value) })}
-            style={{ flex: 1, accentColor: theme.accent }}
-            title="Stage font scale"
-          />
-          <span style={styles.scaleValue}>{Math.round(theme.fontScale * 100)}%</span>
+      {/* Fixed Header */}
+      <div style={styles.header}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span style={styles.title}>Stage Style</span>
         </div>
+        <button type="button" onClick={onClose} style={styles.closeBtn} title="Close">
+          ✕
+        </button>
       </div>
 
-      <div style={styles.section}>
-        <div style={styles.label}>Show</div>
-        <div style={styles.row}>
-          {TOGGLES.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onChange({ [key]: !theme[key] } as Partial<StageTheme>)}
-              style={{
-                ...styles.chip,
-                background: theme[key] ? 'rgba(244,98,31,0.18)' : 'transparent',
-                borderColor: theme[key] ? 'var(--accent, #FF5500)' : 'var(--block-line, rgba(255,255,255,0.14))',
-                color: theme[key] ? '#fff' : 'var(--text-dim, rgba(255,255,255,0.55))',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Scrollable Body */}
+      <div style={styles.scrollBody}>
+        {swatchRow('Accent', ACCENTS, theme.accent, 'accent')}
+        {swatchRow('Background', BACKGROUNDS, theme.background, 'background')}
+        {swatchRow('Text', TEXTS, theme.text, 'text')}
 
-      <button type="button" onClick={() => onChange(defaultTheme())} style={styles.reset}>
-        Reset to defaults
-      </button>
+        {/* Font Scale */}
+        <div style={styles.section}>
+          <div style={styles.label}>Font Scale</div>
+          <div style={styles.row}>
+            <input
+              type="range"
+              min={0.5}
+              max={2}
+              step={0.1}
+              value={theme.fontScale}
+              onChange={(e) => handlePatch({ fontScale: Number(e.currentTarget.value) })}
+              style={{ width: 64, height: 4, accentColor: 'rgba(255, 255, 255, 0.85)', cursor: 'pointer' }}
+              title="Stage font scale"
+            />
+            <span style={styles.scaleValue}>{Math.round(theme.fontScale * 100)}%</span>
+          </div>
+        </div>
+
+        {/* Display Elements Segmented Chips */}
+        <div style={styles.section}>
+          <div style={styles.label}>Display Elements</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+            {TOGGLES.map(({ key, label }) => {
+              const active = Boolean(theme[key]);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handlePatch({ [key]: !theme[key] } as Partial<StageTheme>)}
+                  style={{
+                    ...styles.chip,
+                    background: active ? 'rgba(255, 85, 0, 0.18)' : '#141416',
+                    borderColor: active ? '#FF5500' : 'rgba(255, 255, 255, 0.12)',
+                    color: active ? '#ffffff' : '#a1a1aa',
+                  }}
+                >
+                  {label} {active ? '✓' : ''}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Keyboard Shortcuts */}
+        <div style={styles.section}>
+          <div style={styles.shortcutBox}>
+            <span style={{ fontSize: 11, color: '#a1a1aa' }}>
+              <strong style={{ color: '#ffffff' }}>L</strong> Layout Picker  •  <strong style={{ color: '#ffffff' }}>Esc</strong> Clear Message
+            </span>
+          </div>
+        </div>
+
+        {/* Reset Theme Button */}
+        <button type="button" onClick={() => handlePatch(defaultTheme())} style={styles.reset}>
+          Reset Theme
+        </button>
+      </div>
     </div>,
     document.body,
   );
@@ -180,70 +224,111 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
 const styles: Record<string, CSSProperties> = {
   popover: {
     position: 'fixed',
-    transform: 'translateY(-100%)',
     zIndex: 1500,
     width: POPOVER_WIDTH,
-    padding: 14,
+    maxHeight: 'min(400px, calc(100vh - 80px))',
+    display: 'flex',
+    flexDirection: 'column',
+    borderRadius: 8,
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-primary)',
+    boxShadow: 'var(--shadow-lg)',
+    overflow: 'hidden',
+  },
+  header: {
+    flex: '0 0 auto',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 14px',
+    borderBottom: '1px solid var(--border-primary)',
+    background: 'var(--chrome-control)',
+  },
+  title: { fontSize: 13, fontWeight: fontWeight.bold, color: 'var(--text-primary)' },
+  closeBtn: {
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--text-secondary)',
+    fontSize: 13,
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    padding: '2px 4px',
+  },
+  scrollBody: {
+    flex: '1 1 auto',
+    overflowY: 'auto',
+    padding: '12px 14px',
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
-    borderRadius: 6,
-    background: 'var(--chrome-raised, #1c1e26)',
-    border: '1px solid var(--block-line, rgba(255,255,255,0.14))',
-    boxShadow: '0 18px 50px rgba(0,0,0,0.55)',
   },
-  title: { fontSize: 12, fontWeight: fontWeight.bold, color: '#fff' },
-  section: { display: 'flex', flexDirection: 'column', gap: 6 },
+  section: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: {
     fontSize: 10,
     fontWeight: fontWeight.bold,
-    letterSpacing: '0.12em',
+    letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    color: 'var(--text-dim, rgba(255,255,255,0.5))',
+    color: 'var(--text-secondary)',
   },
   row: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   swatch: {
+    width: 22,
     height: 22,
-    borderRadius: 6,
+    borderRadius: '50%',
     border: '1px solid',
     cursor: 'pointer',
     padding: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.15s ease',
   },
   nativeColor: {
-    width: 26,
+    width: 22,
     height: 22,
     padding: 0,
-    border: '1px solid rgba(255,255,255,0.18)',
-    borderRadius: 6,
+    border: '1px solid var(--border-primary)',
+    borderRadius: '50%',
     background: 'none',
     cursor: 'pointer',
   },
   scaleValue: {
-    width: 38,
+    minWidth: 32,
     textAlign: 'right',
     fontSize: 11,
     fontWeight: fontWeight.semibold,
-    color: '#fff',
+    color: 'var(--text-primary)',
     fontVariantNumeric: 'tabular-nums',
   },
   chip: {
-    padding: '4px 10px',
+    flex: 1,
+    padding: '5px 8px',
     borderRadius: 6,
     border: '1px solid',
     fontSize: 11,
-    fontWeight: fontWeight.semibold,
+    fontWeight: 600,
     cursor: 'pointer',
+    textAlign: 'center',
+    transition: 'all 0.15s ease',
+  },
+  shortcutBox: {
+    padding: '6px 8px',
+    borderRadius: 6,
+    background: 'var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
+    textAlign: 'center',
   },
   reset: {
-    alignSelf: 'flex-start',
-    padding: '5px 10px',
+    width: '100%',
+    padding: '6px 10px',
     borderRadius: 6,
-    border: '1px solid var(--block-line, rgba(255,255,255,0.14))',
+    border: '1px solid var(--border-primary)',
     background: 'transparent',
-    color: 'var(--text-dim, rgba(255,255,255,0.55))',
+    color: 'var(--text-secondary)',
     fontSize: 11,
-    fontWeight: fontWeight.semibold,
+    fontWeight: 600,
     cursor: 'pointer',
+    textAlign: 'center',
   },
 };
 

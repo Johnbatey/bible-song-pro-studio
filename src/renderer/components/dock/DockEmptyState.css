@@ -31,9 +31,12 @@
   --dock-grid-block: 128px;
 }
 
+:root[data-ui-theme='light'] .dock-empty,
+[data-ui-theme='light'] .dock-empty,
+body.light-theme .dock-empty,
 :root[data-bsp-surface='paper'] .dock-empty {
-  --dock-grid-fine: rgba(23, 21, 20, 0.055);
-  --dock-grid-major: rgba(23, 21, 20, 0.10);
+  --dock-grid-fine: rgba(23, 21, 20, 0.065);
+  --dock-grid-major: rgba(23, 21, 20, 0.14);
 }
 
 /* The grid itself. Two layers on one element: four repeating gradients,

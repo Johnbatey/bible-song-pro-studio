@@ -39,7 +39,7 @@ export function AppleToggle({
     >
       {(label || description) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
-          {label && <span style={{ fontSize: 13, fontWeight: 500, color: '#ffffff' }}>{label}</span>}
+          {label && <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{label}</span>}
           {description && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{description}</span>}
         </div>
       )}
@@ -49,8 +49,8 @@ export function AppleToggle({
           width: 38,
           height: 22,
           borderRadius: 6,
-          background: checked ? '#FF5500' : '#2a2a2e',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: checked ? '#FF5500' : 'var(--chrome-control, #2a2a2e)',
+          border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.08))',
           transition: 'background 0.2s ease, border-color 0.2s ease',
           flexShrink: 0,
         }}

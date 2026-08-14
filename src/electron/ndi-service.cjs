@@ -202,7 +202,7 @@ function createNdiService() {
     }
   }
 
-  function startCapture(fps = 15, options = {}) {
+  function startCapture(fps = 30, options = {}) {
     if (!isRunning || !displayWindow) return false;
     if (options.width) width = options.width;
     if (options.height) height = options.height;
@@ -234,16 +234,19 @@ function createNdiService() {
             rect = { x: surfaceX, y: surfaceY, width: surfaceW, height: surfaceH };
           }
         }
-        const image = await displayWindow.capturePage(rect);
+        let image = await displayWindow.capturePage(rect);
         if (image && !image.isEmpty()) {
-          const bitmap = image.toBitmap();
+          const targetW = width || 1920;
+          const targetH = height || 1080;
+          
           const size = image.getSize();
-          if (bitmap && bitmap.length > 0 && size.width > 0 && size.height > 0) {
-            const totalPixels = Math.floor(bitmap.length / 4);
-            const aspect = size.width / size.height;
-            const realWidth = Math.max(1, Math.round(Math.sqrt(totalPixels * aspect)));
-            const realHeight = Math.max(1, Math.round(totalPixels / realWidth));
-            sendFrame(bitmap, realWidth, realHeight, fps);
+          if (size.width !== targetW || size.height !== targetH) {
+            image = image.resize({ width: targetW, height: targetH, quality: 'best' });
+          }
+          
+          const bitmap = image.toBitmap();
+          if (bitmap && bitmap.length > 0) {
+            sendFrame(bitmap, targetW, targetH, fps);
           }
         }
       } catch {

@@ -33,6 +33,8 @@ export interface SceneContent {
   /** The slide itself, for scenes that project a designed slide rather than
       text. Every surface paints this instead of `text` when it is present. */
   slide?: SlideProjection;
+  /** Detailed original language Word Study entry for audience display projection. */
+  wordStudy?: WordStudyEntry;
 }
 
 /**
@@ -204,6 +206,10 @@ export interface LowerThirdTheme {
   gradientStart?: string;
   gradientEnd?: string;
   gradientDirection?: string;
+  savedGradientStart?: string;
+  savedGradientEnd?: string;
+  savedGradientDir?: string;
+  savedSolidColor?: string;
   backgroundOpacity: number;
   accentColor: string;
   fontFamily: string;
@@ -211,6 +217,7 @@ export interface LowerThirdTheme {
   fontWeight: number;
   fontColor: string;
   referenceColor?: string;
+  savedRefColor?: string;
   syncRefColor?: boolean;
   textShadowEnabled?: boolean;
   textShadowLevel?: 'subtle' | 'medium' | 'heavy' | 'custom';
@@ -238,6 +245,10 @@ export interface FullScreenTheme {
   gradientStart?: string;
   gradientEnd?: string;
   gradientDirection?: string;
+  savedGradientStart?: string;
+  savedGradientEnd?: string;
+  savedGradientDir?: string;
+  savedSolidColor?: string;
   backgroundOpacity?: number;
   /** Server-relative, e.g. `/media/<id>` — see MediaItem.url. An absolute url
       would pin the theme to whatever port the server held when it was set. */
@@ -250,6 +261,7 @@ export interface FullScreenTheme {
   fontWeight: number;
   fontColor: string;
   referenceColor?: string;
+  savedRefColor?: string;
   syncRefColor?: boolean;
   textShadowEnabled?: boolean;
   textShadowLevel?: 'subtle' | 'medium' | 'heavy' | 'custom';
@@ -635,6 +647,19 @@ export interface WorkspaceFile {
   app?: string;
 }
 
+export interface WordStudyEntry {
+  strongs: string;
+  language: 'Greek' | 'Hebrew';
+  lemma: string;
+  transliteration: string;
+  pronunciation: string;
+  gloss: string;
+  definition: string;
+  etymology?: string;
+  kjvUsage?: string;
+  triggers: string[];
+}
+
 declare global {
   interface Window {
     BSP: {
@@ -642,6 +667,11 @@ declare global {
       userDataPath: () => Promise<string>;
       version: () => Promise<string>;
       getDisplayUrl: () => Promise<string>;
+      lexicon?: {
+        lookup: (query: string) => Promise<WordStudyEntry | null>;
+        detect: (text: string) => Promise<WordStudyEntry | null>;
+        annotate: (text: string, book?: string) => Promise<Array<{ word: string; strongs?: WordStudyEntry }>>;
+      };
       /** Cmd+Shift+B and POST /api/display/blackout arrive here. Returns an unsubscribe. */
       onBlackoutToggle?: (cb: () => void) => (() => void);
       /* Refused by the main process unless https and on its allowlist. */

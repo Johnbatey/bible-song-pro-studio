@@ -3,6 +3,7 @@ import { useAppStore } from '../stores/appStore';
 import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
 import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { resolveBgVideoLoop } from '../utils/background';
+import { ensureTheme } from '../utils/defaultTheme';
 import { ProgramSurface } from './display/ProgramSurface';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { type, fontWeight } from '../styles/type';
@@ -33,7 +34,8 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
   const setMode = useAppStore((s) => s.setMode);
   const outputMode = useAppStore((s) => s.display.outputMode);
   const setOutputMode = useAppStore((s) => s.setOutputMode);
-  const activeTheme = useAppStore((s) => s.activeTheme);
+  const rawTheme = useAppStore((s) => s.activeTheme);
+  const activeTheme = useMemo(() => ensureTheme(rawTheme), [rawTheme]);
   const activeAlert = useAppStore((s) => s.activeAlert);
   const transcription = useAppStore((s) => s.transcription.text);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -261,8 +263,8 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
             style={{
               ...styles.studioBtn,
               // Studio is a workspace mode — nothing is on air because of it.
-              color: '#ffffff',
-              borderColor: isStudio ? 'var(--chrome-control-active)' : 'var(--chrome-control)',
+              color: 'var(--text-primary)',
+              borderColor: isStudio ? 'var(--border-primary)' : 'var(--border-primary)',
               background: isStudio ? 'var(--chrome-control-active)' : 'var(--chrome-control)',
               fontWeight: isStudio ? 600 : 500,
             }}
@@ -376,7 +378,14 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                 <span style={{ ...styles.dot, background: 'var(--tally-preview)' }} />
                 Preview{hasPendingTake ? ' · ready to take' : ''}
               </div>
-              <div style={{ ...styles.displayBox, borderColor: 'var(--tally-preview)', boxShadow: hasPendingTake ? '0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px var(--tally-preview)' : undefined }}>
+              <div style={{
+                ...styles.displayBox,
+                borderColor: 'var(--tally-preview)',
+                boxShadow: hasPendingTake ? '0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px var(--tally-preview)' : undefined,
+                background: previewSurfaceState.outputMode === 'lowerThird'
+                  ? 'repeating-conic-gradient(#262628 0% 25%, #161414 0% 50%) 50% / 24px 24px'
+                  : '#000',
+              }}>
                 <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
                   <ProgramSurface
                     preview
@@ -398,7 +407,13 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
               <span style={{ ...styles.dot, background: 'var(--tally-program)' }} />
               Program{!isStudio ? ' · live' : ''}
             </div>
-            <div style={{ ...styles.displayBox, borderColor: 'var(--tally-program)' }}>
+            <div style={{
+              ...styles.displayBox,
+              borderColor: 'var(--tally-program)',
+              background: (programSurfaceState.outputMode || programSurfaceState.mode) === 'lowerThird'
+                ? 'repeating-conic-gradient(#262628 0% 25%, #161414 0% 50%) 50% / 24px 24px'
+                : '#000',
+            }}>
               {isTransitioning && (
                 <div style={styles.transitionOverlay}>
                   <div style={styles.transitionSpinner} />

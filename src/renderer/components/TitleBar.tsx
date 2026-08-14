@@ -24,6 +24,8 @@ export function TitleBar() {
    * there. */
   const isBlackout = useAppStore((s) => s.display.blackout);
   const setBlackout = useAppStore((s) => s.setBlackout);
+  const uiThemeMode = useAppStore((s) => s.uiThemeMode);
+  const toggleUIThemeMode = useAppStore((s) => s.toggleUIThemeMode);
 
   const [isFullScreen, setIsFullScreen] = useState(false);
   const isStudio = mode === 'studio';
@@ -124,7 +126,7 @@ export function TitleBar() {
                     style={{
                       ...styles.pillBtn,
                       background: isOpen ? 'var(--chrome-control-active)' : 'transparent',
-                      color: isOpen ? '#ffffff' : 'var(--text-dim)',
+                      color: isOpen ? 'var(--text-primary)' : 'var(--text-secondary)',
                       fontWeight: isOpen ? fontWeight.semibold : fontWeight.medium,
                     }}
                     onClick={() => toggleDock(dock.id)}
@@ -185,7 +187,7 @@ export function TitleBar() {
 
         {/* Quick Toolbar Action Buttons: Outputs, NDI, Alerts, Settings */}
         <div style={styles.toolbarGroup}>
-          {/* Outputs Button */}
+          {/* Audience Display Button */}
           <button
             style={{
               ...styles.toolbarBtn,
@@ -200,14 +202,14 @@ export function TitleBar() {
                 setExternalDisplay(true);
               }
             }}
-            title="Toggle External Output Display"
+            title="Toggle Audience Display Window (Projector/Screen)"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="3" width="20" height="14" rx="2" />
               <line x1="8" y1="21" x2="16" y2="21" />
               <line x1="12" y1="17" x2="12" y2="21" />
             </svg>
-            Outputs
+            Audience
           </button>
 
           {/* NDI Quick Toggle Button */}
@@ -270,6 +272,36 @@ export function TitleBar() {
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
             Settings
+          </button>
+
+          {/* UI Theme Switcher Button (Brand Identity Light / Dark Mode) */}
+          <button
+            style={{
+              ...styles.toolbarBtn,
+              color: uiThemeMode === 'light' ? 'var(--accent)' : 'var(--text-secondary)',
+            }}
+            onClick={toggleUIThemeMode}
+            title={uiThemeMode === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+            aria-label="Toggle UI Theme"
+          >
+            {uiThemeMode === 'dark' ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+            {uiThemeMode === 'dark' ? 'Light' : 'Dark'}
           </button>
         </div>
 
@@ -386,11 +418,11 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
     fontSize: 11,
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     padding: '4px 10px',
     borderRadius: 6,
     background: 'var(--chrome-control)',
-    border: '1px solid var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
     letterSpacing: '0.04em',
   },
   liveDot: {
@@ -402,7 +434,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   blackBtn: {
     padding: '4px 10px',
-    border: '1px solid transparent',
+    border: '1px solid var(--border-primary)',
     borderRadius: 6,
     fontSize: 11,
     fontWeight: 700,
@@ -413,24 +445,29 @@ const styles: Record<string, React.CSSProperties> = {
   toolbarGroup: {
     display: 'flex',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   toolbarBtn: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    padding: '4px 10px',
-    border: '1px solid var(--chrome-control)',
+    width: 60,
+    height: 42,
+    gap: 3,
+    padding: 0,
+    border: '1px solid var(--border-primary)',
     background: 'var(--chrome-control)',
-    borderRadius: 6,
+    borderRadius: 8,
     cursor: 'pointer',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 500,
-    color: '#ffffff',
+    letterSpacing: '-0.01em',
+    color: 'var(--text-primary)',
     transition: 'all 0.15s ease',
     fontFamily: 'var(--font-ui)',
+    flexShrink: 0,
+    boxSizing: 'border-box',
   },
   divider: {
     width: 1,

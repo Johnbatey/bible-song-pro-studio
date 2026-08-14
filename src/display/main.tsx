@@ -59,7 +59,7 @@ function DisplayHost() {
         transform: `translate(-50%, -50%) scale(${scale})`,
         transformOrigin: 'center center',
         overflow: 'hidden',
-        background: '#000',
+        background: (displayState.outputMode || displayState.mode) === 'lowerThird' ? 'transparent' : '#000',
       }}
     >
       <ProgramSurface

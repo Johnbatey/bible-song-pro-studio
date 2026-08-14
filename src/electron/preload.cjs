@@ -268,4 +268,9 @@ contextBridge.exposeInMainWorld('BSP', {
     return () => ipcRenderer.removeListener('display:message', handler);
   },
   sendDisplayMessage: (msg) => { ipcRenderer.send('display:message', msg); },
+  lexicon: {
+    lookup: (query) => ipcRenderer.invoke('lexicon:lookup', query),
+    detect: (text) => ipcRenderer.invoke('lexicon:detect', text),
+    annotate: (text, book) => ipcRenderer.invoke('lexicon:annotate', { text, book }),
+  },
 });

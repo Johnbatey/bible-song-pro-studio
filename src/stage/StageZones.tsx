@@ -19,7 +19,7 @@ import type { StageLayout, StageZone } from './layouts';
 import { resolveColor, type StageTheme } from './theme';
 import { formatTime, timerSeconds, type StageContent, type StageMessage, type StageTimer } from './stage-state';
 import { SlideStage } from '../renderer/components/display/SlideStage';
-import type { SlideProjection } from '../renderer/types';
+import type { SlideProjection, WordStudyEntry } from '../renderer/types';
 
 /** The most messages that fit before the block starts covering the lyrics. */
 const MAX_MESSAGES = 3;
@@ -45,9 +45,13 @@ export interface StageZonesProps {
       room does — and, when the scene is nothing but that picture, see it whole
       rather than reading its file name off a coloured rectangle. */
   currentMedia?: StageMedia | null;
+  /** The live original language Word Study entry, rendered as a structured 2-column view. */
+  wordStudy?: WordStudyEntry | null;
+  /** Parallel secondary translation verse for dual-version displays. */
+  secondaryVerse?: { text: string; reference: string; version?: string } | null;
   next: StageContent | null;
-  songTitle: string;
-  songSubtitle: string;
+  songTitle?: string;
+  songSubtitle?: string;
   timer: StageTimer;
   messages: StageMessage[];
 }
@@ -147,6 +151,8 @@ export function StageZones({
   current,
   currentSlide,
   currentMedia,
+  wordStudy,
+  secondaryVerse,
   next,
   songTitle,
   songSubtitle,
@@ -186,8 +192,8 @@ export function StageZones({
              operator sent a picture, not a line — and that is the case where
              the picture may take the cell whole. With lyrics or a verse over
              it, the media stays a backdrop and the text keeps its inset. */
-          const hasWords = Boolean(current?.title || current?.body || current?.bodyHtml);
-          const fullBleed = !!activeSlide || (!!activeMedia && !hasWords);
+          const hasWords = Boolean(current?.title || current?.body || current?.bodyHtml || wordStudy);
+          const fullBleed = !!activeSlide || !!wordStudy || (!!activeMedia && !hasWords);
           const classes = [
             'zone',
             zone.type === 'slide' ? 'zone-slide' : 'zone-current-text',
@@ -201,7 +207,7 @@ export function StageZones({
                 <div
                   className="zone-title zone-reference"
                   style={{
-                    display: !fullBleed && current?.title ? undefined : 'none',
+                    display: !fullBleed && current?.title && !wordStudy ? undefined : 'none',
                     fontSize: `${Math.max(16, Math.round(base * (refScale / 100) * scale))}px`,
                     fontWeight: 700,
                     textAlign: zone.textAlign || 'center',
@@ -210,9 +216,241 @@ export function StageZones({
                 >
                   {current?.title || ''}
                 </div>
-                {/* When a slide projection is active, draw the full graphical slide board fitted to the cell */}
-                {activeSlide ? (
+                {wordStudy ? (
+                  <div
+                    className="stage-wordstudy-card"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      background: 'linear-gradient(135deg, rgba(14, 14, 18, 0.98) 0%, rgba(26, 18, 14, 0.98) 100%)',
+                      border: '1px solid rgba(255, 85, 0, 0.35)',
+                      borderRadius: 14,
+                      padding: '3cqw 4cqw',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1.35fr',
+                      gap: '3.5cqw',
+                      alignItems: 'center',
+                      boxSizing: 'border-box',
+                      color: '#ffffff',
+                      overflow: 'hidden',
+                      containerType: 'inline-size',
+                    }}
+                  >
+                    {/* LEFT COLUMN: Main Lemma, Transliteration, Badge, Gloss & KJV Usage */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1.2cqw',
+                        alignItems: 'flex-start',
+                        borderRight: '1px solid rgba(255, 255, 255, 0.14)',
+                        paddingRight: '3.5cqw',
+                        height: '100%',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 'clamp(36px, 7.5cqw, 110px)',
+                          fontWeight: 900,
+                          color: '#FF5500',
+                          fontFamily: wordStudy.language === 'Hebrew' ? 'serif' : 'inherit',
+                          lineHeight: 1.02,
+                          textShadow: '0 4px 30px rgba(255, 85, 0, 0.5)',
+                        }}
+                      >
+                        {wordStudy.lemma}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 'clamp(18px, 3.2cqw, 38px)',
+                          fontWeight: 500,
+                          color: '#f4f4f5',
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        / {wordStudy.transliteration.toLowerCase()} /
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 'clamp(13px, 2.2cqw, 26px)',
+                          fontWeight: 800,
+                          padding: '0.4cqw 1.2cqw',
+                          borderRadius: '0.6cqw',
+                          background: 'rgba(255, 85, 0, 0.25)',
+                          color: '#FF5500',
+                          border: '1px solid rgba(255, 85, 0, 0.5)',
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        {wordStudy.strongs} ({wordStudy.language})
+                      </span>
+                      <div
+                        style={{
+                          fontSize: 'clamp(18px, 3.2cqw, 38px)',
+                          fontWeight: 800,
+                          color: '#ffffff',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {wordStudy.gloss}
+                      </div>
+
+                      {wordStudy.kjvUsage && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', width: '100%', marginTop: '0.6cqw' }}>
+                          <div style={{ fontSize: 'clamp(11px, 1.6cqw, 20px)', fontWeight: 800, letterSpacing: '0.08em', color: '#FF5500' }}>
+                            🏷️ KJV TRANSLATION USAGE
+                          </div>
+                          <div
+                            style={{
+                              background: 'rgba(255, 85, 0, 0.12)',
+                              border: '1px solid rgba(255, 85, 0, 0.35)',
+                              borderRadius: '0.8cqw',
+                              padding: '0.8cqw 1.4cqw',
+                              fontSize: 'clamp(14px, 2.4cqw, 30px)',
+                              color: '#ffffff',
+                              fontWeight: 600,
+                              lineHeight: 1.35,
+                            }}
+                          >
+                            {wordStudy.kjvUsage}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* RIGHT COLUMN: Derivation & Exhaustive Definition */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2cqw',
+                        justifyContent: 'center',
+                        overflowY: 'auto',
+                        maxHeight: '100%',
+                      }}
+                    >
+                      {wordStudy.etymology && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw' }}>
+                          <div style={{ fontSize: 'clamp(12px, 1.8cqw, 22px)', fontWeight: 800, letterSpacing: '0.1em', color: '#a1a1aa' }}>
+                            🔗 DERIVATION & ETYMOLOGY
+                          </div>
+                          <div
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.07)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '0.8cqw',
+                              padding: '1cqw 1.6cqw',
+                              fontSize: 'clamp(15px, 2.6cqw, 32px)',
+                              fontStyle: 'italic',
+                              color: '#ffffff',
+                            }}
+                          >
+                            {wordStudy.etymology}
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw' }}>
+                        <div style={{ fontSize: 'clamp(12px, 1.8cqw, 22px)', fontWeight: 800, letterSpacing: '0.1em', color: '#a1a1aa' }}>
+                          📖 STRONGS DEFINITION
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 'clamp(18px, 3.4cqw, 42px)',
+                            lineHeight: 1.45,
+                            color: '#ffffff',
+                            fontFamily: 'serif',
+                            fontWeight: 500,
+                          }}
+                        >
+                          {wordStudy.definition}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : activeSlide ? (
                   <SlideStage projection={activeSlide} className="zone-slide-stage" />
+                ) : secondaryVerse?.text ? (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 20,
+                      width: '100%',
+                      height: '100%',
+                      alignItems: 'center',
+                    }}
+                  >
+                    {/* LEFT COLUMN: Primary Version */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                        height: '100%',
+                        justifyContent: 'center',
+                        borderRight: '1px solid rgba(255, 255, 255, 0.16)',
+                        paddingRight: 14,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: `${Math.max(14, Math.round(base * 0.7 * scale))}px`,
+                          fontWeight: 800,
+                          color: resolveColor('accent', theme),
+                          textAlign: zone.textAlign || 'center',
+                          marginBottom: 4,
+                        }}
+                      >
+                        {current?.title || ''}
+                      </div>
+                      <BodyText
+                        content={current}
+                        style={{
+                          fontSize: px(base * 0.88),
+                          fontWeight: zone.fontWeight || 600,
+                          textAlign: zone.textAlign || 'center',
+                          color: resolveColor(zone.color || 'text', theme),
+                        }}
+                      />
+                    </div>
+
+                    {/* RIGHT COLUMN: Secondary Version */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                        height: '100%',
+                        justifyContent: 'center',
+                        paddingLeft: 6,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: `${Math.max(14, Math.round(base * 0.7 * scale))}px`,
+                          fontWeight: 800,
+                          color: resolveColor('accent', theme),
+                          textAlign: zone.textAlign || 'center',
+                          marginBottom: 4,
+                        }}
+                      >
+                        {secondaryVerse.reference}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: px(base * 0.88),
+                          fontWeight: zone.fontWeight || 600,
+                          textAlign: zone.textAlign || 'center',
+                          color: resolveColor(zone.color || 'text', theme),
+                          whiteSpace: 'pre-wrap',
+                        }}
+                      >
+                        {secondaryVerse.text}
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <BodyText
                     content={current}
@@ -224,7 +462,7 @@ export function StageZones({
                     }}
                   />
                 )}
-                {!fullBleed && <div className="zone-notes">{current?.notes || ''}</div>}
+                {!fullBleed && !wordStudy && <div className="zone-notes">{current?.notes || ''}</div>}
               </div>
             </div>
           );

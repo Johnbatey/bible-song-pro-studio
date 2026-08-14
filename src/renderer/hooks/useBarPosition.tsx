@@ -11,9 +11,12 @@ export type BarPosition = 'top' | 'bottom';
  * one element means the scrolling and every control behave identically in both
  * positions, with no second copy to drift.
  */
-export function useBarPosition(storageKey: string) {
-  const [position, setPosition] = useState<BarPosition>(() =>
-    localStorage.getItem(storageKey) === 'bottom' ? 'bottom' : 'top');
+export function useBarPosition(storageKey: string, defaultPosition: BarPosition = 'top') {
+  const [position, setPosition] = useState<BarPosition>(() => {
+    const saved = localStorage.getItem(storageKey);
+    if (saved === 'bottom' || saved === 'top') return saved;
+    return defaultPosition;
+  });
 
   const move = () => {
     const next: BarPosition = position === 'top' ? 'bottom' : 'top';
@@ -36,14 +39,14 @@ interface MoveBarButtonProps {
 export function MoveBarButton({ position, onMove, label, style }: MoveBarButtonProps) {
   return (
     <button
-      style={style}
+      style={{ color: 'var(--text-primary)', ...style }}
       onClick={onMove}
       title={position === 'top'
         ? `Move this toolbar to the bottom of the ${label} window`
         : `Move this toolbar back to the top of the ${label} window`}
       aria-label="Move toolbar"
     >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         {position === 'top' ? (
           <>
             <path d="M12 5v14" />

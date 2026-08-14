@@ -12,7 +12,7 @@
    ========================================================================= */
 import type { Background, MediaItem } from '../types';
 import { MediaGrid } from './MediaGrid';
-import { type } from '../styles/type';
+import { type as typeStyles } from '../styles/type';
 import {
   gradientCss,
   parseBackgroundInfo,
@@ -48,19 +48,33 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
         onChange(undefined);
         break;
       case 'solid':
-        onChange({ type: 'solid', color: value?.color || DEFAULT_GROUND });
+        onChange({
+          type: 'solid',
+          color: value?.color || info.color || DEFAULT_GROUND,
+          gradient: value?.gradient || gradientCss(info.start, info.end, info.dir),
+        });
         break;
       case 'gradient':
         onChange({
           type: 'gradient',
-          gradient: gradientCss(DEFAULT_GRADIENT_START, DEFAULT_GRADIENT_END, '135deg'),
+          gradient: value?.gradient || gradientCss(info.start || DEFAULT_GRADIENT_START, info.end || DEFAULT_GRADIENT_END, info.dir || '135deg'),
+          color: value?.color || info.color || DEFAULT_GROUND,
         });
         break;
       /* Media needs a file before it means anything, and there is no sensible
          default file to guess. The type is staged and the grid below asks. */
       case 'image':
       case 'video':
-        onChange({ type: next, mediaUrl: '', mediaType: next, fit: 'cover', loop: true, opacity: 1 });
+        onChange({
+          type: next,
+          mediaUrl: value?.mediaUrl || '',
+          mediaType: next,
+          fit: value?.fit || 'cover',
+          loop: value?.loop !== false,
+          opacity: typeof value?.opacity === 'number' ? value.opacity : 1,
+          gradient: value?.gradient,
+          color: value?.color,
+        });
         break;
     }
   };
@@ -105,7 +119,7 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
               cursor: 'pointer',
               background: choice === c.id ? 'var(--accent)' : 'transparent',
               color: choice === c.id ? '#fff' : 'var(--text-secondary)',
-              ...type.label,
+              ...typeStyles.label,
             }}
           >
             {c.label}
@@ -114,7 +128,7 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
       </div>
 
       {choice === 'theme' && (
-        <div style={{ ...type.caption, color: 'var(--text-dim)' }}>
+        <div style={{ ...typeStyles.caption, color: 'var(--text-dim)' }}>
           Follows the active theme, the same as Scripture does.
         </div>
       )}
@@ -123,7 +137,7 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
         <>
           <MediaGrid kind={choice} selectedUrl={value?.mediaUrl || ''} onSelect={pickMedia} />
           {choice === 'video' && value?.mediaUrl && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, ...type.caption, color: 'var(--text-secondary)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, ...typeStyles.caption, color: 'var(--text-secondary)' }}>
               <input
                 type="checkbox"
                 checked={value?.loop !== false}
@@ -148,7 +162,7 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
       {choice === 'gradient' && (
         <div style={{ display: 'flex', gap: 6 }}>
           <div style={{ flex: 1 }}>
-            <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Start</label>
+            <label style={{ ...typeStyles.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Start</label>
             <input
               className="input"
               type="color"
@@ -158,7 +172,7 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
             />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>End</label>
+            <label style={{ ...typeStyles.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>End</label>
             <input
               className="input"
               type="color"
@@ -168,7 +182,7 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
             />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Direction</label>
+            <label style={{ ...typeStyles.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Direction</label>
             <select className="input" value={info.dir} onChange={(e) => setGradient({ dir: e.target.value })}>
               <option value="135deg">Diagonal</option>
               <option value="180deg">Top to bottom</option>

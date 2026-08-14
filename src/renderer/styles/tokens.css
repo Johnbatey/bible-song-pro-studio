@@ -117,18 +117,21 @@
    BSP is dark-first. Light exists for print, documentation and invoices.
    Signal is swapped for Signal Deep — #FF5500 fails contrast on paper.
    ------------------------------------------------------------------------- */
-:root[data-bsp-surface="paper"] {
+:root[data-bsp-surface="paper"],
+:root[data-ui-theme="light"],
+[data-ui-theme="light"],
+body.light-theme {
   --bsp-booth:   var(--bsp-paper);
   --bsp-ground:  var(--bsp-paper);
   --bsp-surface: #FFFFFF;
-  --bsp-raised:  #FFFFFF;
+  --bsp-raised:  #F4F2EF;
   --bsp-active:  #EAE6E1;
   --bsp-edge:    var(--bsp-paper-edge);
   --bsp-screen:  var(--bsp-ink);
   --bsp-soft:    #3A3634;
   --bsp-dim:     #5E5854;
   --bsp-mute:    #8C8480;
-  --bsp-signal:  var(--bsp-signal-deep);
+  --bsp-signal:  #FF5500;
 }
 
 @media (prefers-reduced-motion: reduce) {

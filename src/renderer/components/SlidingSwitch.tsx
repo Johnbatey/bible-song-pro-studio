@@ -75,7 +75,7 @@ export function SlidingSwitch({ value, options, onChange, height = 38, style }: 
             height: '100%',
             background: 'transparent',
             border: 'none',
-            color: '#ffffff',
+            color: 'var(--text-primary)',
             fontSize: 12,
             fontWeight: 600,
             whiteSpace: 'nowrap',

@@ -46,7 +46,7 @@ function SingleSurface() {
         transform: `translate(-50%, -50%) scale(${scale})`,
         transformOrigin: 'center center',
         overflow: 'hidden',
-        background: '#000',
+        background: (fixture.state.outputMode || fixture.state.mode) === 'lowerThird' ? 'transparent' : '#000',
       }}
     >
       <ProgramSurface className="audience-program-surface" state={fixture.state} />

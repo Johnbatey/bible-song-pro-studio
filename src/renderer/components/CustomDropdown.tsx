@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 
 export interface DropdownOption<T extends string = string> {
   value: T;
-  label: string;
+  label: React.ReactNode;
   sublabel?: string;
+  icon?: React.ReactNode;
 }
 
 interface CustomDropdownProps<T extends string = string> {
@@ -77,10 +78,11 @@ export function CustomDropdown<T extends string = string>({
   }, []);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block', flexShrink: 0, ...style }}>
+    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block', width: style?.width || 'auto', flexShrink: 0, ...style }}>
       <button
         style={{
           display: 'flex',
+          width: '100%',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 8,
@@ -89,7 +91,7 @@ export function CustomDropdown<T extends string = string>({
           background: 'var(--chrome-control, #1d1b1c)',
           border: '1px solid var(--border-primary, #262628)',
           borderRadius: 6,
-          color: '#ffffff',
+          color: 'var(--text-primary)',
           fontSize: 13,
           fontWeight: 600,
           cursor: 'pointer',
@@ -135,7 +137,7 @@ export function CustomDropdown<T extends string = string>({
             background: 'var(--bg-secondary, #161414)',
             border: '1px solid var(--border-primary, #262628)',
             borderRadius: 6,
-            boxShadow: '0 16px 40px rgba(0, 0, 0, 0.85)',
+            boxShadow: 'var(--shadow-lg)',
             padding: 4,
             display: 'flex',
             flexDirection: 'column',
@@ -158,7 +160,7 @@ export function CustomDropdown<T extends string = string>({
                   background: isSelected ? 'var(--accent-dim, rgba(255, 85, 0, 0.15))' : 'transparent',
                   border: 'none',
                   borderRadius: 6,
-                  color: isSelected ? 'var(--accent, #FF5500)' : '#ffffff',
+                  color: isSelected ? 'var(--accent, #FF5500)' : 'var(--text-primary)',
                   fontSize: 13,
                   fontWeight: isSelected ? 700 : 500,
                   cursor: 'pointer',
@@ -181,11 +183,18 @@ export function CustomDropdown<T extends string = string>({
                   }
                 }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
-                  {opt.sublabel && (
-                    <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 400 }}>{opt.sublabel}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                  {opt.icon && (
+                    <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? 'var(--accent)' : 'var(--text-secondary)', flexShrink: 0 }}>
+                      {opt.icon}
+                    </span>
                   )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
+                    {opt.sublabel && (
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 400 }}>{opt.sublabel}</span>
+                    )}
+                  </div>
                 </div>
                 {isSelected && (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent, #FF5500)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
