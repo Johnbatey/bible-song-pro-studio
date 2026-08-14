@@ -35,6 +35,7 @@ import {
 import { groupShapes, layerUnits, moveLayerUnit, selectionHasGroup, ungroupShapes } from '../slide-engine/edit/grouping';
 import type { SelectionState } from '../slide-engine/edit/geometry';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
+import { getCustomTemplates } from '../services/customTemplateStore';
 
 export function SlideEditorModal() {
   const isSlideEditorOpen = useAppStore((s) => s.isSlideEditorOpen);
@@ -760,6 +761,23 @@ export function SlideEditorModal() {
   }
 
   function handleApplyTemplate(templateType: string) {
+    if (templateType.startsWith('custom-tpl-')) {
+      const customTemplates = getCustomTemplates();
+      const match = customTemplates.find((t) => t.id === templateType);
+      if (match) {
+        const now = Date.now();
+        const clonedEls: SlideElement[] = (match.elements || []).map((el, idx) => ({
+          ...el,
+          id: `el-${now}-${idx}`,
+        }));
+        handleUpdateSlide({
+          background: match.background ? { ...match.background } : { type: 'color', value: '#18181b' },
+          elements: clonedEls,
+        });
+        return;
+      }
+    }
+
     let tplBg = 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)';
     let elements: SlideElement[] = [];
 

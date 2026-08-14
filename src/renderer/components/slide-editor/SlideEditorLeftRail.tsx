@@ -1,6 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { PresentationSlide } from '../../types';
 import { NativeSlideBoard, slideElementsFor } from '../NativeSlideBoard';
+import {
+  getCustomTemplates,
+  saveCustomTemplate,
+  updateCustomTemplateFromSlide,
+  renameCustomTemplate,
+  deleteCustomTemplate,
+  exportCustomTemplate,
+  importCustomTemplateFile,
+  subscribeCustomTemplates,
+  type CustomSlideTemplate,
+} from '../../services/customTemplateStore';
 
 interface SlideEditorLeftRailProps {
   slides: PresentationSlide[];
@@ -11,12 +23,7 @@ interface SlideEditorLeftRailProps {
   onDeleteSlide: (index: number) => void;
   onMoveSlide: (fromIndex: number, toIndex: number) => void;
   onApplyTemplate: (templateType: string) => void;
-  /* Supplied by the PowerPoint path, whose slides are parsed OOXML rather than
-     the native element model — the rail draws whatever this returns in place
-     of its own background-and-title preview. */
   renderThumb?: (index: number, width: number) => React.ReactNode;
-  /* PowerPoint decks have a fixed slide list: adding, duplicating, deleting
-     and reordering would have to rewrite the package, which is not ported. */
   readOnlyDeck?: boolean;
 }
 
@@ -27,10 +34,10 @@ function RailSlideThumb({
   index: number;
   renderThumb: (index: number, width: number) => React.ReactNode;
 }) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const [width, setWidth] = React.useState<number>(180);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number>(180);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
@@ -50,6 +57,34 @@ function RailSlideThumb({
   );
 }
 
+function CustomTemplateThumb({ template }: { template: CustomSlideTemplate }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number>(210);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const measured = entries[0]?.contentRect?.width;
+      if (measured && measured > 0) {
+        setWidth(Math.round(measured));
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} style={{ width: '100%', overflow: 'hidden', background: '#000', display: 'flex' }}>
+      <NativeSlideBoard
+        elements={template.elements || []}
+        background={template.background}
+        width={width}
+      />
+    </div>
+  );
+}
+
 export function SlideEditorLeftRail({
   slides,
   activeSlideIndex,
@@ -63,17 +98,87 @@ export function SlideEditorLeftRail({
   readOnlyDeck = false,
 }: SlideEditorLeftRailProps) {
   const [activeTab, setActiveTab] = useState<'slides' | 'templates'>('slides');
+  const [customTemplates, setCustomTemplates] = useState<CustomSlideTemplate[]>(getCustomTemplates());
+
+  // Context Menu & Modal States
+  const [slideContextMenu, setSlideContextMenu] = useState<{ x: number; y: number; slideIndex: number } | null>(null);
+  const [templateContextMenu, setTemplateContextMenu] = useState<{ x: number; y: number; template: CustomSlideTemplate } | null>(null);
+  const [saveModal, setSaveModal] = useState<{ slideIndex: number } | null>(null);
+  const [renameModal, setRenameModal] = useState<{ templateId: string; currentName: string } | null>(null);
+  const [templateNameInput, setTemplateNameInput] = useState('');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Subscribe to store updates
+  useEffect(() => {
+    setCustomTemplates(getCustomTemplates());
+    const unsubscribe = subscribeCustomTemplates(() => {
+      setCustomTemplates(getCustomTemplates());
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Dismiss context menus on global click
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setSlideContextMenu(null);
+      setTemplateContextMenu(null);
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   const prebuiltTemplates = [
-    { id: 'worship', name: 'Worship Song Classic', bg: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)', text: 'Sing unto the Lord a new song' },
-    { id: 'sermon', name: 'Sermon Key Points', bg: 'linear-gradient(135deg, #18181b 0%, #09090b 100%)', text: '01. Main Scripture & Key Takeaways' },
-    { id: 'scripture', name: 'Scripture Verse Display', bg: 'linear-gradient(135deg, #0b132b 0%, #1c2541 100%)', text: '"For God so loved the world..." — John 3:16' },
-    { id: 'lower-third', name: 'Lower Third Overlay Bar', bg: 'rgba(0, 0, 0, 0.85)', text: 'Pastor David · Guest Speaker' },
-    { id: 'announcement', name: 'Event Announcement', bg: 'linear-gradient(135deg, #4c1d95 0%, #831843 100%)', text: 'Sunday Worship Service · 10 AM' },
-    { id: 'welcome', name: 'Welcome & Fellowship', bg: 'linear-gradient(135deg, #1c1917 0%, #292524 100%)', text: 'Welcome to Our Church Family' },
-    { id: 'offering', name: 'Offering & Tithing', bg: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)', text: 'Honour the Lord with your wealth' },
-    { id: 'benediction', name: 'Benediction & Closing', bg: 'linear-gradient(135deg, #450a0a 0%, #1c0505 100%)', text: 'The Peace & Blessing of Christ' },
+    { id: 'worship', name: 'Worship Song Classic', bg: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)' },
+    { id: 'sermon', name: 'Sermon Key Points', bg: 'linear-gradient(135deg, #18181b 0%, #09090b 100%)' },
+    { id: 'scripture', name: 'Scripture Verse Display', bg: 'linear-gradient(135deg, #0b132b 0%, #1c2541 100%)' },
+    { id: 'lower-third', name: 'Lower Third Overlay Bar', bg: 'rgba(0, 0, 0, 0.85)' },
+    { id: 'announcement', name: 'Event Announcement', bg: 'linear-gradient(135deg, #4c1d95 0%, #831843 100%)' },
+    { id: 'welcome', name: 'Welcome & Fellowship', bg: 'linear-gradient(135deg, #1c1917 0%, #292524 100%)' },
+    { id: 'offering', name: 'Offering & Tithing', bg: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)' },
+    { id: 'benediction', name: 'Benediction & Closing', bg: 'linear-gradient(135deg, #450a0a 0%, #1c0505 100%)' },
   ];
+
+  const handleOpenSaveModal = (slideIndex: number) => {
+    const targetSlide = slides[slideIndex];
+    setTemplateNameInput(targetSlide?.title || `Custom Template ${customTemplates.length + 1}`);
+    setSaveModal({ slideIndex });
+    setSlideContextMenu(null);
+  };
+
+  const handleSaveModalSubmit = () => {
+    if (!saveModal) return;
+    const slide = slides[saveModal.slideIndex];
+    if (slide) {
+      saveCustomTemplate(templateNameInput || 'Custom Template', slide);
+    }
+    setSaveModal(null);
+    setTemplateNameInput('');
+    setActiveTab('templates');
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await importCustomTemplateFile(file);
+      setActiveTab('templates');
+    } catch (err: any) {
+      alert(`Failed to import template: ${err?.message || 'Invalid format'}`);
+    }
+    if (e.target) e.target.value = '';
+  };
+
+  const handleRenameSubmit = () => {
+    if (!renameModal) return;
+    renameCustomTemplate(renameModal.templateId, templateNameInput);
+    setRenameModal(null);
+    setTemplateNameInput('');
+  };
 
   return (
     <aside
@@ -87,8 +192,18 @@ export function SlideEditorLeftRail({
         height: '100%',
         userSelect: 'none',
         boxSizing: 'border-box',
+        position: 'relative',
       }}
     >
+      {/* Hidden File Input for Importing Templates */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".bsptemplate,.json"
+        onChange={handleFileImport}
+        style={{ display: 'none' }}
+      />
+
       {/* Rail Nav Segmented Switcher */}
       <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-primary)' }}>
         <div
@@ -173,27 +288,27 @@ export function SlideEditorLeftRail({
               Slides Deck
             </span>
             {!readOnlyDeck && (
-            <button
-              type="button"
-              onClick={onAddSlide}
-              style={{
-                width: 24,
-                height: 24,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#FF5500',
-                border: 'none',
-                borderRadius: 4,
-                color: '#ffffff',
-                cursor: 'pointer',
-              }}
-              title="Add New Slide"
-            >
-              <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2.5 }}>
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
+              <button
+                type="button"
+                onClick={onAddSlide}
+                style={{
+                  width: 24,
+                  height: 24,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#FF5500',
+                  border: 'none',
+                  borderRadius: 4,
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                }}
+                title="Add New Slide"
+              >
+                <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2.5 }}>
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
             )}
           </div>
 
@@ -201,13 +316,21 @@ export function SlideEditorLeftRail({
           <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
             {slides.map((slide, idx) => {
               const isActive = idx === activeSlideIndex;
-              const bgValue = slide.background?.value || '#18181b';
-              const bgType = slide.background?.type || 'color';
 
               return (
                 <div
                   key={slide.id || idx}
                   onClick={() => onSelectSlide(idx)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSelectSlide(idx);
+                    setSlideContextMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      slideIndex: idx,
+                    });
+                  }}
                   style={{
                     display: 'flex',
                     gap: 8,
@@ -270,6 +393,17 @@ export function SlideEditorLeftRail({
                         {slide.transition || 'fade'}
                       </span>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenSaveModal(idx);
+                          }}
+                          style={{ background: 'none', border: 'none', color: 'var(--accent, #FF5500)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
+                          title="Save as Template"
+                        >
+                          💾
+                        </button>
                         {!readOnlyDeck && idx > 0 && (
                           <button
                             type="button"
@@ -362,55 +496,572 @@ export function SlideEditorLeftRail({
         </div>
       ) : (
         /* Templates Panel */
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 12, overflowY: 'auto', gap: 12 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)', textTransform: 'uppercase' }}>
-            Slide Templates
-          </span>
-
-          {prebuiltTemplates.map((tpl) => (
-            <div
-              key={tpl.id}
-              onClick={() => onApplyTemplate(tpl.id)}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          {/* Templates Action Toolbar */}
+          <div
+            style={{
+              padding: '10px 12px',
+              display: 'flex',
+              gap: 6,
+              borderBottom: '1px solid var(--border-primary)',
+              background: 'var(--bg-primary)',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => handleOpenSaveModal(activeSlideIndex)}
               style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: 6,
-                overflow: 'hidden',
+                flex: 1,
+                padding: '6px 8px',
+                background: 'var(--accent, #FF5500)',
+                border: 'none',
+                borderRadius: 5,
+                color: '#ffffff',
+                fontSize: 11,
+                fontWeight: 600,
                 cursor: 'pointer',
-                padding: 0,
                 display: 'flex',
-                flexDirection: 'column',
-                transition: 'all 0.15s ease',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(244, 98, 31, 0.5)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
+              title="Save active slide as a custom template"
             >
-              <TemplateCardThumb id={tpl.id} bg={tpl.bg} />
-              <div
+              ➕ Save Active Slide
+            </button>
+            <button
+              type="button"
+              onClick={handleImportClick}
+              style={{
+                padding: '6px 10px',
+                background: 'var(--chrome-control)',
+                border: '1px solid var(--border-primary)',
+                borderRadius: 5,
+                color: 'var(--text-primary)',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+              }}
+              title="Import .bsptemplate or JSON template file"
+            >
+              📥 Import
+            </button>
+          </div>
+
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Custom User Templates Section */}
+            {customTemplates.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent, #FF5500)', textTransform: 'uppercase' }}>
+                    My Custom Templates ({customTemplates.length})
+                  </span>
+                </div>
+
+                {customTemplates.map((tpl) => (
+                  <div
+                    key={tpl.id}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setTemplateContextMenu({ x: e.clientX, y: e.clientY, template: tpl });
+                    }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 85, 0, 0.25)',
+                      borderRadius: 6,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      position: 'relative',
+                    }}
+                  >
+                    <div onClick={() => onApplyTemplate(tpl.id)}>
+                      <CustomTemplateThumb template={tpl} />
+                    </div>
+
+                    <div
+                      style={{
+                        padding: '6px 10px',
+                        background: 'rgba(22, 20, 20, 0.95)',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span
+                        onClick={() => onApplyTemplate(tpl.id)}
+                        style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}
+                      >
+                        {tpl.name}
+                      </span>
+
+                      {/* Quick Action Controls */}
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => onApplyTemplate(tpl.id)}
+                          style={{ background: 'none', border: 'none', color: '#FF5500', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
+                          title="Apply Template to Current Slide"
+                        >
+                          Apply
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateCustomTemplateFromSlide(tpl.id, slides[activeSlideIndex]);
+                            alert(`Template "${tpl.name}" updated from Slide ${activeSlideIndex + 1}!`);
+                          }}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}
+                          title="Update Template layout from Active Slide"
+                        >
+                          🔄
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => exportCustomTemplate(tpl)}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}
+                          title="Export Template File (.bsptemplate)"
+                        >
+                          📤
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteCustomTemplate(tpl.id)}
+                          style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: 11 }}
+                          title="Delete Custom Template"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Prebuilt System Templates */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase' }}>
+                Prebuilt Templates
+              </span>
+
+              {prebuiltTemplates.map((tpl) => (
+                <div
+                  key={tpl.id}
+                  onClick={() => onApplyTemplate(tpl.id)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: 6,
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(244, 98, 31, 0.5)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.5)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
+                  <TemplateCardThumb id={tpl.id} bg={tpl.bg} />
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      padding: '6px 10px',
+                      background: 'rgba(0, 0, 0, 0.6)',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                    }}
+                  >
+                    {tpl.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Slide Right-Click Context Menu Portal */}
+      {slideContextMenu && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: slideContextMenu.y,
+            left: slideContextMenu.x,
+            zIndex: 100020,
+            background: 'var(--bg-secondary, #1a1919)',
+            border: '1px solid var(--border-primary, #333)',
+            borderRadius: 6,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+            padding: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            minWidth: 180,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => handleOpenSaveModal(slideContextMenu.slideIndex)}
+            style={contextMenuItemStyle}
+          >
+            💾 Save as Template...
+          </button>
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '2px 0' }} />
+          {!readOnlyDeck && (
+            <button
+              type="button"
+              onClick={() => {
+                onDuplicateSlide(slideContextMenu.slideIndex);
+                setSlideContextMenu(null);
+              }}
+              style={contextMenuItemStyle}
+            >
+              ❐ Duplicate Slide
+            </button>
+          )}
+          {!readOnlyDeck && slideContextMenu.slideIndex > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                onMoveSlide(slideContextMenu.slideIndex, slideContextMenu.slideIndex - 1);
+                setSlideContextMenu(null);
+              }}
+              style={contextMenuItemStyle}
+            >
+              ▲ Move Up
+            </button>
+          )}
+          {!readOnlyDeck && slideContextMenu.slideIndex < slides.length - 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                onMoveSlide(slideContextMenu.slideIndex, slideContextMenu.slideIndex + 1);
+                setSlideContextMenu(null);
+              }}
+              style={contextMenuItemStyle}
+            >
+              ▼ Move Down
+            </button>
+          )}
+          {slides.length > 1 && (
+            <>
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '2px 0' }} />
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteSlide(slideContextMenu.slideIndex);
+                  setSlideContextMenu(null);
+                }}
+                style={{ ...contextMenuItemStyle, color: '#f87171' }}
+              >
+                🗑 Delete Slide
+              </button>
+            </>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* Custom Template Context Menu Portal */}
+      {templateContextMenu && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: templateContextMenu.y,
+            left: templateContextMenu.x,
+            zIndex: 100020,
+            background: 'var(--bg-secondary, #1a1919)',
+            border: '1px solid var(--border-primary, #333)',
+            borderRadius: 6,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+            padding: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            minWidth: 200,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onApplyTemplate(templateContextMenu.template.id);
+              setTemplateContextMenu(null);
+            }}
+            style={contextMenuItemStyle}
+          >
+            ✨ Apply to Active Slide
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              updateCustomTemplateFromSlide(templateContextMenu.template.id, slides[activeSlideIndex]);
+              setTemplateContextMenu(null);
+              alert(`Updated "${templateContextMenu.template.name}" from active slide!`);
+            }}
+            style={contextMenuItemStyle}
+          >
+            🔄 Update from Active Slide
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTemplateNameInput(templateContextMenu.template.name);
+              setRenameModal({ templateId: templateContextMenu.template.id, currentName: templateContextMenu.template.name });
+              setTemplateContextMenu(null);
+            }}
+            style={contextMenuItemStyle}
+          >
+            ✏️ Rename Template...
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              exportCustomTemplate(templateContextMenu.template);
+              setTemplateContextMenu(null);
+            }}
+            style={contextMenuItemStyle}
+          >
+            📤 Export Template (.bsptemplate)
+          </button>
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '2px 0' }} />
+          <button
+            type="button"
+            onClick={() => {
+              deleteCustomTemplate(templateContextMenu.template.id);
+              setTemplateContextMenu(null);
+            }}
+            style={{ ...contextMenuItemStyle, color: '#f87171' }}
+          >
+            🗑 Delete Template
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {/* Save Template Name Modal */}
+      {saveModal && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100030,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setSaveModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 360,
+              background: 'var(--bg-secondary, #1a1919)',
+              border: '1px solid var(--border-primary, #333)',
+              borderRadius: 8,
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.8)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#ffffff' }}>
+              Save Slide as Template
+            </h3>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
+              Give your new custom template a descriptive name:
+            </p>
+            <input
+              type="text"
+              autoFocus
+              value={templateNameInput}
+              onChange={(e) => setTemplateNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveModalSubmit();
+                if (e.key === 'Escape') setSaveModal(null);
+              }}
+              placeholder="e.g. Sunday Worship Lower Third"
+              style={{
+                width: '100%',
+                height: 36,
+                background: 'var(--chrome-control, #121111)',
+                border: '1px solid var(--border-primary, #333)',
+                borderRadius: 6,
+                padding: '0 10px',
+                color: '#ffffff',
+                fontSize: 13,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => setSaveModal(null)}
                 style={{
-                  fontSize: 11,
+                  padding: '8px 14px',
+                  background: 'transparent',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: 6,
+                  color: 'var(--text-secondary)',
+                  fontSize: 12,
                   fontWeight: 600,
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  padding: '6px 10px',
-                  background: 'rgba(0, 0, 0, 0.6)',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                  cursor: 'pointer',
                 }}
               >
-                {tpl.name}
-              </div>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveModalSubmit}
+                style={{
+                  padding: '8px 16px',
+                  background: 'var(--accent, #FF5500)',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Save Template
+              </button>
             </div>
-          ))}
-        </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Rename Custom Template Modal */}
+      {renameModal && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100030,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setRenameModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 360,
+              background: 'var(--bg-secondary, #1a1919)',
+              border: '1px solid var(--border-primary, #333)',
+              borderRadius: 8,
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.8)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#ffffff' }}>
+              Rename Custom Template
+            </h3>
+            <input
+              type="text"
+              autoFocus
+              value={templateNameInput}
+              onChange={(e) => setTemplateNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRenameSubmit();
+                if (e.key === 'Escape') setRenameModal(null);
+              }}
+              style={{
+                width: '100%',
+                height: 36,
+                background: 'var(--chrome-control, #121111)',
+                border: '1px solid var(--border-primary, #333)',
+                borderRadius: 6,
+                padding: '0 10px',
+                color: '#ffffff',
+                fontSize: 13,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => setRenameModal(null)}
+                style={{
+                  padding: '8px 14px',
+                  background: 'transparent',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: 6,
+                  color: 'var(--text-secondary)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRenameSubmit}
+                style={{
+                  padding: '8px 16px',
+                  background: 'var(--accent, #FF5500)',
+                  border: 'none',
+                  borderRadius: 6,
+                  color: '#ffffff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Save Name
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </aside>
   );
 }
+
+const contextMenuItemStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  background: 'transparent',
+  border: 'none',
+  borderRadius: 4,
+  color: 'var(--text-primary, #ffffff)',
+  fontSize: 12,
+  fontWeight: 500,
+  cursor: 'pointer',
+  textAlign: 'left',
+  width: '100%',
+  transition: 'background 0.15s ease',
+};
 
 function getTemplateElements(id: string): any[] {
   if (id === 'worship') {
@@ -472,10 +1123,10 @@ function getTemplateElements(id: string): any[] {
 }
 
 function TemplateCardThumb({ id, bg }: { id: string; bg: string }) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const [containerW, setContainerW] = React.useState(210);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerW, setContainerW] = useState(210);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const measure = () => {
