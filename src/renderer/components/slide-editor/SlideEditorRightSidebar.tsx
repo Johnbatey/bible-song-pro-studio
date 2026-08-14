@@ -648,91 +648,13 @@ export function SlideEditorRightSidebar({
                     </div>
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Size</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = Math.max(8, Number(currentFontSize) - 2);
-                            setText({ fontSize: next });
-                          }}
-                          style={{
-                            width: 24,
-                            height: 32,
-                            background: 'var(--chrome-control, #1d1b1c)',
-                            border: '1px solid var(--border-primary, #262628)',
-                            borderRadius: 5,
-                            color: 'var(--text-primary)',
-                            fontSize: 14,
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                          }}
-                          title="Decrease Font Size (-2)"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min="6"
-                          max="300"
-                          value={fieldValue('fontSize', currentFontSize)}
-                          onChange={(e) => editField('fontSize', e.target.value, (v) => {
-                            const n = parseInt(v, 10);
-                            if (Number.isFinite(n) && n >= 6 && n <= 300) setText({ fontSize: n });
-                          })}
-                          onBlur={() => setDraft(null)}
-                          style={{
-                            flex: 1,
-                            height: 32,
-                            background: 'var(--chrome-control, #1d1b1c)',
-                            border: '1px solid var(--border-primary, #262628)',
-                            borderRadius: 5,
-                            color: 'var(--text-primary)',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            textAlign: 'center',
-                            outline: 'none',
-                            padding: '0 2px',
-                            minWidth: 0,
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = Math.min(300, Number(currentFontSize) + 2);
-                            setText({ fontSize: next });
-                          }}
-                          style={{
-                            width: 24,
-                            height: 32,
-                            background: 'var(--chrome-control, #1d1b1c)',
-                            border: '1px solid var(--border-primary, #262628)',
-                            borderRadius: 5,
-                            color: 'var(--text-primary)',
-                            fontSize: 14,
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                          }}
-                          title="Increase Font Size (+2)"
-                        >
-                          +
-                        </button>
-                        <CustomDropdown
-                          value={String(currentFontSize)}
-                          options={FONT_SIZES}
-                          onChange={(sz) => setText({ fontSize: parseInt(sz, 10) })}
-                          style={{ width: 24 }}
-                          buttonStyle={{ padding: '0 4px', height: 32, justifyContent: 'center' }}
-                          zIndex={100005}
-                        />
-                      </div>
+                      <CustomDropdown
+                        value={String(currentFontSize)}
+                        options={FONT_SIZES}
+                        onChange={(sz) => setText({ fontSize: parseInt(sz, 10) })}
+                        style={{ width: '100%' }}
+                        zIndex={100005}
+                      />
                     </div>
                   </div>
 
