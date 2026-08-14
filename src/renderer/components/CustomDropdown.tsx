@@ -25,7 +25,7 @@ export function CustomDropdown<T extends string = string>({
   title,
   style,
   buttonStyle,
-  zIndex = 9999,
+  zIndex = 100005,
 }: CustomDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number; flip: boolean } | null>(null);
