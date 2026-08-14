@@ -51,11 +51,11 @@
   white-space: nowrap;
   transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
 }
-.dz-app button:hover:not(:disabled) { background: #232838; border-color: var(--dz-line-strong); }
+.dz-app button:hover:not(:disabled) { background: var(--bsp-active); border-color: var(--dz-line-strong); }
 .dz-app button:disabled { opacity: 0.35; cursor: default; }
-.dz-app button[data-active] { background: rgba(244, 98, 31, 0.2); border-color: var(--dz-accent); }
+.dz-app button[data-active] { background: var(--bsp-signal-wash); border-color: var(--dz-accent); }
 .dz-app button.dz-primary { background: var(--dz-accent); border-color: var(--dz-accent); color: #fff; }
-.dz-app button.dz-primary:hover:not(:disabled) { background: #ff7434; }
+.dz-app button.dz-primary:hover:not(:disabled) { background: var(--bsp-signal-lift); }
 .dz-app button.dz-danger { color: #ff8f8f; border-color: rgba(239, 68, 68, 0.4); }
 .dz-app button.dz-danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.16); }
 

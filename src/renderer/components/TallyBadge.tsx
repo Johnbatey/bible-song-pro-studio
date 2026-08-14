@@ -19,7 +19,7 @@ const FACE: Record<TallyState, { label: string; background: string; glow: string
   /* Program orange and preview green come from the tokens, not from the hex
      they happen to resolve to — the tally palette is one decision, made in
      tokens.css, and a panel is not a place to re-make it. */
-  live: { label: 'LIVE', background: 'var(--tally-program)', glow: '0 2px 6px rgba(244, 98, 31, 0.5)' },
+  live: { label: 'LIVE', background: 'var(--tally-program)', glow: '0 2px 6px var(--bsp-signal-glow)' },
   cued: { label: 'CUED', background: 'var(--tally-preview)', glow: '0 2px 6px rgba(34, 197, 94, 0.5)' },
 };
 
