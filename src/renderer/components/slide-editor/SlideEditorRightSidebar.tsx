@@ -172,6 +172,114 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
+interface ScrubbableInputProps {
+  value: number;
+  onChange: (val: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  precision?: number;
+  style?: React.CSSProperties;
+  inputStyle?: React.CSSProperties;
+  badge?: React.ReactNode;
+  suffix?: string;
+  title?: string;
+}
+
+function ScrubbableInput({
+  value,
+  onChange,
+  min = -1000,
+  max = 1000,
+  step = 1,
+  precision = 0,
+  style,
+  inputStyle,
+  badge,
+  suffix,
+  title,
+}: ScrubbableInputProps) {
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startValRef = useRef(0);
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    // Prefer deltaX (horizontal trackpad swipe) if present, else use -deltaY (vertical swipe)
+    const rawDelta = Math.abs(e.deltaX) >= Math.abs(e.deltaY) ? e.deltaX : -e.deltaY;
+    if (Math.abs(rawDelta) < 0.5) return;
+
+    const multiplier = e.shiftKey ? 10 : 1;
+    const direction = rawDelta > 0 ? 1 : -1;
+    const deltaAmount = direction * step * multiplier;
+
+    let nextVal = value + deltaAmount;
+    if (precision === 0) nextVal = Math.round(nextVal);
+    else nextVal = parseFloat(nextVal.toFixed(precision));
+
+    if (min !== undefined) nextVal = Math.max(min, nextVal);
+    if (max !== undefined) nextVal = Math.min(max, nextVal);
+
+    onChange(nextVal);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    isDraggingRef.current = true;
+    startXRef.current = e.clientX;
+    startValRef.current = value;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const diffX = moveEvent.clientX - startXRef.current;
+      const multiplier = moveEvent.shiftKey ? 10 : 1;
+      const deltaAmount = Math.round(diffX / 3) * step * multiplier;
+
+      let nextVal = startValRef.current + deltaAmount;
+      if (precision === 0) nextVal = Math.round(nextVal);
+      else nextVal = parseFloat(nextVal.toFixed(precision));
+
+      if (min !== undefined) nextVal = Math.max(min, nextVal);
+      if (max !== undefined) nextVal = Math.min(max, nextVal);
+
+      onChange(nextVal);
+    };
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  return (
+    <div
+      onWheel={handleWheel}
+      onMouseDown={handleMouseDown}
+      style={{ ...styles.iconInputBox, cursor: 'ew-resize', ...style }}
+      title={title || "Swipe left/right with two fingers (or drag) to adjust value. Hold Shift for 10x speed."}
+    >
+      {badge && <span style={styles.iconInputBadge}>{badge}</span>}
+      <input
+        type="number"
+        step={step}
+        min={min}
+        max={max}
+        value={value === 0 ? '0' : (value ?? '')}
+        onChange={(e) => {
+          const parsed = precision === 0 ? parseInt(e.target.value, 10) : parseFloat(e.target.value);
+          if (Number.isFinite(parsed)) onChange(parsed);
+        }}
+        onWheel={handleWheel}
+        style={{ ...styles.iconInput, ...inputStyle }}
+      />
+      {suffix && <span style={{ fontSize: 10, color: 'var(--text-dim)', paddingRight: 6, flexShrink: 0 }}>{suffix}</span>}
+    </div>
+  );
+}
+
 export function SlideEditorRightSidebar({
   slide,
   selectedElement,
@@ -662,42 +770,28 @@ export function SlideEditorRightSidebar({
                   <div style={styles.twoColRow}>
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Line height</span>
-                      <div style={styles.iconInputBox}>
-                        <span style={styles.iconInputBadge}>⤢</span>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0.5"
-                          max="3"
-                          value={fieldValue('lineHeight', currentLineHeight)}
-                          onChange={(e) => editField('lineHeight', e.target.value, (v) => {
-                            const n = parseFloat(v);
-                            if (Number.isFinite(n) && n >= 0.5 && n <= 3) setText({ lineHeight: n });
-                          })}
-                          onBlur={() => setDraft(null)}
-                          style={styles.iconInput}
-                        />
-                      </div>
+                      <ScrubbableInput
+                        value={currentLineHeight}
+                        onChange={(v) => setText({ lineHeight: v })}
+                        min={0.5}
+                        max={3.0}
+                        step={0.1}
+                        precision={1}
+                        badge="⤢"
+                      />
                     </div>
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Letter spacing</span>
-                      <div style={styles.iconInputBox}>
-                        <span style={styles.iconInputBadge}>|A|</span>
-                        <input
-                          type="number"
-                          step="1"
-                          min="-20"
-                          max="80"
-                          value={fieldValue('letterSpacing', currentLetterSpacing)}
-                          onChange={(e) => editField('letterSpacing', e.target.value, (v) => {
-                            const n = parseFloat(v);
-                            if (Number.isFinite(n) && n >= -20 && n <= 80) setText({ letterSpacing: n });
-                          })}
-                          onBlur={() => setDraft(null)}
-                          style={styles.iconInput}
-                        />
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)', paddingRight: 4 }}>px</span>
-                      </div>
+                      <ScrubbableInput
+                        value={currentLetterSpacing}
+                        onChange={(v) => setText({ letterSpacing: v })}
+                        min={-20}
+                        max={80}
+                        step={1}
+                        precision={0}
+                        badge="|A|"
+                        suffix="px"
+                      />
                     </div>
                   </div>
 
@@ -1030,20 +1124,22 @@ export function SlideEditorRightSidebar({
                     <div style={styles.twoColRow}>
                       <div style={styles.propRowCol}>
                         <span style={styles.propLabel}>X Position (%)</span>
-                        <input
-                          type="number"
-                          value={selectedElement.x === 0 ? '0' : (selectedElement.x ?? '')}
-                          onChange={(e) => onUpdateElement(selectedElement.id, { x: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
-                          style={styles.numberInput}
+                        <ScrubbableInput
+                          value={selectedElement.x || 0}
+                          onChange={(v) => onUpdateElement(selectedElement.id, { x: v })}
+                          min={-100}
+                          max={200}
+                          step={1}
                         />
                       </div>
                       <div style={styles.propRowCol}>
                         <span style={styles.propLabel}>Y Position (%)</span>
-                        <input
-                          type="number"
-                          value={selectedElement.y === 0 ? '0' : (selectedElement.y ?? '')}
-                          onChange={(e) => onUpdateElement(selectedElement.id, { y: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
-                          style={styles.numberInput}
+                        <ScrubbableInput
+                          value={selectedElement.y || 0}
+                          onChange={(v) => onUpdateElement(selectedElement.id, { y: v })}
+                          min={-100}
+                          max={200}
+                          step={1}
                         />
                       </div>
                     </div>
@@ -1051,20 +1147,22 @@ export function SlideEditorRightSidebar({
                     <div style={styles.twoColRow}>
                       <div style={styles.propRowCol}>
                         <span style={styles.propLabel}>Width (%)</span>
-                        <input
-                          type="number"
-                          value={selectedElement.width === 0 ? '0' : (selectedElement.width ?? '')}
-                          onChange={(e) => onUpdateElement(selectedElement.id, { width: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
-                          style={styles.numberInput}
+                        <ScrubbableInput
+                          value={selectedElement.width || 0}
+                          onChange={(v) => onUpdateElement(selectedElement.id, { width: v })}
+                          min={1}
+                          max={200}
+                          step={1}
                         />
                       </div>
                       <div style={styles.propRowCol}>
                         <span style={styles.propLabel}>Height (%)</span>
-                        <input
-                          type="number"
-                          value={selectedElement.height === 0 ? '0' : (selectedElement.height ?? '')}
-                          onChange={(e) => onUpdateElement(selectedElement.id, { height: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value) })}
-                          style={styles.numberInput}
+                        <ScrubbableInput
+                          value={selectedElement.height || 0}
+                          onChange={(v) => onUpdateElement(selectedElement.id, { height: v })}
+                          min={1}
+                          max={200}
+                          step={1}
                         />
                       </div>
                     </div>
