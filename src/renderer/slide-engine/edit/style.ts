@@ -130,6 +130,56 @@ export function setShapesTextColor(shapes: ParsedShape[], hex: string): void {
   });
 }
 
+export function setShapesFontFamily(shapes: ParsedShape[], font: string): void {
+  shapes.forEach((s) => {
+    if (s.kind !== 'text' || !s.paragraphs) return;
+    s.paragraphs.forEach((p: ParsedRun[]) => p.forEach((run) => {
+      run.fontFace = font;
+      run.fontFamily = font;
+    }));
+  });
+}
+
+export function setShapesFontWeight(shapes: ParsedShape[], weight: number): void {
+  shapes.forEach((s) => {
+    if (s.kind !== 'text' || !s.paragraphs) return;
+    s.paragraphs.forEach((p: ParsedRun[]) => p.forEach((run) => {
+      run.bold = weight >= 700;
+      run.fontWeight = weight;
+    }));
+  });
+}
+
+export function setShapesFontSize(shapes: ParsedShape[], size: number): void {
+  shapes.forEach((s) => {
+    if (s.kind !== 'text' || !s.paragraphs) return;
+    s.paragraphs.forEach((p: ParsedRun[]) => p.forEach((run) => {
+      run.fontSize = size;
+    }));
+  });
+}
+
+export function setShapesLineHeight(shapes: ParsedShape[], lh: number): void {
+  shapes.forEach((s) => {
+    if (s.kind !== 'text') return;
+    s.lineHeight = lh;
+  });
+}
+
+export function setShapesLetterSpacing(shapes: ParsedShape[], ls: number): void {
+  shapes.forEach((s) => {
+    if (s.kind !== 'text') return;
+    s.letterSpacing = ls;
+  });
+}
+
+export function setShapesTextAlign(shapes: ParsedShape[], align: string): void {
+  shapes.forEach((s) => {
+    if (s.kind !== 'text') return;
+    s.textAlign = align as any;
+  });
+}
+
 /* ---- z-order ----------------------------------------------------------- */
 
 const SHAPE_TAGS: Record<string, boolean> = { sp: true, pic: true, graphicFrame: true, cxnSp: true, grpSp: true };

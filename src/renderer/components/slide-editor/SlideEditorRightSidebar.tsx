@@ -18,6 +18,12 @@ export interface PptxInspector {
   onFill: (hex: string) => void;
   onStroke: (hex: string, widthPx?: number | null) => void;
   onTextColor: (hex: string) => void;
+  onFontFamily?: (font: string) => void;
+  onFontWeight?: (weight: number) => void;
+  onFontSize?: (size: number) => void;
+  onLineHeight?: (lh: number) => void;
+  onLetterSpacing?: (ls: number) => void;
+  onTextAlign?: (align: string) => void;
   onReorder: (toFront: boolean) => void;
   onDelete: () => void;
   onEditText: (shape: ParsedShape, value: string) => void;
@@ -218,19 +224,73 @@ export function SlideEditorRightSidebar({
    *                        header so the operator knows what will change
    *   non-text selected  → null, and Typography does not render at all
    */
+  const firstPptxText = pptx
+    ? (pptx.selected.find((s) => s.paragraphs && s.paragraphs.length > 0) ||
+       pptx.shapes.find((s) => s.paragraphs && s.paragraphs.length > 0) || null)
+    : null;
+  const firstPptxRun = firstPptxText?.paragraphs?.[0]?.[0];
+
   const firstTextElement = nativeElements.find((e) => e.type === 'text') || null;
-  const targetTextElement =
-    selectedElement
-      ? (selectedElement.type === 'text' ? selectedElement : null)
-      : firstTextElement;
-  const typographyScope = selectedElement
-    ? (selectedElement.type === 'text' ? 'selected' : 'unavailable')
-    : (firstTextElement ? 'default' : 'unavailable');
+  const targetTextElement = pptx
+    ? null
+    : (selectedElement
+        ? (selectedElement.type === 'text' ? selectedElement : null)
+        : firstTextElement);
+
+  const typographyScope = pptx
+    ? (pptx.selected.length > 0
+        ? (firstPptxText ? 'selected' : 'unavailable')
+        : (firstPptxText ? 'default' : 'unavailable'))
+    : (selectedElement
+        ? (selectedElement.type === 'text' ? 'selected' : 'unavailable')
+        : (firstTextElement ? 'default' : 'unavailable'));
+
+  const currentFontFamily = pptx
+    ? (firstPptxRun?.fontFamily || firstPptxRun?.fontFace || 'Inter')
+    : (targetTextElement?.fontFamily || 'Inter');
+
+  const currentFontWeight = pptx
+    ? (firstPptxRun?.fontWeight ?? (firstPptxRun?.bold ? 700 : 600))
+    : (targetTextElement?.fontWeight ?? 600);
+
+  const currentFontSize = pptx
+    ? (firstPptxRun?.fontSize || 42)
+    : (targetTextElement?.fontSize ?? 42);
+
+  const currentLineHeight: number = pptx
+    ? (typeof firstPptxText?.lineHeight === 'number' ? firstPptxText.lineHeight : 1.3)
+    : (targetTextElement?.lineHeight ?? 1.3);
+
+  const currentLetterSpacing: number = pptx
+    ? (typeof firstPptxText?.letterSpacing === 'number' ? firstPptxText.letterSpacing : 0)
+    : (targetTextElement?.letterSpacing ?? 0);
+
+  const currentColor = pptx
+    ? (firstPptxRun?.color || '#ffffff')
+    : (targetTextElement?.color || '#ffffff');
+
+  const currentTextAlign = pptx
+    ? (typeof firstPptxText?.textAlign === 'string' ? firstPptxText.textAlign : 'center')
+    : (targetTextElement?.textAlign || 'center');
+
+  const currentOpacity: number = pptx
+    ? (typeof firstPptxText?.opacity === 'number' ? firstPptxText.opacity : 1)
+    : (targetTextElement?.opacity ?? 1);
 
   /** Every Typography control writes through here, so none of them can act on
       a target that is not there. */
   const setText = (updates: Partial<SlideElement>) => {
-    if (targetTextElement) onUpdateElement(targetTextElement.id, updates);
+    if (pptx) {
+      if (updates.fontFamily && pptx.onFontFamily) pptx.onFontFamily(updates.fontFamily);
+      if (typeof updates.fontWeight === 'number' && pptx.onFontWeight) pptx.onFontWeight(updates.fontWeight);
+      if (typeof updates.fontSize === 'number' && pptx.onFontSize) pptx.onFontSize(updates.fontSize);
+      if (typeof updates.lineHeight === 'number' && pptx.onLineHeight) pptx.onLineHeight(updates.lineHeight);
+      if (typeof updates.letterSpacing === 'number' && pptx.onLetterSpacing) pptx.onLetterSpacing(updates.letterSpacing);
+      if (updates.color && pptx.onTextColor) pptx.onTextColor(updates.color);
+      if (updates.textAlign && pptx.onTextAlign) pptx.onTextAlign(updates.textAlign);
+    } else if (targetTextElement) {
+      onUpdateElement(targetTextElement.id, updates);
+    }
   };
 
   /* Free-typed fields — line height, letter spacing, the hex box — need
@@ -239,7 +299,8 @@ export function SlideEditorRightSidebar({
      is what made these three feel like they fought back. The draft is keyed by
      element and field, so changing selection drops it. */
   const [draft, setDraft] = useState<{ key: string; value: string } | null>(null);
-  const draftKey = (field: string) => `${targetTextElement?.id || 'none'}:${field}`;
+  const activeId = pptx ? (firstPptxText?.id || 'pptx-first') : (targetTextElement?.id || 'none');
+  const draftKey = (field: string) => `${activeId}:${field}`;
   const fieldValue = (field: string, actual: string | number) =>
     draft && draft.key === draftKey(field) ? draft.value : String(actual);
   const editField = (field: string, value: string, commit: (v: string) => void) => {
@@ -563,7 +624,7 @@ export function SlideEditorRightSidebar({
                   <div style={styles.propRowCol}>
                     <span style={styles.propLabel}>Font</span>
                     <CustomDropdown
-                      value={targetTextElement?.fontFamily || 'Inter'}
+                      value={currentFontFamily}
                       options={FONT_FAMILIES}
                       onChange={(font) => setText({ fontFamily: font })}
                       style={{ width: '100%' }}
@@ -575,7 +636,7 @@ export function SlideEditorRightSidebar({
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Weight</span>
                       <CustomDropdown
-                        value={String(targetTextElement?.fontWeight ?? 600)}
+                        value={String(currentFontWeight)}
                         options={FONT_WEIGHTS}
                         onChange={(wt) => setText({ fontWeight: parseInt(wt, 10) })}
                         style={{ width: '100%' }}
@@ -584,7 +645,7 @@ export function SlideEditorRightSidebar({
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Size</span>
                       <CustomDropdown
-                        value={String(targetTextElement?.fontSize ?? 42)}
+                        value={String(currentFontSize)}
                         options={FONT_SIZES}
                         onChange={(sz) => setText({ fontSize: parseInt(sz, 10) })}
                         style={{ width: '100%' }}
@@ -603,13 +664,9 @@ export function SlideEditorRightSidebar({
                           step="0.1"
                           min="0.5"
                           max="3"
-                          value={fieldValue('lineHeight', targetTextElement?.lineHeight ?? 1.3)}
+                          value={fieldValue('lineHeight', currentLineHeight)}
                           onChange={(e) => editField('lineHeight', e.target.value, (v) => {
                             const n = parseFloat(v);
-                            /* An empty box, or a half-typed '1.', parses to NaN
-                               — and NaN written into the element takes the text
-                               block's layout down with it. Held until the value
-                               is a number. */
                             if (Number.isFinite(n) && n >= 0.5 && n <= 3) setText({ lineHeight: n });
                           })}
                           onBlur={() => setDraft(null)}
@@ -626,7 +683,7 @@ export function SlideEditorRightSidebar({
                           step="1"
                           min="-20"
                           max="80"
-                          value={fieldValue('letterSpacing', targetTextElement?.letterSpacing ?? 0)}
+                          value={fieldValue('letterSpacing', currentLetterSpacing)}
                           onChange={(e) => editField('letterSpacing', e.target.value, (v) => {
                             const n = parseFloat(v);
                             if (Number.isFinite(n) && n >= -20 && n <= 80) setText({ letterSpacing: n });
@@ -645,7 +702,7 @@ export function SlideEditorRightSidebar({
                     <div style={styles.colorPillRow}>
                       <input
                         type="color"
-                        value={normalizeHex(targetTextElement?.color) || '#ffffff'}
+                        value={normalizeHex(currentColor) || '#ffffff'}
                         onChange={(e) => {
                           setDraft(null);
                           setText({ color: e.target.value });
@@ -655,14 +712,8 @@ export function SlideEditorRightSidebar({
                       <input
                         type="text"
                         spellCheck={false}
-                        value={fieldValue('color', (targetTextElement?.color || '#FFFFFF').toUpperCase())}
+                        value={fieldValue('color', (currentColor || '#FFFFFF').toUpperCase())}
                         onChange={(e) => editField('color', e.target.value, (v) => {
-                          /* Six digits exactly while typing. Shorthand is a real
-                             colour, so accepting it here meant '#FF5500' flashed
-                             yellow on its way past '#FF5' — every prefix of a hex
-                             you are half-way through repainting the slide. Blur
-                             below still takes shorthand, so '#F50' typed and
-                             committed on its own works. */
                           if (/^#[0-9a-f]{6}$/i.test(v.trim())) setText({ color: v.trim().toLowerCase() });
                         })}
                         onBlur={(e) => {
@@ -673,7 +724,7 @@ export function SlideEditorRightSidebar({
                         style={styles.colorHexInput}
                       />
                       <span style={styles.opacityBadge}>
-                        {Math.round((targetTextElement?.opacity ?? 1) * 100)}%
+                        {Math.round(currentOpacity * 100)}%
                       </span>
                     </div>
                   </div>
@@ -685,7 +736,7 @@ export function SlideEditorRightSidebar({
                       {/* Horizontal Alignment */}
                       <div style={{ ...styles.segmentGroup, flex: 1 }}>
                         {(['left', 'center', 'right', 'justify'] as const).map((align) => {
-                          const on = (targetTextElement?.textAlign || 'center') === align;
+                          const on = currentTextAlign === align;
                           return (
                             <button
                               key={align}

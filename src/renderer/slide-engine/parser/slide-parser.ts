@@ -58,7 +58,9 @@ export interface ParsedRun {
   italic?: boolean;
   underline?: boolean;
   fontFace?: string | null;
+  fontFamily?: string | null;
   fontSize?: number | null;
+  fontWeight?: number | null;
   align?: string;
   paragraphStyle?: ParagraphLayout;
 }

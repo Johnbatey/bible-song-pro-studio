@@ -19,7 +19,19 @@ import { deriveSlideText } from '../slide-engine/io/deck-import';
 import { buildDeckFromPptx } from '../hooks/usePptxImport';
 import { markSlideDirty } from '../slide-engine/io/save';
 import { setShapeText } from '../slide-engine/edit/text';
-import { deleteShapes, reorderShapes, setShapesFill, setShapesStroke, setShapesTextColor } from '../slide-engine/edit/style';
+import {
+  deleteShapes,
+  reorderShapes,
+  setShapesFill,
+  setShapesStroke,
+  setShapesTextColor,
+  setShapesFontFamily,
+  setShapesFontWeight,
+  setShapesFontSize,
+  setShapesLineHeight,
+  setShapesLetterSpacing,
+  setShapesTextAlign,
+} from '../slide-engine/edit/style';
 import { groupShapes, layerUnits, moveLayerUnit, selectionHasGroup, ungroupShapes } from '../slide-engine/edit/grouping';
 import type { SelectionState } from '../slide-engine/edit/geometry';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
@@ -330,6 +342,12 @@ export function SlideEditorModal() {
         onFill: (hex) => commitStyle(() => setShapesFill(pptxSelected, hex)),
         onStroke: (hex, w) => commitStyle(() => setShapesStroke(pptxSelected, hex, w)),
         onTextColor: (hex) => commitStyle(() => setShapesTextColor(pptxSelected, hex)),
+        onFontFamily: (font) => commitStyle(() => setShapesFontFamily(pptxSelected, font)),
+        onFontWeight: (wt) => commitStyle(() => setShapesFontWeight(pptxSelected, wt)),
+        onFontSize: (sz) => commitStyle(() => setShapesFontSize(pptxSelected, sz)),
+        onLineHeight: (lh) => commitStyle(() => setShapesLineHeight(pptxSelected, lh)),
+        onLetterSpacing: (ls) => commitStyle(() => setShapesLetterSpacing(pptxSelected, ls)),
+        onTextAlign: (al) => commitStyle(() => setShapesTextAlign(pptxSelected, al)),
         onReorder: handlePptxReorder,
         onDelete: handlePptxDelete,
         onEditText: handlePptxTextEdit,
