@@ -22,6 +22,7 @@ export function TitleBar() {
    * drawn `state.blackout`, and the display window and NDI feed have always
    * been fed from the store — the one thing missing was the button writing
    * there. */
+  const setCurrentScene = useAppStore((s) => s.setCurrentScene);
   const isBlackout = useAppStore((s) => s.display.blackout);
   const setBlackout = useAppStore((s) => s.setBlackout);
   const uiThemeMode = useAppStore((s) => s.uiThemeMode);
@@ -163,11 +164,57 @@ export function TitleBar() {
           </div>
         )}
 
-        {/* Live Status Badge */}
-        <div style={styles.liveBadge}>
-          <span style={styles.liveDot} />
-          LIVE
-        </div>
+        {/* Live / Standby / Blackout Dynamic Status Pill */}
+        <button
+          type="button"
+          style={{
+            ...styles.liveBadge,
+            cursor: 'pointer',
+            background: isBlackout
+              ? 'rgba(239, 68, 68, 0.15)'
+              : currentScene
+              ? 'rgba(16, 185, 129, 0.15)'
+              : 'var(--chrome-control)',
+            borderColor: isBlackout
+              ? 'rgba(239, 68, 68, 0.4)'
+              : currentScene
+              ? 'rgba(16, 185, 129, 0.4)'
+              : 'var(--border-primary)',
+            color: isBlackout
+              ? '#EF4444'
+              : currentScene
+              ? '#10B981'
+              : 'var(--text-secondary)',
+            transition: 'all 0.2s ease',
+          }}
+          onClick={() => {
+            if (isBlackout) {
+              setBlackout(false);
+            } else if (currentScene) {
+              setCurrentScene(null);
+            }
+          }}
+          title={
+            isBlackout
+              ? 'Blackout is ACTIVE — click to restore live presentation'
+              : currentScene
+              ? 'Content is LIVE on air — click to clear program slide'
+              : 'STANDBY — no slide is currently projected'
+          }
+        >
+          <span
+            style={{
+              ...styles.liveDot,
+              background: isBlackout ? '#EF4444' : currentScene ? '#10B981' : '#6B7280',
+              boxShadow: isBlackout
+                ? '0 0 8px rgba(239, 68, 68, 0.8)'
+                : currentScene
+                ? '0 0 8px rgba(16, 185, 129, 0.8)'
+                : 'none',
+            }}
+          />
+          {isBlackout ? 'BLACKOUT' : currentScene ? 'LIVE' : 'STANDBY'}
+        </button>
 
         {/* Blackout Toggle Button */}
         <button
