@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import type { PresentationSlide, SlideElement } from '../../types';
-import { slideElementsFor } from '../NativeSlideBoard';
+import { slideElementsFor, hexToRgba } from '../NativeSlideBoard';
 import type { ActiveTool } from './SlideEditorQuickToolbar';
 
 interface SlideEditorCanvasBoardProps {
@@ -578,14 +578,16 @@ export function SlideEditorCanvasBoard({
                     : '12px';
 
                 const borderWidth = el.borderWidth !== undefined ? el.borderWidth : 3;
+                const rawBg = el.backgroundColor !== undefined ? el.backgroundColor : '#FF5500';
+                const rawBorder = el.borderColor || '#FF5500';
 
                 return (
                   <div
                     style={{
                       width: '100%',
                       height: '100%',
-                      backgroundColor: el.backgroundColor !== undefined ? el.backgroundColor : '#FF5500',
-                      borderColor: el.borderColor || '#FF5500',
+                      backgroundColor: hexToRgba(rawBg, el.fillOpacity ?? 1),
+                      borderColor: hexToRgba(rawBorder, el.strokeOpacity ?? 1),
                       borderWidth: `${borderWidth}px`,
                       borderStyle: borderWidth > 0 ? 'solid' : 'none',
                       borderRadius: computedRadius,

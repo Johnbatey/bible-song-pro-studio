@@ -1002,6 +1002,31 @@ export function SlideEditorRightSidebar({
                       </div>
                     </div>
 
+                    {/* Fill Opacity Slider */}
+                    {selectedElement && (
+                      <div style={styles.propRowCol}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={styles.propLabel}>Fill Opacity</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {Math.round((selectedElement.fillOpacity ?? 1) * 100)}%
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={Math.round((selectedElement.fillOpacity ?? 1) * 100)}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) / 100;
+                              onUpdateElement(selectedElement.id, { fillOpacity: val });
+                            }}
+                            style={{ flex: 1, accentColor: '#FF5500' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {/* Border Color */}
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Border Color</span>
@@ -1036,6 +1061,31 @@ export function SlideEditorRightSidebar({
                         />
                       </div>
                     </div>
+
+                    {/* Stroke Opacity Slider */}
+                    {selectedElement && (
+                      <div style={styles.propRowCol}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={styles.propLabel}>Stroke Opacity</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {Math.round((selectedElement.strokeOpacity ?? 1) * 100)}%
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={Math.round((selectedElement.strokeOpacity ?? 1) * 100)}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) / 100;
+                              onUpdateElement(selectedElement.id, { strokeOpacity: val });
+                            }}
+                            style={{ flex: 1, accentColor: '#FF5500' }}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {/* Border Width Slider */}
                     <div style={styles.propRowCol}>
@@ -1084,10 +1134,10 @@ export function SlideEditorRightSidebar({
                       </div>
                     </div>
 
-                    {/* Opacity Slider */}
+                    {/* Layer Opacity Slider */}
                     <div style={styles.propRowCol}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>Opacity</span>
+                        <span style={styles.propLabel}>Layer Opacity</span>
                         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                           {Math.round((selectedElement?.opacity ?? 1) * 100)}%
                         </span>

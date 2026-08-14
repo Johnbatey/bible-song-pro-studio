@@ -102,7 +102,9 @@ export interface SlideElement {
   lineHeight?: number;
   letterSpacing?: number;
   backgroundColor?: string;
+  fillOpacity?: number;
   borderColor?: string;
+  strokeOpacity?: number;
   borderWidth?: number;
   borderRadius?: number;
   opacity?: number;

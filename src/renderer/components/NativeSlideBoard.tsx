@@ -18,6 +18,30 @@ import type { PresentationSlide, SlideBackground, SlideElement } from '../types'
 export const NATIVE_BOARD_W = 1280;
 export const NATIVE_BOARD_H = 720;
 
+export function hexToRgba(color: string | undefined, opacity: number = 1): string {
+  if (!color || color === 'transparent') return 'transparent';
+  if (opacity >= 1 && (color.startsWith('#') || color.startsWith('rgb('))) return color;
+
+  const rgbaMatch = color.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\)/i);
+  if (rgbaMatch) {
+    return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${opacity})`;
+  }
+
+  const hex = color.trim().replace(/^#/, '');
+  let r = 255, g = 85, b = 0;
+  if (hex.length === 3) {
+    r = parseInt(hex[0] + hex[0], 16);
+    g = parseInt(hex[1] + hex[1], 16);
+    b = parseInt(hex[2] + hex[2], 16);
+  } else if (hex.length >= 6) {
+    r = parseInt(hex.substring(0, 2), 16);
+    g = parseInt(hex.substring(2, 4), 16);
+    b = parseInt(hex.substring(4, 6), 16);
+  }
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return color;
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
 /**
  * What a slide with no layers of its own looks like: a title and a body, the
  * pair the editor drops onto a fresh slide. The editor renders these when
@@ -131,6 +155,8 @@ function ElementBox({ el }: { el: SlideElement }) {
         : '12px';
 
     const borderWidth = el.borderWidth !== undefined ? el.borderWidth : 3;
+    const rawBg = el.backgroundColor !== undefined ? el.backgroundColor : '#FF5500';
+    const rawBorder = el.borderColor || '#FF5500';
 
     return (
       <div style={outer}>
@@ -138,8 +164,8 @@ function ElementBox({ el }: { el: SlideElement }) {
           style={{
             width: '100%',
             height: '100%',
-            backgroundColor: el.backgroundColor !== undefined ? el.backgroundColor : '#FF5500',
-            borderColor: el.borderColor || '#FF5500',
+            backgroundColor: hexToRgba(rawBg, el.fillOpacity ?? 1),
+            borderColor: hexToRgba(rawBorder, el.strokeOpacity ?? 1),
             borderWidth: `${borderWidth}px`,
             borderStyle: borderWidth > 0 ? 'solid' : 'none',
             borderRadius: computedRadius,
