@@ -445,8 +445,19 @@ export function BiblePanel() {
   useEffect(() => {
     if (!highlightedVerse) return;
     const target = chapterVerses.find((v) => v.verse === highlightedVerse);
-    if (target) verseRefs.current[target.reference]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (target) verseRefs.current[target.reference]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [highlightedVerse, chapterVerses]);
+
+  function navigateToVerse(verse: BibleVerse) {
+    if (verse.book && verse.chapter) {
+      if (selectedBook !== verse.book) setSelectedBook(verse.book);
+      if (chapter !== verse.chapter) setChapter(verse.chapter);
+      setHighlightedVerse(verse.verse);
+      setSelectedVerseNumbers([verse.verse]);
+      setResults([]);
+      setQuery('');
+    }
+  }
 
   const selectedChapterCount = useMemo(() => {
     if (!selectedBook) return 0;
@@ -1105,8 +1116,14 @@ export function BiblePanel() {
               <button
                 key={verse.reference}
                 className="btn btn-sm btn-secondary"
-                onClick={() => sendVerse(verse)}
-                onDoubleClick={() => sendVerse(verse, { direct: true })}
+                onClick={() => {
+                  navigateToVerse(verse);
+                  void sendVerse(verse);
+                }}
+                onDoubleClick={() => {
+                  navigateToVerse(verse);
+                  void sendVerse(verse, { direct: true });
+                }}
               >
                 {verse.reference}
               </button>
