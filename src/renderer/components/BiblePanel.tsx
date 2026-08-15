@@ -182,7 +182,14 @@ function parseReferenceQuery(query: string, books: BibleBook[]) {
   let matchedBookName = '';
   if (aliasMatch) {
     const foundInBooks = books.find((b) => b.name.toLowerCase() === aliasMatch.toLowerCase());
-    if (foundInBooks) matchedBookName = foundInBooks.name;
+    if (foundInBooks) {
+      matchedBookName = foundInBooks.name;
+    } else {
+      const canonicalIdx = FALLBACK_BOOKS.findIndex((fb) => fb.toLowerCase() === aliasMatch.toLowerCase());
+      if (canonicalIdx !== -1 && books[canonicalIdx]) {
+        matchedBookName = books[canonicalIdx].name;
+      }
+    }
   }
 
   if (!matchedBookName) {
@@ -441,7 +448,32 @@ export function BiblePanel() {
   }, []);
 
   useEffect(() => {
-    window.BSP?.bible?.getBooks(selectedVersion).then(setBooks).catch(() => {});
+    window.BSP?.bible?.getBooks(selectedVersion).then((loadedBooks) => {
+      setBooks(loadedBooks);
+      if (loadedBooks && loadedBooks.length > 0) {
+        setSelectedBook((prevBook) => {
+          if (!prevBook) return loadedBooks[0].name;
+
+          const exact = loadedBooks.find((b) => b.name === prevBook);
+          if (exact) return exact.name;
+
+          const prevIndex = books.findIndex((b) => b.name === prevBook);
+          if (prevIndex !== -1 && loadedBooks[prevIndex]) {
+            return loadedBooks[prevIndex].name;
+          }
+
+          const alias = BOOK_ALIASES[prevBook.toLowerCase()] || BOOK_ALIASES[prevBook.toLowerCase().replace(/\s+/g, '')];
+          if (alias) {
+            const aliasIndex = FALLBACK_BOOKS.findIndex((fb) => fb.toLowerCase() === alias.toLowerCase());
+            if (aliasIndex !== -1 && loadedBooks[aliasIndex]) {
+              return loadedBooks[aliasIndex].name;
+            }
+          }
+
+          return loadedBooks[0]?.name || prevBook;
+        });
+      }
+    }).catch(() => {});
   }, [selectedVersion]);
 
   useEffect(() => {
