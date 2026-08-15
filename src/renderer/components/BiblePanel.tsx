@@ -1195,12 +1195,14 @@ export function BiblePanel() {
         className="blk-fill"
         title={chapterLabel}
         tools={(
-          <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <BlockButton onClick={() => { void handlePickImport(); }} disabled={importing} title="Import custom Bible translation (.json, .xml, .bible)">
               {importing ? 'Importing…' : 'Import'}
             </BlockButton>
-            <span style={styles.footerNote}>{currentVersion?.name || selectedVersion}</span>
-          </>
+            <span style={{ ...type.caption, color: 'var(--text-dim)', lineHeight: 1 }}>
+              {currentVersion?.name || selectedVersion}
+            </span>
+          </div>
         )}
       >
         {pinned.length > 0 && (
