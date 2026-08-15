@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
-import { importSongFiles, SONG_FILE_ACCEPT } from '../utils/song-import';
+import { importSongFiles, pickAndImportSongs, SONG_FILE_ACCEPT } from '../utils/song-import';
 import type { Scene, Song } from '../types';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton, BlockSegment } from './Block';
@@ -103,6 +103,26 @@ export function SongsPanel() {
     setImporting(true);
     try {
       const { songs: imported, errors } = await importSongFiles(files);
+      if (imported.length > 0) {
+        const existingTitles = new Set(songs.map((s) => s.title.toLowerCase()));
+        const fresh = imported.filter((s) => !existingTitles.has(s.title.toLowerCase()));
+        setSongs([...songs, ...fresh]);
+        const skipped = imported.length - fresh.length;
+        notify(
+          `Imported ${fresh.length} song${fresh.length === 1 ? '' : 's'}` +
+            (skipped > 0 ? ` · ${skipped} already in library` : '')
+        );
+      }
+      if (errors.length > 0) notify(errors[0], 'warning');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handlePickImport = async () => {
+    setImporting(true);
+    try {
+      const { songs: imported, errors } = await pickAndImportSongs();
       if (imported.length > 0) {
         const existingTitles = new Set(songs.map((s) => s.title.toLowerCase()));
         const fresh = imported.filter((s) => !existingTitles.has(s.title.toLowerCase()));
@@ -244,7 +264,7 @@ export function SongsPanel() {
             {songs.length === 0 && (
               <BlockButton onClick={handleAddDemoSongs}>Demo</BlockButton>
             )}
-            <BlockButton onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            <BlockButton onClick={handlePickImport} disabled={importing}>
               {importing ? 'Importing…' : 'Import'}
             </BlockButton>
           </>

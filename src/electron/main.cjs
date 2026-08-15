@@ -1270,6 +1270,18 @@ app.whenReady().then(async () => {
   ipcMain.handle('song:importText', (_, p) => songImportService?.importText(p?.text));
   ipcMain.handle('song:arrangeText', (_, p) => songImportService?.arrangeText(p?.text)
     || { ok: false, error: 'Song import service unavailable' });
+  ipcMain.handle('song:pick', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Worship Songs & Databases',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{
+        name: 'Worship Songs & Databases (EasyWorship, OpenLP, OpenLyrics, ChordPro, Text)',
+        extensions: ['db', 'ddb', 'sqlite', 'sqlite3', 'xml', 'pro', 'chordpro', 'chopro', 'txt']
+      }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true, filePaths: [] };
+    return { ok: true, filePaths: result.filePaths };
+  });
 
   // Settings IPC — secrets are write-only from the renderer's point of view
   ipcMain.handle('settings:get', () => settingsService?.getPublic() || { ok: false, settings: {} });

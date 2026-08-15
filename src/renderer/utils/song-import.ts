@@ -55,7 +55,12 @@ export async function importSongFiles(files: File[]): Promise<{ songs: Song[]; e
     try {
       const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
       const isDatabase = ext === '.db' || ext === '.ddb' || ext === '.sqlite' || ext === '.sqlite3';
-      const filePath = (file as any).path;
+      
+      const filePath = window.BSP?.song?.pathForFile?.(file)
+        || window.BSP?.media?.pathForFile?.(file)
+        || window.BSP?.deck?.pathForFile?.(file)
+        || (file as any).path
+        || '';
 
       let result;
       if (isDatabase && filePath) {
@@ -80,6 +85,38 @@ export async function importSongFiles(files: File[]): Promise<{ songs: Song[]; e
       });
     } catch (err) {
       errors.push(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return { songs, errors };
+}
+
+/**
+ * Open native system file picker dialog to import songs or databases.
+ */
+export async function pickAndImportSongs(): Promise<{ songs: Song[]; errors: string[] }> {
+  const pickResult = await window.BSP?.song?.pick?.();
+  if (!pickResult?.ok || !pickResult.filePaths?.length) {
+    return { songs: [], errors: [] };
+  }
+
+  const songs: Song[] = [];
+  const errors: string[] = [];
+
+  for (const filePath of pickResult.filePaths) {
+    try {
+      const result = await window.BSP?.song?.importFile({ filePath });
+      if (!result?.ok || !result.songs?.length) {
+        errors.push(`${filePath}: ${result?.error || 'no songs found'}`);
+        continue;
+      }
+      result.songs.forEach((imported: ImportedSong) => {
+        const song = toSong(imported);
+        if (song.slides.length > 0) songs.push(song);
+        else errors.push(`${filePath}: parsed but contained no lyrics`);
+      });
+    } catch (err) {
+      errors.push(`${filePath}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
