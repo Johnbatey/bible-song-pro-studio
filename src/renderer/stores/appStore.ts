@@ -101,6 +101,7 @@ interface AppState {
   setVideoTransportTarget: (target: 'program' | 'preview' | null) => void;
   reportVideoClock: (clock: { currentTime: number; duration: number }) => void;
   setVideoLoop: (loop: boolean) => void;
+  setVideoMuted: (muted: boolean) => void;
   cutToScene: (scene: Scene) => void;
   transitionToScene: (scene: Scene, transitionType?: string) => void;
 
@@ -296,19 +297,18 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       },
     })),
   setVideoTransportTarget: (target) =>
-    set((s) => (
-      s.display.videoTransport.target === target
-        ? s
-        : {
-            display: {
-              ...s.display,
-              /* A new clip starts from the top and starts playing, or the
-                 transport would open showing the last one's position. */
-              videoClock: { currentTime: 0, duration: 0 },
-              videoTransport: { target, playing: true, seekTo: null, seekNonce: 0 },
-            },
-          }
-    )),
+    set((s) => {
+      if (s.display.videoTransport.target === target) return s;
+      const scene = target === 'program' ? s.display.currentScene : target === 'preview' ? s.display.previewScene : null;
+      const initialMuted = Boolean(scene?.background?.muted);
+      return {
+        display: {
+          ...s.display,
+          videoClock: { currentTime: 0, duration: 0 },
+          videoTransport: { target, playing: true, seekTo: null, seekNonce: 0, muted: initialMuted },
+        },
+      };
+    }),
   /* Loop lives on the scene, not the transport: it is a property of the clip
      the operator chose, it is what every surface already reads, and it has to
      survive the scene being re-fired later. Written to the live copy and to
@@ -323,6 +323,28 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       const next = { ...scene, background: { ...scene.background, loop } };
       return {
         display: { ...s.display, [key]: next },
+        scenes: s.scenes.map((sc) => (sc.id === next.id ? next : sc)),
+      };
+    }),
+
+  setVideoMuted: (muted) =>
+    set((s) => {
+      const target = s.display.videoTransport.target;
+      const updatedTransport = {
+        ...s.display.videoTransport,
+        muted,
+      };
+      if (!target) {
+        return { display: { ...s.display, videoTransport: updatedTransport } };
+      }
+      const key = target === 'program' ? 'currentScene' : 'previewScene';
+      const scene = s.display[key];
+      if (!scene?.background) {
+        return { display: { ...s.display, videoTransport: updatedTransport } };
+      }
+      const next = { ...scene, background: { ...scene.background, muted } };
+      return {
+        display: { ...s.display, [key]: next, videoTransport: updatedTransport },
         scenes: s.scenes.map((sc) => (sc.id === next.id ? next : sc)),
       };
     }),

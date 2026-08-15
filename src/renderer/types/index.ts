@@ -197,6 +197,7 @@ export interface Background {
   mediaType?: 'image' | 'video';
   fit?: 'cover' | 'contain' | 'fill';
   loop?: boolean;
+  muted?: boolean;
   opacity?: number;
 }
 
@@ -573,6 +574,7 @@ export interface VideoTransport {
   playing: boolean;
   seekTo: number | null;
   seekNonce: number;
+  muted?: boolean;
 }
 
 /** What the playing surface reports back. Duration is 0 until metadata lands. */

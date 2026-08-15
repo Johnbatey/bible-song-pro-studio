@@ -60,6 +60,7 @@ export function MediaPanel() {
   const [isDragging, setIsDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState<{ item: MediaItem; x: number; y: number } | null>(null);
+  const [mutedMediaIds, setMutedMediaIds] = useState<Record<string, boolean>>({});
 
   /* An operator notice, not a room announcement — "Imported 1 file" has no
      business on the projector. */
@@ -177,6 +178,7 @@ export function MediaPanel() {
         mediaType: item.type,
         fit: 'cover',
         loop: true,
+        muted: Boolean(mutedMediaIds[item.id]),
         opacity: 1,
       },
     };
@@ -403,15 +405,55 @@ export function MediaPanel() {
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   ) : (
-                    <video
-                      src={absoluteUrl(item)}
-                      muted
-                      playsInline
-                      preload="metadata"
-                      onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
-                      onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
+                    <>
+                      <video
+                        src={absoluteUrl(item)}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                        onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMutedMediaIds((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
+                        }}
+                        title={mutedMediaIds[item.id] ? "Pre-muted: Audio will be muted when played. Click to unmute." : "Audio Enabled: Audio will play. Click to pre-mute."}
+                        style={{
+                          position: 'absolute',
+                          bottom: 6,
+                          left: 6,
+                          width: 24,
+                          height: 24,
+                          borderRadius: 4,
+                          background: mutedMediaIds[item.id] ? 'rgba(239, 68, 68, 0.95)' : 'rgba(0, 0, 0, 0.65)',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          zIndex: 10,
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {mutedMediaIds[item.id] ? (
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+                            <line x1="22" y1="2" x2="2" y2="22" stroke="#ffffff" strokeWidth="2.5" />
+                          </svg>
+                        ) : (
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                          </svg>
+                        )}
+                      </button>
+                    </>
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>

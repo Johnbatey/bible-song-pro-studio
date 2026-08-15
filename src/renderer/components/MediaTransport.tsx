@@ -83,6 +83,29 @@ function PauseGlyph() {
   );
 }
 
+function MuteOffGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden focusable="false"
+         fill="none" stroke="currentColor" strokeWidth="2"
+         strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+    </svg>
+  );
+}
+
+function MuteOnGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden focusable="false"
+         fill="none" stroke="currentColor" strokeWidth="2"
+         strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+      <line x1="22" y1="2" x2="2" y2="22" stroke="#EF4444" strokeWidth="2.5" />
+    </svg>
+  );
+}
+
 const glyphButton: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
   width: 20, height: 20, flexShrink: 0, padding: 0,
@@ -98,6 +121,14 @@ export function MediaTransport() {
   const setVideoPlaying = useAppStore((s) => s.setVideoPlaying);
   const seekVideo = useAppStore((s) => s.seekVideo);
   const setVideoLoop = useAppStore((s) => s.setVideoLoop);
+  const setVideoMuted = useAppStore((s) => s.setVideoMuted);
+  const isMuted = useAppStore((s) => {
+    if (s.display.videoTransport.muted !== undefined) return s.display.videoTransport.muted;
+    const scene = s.display.videoTransport.target === 'program'
+      ? s.display.currentScene
+      : s.display.previewScene;
+    return Boolean(scene?.background?.muted);
+  });
   const looping = useAppStore((s) => {
     const scene = s.display.videoTransport.target === 'program'
       ? s.display.currentScene
@@ -284,21 +315,36 @@ export function MediaTransport() {
       </button>
 
       {showLoop && (
-        <button
-          type="button"
-          onClick={() => setVideoLoop(!looping)}
-          title={looping ? 'Looping — click to play once' : 'Play once — click to loop'}
-          aria-label="Loop"
-          aria-pressed={looping}
-          style={{
-            ...glyphButton,
-            /* Loop is not an on-air state, so it never wears Signal. On is
-               white, off is muted — the same weight every other toggle uses. */
-            color: looping ? 'var(--text-primary)' : 'var(--text-mute)',
-          }}
-        >
-          <LoopGlyph />
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => setVideoLoop(!looping)}
+            title={looping ? 'Looping — click to play once' : 'Play once — click to loop'}
+            aria-label="Loop"
+            aria-pressed={looping}
+            style={{
+              ...glyphButton,
+              /* Loop is not an on-air state, so it never wears Signal. On is
+                 white, off is muted — the same weight every other toggle uses. */
+              color: looping ? 'var(--text-primary)' : 'var(--text-mute)',
+            }}
+          >
+            <LoopGlyph />
+          </button>
+          <button
+            type="button"
+            onClick={() => setVideoMuted(!isMuted)}
+            title={isMuted ? 'Muted — click to unmute audio' : 'Audio On — click to mute audio'}
+            aria-label="Mute Audio"
+            aria-pressed={isMuted}
+            style={{
+              ...glyphButton,
+              color: isMuted ? '#EF4444' : 'var(--text-primary)',
+            }}
+          >
+            {isMuted ? <MuteOnGlyph /> : <MuteOffGlyph />}
+          </button>
+        </>
       )}
 
       {/* Rail */}
