@@ -550,6 +550,7 @@ export function SlideEditorCanvasBoard({
                 boxShadow: computeBoxShadow(el) || (isSelected ? '0 0 0 2px rgba(255, 85, 0, 0.3)' : undefined),
                 borderRadius: isSelected ? 4 : undefined,
                 boxSizing: 'border-box',
+                pointerEvents: dragState && dragState.elementId !== el.id ? 'none' : 'auto',
               }}
             >
               {/* Text Element */}
@@ -627,6 +628,7 @@ export function SlideEditorCanvasBoard({
                 <img
                   src={el.content}
                   alt=""
+                  draggable={false}
                   style={{
                     width: '100%',
                     height: '100%',
@@ -637,6 +639,9 @@ export function SlideEditorCanvasBoard({
                     borderStyle: (el.borderWidth ?? 0) > 0 ? 'solid' : 'none',
                     opacity: el.opacity ?? 1,
                     boxSizing: 'border-box',
+                    pointerEvents: 'none',
+                    WebkitUserDrag: 'none',
+                    userSelect: 'none',
                   }}
                 />
               )}
@@ -722,7 +727,9 @@ export function SlideEditorCanvasBoard({
                     <div
                       key={h.name}
                       onPointerDown={(evt) => {
+                        evt.preventDefault();
                         evt.stopPropagation();
+                        try { (evt.target as HTMLElement).setPointerCapture(evt.pointerId); } catch {}
                         setDragState({
                           elementId: el.id,
                           handle: h.name,

@@ -157,6 +157,7 @@ function ElementBox({ el }: { el: SlideElement }) {
         <img
           src={el.content}
           alt=""
+          draggable={false}
           style={{
             width: '100%',
             height: '100%',
@@ -167,6 +168,9 @@ function ElementBox({ el }: { el: SlideElement }) {
             borderStyle: (el.borderWidth ?? 0) > 0 ? 'solid' : 'none',
             boxShadow: computeBoxShadow(el),
             boxSizing: 'border-box',
+            pointerEvents: 'none',
+            WebkitUserDrag: 'none',
+            userSelect: 'none',
           }}
         />
       </div>

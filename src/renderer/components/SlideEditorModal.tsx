@@ -278,6 +278,40 @@ export function SlideEditorModal() {
         return;
       }
 
+      // Cmd + ] / Ctrl + ] (Move Up) & Cmd + [ / Ctrl + [ (Move Down)
+      if ((e.metaKey || e.ctrlKey) && (e.key === ']' || e.key === '[')) {
+        if (isPptxDeck) {
+          if (pptxSelection && pptxSelection.ids.length > 0) {
+            e.preventDefault();
+            handlePptxReorder(e.key === ']');
+          }
+        } else {
+          if (selectedElementIds.length > 0) {
+            e.preventDefault();
+            const dir = e.shiftKey ? (e.key === ']' ? 'top' : 'bottom') : (e.key === ']' ? 'up' : 'down');
+            const currentEls = [...activeSlideElements];
+            const elementsWithZ = currentEls.map((el, i) => ({
+              ...el,
+              zIndex: el.zIndex !== undefined ? el.zIndex : i + 1,
+            }));
+            const maxZ = Math.max(1, ...elementsWithZ.map((item) => item.zIndex));
+            const minZ = Math.min(1, ...elementsWithZ.map((item) => item.zIndex));
+
+            const updated = elementsWithZ.map((el) => {
+              if (!selectedElementIds.includes(el.id) || el.locked) return el;
+              let newZ = el.zIndex;
+              if (dir === 'up') newZ = Math.min(maxZ + 5, el.zIndex + 1);
+              if (dir === 'down') newZ = Math.max(1, el.zIndex - 1);
+              if (dir === 'top') newZ = maxZ + 1;
+              if (dir === 'bottom') newZ = Math.max(1, minZ - 1);
+              return { ...el, zIndex: newZ };
+            });
+            handleUpdateSlideElements(updated);
+          }
+        }
+        return;
+      }
+
       // Arrow Keys (Nudge selected elements)
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (!isPptxDeck && selectedElementIds.length > 0) {
