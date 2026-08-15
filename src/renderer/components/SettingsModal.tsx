@@ -196,6 +196,29 @@ export function SettingsModal() {
   const [outputAudioDevices, setOutputAudioDevices] = useState<AudioInputDevice[]>([]);
   /** Devices are there but unnamed — Chromium withholds labels until access is granted. */
   const [micNamesHidden, setMicNamesHidden] = useState(false);
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateStatusText, setUpdateStatusText] = useState<string | null>(null);
+
+  const handleManualUpdateCheck = async () => {
+    if (!window.BSP?.updates?.check) return;
+    setUpdateChecking(true);
+    setUpdateStatusText(null);
+    try {
+      const res = await window.BSP.updates.check();
+      if (res?.updateAvailable) {
+        setUpdateStatusText(`v${res.latestVersion} available!`);
+        if (res.releaseUrl && window.BSP?.openExternal) {
+          window.BSP.openExternal(res.releaseUrl);
+        }
+      } else {
+        setUpdateStatusText('You are on the latest version.');
+      }
+    } catch (err) {
+      setUpdateStatusText('Unable to reach update server.');
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
 
   /* The on-device recogniser. `aiStatus` here is the ONNX engine's own slice of
      the transcription service's status, which is the half this row is about —
@@ -543,6 +566,31 @@ export function SettingsModal() {
                     <div style={modalStyles.rowSub}>macOS Metal Hardware Acceleration • Port 8942</div>
                   </div>
                   <span style={{ fontSize: 12, color: '#2ecc71', fontWeight: 600 }}>Active</span>
+                </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Software Updates</div>
+                    <div style={modalStyles.rowSub}>
+                      App Version {appVersion || '3.0.0'} {updateStatusText ? `• ${updateStatusText}` : ''}
+                    </div>
+                  </div>
+                  <button
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 6,
+                      border: '1px solid var(--settings-line)',
+                      background: 'var(--settings-card)',
+                      color: 'var(--text-primary)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                    onClick={handleManualUpdateCheck}
+                    disabled={updateChecking}
+                  >
+                    {updateChecking ? 'Checking...' : 'Check for updates'}
+                  </button>
                 </div>
 
                 <BackupSystem />

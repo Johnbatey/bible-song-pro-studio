@@ -884,8 +884,23 @@ declare global {
       feedback?: {
         send: (payload: FeedbackPayload) => Promise<{ ok: boolean; issueUrl?: string; error?: string }>;
       };
+      updates?: {
+        check: () => Promise<UpdateCheckResult>;
+      };
     };
   }
+}
+
+export interface UpdateCheckResult {
+  ok: boolean;
+  updateAvailable: boolean;
+  currentVersion: string;
+  latestVersion?: string;
+  releaseName?: string;
+  releaseNotes?: string;
+  releaseUrl?: string;
+  publishedAt?: string;
+  error?: string;
 }
 
 export interface FeedbackPayload {

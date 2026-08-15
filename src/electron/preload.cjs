@@ -279,4 +279,7 @@ contextBridge.exposeInMainWorld('BSP', {
   feedback: {
     send: (payload) => ipcRenderer.invoke('feedback:send', payload),
   },
+  updates: {
+    check: () => ipcRenderer.invoke('app:checkForUpdates'),
+  },
 });

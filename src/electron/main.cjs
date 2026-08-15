@@ -1517,6 +1517,72 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Automatic GitHub Releases update check handler
+  ipcMain.handle('app:checkForUpdates', async () => {
+    try {
+      const currentVersion = app.getVersion();
+      const https = require('https');
+      
+      const data = await new Promise((resolve, reject) => {
+        const req = https.get(
+          'https://api.github.com/repos/Johnbatey/bible-song-pro-studio/releases/latest',
+          {
+            headers: {
+              'User-Agent': 'Bible-Song-Pro-Studio-App',
+              'Accept': 'application/vnd.github.v3+json',
+            },
+            timeout: 6000,
+          },
+          (res) => {
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+              return reject(new Error(`HTTP ${res.statusCode}`));
+            }
+            let body = '';
+            res.on('data', (chunk) => { body += chunk; });
+            res.on('end', () => {
+              try {
+                resolve(JSON.parse(body));
+              } catch (e) {
+                reject(e);
+              }
+            });
+          }
+        );
+        req.on('error', reject);
+        req.on('timeout', () => {
+          req.destroy();
+          reject(new Error('Request timeout'));
+        });
+      });
+
+      const rawTag = (data?.tag_name || '').replace(/^v/, '').trim();
+      if (!rawTag) return { ok: true, updateAvailable: false, currentVersion };
+
+      const parseSemver = (v) => v.split('.').map((n) => parseInt(n, 10) || 0);
+      const [curMaj, curMin, curPat] = parseSemver(currentVersion);
+      const [latestMaj, latestMin, latestPat] = parseSemver(rawTag);
+
+      let updateAvailable = false;
+      if (latestMaj > curMaj) updateAvailable = true;
+      else if (latestMaj === curMaj && latestMin > curMin) updateAvailable = true;
+      else if (latestMaj === curMaj && latestMin === curMin && latestPat > curPat) updateAvailable = true;
+
+      return {
+        ok: true,
+        updateAvailable,
+        currentVersion,
+        latestVersion: rawTag,
+        releaseName: data?.name || `Version ${rawTag}`,
+        releaseNotes: data?.body || '',
+        releaseUrl: data?.html_url || 'https://github.com/Johnbatey/bible-song-pro-studio/releases/latest',
+        publishedAt: data?.published_at || null,
+      };
+    } catch (err) {
+      console.warn('Update check failed:', err.message || err);
+      return { ok: false, updateAvailable: false, currentVersion: app.getVersion(), error: err.message };
+    }
+  });
+
   /* No audio:getInputDevices handler, deliberately.
      It used to return a hardcoded [] — and because that resolves rather than
      throws, the renderer's fallback to enumerateDevices never ran and the

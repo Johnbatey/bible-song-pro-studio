@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAppStore } from './stores/appStore';
 import { TitleBar } from './components/TitleBar';
+import { UpdateBanner } from './components/UpdateBanner';
 import { DockHost } from './components/dock/DockHost';
 import { SettingsModal } from './components/SettingsModal';
 import { SlideEditorModal } from './components/SlideEditorModal';
@@ -113,6 +114,7 @@ export function App() {
   return (
     <div className="app-shell">
       <TitleBar />
+      <UpdateBanner />
       <div className="app-body">
         <div className="app-main">
           <DockHost />
