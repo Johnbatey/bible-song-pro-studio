@@ -334,11 +334,19 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
   const endColor = info.end || '#7C2D12';
   const direction = info.dir || '135deg';
 
+  const [startPos, setStartPos] = useState<number>(0);
+  const [endPos, setEndPos] = useState<number>(100);
+
   const angleDeg = direction.includes('deg') ? parseInt(direction.replace('deg', ''), 10) || 135 : 135;
   const isRadial = direction === 'radial';
 
-  const updateGradient = (newStart: string, newEnd: string, newDir: string) => {
-    const css = gradientCss(newStart, newEnd, newDir);
+  const updateGradient = (newStart: string, newEnd: string, newDir: string, pStart = startPos, pEnd = endPos) => {
+    let css: string;
+    if (newDir === 'radial') {
+      css = `radial-gradient(circle at center, ${newStart} ${pStart}%, ${newEnd} ${pEnd}%)`;
+    } else {
+      css = `linear-gradient(${newDir}, ${newStart} ${pStart}%, ${newEnd} ${pEnd}%)`;
+    }
     onChange(css);
   };
 
@@ -350,10 +358,24 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
     updateGradient(startColor, endColor, dir);
   };
 
+  const handlePosChange = (stop: 'start' | 'end', newPos: number) => {
+    const clamped = Math.max(0, Math.min(100, newPos));
+    if (stop === 'start') {
+      setStartPos(clamped);
+      updateGradient(startColor, endColor, direction, clamped, endPos);
+    } else {
+      setEndPos(clamped);
+      updateGradient(startColor, endColor, direction, startPos, clamped);
+    }
+  };
+
+  const activeColor = activeStop === 'start' ? startColor : endColor;
+  const activePos = activeStop === 'start' ? startPos : endPos;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
-      {/* Visual Gradient Ramp Track Bar */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4, width: '100%', boxSizing: 'border-box' }}>
+      {/* Visual Gradient Ramp Track Bar with Movable Stop Pins */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={styles.propLabel}>Gradient Ramp</span>
           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)' }}>
@@ -361,142 +383,169 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
           </span>
         </div>
 
-        {/* Ramp Track Preview Bar */}
-        <div
-          style={{
-            height: 26,
-            width: '100%',
-            borderRadius: 6,
-            background: gradientCss(startColor, endColor, direction),
-            boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.3)',
-            position: 'relative',
-          }}
-        />
+        {/* Ramp Track Bar Container */}
+        <div style={{ position: 'relative', width: '100%', paddingTop: 6, paddingBottom: 16 }}>
+          {/* Main Gradient Bar */}
+          <div
+            style={{
+              height: 22,
+              width: '100%',
+              borderRadius: 5,
+              background: gradientCss(startColor, endColor, direction),
+              boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.4)',
+            }}
+          />
 
-        {/* Color Stop Track Pins */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px', marginTop: -2 }}>
-          {/* Start / Highlight Stop Pin */}
+          {/* Movable Start / Highlight Stop Pointer Handle */}
           <div
             onClick={() => setActiveStop('start')}
             style={{
+              position: 'absolute',
+              left: `calc(${startPos}% - 7px)`,
+              bottom: 0,
+              cursor: 'ew-resize',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              cursor: 'pointer',
-              gap: 2,
+              zIndex: activeStop === 'start' ? 10 : 2,
             }}
+            title="Highlight Stop: Drag or click to edit"
           >
+            {/* Arrow Pointer */}
+            <div
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: '5px solid transparent',
+                borderRight: '5px solid transparent',
+                borderBottom: `6px solid ${activeStop === 'start' ? '#FF5500' : '#ffffff'}`,
+              }}
+            />
+            {/* Swatch Square */}
             <div
               style={{
                 width: 14,
                 height: 14,
-                borderRadius: '50%',
+                borderRadius: 3,
                 background: startColor,
-                border: activeStop === 'start' ? '2px solid #FF5500' : '2px solid #ffffff',
-                boxShadow: activeStop === 'start' ? '0 0 8px rgba(255, 85, 0, 0.8)' : '0 1px 4px rgba(0, 0, 0, 0.5)',
-                transition: 'all 0.15s ease',
+                border: activeStop === 'start' ? '2px solid #FF5500' : '1px solid #ffffff',
+                boxShadow: activeStop === 'start' ? '0 0 8px rgba(255, 85, 0, 0.9)' : '0 1px 4px rgba(0,0,0,0.6)',
               }}
             />
-            <span style={{ fontSize: 9, fontWeight: 700, color: activeStop === 'start' ? '#FF5500' : 'var(--text-dim)' }}>
-              Highlight
-            </span>
           </div>
 
-          {/* End / Shadow Stop Pin */}
+          {/* Movable End / Shadow Stop Pointer Handle */}
           <div
             onClick={() => setActiveStop('end')}
             style={{
+              position: 'absolute',
+              left: `calc(${endPos}% - 7px)`,
+              bottom: 0,
+              cursor: 'ew-resize',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              cursor: 'pointer',
-              gap: 2,
+              zIndex: activeStop === 'end' ? 10 : 2,
             }}
+            title="Shadow Stop: Drag or click to edit"
           >
+            {/* Arrow Pointer */}
+            <div
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: '5px solid transparent',
+                borderRight: '5px solid transparent',
+                borderBottom: `6px solid ${activeStop === 'end' ? '#FF5500' : '#ffffff'}`,
+              }}
+            />
+            {/* Swatch Square */}
             <div
               style={{
                 width: 14,
                 height: 14,
-                borderRadius: '50%',
+                borderRadius: 3,
                 background: endColor,
-                border: activeStop === 'end' ? '2px solid #FF5500' : '2px solid #ffffff',
-                boxShadow: activeStop === 'end' ? '0 0 8px rgba(255, 85, 0, 0.8)' : '0 1px 4px rgba(0, 0, 0, 0.5)',
-                transition: 'all 0.15s ease',
+                border: activeStop === 'end' ? '2px solid #FF5500' : '1px solid #ffffff',
+                boxShadow: activeStop === 'end' ? '0 0 8px rgba(255, 85, 0, 0.9)' : '0 1px 4px rgba(0,0,0,0.6)',
               }}
             />
-            <span style={{ fontSize: 9, fontWeight: 700, color: activeStop === 'end' ? '#FF5500' : 'var(--text-dim)' }}>
-              Shadow
-            </span>
           </div>
         </div>
       </div>
 
-      {/* Dual Color Selectors (Highlight & Shadow Swatches) */}
-      <div style={styles.twoColRow}>
-        {/* Highlight Color */}
-        <div
+      {/* Active Stop Selector Tabs */}
+      <div style={styles.segmentGroup}>
+        <button
+          type="button"
           onClick={() => setActiveStop('start')}
           style={{
-            ...styles.propRowCol,
-            flex: 1,
-            padding: 8,
-            background: activeStop === 'start' ? 'var(--accent-glow)' : 'var(--bg-primary)',
-            borderRadius: 6,
-            border: activeStop === 'start' ? '1px solid rgba(255, 85, 0, 0.4)' : '1px solid var(--border-primary)',
-            cursor: 'pointer',
+            ...styles.segmentBtn,
+            background: activeStop === 'start' ? 'var(--chrome-control-active)' : 'transparent',
+            color: activeStop === 'start' ? '#FF5500' : 'var(--text-secondary)',
+            fontWeight: activeStop === 'start' ? 700 : 500,
+            fontSize: 10,
           }}
         >
-          <span style={{ fontSize: 10, fontWeight: 700, color: activeStop === 'start' ? '#FF5500' : 'var(--text-secondary)' }}>
-            Highlight Color
-          </span>
+          ● Highlight ({startPos}%)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveStop('end')}
+          style={{
+            ...styles.segmentBtn,
+            background: activeStop === 'end' ? 'var(--chrome-control-active)' : 'transparent',
+            color: activeStop === 'end' ? '#FF5500' : 'var(--text-secondary)',
+            fontWeight: activeStop === 'end' ? 700 : 500,
+            fontSize: 10,
+          }}
+        >
+          ● Shadow ({endPos}%)
+        </button>
+      </div>
+
+      {/* Active Stop Color & Position Editor Box */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10, background: 'var(--bg-primary)', borderRadius: 6, border: '1px solid var(--border-primary)' }}>
+        {/* Color Swatch & Hex */}
+        <div style={styles.propRowCol}>
+          <span style={styles.propLabel}>{activeStop === 'start' ? 'Highlight Color' : 'Shadow Color'}</span>
           <div style={styles.colorPillRow}>
             <input
               type="color"
-              value={normalizeHex(startColor) || '#F97316'}
-              onChange={(e) => updateGradient(e.target.value, endColor, direction)}
+              value={normalizeHex(activeColor) || '#F97316'}
+              onChange={(e) => {
+                if (activeStop === 'start') updateGradient(e.target.value, endColor, direction);
+                else updateGradient(startColor, e.target.value, direction);
+              }}
               style={styles.colorSwatch}
             />
             <input
               type="text"
               spellCheck={false}
-              value={startColor.toUpperCase()}
-              onChange={(e) => updateGradient(e.target.value, endColor, direction)}
+              value={activeColor.toUpperCase()}
+              onChange={(e) => {
+                if (activeStop === 'start') updateGradient(e.target.value, endColor, direction);
+                else updateGradient(startColor, e.target.value, direction);
+              }}
               style={styles.colorHexInput}
             />
           </div>
         </div>
 
-        {/* Shadow Color */}
-        <div
-          onClick={() => setActiveStop('end')}
-          style={{
-            ...styles.propRowCol,
-            flex: 1,
-            padding: 8,
-            background: activeStop === 'end' ? 'var(--accent-glow)' : 'var(--bg-primary)',
-            borderRadius: 6,
-            border: activeStop === 'end' ? '1px solid rgba(255, 85, 0, 0.4)' : '1px solid var(--border-primary)',
-            cursor: 'pointer',
-          }}
-        >
-          <span style={{ fontSize: 10, fontWeight: 700, color: activeStop === 'end' ? '#FF5500' : 'var(--text-secondary)' }}>
-            Shadow Color
-          </span>
-          <div style={styles.colorPillRow}>
-            <input
-              type="color"
-              value={normalizeHex(endColor) || '#7C2D12'}
-              onChange={(e) => updateGradient(startColor, e.target.value, direction)}
-              style={styles.colorSwatch}
-            />
-            <input
-              type="text"
-              spellCheck={false}
-              value={endColor.toUpperCase()}
-              onChange={(e) => updateGradient(startColor, e.target.value, direction)}
-              style={styles.colorHexInput}
-            />
+        {/* Location Stop Slider */}
+        <div style={styles.propRowCol}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={styles.propLabel}>Location</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-primary)' }}>{activePos}%</span>
           </div>
+          <ScrubbableInput
+            value={activePos}
+            onChange={(v) => handlePosChange(activeStop, v)}
+            min={0}
+            max={100}
+            step={1}
+            suffix="%"
+          />
         </div>
       </div>
 
@@ -556,7 +605,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
       </div>
 
       {/* Quick Gradient Presets Grid */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 }}>
         <span style={styles.propLabel}>Presets</span>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
           {[
@@ -1898,8 +1947,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   twoColRow: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 10,
+    gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+    gap: 8,
+    minWidth: 0,
   },
   pillGroup: {
     display: 'flex',
