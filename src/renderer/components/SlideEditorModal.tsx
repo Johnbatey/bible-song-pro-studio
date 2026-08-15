@@ -111,7 +111,8 @@ export function SlideEditorModal() {
   const [historyPointer, setHistoryPointer] = useState(-1);
 
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  const selectedElementId = selectedElementIds[selectedElementIds.length - 1] || null;
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [smartSnap, setSmartSnap] = useState(true);
 
@@ -212,30 +213,95 @@ export function SlideEditorModal() {
     });
     setPptxSelection(null);
   }, [pptxSlide, pptxShapes, pptxSelection, commitStyle]);
+  const slides = deck.slides.length > 0 ? deck.slides : [
+    {
+      id: 'slide-default',
+      title: 'Untitled Slide',
+      body: 'Double click to edit',
+      label: 'Slide 1',
+      notes: '',
+      transition: 'fade' as const,
+      durationMs: 3000,
+      hidden: false,
+      buildCount: 1,
+      buildStep: 1,
+      background: { type: 'color' as const, value: '#18181b' },
+      aspectRatio: '16:9' as const,
+    },
+  ];
 
-  /* Keyboard shortcut for deleting selected elements or layers */
+  const activeSlide = slides[activeSlideIndex] || slides[0];
+  const activeSlideElements = slideElementsFor(activeSlide);
+  const selectedElement = activeSlideElements.find((el) => el.id === selectedElementId) || null;
+
+  /* Keyboard shortcuts for slide editor (Cmd+D duplicate, Delete, Cmd+A select all, Arrow nudge) */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
       }
-      if (isPptxDeck) {
-        if (pptxSelection && pptxSelection.ids.length > 0) {
-          e.preventDefault();
-          handlePptxDelete();
+
+      // Delete / Backspace
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (isPptxDeck) {
+          if (pptxSelection && pptxSelection.ids.length > 0) {
+            e.preventDefault();
+            handlePptxDelete();
+          }
+        } else {
+          if (selectedElementIds.length > 0) {
+            e.preventDefault();
+            const updated = activeSlideElements.filter((el) => !selectedElementIds.includes(el.id));
+            handleUpdateSlideElements(updated);
+            setSelectedElementIds([]);
+          }
         }
-      } else {
-        if (selectedElementId) {
+        return;
+      }
+
+      // Cmd+D / Ctrl+D (Duplicate selected elements)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+        if (!isPptxDeck && selectedElementIds.length > 0) {
           e.preventDefault();
-          handleDeleteElement(selectedElementId);
+          handleDuplicateElements();
+        }
+        return;
+      }
+
+      // Cmd+A / Ctrl+A (Select All elements on slide)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+        if (!isPptxDeck && activeSlideElements.length > 0) {
+          e.preventDefault();
+          setSelectedElementIds(activeSlideElements.map((el) => el.id));
+        }
+        return;
+      }
+
+      // Arrow Keys (Nudge selected elements)
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (!isPptxDeck && selectedElementIds.length > 0) {
+          e.preventDefault();
+          const amount = e.shiftKey ? 2 : 0.5;
+          const dx = e.key === 'ArrowLeft' ? -amount : e.key === 'ArrowRight' ? amount : 0;
+          const dy = e.key === 'ArrowUp' ? -amount : e.key === 'ArrowDown' ? amount : 0;
+
+          const updated = activeSlideElements.map((el) => {
+            if (!selectedElementIds.includes(el.id) || el.locked) return el;
+            return {
+              ...el,
+              x: Math.max(-100, Math.min(200, parseFloat((el.x + dx).toFixed(1)))),
+              y: Math.max(-100, Math.min(200, parseFloat((el.y + dy).toFixed(1)))),
+            };
+          });
+          handleUpdateSlideElements(updated);
         }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPptxDeck, pptxSelection, selectedElementId, handlePptxDelete]);
+  }, [isPptxDeck, pptxSelection, selectedElementIds, activeSlideElements, handlePptxDelete, handleDuplicateElements, handleUpdateSlideElements]);
 
   const handlePptxTextEdit = useCallback((shape: ParsedShape, value: string) => {
     setShapeText(shape, value);
@@ -556,42 +622,7 @@ export function SlideEditorModal() {
     }
   };
 
-  const slides = deck.slides.length > 0 ? deck.slides : [
-    {
-      id: 'slide-default',
-      title: 'Untitled Slide',
-      body: 'Double click to edit',
-      label: 'Slide 1',
-      notes: '',
-      transition: 'fade' as const,
-      durationMs: 3000,
-      hidden: false,
-      buildCount: 1,
-      buildStep: 1,
-      background: { type: 'color' as const, value: '#18181b' },
-      aspectRatio: '16:9' as const,
-    },
-  ];
 
-  const activeSlide = slides[activeSlideIndex] || slides[0];
-
-  /* The elements the editor is actually looking at.
-   *
-   * A slide that has never been touched carries no `elements` array, and both
-   * canvases paint `defaultSlideElements()` for it — a title and a body with
-   * the fixed ids `title-el` and `body-el`. Everything downstream of the
-   * selection used to read `activeSlide.elements` directly, which for such a
-   * slide is `undefined`, and that is why the whole inspector was dead:
-   * clicking the title selected `title-el`, the lookup found nothing, and the
-   * Typography panel had no element to act on. Worse, the first edit mapped
-   * over `[]` and wrote `elements: []` back — `Array.isArray` then passed, the
-   * defaults stopped being substituted, and the slide went blank.
-   *
-   * Reading through the same helper the canvases render with means the
-   * selection resolves and the first edit materialises those two defaults into
-   * the slide instead of erasing them. */
-  const activeSlideElements = slideElementsFor(activeSlide);
-  const selectedElement = activeSlideElements.find((el) => el.id === selectedElementId) || null;
 
   const renderNativeThumb = useCallback((index: number, width = 180) => {
     const slide = slides[index];
@@ -627,7 +658,7 @@ export function SlideEditorModal() {
         zIndex: (activeSlideElements.length) + 1,
       };
       handleUpdateSlideElements([...activeSlideElements, newElement]);
-      setSelectedElementId(newElement.id);
+      handleSelectElement(newElement.id);
       setActiveTool('select');
     } else if (['box', 'rectangle', 'rounded', 'circle', 'triangle', 'star', 'line'].includes(tool)) {
       const isCircle = tool === 'circle';
@@ -648,7 +679,7 @@ export function SlideEditorModal() {
         zIndex: (activeSlideElements.length) + 1,
       };
       handleUpdateSlideElements([...activeSlideElements, newElement]);
-      setSelectedElementId(newElement.id);
+      handleSelectElement(newElement.id);
       setActiveTool('select');
     } else if (tool === 'image') {
       const input = document.createElement('input');
@@ -671,7 +702,7 @@ export function SlideEditorModal() {
               zIndex: (activeSlideElements.length) + 1,
             };
             handleUpdateSlideElements([...activeSlideElements, newElement]);
-            setSelectedElementId(newElement.id);
+            handleSelectElement(newElement.id);
           };
           reader.readAsDataURL(file);
         }
@@ -1117,6 +1148,20 @@ export function SlideEditorModal() {
     updateDeckState((prev) => ({ ...prev, slides: updatedSlides }));
   }
 
+  function handleSelectElement(id: string | null, additive = false) {
+    if (id === null) {
+      setSelectedElementIds([]);
+      return;
+    }
+    if (additive) {
+      setSelectedElementIds((prev) =>
+        prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      );
+    } else {
+      setSelectedElementIds([id]);
+    }
+  }
+
   function handleUpdateSlideElements(elements: SlideElement[]) {
     handleUpdateSlide({ elements });
   }
@@ -1127,9 +1172,29 @@ export function SlideEditorModal() {
   }
 
   function handleDeleteElement(elementId: string) {
-    const updatedElements = activeSlideElements.filter((el) => el.id !== elementId);
+    const updatedElements = activeSlideElements.filter((el) => !selectedElementIds.includes(el.id) && el.id !== elementId);
     handleUpdateSlideElements(updatedElements);
-    setSelectedElementId(null);
+    setSelectedElementIds([]);
+  }
+
+  function handleDuplicateElements(idsToDuplicate?: string[]) {
+    const targetIds = idsToDuplicate || selectedElementIds;
+    if (!targetIds.length) return;
+    const targets = activeSlideElements.filter((el) => targetIds.includes(el.id));
+    if (!targets.length) return;
+
+    const now = Date.now();
+    const maxZ = Math.max(0, ...activeSlideElements.map((e) => e.zIndex || 1));
+    const duplicates: SlideElement[] = targets.map((target, idx) => ({
+      ...target,
+      id: `el-${now}-${idx}`,
+      x: Math.min(90, target.x + 3),
+      y: Math.min(90, target.y + 3),
+      zIndex: maxZ + 1 + idx,
+    }));
+
+    handleUpdateSlideElements([...activeSlideElements, ...duplicates]);
+    setSelectedElementIds(duplicates.map((d) => d.id));
   }
 
   function handleSaveToDeck() {
@@ -1218,7 +1283,7 @@ export function SlideEditorModal() {
           onSelectSlide={(idx) => {
             if (isPptxDeck) { pkg.setActiveIndex(idx); return; }
             setActiveSlideIndex(idx);
-            setSelectedElementId(null);
+            handleSelectElement(null);
           }}
           renderThumb={isPptxDeck ? renderPptxThumb : renderNativeThumb}
           readOnlyDeck={isPptxDeck}
@@ -1247,9 +1312,12 @@ export function SlideEditorModal() {
           slide={activeSlide}
           activeTool={activeTool}
           selectedElementId={selectedElementId}
-          onSelectElement={setSelectedElementId}
+          selectedElementIds={selectedElementIds}
+          onSelectElement={handleSelectElement}
           onUpdateElement={handleUpdateElement}
           onUpdateSlideText={(title, body) => handleUpdateSlide({ title, body })}
+          onDuplicateElements={handleDuplicateElements}
+          onAddElements={(newEls) => handleUpdateSlideElements([...activeSlideElements, ...newEls])}
           smartSnap={smartSnap}
         />
         )}
@@ -1263,7 +1331,7 @@ export function SlideEditorModal() {
           selectedElementId={selectedElementId}
           onUpdateElement={handleUpdateElement}
           onAddElements={(newEls) => handleUpdateSlideElements([...activeSlideElements, ...newEls])}
-          pptx={pptxInspector && {
+          pptx={pptxInspector ? {
             canGroup: pptxInspector.canGroup,
             canUngroup: pptxInspector.canUngroup,
             hasSelection: pptxSelected.length > 0,
@@ -1271,17 +1339,19 @@ export function SlideEditorModal() {
             onUngroup: handlePptxUngroup,
             onReorder: handlePptxReorder,
             onDelete: handlePptxDelete,
-          }}
+          } : null}
         />
 
         {/* Right Inspector Sidebar */}
         <SlideEditorRightSidebar
           slide={activeSlide}
           selectedElement={selectedElement}
+          selectedElementIds={selectedElementIds}
           onUpdateSlide={handleUpdateSlide}
           onUpdateElement={handleUpdateElement}
           onDeleteElement={handleDeleteElement}
-          onSelectElement={setSelectedElementId}
+          onDuplicateElements={handleDuplicateElements}
+          onSelectElement={handleSelectElement}
           onReorderElements={handleUpdateSlideElements}
           pptx={pptxInspector}
         />

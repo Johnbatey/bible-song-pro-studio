@@ -28,6 +28,7 @@ export interface LayerListProps {
   onSelect: (id: string, additive: boolean) => void;
   /** Both indices are into `rows`; the dragged row lands at `to`. */
   onReorder: (from: number, to: number) => void;
+  onDuplicateLayer?: (from: number, to: number) => void;
   onDelete?: (id: string) => void;
   onToggleLock?: (id: string) => void;
   emptyHint: string;
@@ -83,7 +84,7 @@ export function UnlockedIcon({ size = 12 }: { size?: number }) {
   );
 }
 
-export function LayerList({ rows, onSelect, onReorder, onDelete, onToggleLock, emptyHint }: LayerListProps) {
+export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelete, onToggleLock, emptyHint }: LayerListProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
@@ -111,18 +112,24 @@ export function LayerList({ rows, onSelect, onReorder, onDelete, onToggleLock, e
                 return;
               }
               setDragIndex(index);
-              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.effectAllowed = e.altKey ? 'copy' : 'move';
               e.dataTransfer.setData('text/plain', row.id);
             }}
             onDragOver={(e) => {
               if (dragIndex === null) return;
               e.preventDefault();
-              e.dataTransfer.dropEffect = 'move';
+              e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
               setOverIndex(index);
             }}
             onDrop={(e) => {
               e.preventDefault();
-              if (dragIndex !== null && dragIndex !== index) onReorder(dragIndex, index);
+              if (dragIndex !== null) {
+                if (e.altKey && onDuplicateLayer) {
+                  onDuplicateLayer(dragIndex, index);
+                } else if (dragIndex !== index) {
+                  onReorder(dragIndex, index);
+                }
+              }
               endDrag();
             }}
             onMouseDown={(e) => onSelect(row.id, e.shiftKey || e.metaKey)}

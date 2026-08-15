@@ -33,9 +33,12 @@ interface SlideEditorCanvasBoardProps {
   slide: PresentationSlide;
   activeTool: ActiveTool;
   selectedElementId: string | null;
-  onSelectElement: (id: string | null) => void;
+  selectedElementIds?: string[];
+  onSelectElement: (id: string | null, additive?: boolean) => void;
   onUpdateElement: (id: string, updates: Partial<SlideElement>) => void;
   onUpdateSlideText: (title: string, body: string) => void;
+  onDuplicateElements?: (ids?: string[]) => void;
+  onAddElements?: (newEls: SlideElement[]) => void;
   smartSnap: boolean;
 }
 
@@ -43,11 +46,17 @@ export function SlideEditorCanvasBoard({
   slide,
   activeTool,
   selectedElementId,
+  selectedElementIds,
   onSelectElement,
   onUpdateElement,
   onUpdateSlideText,
+  onDuplicateElements,
+  onAddElements,
   smartSnap,
 }: SlideEditorCanvasBoardProps) {
+  const activeSelection = selectedElementIds && selectedElementIds.length > 0
+    ? selectedElementIds
+    : (selectedElementId ? [selectedElementId] : []);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.75);
   const [panX, setPanX] = useState(0);
@@ -444,19 +453,10 @@ export function SlideEditorCanvasBoard({
 
         {/* Elements Rendering in Percentage */}
         {elements.map((el) => {
-          const isSelected = el.id === selectedElementId;
+          const isSelected = activeSelection.includes(el.id);
           const isEditing = el.id === editingTextId;
           const isLocked = Boolean(el.locked);
 
-          /* Element geometry is a percentage of the slide, everywhere.
-             This used to read `el.x > 100 ? (el.x / 1280) * 100 : el.x`,
-             guessing at the unit — and it guessed differently from the
-             renderer that actually goes to air, which has always written
-             `${el.x}%` flat (see NativeSlideBoard's ElementBox). So anything
-             positioned or sized past 100 sat in one place on the editor
-             canvas and a different place on the screen: the operator lined it
-             up here and it moved when they took it. The editor now reads the
-             numbers the same way the output does. */
           const elX = el.x;
           const elY = el.y;
           const elW = el.width;
@@ -467,18 +467,62 @@ export function SlideEditorCanvasBoard({
               key={el.id}
               onClick={(e) => {
                 e.stopPropagation();
-                onSelectElement(el.id);
+                onSelectElement(el.id, e.shiftKey || e.metaKey || e.ctrlKey);
               }}
               onDoubleClick={(e) => {
                 if (isLocked) return;
                 e.stopPropagation();
-                onSelectElement(el.id);
+                onSelectElement(el.id, false);
                 if (el.type === 'text') setEditingTextId(el.id);
               }}
               onPointerDown={(e) => {
                 if (isEditing || isLocked) return;
                 e.stopPropagation();
-                onSelectElement(el.id);
+
+                const isShift = e.shiftKey || e.metaKey || e.ctrlKey;
+                const isAlt = e.altKey;
+
+                if (isAlt) {
+                  // Alt / Option + Drag to Duplicate
+                  const now = Date.now();
+                  const targetsToDup = activeSelection.includes(el.id)
+                    ? elements.filter((item) => activeSelection.includes(item.id))
+                    : [el];
+
+                  const maxZ = Math.max(0, ...elements.map((item) => item.zIndex || 1));
+                  const duplicates: SlideElement[] = targetsToDup.map((target, idx) => ({
+                    ...target,
+                    id: `el-${now}-${idx}`,
+                    x: Math.min(95, target.x + 2),
+                    y: Math.min(95, target.y + 2),
+                    zIndex: maxZ + 1 + idx,
+                  }));
+
+                  if (onAddElements) {
+                    onAddElements(duplicates);
+                  }
+
+                  const activeDup = duplicates.find((d, idx) => targetsToDup[idx]?.id === el.id) || duplicates[0];
+                  if (activeDup) {
+                    onSelectElement(activeDup.id, false);
+                    setDragState({
+                      elementId: activeDup.id,
+                      handle: null,
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      initialX: activeDup.x,
+                      initialY: activeDup.y,
+                      initialW: activeDup.width,
+                      initialH: activeDup.height,
+                    });
+                  }
+                  return;
+                }
+
+                if (!isSelected || isShift) {
+                  onSelectElement(el.id, isShift);
+                }
+
                 setDragState({
                   elementId: el.id,
                   handle: null,

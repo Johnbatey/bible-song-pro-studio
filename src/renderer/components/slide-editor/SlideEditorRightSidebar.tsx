@@ -38,22 +38,24 @@ export interface PptxInspector {
 interface SlideEditorRightSidebarProps {
   slide: PresentationSlide;
   selectedElement: SlideElement | null;
+  selectedElementIds?: string[];
   onUpdateSlide: (updates: Partial<PresentationSlide>) => void;
   onUpdateElement: (id: string, updates: Partial<SlideElement>) => void;
   onDeleteElement: (id: string) => void;
-  onSelectElement: (id: string | null) => void;
+  onDuplicateElements?: (ids?: string[]) => void;
+  onSelectElement: (id: string | null, additive?: boolean) => void;
   onReorderElements: (elements: SlideElement[]) => void;
   pptx?: PptxInspector | null;
 }
 
-function nativeLayerRows(elements: SlideElement[], selectedId: string | null): LayerRow[] {
+function nativeLayerRows(elements: SlideElement[], selectedIds: string[]): LayerRow[] {
   return [...elements]
     .sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0))
     .map((el) => ({
       id: el.id,
       label: (el.content || '').trim().slice(0, 34) || el.type,
       kind: el.type === 'text' ? 'text' : el.type === 'image' ? 'image' : 'shape',
-      selected: el.id === selectedId,
+      selected: selectedIds.includes(el.id),
       locked: Boolean(el.locked),
     }));
 }
@@ -641,9 +643,11 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
 export function SlideEditorRightSidebar({
   slide,
   selectedElement,
+  selectedElementIds = [],
   onUpdateSlide,
   onUpdateElement,
   onDeleteElement,
+  onDuplicateElements,
   onSelectElement,
   onReorderElements,
   pptx = null,
@@ -686,7 +690,10 @@ export function SlideEditorRightSidebar({
      `slide.elements` straight gave an empty list for exactly those slides, and
      the inspector had nothing to point at. */
   const nativeElements = slideElementsFor(slide);
-  const nativeRows = nativeLayerRows(nativeElements, selectedElement?.id || null);
+  const activeSelectionIds = selectedElementIds.length > 0
+    ? selectedElementIds
+    : (selectedElement ? [selectedElement.id] : []);
+  const nativeRows = nativeLayerRows(nativeElements, activeSelectionIds);
 
   /**
    * Which element the Typography controls act on.
@@ -814,6 +821,26 @@ export function SlideEditorRightSidebar({
     order.splice(to, 0, moved);
     const zById = new Map(order.map((row, i) => [row.id, order.length - i]));
     onReorderElements(nativeElements.map((el) => ({ ...el, zIndex: zById.get(el.id) ?? el.zIndex })));
+  }
+
+  function handleNativeDuplicateLayer(from: number, to: number) {
+    const targetRow = nativeRows[from];
+    if (!targetRow) return;
+    const targetEl = nativeElements.find((e) => e.id === targetRow.id);
+    if (!targetEl) return;
+
+    const now = Date.now();
+    const duplicate: SlideElement = {
+      ...targetEl,
+      id: `el-${now}`,
+      x: Math.min(95, targetEl.x + 3),
+      y: Math.min(95, targetEl.y + 3),
+      zIndex: Math.max(0, ...nativeElements.map((e) => e.zIndex || 1)) + 1,
+    };
+
+    const nextElements = [...nativeElements, duplicate];
+    onReorderElements(nextElements);
+    onSelectElement(duplicate.id, false);
   }
 
   const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1068,6 +1095,111 @@ export function SlideEditorRightSidebar({
                 </div>
               )}
             </div>
+
+            {/* Multi-Selection Alignment & Operations Card */}
+            {selectedElementIds.length > 1 && (
+              <div style={styles.sectionCard}>
+                <div style={styles.sectionHeader}>
+                  <span style={styles.sectionTitle}>
+                    Multi-Selection ({selectedElementIds.length} items)
+                  </span>
+                </div>
+                <div style={styles.sectionBody}>
+                  <div style={styles.propRowCol}>
+                    <span style={styles.propLabel}>Alignment</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                      {[
+                        { label: '⇤ Align Left', align: 'left' },
+                        { label: '⤯ Center', align: 'center' },
+                        { label: '⇥ Right', align: 'right' },
+                        { label: '⤒ Top', align: 'top' },
+                        { label: '⤯ Middle', align: 'middle' },
+                        { label: '⤓ Bottom', align: 'bottom' },
+                      ].map((item) => (
+                        <button
+                          key={item.align}
+                          type="button"
+                          onClick={() => {
+                            const selectedEls = nativeElements.filter((e) => selectedElementIds.includes(e.id));
+                            if (!selectedEls.length) return;
+                            let targetVal = 0;
+                            if (item.align === 'left') targetVal = Math.min(...selectedEls.map((e) => e.x));
+                            if (item.align === 'right') targetVal = Math.max(...selectedEls.map((e) => e.x + e.width));
+                            if (item.align === 'center') {
+                              const avg = selectedEls.reduce((acc, e) => acc + (e.x + e.width / 2), 0) / selectedEls.length;
+                              selectedEls.forEach((e) => onUpdateElement(e.id, { x: parseFloat((avg - e.width / 2).toFixed(1)) }));
+                              return;
+                            }
+                            if (item.align === 'top') targetVal = Math.min(...selectedEls.map((e) => e.y));
+                            if (item.align === 'bottom') targetVal = Math.max(...selectedEls.map((e) => e.y + e.height));
+                            if (item.align === 'middle') {
+                              const avg = selectedEls.reduce((acc, e) => acc + (e.y + e.height / 2), 0) / selectedEls.length;
+                              selectedEls.forEach((e) => onUpdateElement(e.id, { y: parseFloat((avg - e.height / 2).toFixed(1)) }));
+                              return;
+                            }
+                            selectedEls.forEach((e) => {
+                              if (item.align === 'left') onUpdateElement(e.id, { x: targetVal });
+                              if (item.align === 'right') onUpdateElement(e.id, { x: targetVal - e.width });
+                              if (item.align === 'top') onUpdateElement(e.id, { y: targetVal });
+                              if (item.align === 'bottom') onUpdateElement(e.id, { y: targetVal - e.height });
+                            });
+                          }}
+                          style={{
+                            height: 26,
+                            background: 'var(--chrome-control)',
+                            border: '1px solid var(--border-primary)',
+                            borderRadius: 5,
+                            color: 'var(--text-primary)',
+                            fontSize: 10,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                          title={`Align ${item.align}`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => onDuplicateElements?.(selectedElementIds)}
+                      style={{
+                        flex: 1,
+                        height: 28,
+                        background: 'var(--chrome-control)',
+                        border: '1px solid var(--border-primary)',
+                        borderRadius: 5,
+                        color: '#FF5500',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ⌥ Duplicate All (⌘D)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => selectedElementIds.forEach((id) => onDeleteElement(id))}
+                      style={{
+                        height: 28,
+                        padding: '0 10px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: 5,
+                        color: '#f87171',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Delete All
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Typography. Hidden outright when the selection is a shape or an
                 image: a control that cannot act on what is selected is worse
@@ -1879,8 +2011,9 @@ export function SlideEditorRightSidebar({
             ) : (
               <LayerList
                 rows={nativeRows}
-                onSelect={(id) => onSelectElement(id)}
+                onSelect={(id, additive) => onSelectElement(id, additive)}
                 onReorder={handleNativeReorder}
+                onDuplicateLayer={handleNativeDuplicateLayer}
                 onDelete={onDeleteElement}
                 onToggleLock={(id) => {
                   const target = nativeElements.find((e) => e.id === id);
