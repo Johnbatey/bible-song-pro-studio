@@ -224,6 +224,7 @@ function ElementBox({ el }: { el: SlideElement }) {
           fontFamily: el.fontFamily || 'Inter',
           fontSize: el.fontSize || 36,
           fontWeight: el.fontWeight || 500,
+          fontStyle: el.fontStyle || 'normal',
           textAlign: el.textAlign || 'center',
           lineHeight: el.lineHeight || 1.3,
           letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,

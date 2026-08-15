@@ -93,6 +93,7 @@ export interface SlideElement {
   fontSize?: number;
   fontFamily?: string;
   fontWeight?: string | number;
+  fontStyle?: 'normal' | 'italic';
   color?: string;
   textAlign?: 'left' | 'center' | 'right' | 'justify';
   vAlign?: 'top' | 'middle' | 'bottom';

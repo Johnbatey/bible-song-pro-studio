@@ -574,6 +574,7 @@ export function SlideEditorCanvasBoard({
                       fontFamily: el.fontFamily || 'Inter',
                       fontSize: el.fontSize || 36,
                       fontWeight: el.fontWeight || 500,
+                      fontStyle: el.fontStyle || 'normal',
                       textAlign: el.textAlign || 'center',
                       lineHeight: el.lineHeight || 1.3,
                       /* Typing into a block must not change how it is set, or
@@ -601,6 +602,7 @@ export function SlideEditorCanvasBoard({
                       fontFamily: el.fontFamily || 'Inter',
                       fontSize: el.fontSize || 36,
                       fontWeight: el.fontWeight || 500,
+                      fontStyle: el.fontStyle || 'normal',
                       textAlign: el.textAlign || 'center',
                       lineHeight: el.lineHeight || 1.3,
                       letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,

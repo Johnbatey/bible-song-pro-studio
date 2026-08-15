@@ -373,6 +373,44 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
     }
   };
 
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const handlePointerDownTrack = (e: React.PointerEvent<HTMLDivElement>, targetStop?: 'start' | 'end') => {
+    if (!trackRef.current) return;
+    e.preventDefault();
+    const rect = trackRef.current.getBoundingClientRect();
+    const calculatePos = (clientX: number) => {
+      const pct = ((clientX - rect.left) / rect.width) * 100;
+      return Math.round(Math.max(0, Math.min(100, pct)));
+    };
+
+    const clickPos = calculatePos(e.clientX);
+    let stopToMove = targetStop;
+    if (!stopToMove) {
+      const distStart = Math.abs(clickPos - startPos);
+      const distEnd = Math.abs(clickPos - endPos);
+      stopToMove = distStart <= distEnd ? 'start' : 'end';
+    }
+
+    setActiveStop(stopToMove);
+    handlePosChange(stopToMove, clickPos);
+
+    const activeStopRef = stopToMove;
+
+    const onPointerMove = (moveEvt: PointerEvent) => {
+      const pos = calculatePos(moveEvt.clientX);
+      handlePosChange(activeStopRef, pos);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
+
   const activeColor = activeStop === 'start' ? startColor : endColor;
   const activePos = activeStop === 'start' ? startPos : endPos;
 
@@ -388,7 +426,11 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
         </div>
 
         {/* Ramp Track Bar Container */}
-        <div style={{ position: 'relative', width: '100%', paddingTop: 6, paddingBottom: 16 }}>
+        <div
+          ref={trackRef}
+          onPointerDown={(e) => handlePointerDownTrack(e)}
+          style={{ position: 'relative', width: '100%', paddingTop: 6, paddingBottom: 16, cursor: 'ew-resize', touchAction: 'none' }}
+        >
           {/* Main Gradient Bar */}
           <div
             style={{
@@ -402,7 +444,10 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
 
           {/* Movable Start / Highlight Stop Pointer Handle */}
           <div
-            onClick={() => setActiveStop('start')}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              handlePointerDownTrack(e, 'start');
+            }}
             style={{
               position: 'absolute',
               left: `calc(${startPos}% - 7px)`,
@@ -413,7 +458,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
               alignItems: 'center',
               zIndex: activeStop === 'start' ? 10 : 2,
             }}
-            title="Highlight Stop: Drag or click to edit"
+            title="Highlight Stop: Drag anywhere along the ramp bar"
           >
             {/* Arrow Pointer */}
             <div
@@ -440,7 +485,10 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
 
           {/* Movable End / Shadow Stop Pointer Handle */}
           <div
-            onClick={() => setActiveStop('end')}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              handlePointerDownTrack(e, 'end');
+            }}
             style={{
               position: 'absolute',
               left: `calc(${endPos}% - 7px)`,
@@ -451,7 +499,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
               alignItems: 'center',
               zIndex: activeStop === 'end' ? 10 : 2,
             }}
-            title="Shadow Stop: Drag or click to edit"
+            title="Shadow Stop: Drag anywhere along the ramp bar"
           >
             {/* Arrow Pointer */}
             <div
@@ -1245,10 +1293,10 @@ export function SlideEditorRightSidebar({
                     />
                   </div>
 
-                  {/* Weight & Size Row */}
+                  {/* Font Style / Sub-family & Size Row */}
                   <div style={styles.twoColRow}>
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>Weight</span>
+                      <span style={styles.propLabel}>Font Style</span>
                       <CustomDropdown
                         value={String(currentFontWeight)}
                         options={FONT_WEIGHTS}
@@ -1279,10 +1327,10 @@ export function SlideEditorRightSidebar({
                       <ScrubbableInput
                         value={currentLineHeight}
                         onChange={(v) => setText({ lineHeight: v })}
-                        min={0.5}
-                        max={3.0}
-                        step={0.1}
-                        precision={1}
+                        min={0.1}
+                        max={5.0}
+                        step={0.05}
+                        precision={2}
                         badge="⤌⤍"
                       />
                     </div>
@@ -1334,9 +1382,9 @@ export function SlideEditorRightSidebar({
                     </div>
                   </div>
 
-                  {/* Horizontal & Vertical Alignment */}
+                  {/* Horizontal & Vertical Alignment & Quick Styles */}
                   <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>Alignment</span>
+                    <span style={styles.propLabel}>Alignment & Styles</span>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {/* Horizontal Alignment */}
                       <div style={{ ...styles.segmentGroup, flex: 1 }}>
@@ -1358,6 +1406,39 @@ export function SlideEditorRightSidebar({
                             </button>
                           );
                         })}
+                      </div>
+
+                      {/* Italic & Underline Toggles */}
+                      <div style={{ ...styles.segmentGroup, width: 64 }}>
+                        <button
+                          type="button"
+                          onClick={() => setText({ fontStyle: targetTextElement?.fontStyle === 'italic' ? 'normal' : 'italic' })}
+                          style={{
+                            ...styles.segmentBtn,
+                            background: targetTextElement?.fontStyle === 'italic' ? 'var(--chrome-control-active)' : 'transparent',
+                            color: targetTextElement?.fontStyle === 'italic' ? '#FF5500' : 'var(--text-secondary)',
+                            fontStyle: 'italic',
+                            fontWeight: 700,
+                            fontFamily: 'serif',
+                          }}
+                          title="Italic"
+                        >
+                          I
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setText({ textDecoration: targetTextElement?.textDecoration === 'underline' ? 'none' : 'underline' })}
+                          style={{
+                            ...styles.segmentBtn,
+                            background: targetTextElement?.textDecoration === 'underline' ? 'var(--chrome-control-active)' : 'transparent',
+                            color: targetTextElement?.textDecoration === 'underline' ? '#FF5500' : 'var(--text-secondary)',
+                            textDecoration: 'underline',
+                            fontWeight: 700,
+                          }}
+                          title="Underline"
+                        >
+                          U
+                        </button>
                       </div>
 
                       {/* Vertical Alignment */}
