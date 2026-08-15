@@ -991,12 +991,12 @@ export function BiblePanel() {
             onClick={() => setShowStrongs((v) => !v)}
             style={{
               height: 38,
-              padding: '0 14px',
-              background: showStrongs ? '#141416' : 'var(--chrome-control)',
-              border: showStrongs ? 'none' : '1px solid var(--border-primary)',
+              padding: '0 12px',
+              background: showStrongs ? 'rgba(255, 85, 0, 0.15)' : 'var(--chrome-control)',
+              border: showStrongs ? '1px solid rgba(255, 85, 0, 0.4)' : '1px solid var(--border-primary)',
               borderRadius: 6,
-              color: showStrongs ? '#ffffff' : 'var(--text-primary)',
-              fontSize: 12,
+              color: showStrongs ? '#FF5500' : 'var(--text-secondary)',
+              fontSize: 11,
               fontWeight: 700,
               cursor: 'pointer',
               display: 'flex',
