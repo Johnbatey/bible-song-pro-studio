@@ -1,7 +1,8 @@
-import type { Alert, Scene, FullScreenTheme, Theme, VideoTransport } from '../../types';
+import type { Alert, Scene, FullScreenTheme, Theme, VideoTransport, AppSettings } from '../../types';
 import { memo, useEffect, useRef } from 'react';
 import type React from 'react';
 import { SlideStage } from './SlideStage';
+import { attachAudioOutputSink } from '../../utils/audio-output';
 import './ProgramSurface.css';
 
 export interface ProgramSurfaceState {
@@ -11,6 +12,7 @@ export interface ProgramSurfaceState {
   activeAlert?: Alert | null;
   transcription?: string;
   blackout?: boolean;
+  settings?: Partial<AppSettings>;
   /**
    * Whether an idle screen shows the "Bible Song Pro / Waiting for signal"
    * card. Defaults on, so a caller that knows nothing about it behaves as
@@ -247,6 +249,19 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     if (!el || !transport || transport.seekTo === null) return;
     if (Number.isFinite(transport.seekTo)) el.currentTime = transport.seekTo;
   }, [transport?.seekNonce]);
+
+  /* Audio output device routing & master volume */
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const targetDeviceId = preview
+      ? state.settings?.audioCueDeviceId
+      : state.settings?.audioOutputDeviceId;
+    attachAudioOutputSink(el, targetDeviceId);
+
+    const masterVol = (state.settings?.audioMasterVolume ?? 100) / 100;
+    el.volume = Math.max(0, Math.min(1, masterVol));
+  }, [preview, state.settings?.audioOutputDeviceId, state.settings?.audioCueDeviceId, state.settings?.audioMasterVolume]);
 
   const mode = state.outputMode || state.mode || 'fullscreen';
   const themeSection = mode === 'lowerThird' ? state.theme?.lowerThird : state.theme?.fullScreen;

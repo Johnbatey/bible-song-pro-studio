@@ -181,6 +181,7 @@ export function SettingsModal() {
   const [selectedDisplayId, setSelectedDisplayId] = useState<string>('auto');
   const [selectedStageDisplayId, setSelectedStageDisplayId] = useState<string>('auto');
   const [audioDevices, setAudioDevices] = useState<AudioInputDevice[]>([]);
+  const [outputAudioDevices, setOutputAudioDevices] = useState<AudioInputDevice[]>([]);
   /** Devices are there but unnamed — Chromium withholds labels until access is granted. */
   const [micNamesHidden, setMicNamesHidden] = useState(false);
 
@@ -308,18 +309,26 @@ export function SettingsModal() {
       const devices = await navigator.mediaDevices?.enumerateDevices();
       const inputs = (devices || [])
         .filter((device) => device.kind === 'audioinput')
-        /* Chromium lists a synthetic "default" entry that mirrors whichever
-           device the OS is on. The select already offers that as its first
-           option, so keeping it would show the same microphone twice. */
         .filter((device) => device.deviceId !== 'default')
         .map((device, index) => ({
           deviceId: device.deviceId || `input-${index}`,
           label: device.label || `Microphone ${index + 1}`,
         }));
       setAudioDevices(inputs);
+
+      const outputs = (devices || [])
+        .filter((device) => device.kind === 'audiooutput')
+        .filter((device) => device.deviceId !== 'default')
+        .map((device, index) => ({
+          deviceId: device.deviceId || `output-${index}`,
+          label: device.label || `Soundcard / Output ${index + 1}`,
+        }));
+      setOutputAudioDevices(outputs);
+
       setMicNamesHidden(inputs.length > 0 && (devices || []).every((d) => !d.label));
     } catch {
       setAudioDevices([]);
+      setOutputAudioDevices([]);
     }
   }, []);
 
@@ -752,6 +761,92 @@ export function SettingsModal() {
                     <div style={modalStyles.rowSub}>Allow hands-free control during sermons</div>
                   </div>
                   <AppleToggle checked={voiceCommands} onChange={setVoiceCommands} />
+                </div>
+
+                {/* Audio Output & Sound Routing Block */}
+                <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--settings-line)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>
+                    Audio Output & Sound Routing
+                  </div>
+
+                  {/* Program Soundcard / HDMI / Dante Output */}
+                  <div style={modalStyles.formRow}>
+                    <div>
+                      <div style={modalStyles.rowTitle}>Program Audio Output Device</div>
+                      <div style={modalStyles.rowSub}>
+                        Routes media & video soundtrack audio (e.g. HDMI to Projector, Sound Desk, Dante)
+                      </div>
+                    </div>
+                    <select
+                      style={modalStyles.selectInput}
+                      value={settings?.audioOutputDeviceId || 'default'}
+                      onChange={(e) => saveSettings({ audioOutputDeviceId: e.target.value })}
+                    >
+                      <option value="default">System Default Audio Output</option>
+                      {outputAudioDevices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Cue / Headphones Output */}
+                  <div style={modalStyles.formRow}>
+                    <div>
+                      <div style={modalStyles.rowTitle}>Monitor / Cue Headphones Device</div>
+                      <div style={modalStyles.rowSub}>
+                        Operator headphones output for pre-listening to video audio in Studio Mode
+                      </div>
+                    </div>
+                    <select
+                      style={modalStyles.selectInput}
+                      value={settings?.audioCueDeviceId || 'default'}
+                      onChange={(e) => saveSettings({ audioCueDeviceId: e.target.value })}
+                    >
+                      <option value="default">System Default Headphones / Secondary Device</option>
+                      {outputAudioDevices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Master Program Volume */}
+                  <div style={modalStyles.formRow}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <div style={modalStyles.rowTitle}>Master Program Volume</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {settings?.audioMasterVolume ?? 100}%
+                        </div>
+                      </div>
+                      <div style={modalStyles.rowSub}>Master output gain level for all played presentation media</div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={settings?.audioMasterVolume ?? 100}
+                        onChange={(e) => saveSettings({ audioMasterVolume: Number(e.target.value) })}
+                        style={modalStyles.rangeInput}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mono Mixdown Toggle */}
+                  <div style={modalStyles.formRow}>
+                    <div>
+                      <div style={modalStyles.rowTitle}>Mono PA Mixdown</div>
+                      <div style={modalStyles.rowSub}>
+                        Combine stereo L/R channels into mono for single-channel church PA systems
+                      </div>
+                    </div>
+                    <AppleToggle
+                      checked={Boolean(settings?.audioMonoMixdown)}
+                      onChange={(checked) => saveSettings({ audioMonoMixdown: checked })}
+                    />
+                  </div>
                 </div>
               </div>
             )}

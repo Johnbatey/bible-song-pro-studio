@@ -395,6 +395,11 @@ export interface SongImportResult {
   error?: string;
 }
 
+export interface AudioOutputDevice {
+  deviceId: string;
+  label: string;
+}
+
 export interface AppSettings {
   /** Secrets never come back from main — only whether one is stored. */
   deepgramApiKeySet?: boolean;
@@ -409,6 +414,14 @@ export interface AppSettings {
   sermonLanguage: SermonLanguage;
   obsUrl: string;
   obsAutoConnect: boolean;
+  /** Output audio device for Program media audio (e.g. HDMI, Sound Desk, Dante). */
+  audioOutputDeviceId?: string;
+  /** Cue/Headphones audio device for operator pre-listening. */
+  audioCueDeviceId?: string;
+  /** Master Program Audio Volume (0-100). */
+  audioMasterVolume?: number;
+  /** Mix down panned stereo tracks to Mono PA output. */
+  audioMonoMixdown?: boolean;
 }
 
 /** 'auto' lets Whisper detect the language per utterance. */
@@ -424,6 +437,10 @@ export interface AppSettingsPatch {
   obsUrl: string;
   obsPassword: string;
   obsAutoConnect: boolean;
+  audioOutputDeviceId?: string;
+  audioCueDeviceId?: string;
+  audioMasterVolume?: number;
+  audioMonoMixdown?: boolean;
 }
 
 export interface ObsStatus {
