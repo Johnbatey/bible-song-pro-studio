@@ -673,7 +673,13 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
         </div>
       )}
 
-      {state.activeAlert && <div className={`program-alert program-alert-${state.activeAlert.type}`}>{state.activeAlert.text}</div>}
+      {state.activeAlert && (
+        <div className={`program-alert program-alert-${state.activeAlert.type}`}>
+          <div className="program-alert-track">
+            <span className="program-alert-text">{state.activeAlert.text}</span>
+          </div>
+        </div>
+      )}
       {state.blackout && <div className="program-blackout" />}
     </div>
   );
