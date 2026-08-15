@@ -312,6 +312,21 @@ function createSongImportService() {
       .trim();
   }
 
+  function isLikelySongSectionHeader(line) {
+    return /^(verse|chorus|bridge|refrain|pre[-\s]?chorus|intro|outro|tag|ending|blank)(\s+\d+|[ .:-]*\d*)?$/i.test(
+      String(line || '').trim()
+    );
+  }
+
+  function inferSongTitleFromLyrics(lyrics, fallback = 'Imported Song') {
+    const lines = String(lyrics || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const preferred = lines.find((line) => !isLikelySongSectionHeader(line)) || lines[0] || fallback;
+    return preferred.replace(/\s+/g, ' ').slice(0, 80) || fallback;
+  }
+
   function parseOpenLpLyrics(xml) {
     const verses = [...String(xml || '').matchAll(/<verse\b[^>]*name=["']([^"']*)["'][^>]*>([\s\S]*?)<\/verse>/gi)]
       .map((m) => {
@@ -347,8 +362,18 @@ function createSongImportService() {
       const songId = Number(wordsRow && (wordsRow.song_id || wordsRow.rowid || wordsRow.id));
       const songRow = Number.isFinite(songId) ? titlesByRowId.get(songId) : wordsRow;
       const rawText = rtfToPlainText(wordsRow && (wordsRow.words || wordsRow.words_text || wordsRow.word || wordsRow.text || ''));
-      const title = (songRow && (songRow.title || songRow.song_title)) ? String(songRow.title || songRow.song_title).trim() : `EasyWorship Song ${index + 1}`;
-      const author = (songRow && (songRow.author || songRow.writer)) ? String(songRow.author || songRow.writer).trim() : '';
+
+      let title = (songRow && (songRow.title || songRow.song_title))
+        ? String(songRow.title || songRow.song_title).trim()
+        : (wordsRow && (wordsRow.title || wordsRow.song_title)) ? String(wordsRow.title || wordsRow.song_title).trim() : '';
+
+      if (!title || title.startsWith('EasyWorship Song')) {
+        title = inferSongTitleFromLyrics(rawText, `EasyWorship Song ${index + 1}`);
+      }
+
+      const author = (songRow && (songRow.author || songRow.writer))
+        ? String(songRow.author || songRow.writer).trim()
+        : (wordsRow && (wordsRow.author || wordsRow.writer)) ? String(wordsRow.author || wordsRow.writer).trim() : '';
 
       const { sections, verseOrder } = arrangeLyrics(rawText);
       return {
@@ -371,13 +396,19 @@ function createSongImportService() {
     }
 
     const songs = songsRows.map((row, index) => {
-      const title = row.title ? String(row.title).trim() : `OpenLP Song ${index + 1}`;
+      const xmlLyrics = row.lyrics ? String(row.lyrics) : '';
+      const verses = parseOpenLpLyrics(xmlLyrics);
+      const lyricsText = verses.map((v) => v.lines.join('\n')).join('\n\n');
+
+      let title = row.title ? String(row.title).trim() : '';
+      if (!title) {
+        title = inferSongTitleFromLyrics(lyricsText, `OpenLP Song ${index + 1}`);
+      }
+
       const author = row.authors || row.search_title || '';
       const ccli = row.ccli_number ? String(row.ccli_number) : '';
       const copyright = row.copyright ? String(row.copyright) : '';
-      const xmlLyrics = row.lyrics ? String(row.lyrics) : '';
 
-      const verses = parseOpenLpLyrics(xmlLyrics);
       const labels = labelsFor(verses.map((v) => v.name));
       const formattedVerses = verses.map((v, i) => ({ name: labels[i] || v.name, lines: v.lines }));
 
@@ -402,14 +433,31 @@ function createSongImportService() {
     // Check for SQLite database formats (EasyWorship & OpenLP)
     if (ext === '.db' || ext === '.ddb' || ext === '.sqlite' || ext === '.sqlite3') {
       try {
-        const tables = await readSqliteTables(filePath);
-        const hasWord = findTable(tables, 'word', 'words', 'songwords').length > 0;
-        const hasSong = findTable(tables, 'song', 'songs').length > 0;
+        const parentDir = path.dirname(filePath);
+        let siblingDbPaths = [filePath];
+        if (fs.existsSync(parentDir)) {
+          const files = fs.readdirSync(parentDir);
+          const dbs = files
+            .filter((f) => /\.(db|ddb)$/i.test(f))
+            .map((f) => path.join(parentDir, f));
+          if (dbs.length > 1) siblingDbPaths = dbs;
+        }
+
+        const mergedTables = {};
+        for (const dbPath of siblingDbPaths) {
+          try {
+            const dbTables = await readSqliteTables(dbPath);
+            Object.assign(mergedTables, dbTables);
+          } catch (_) {}
+        }
+
+        const hasWord = findTable(mergedTables, 'word', 'words', 'songwords').length > 0;
+        const hasSong = findTable(mergedTables, 'song', 'songs').length > 0;
 
         if (hasWord || hasSong) {
-          const songs = importEasyWorshipDatabase(tables);
+          const songs = importEasyWorshipDatabase(mergedTables);
           if (songs.length > 0) return { ok: true, songs, format: 'easyworship' };
-          const openLpSongs = importOpenLpDatabase(tables);
+          const openLpSongs = importOpenLpDatabase(mergedTables);
           if (openLpSongs.length > 0) return { ok: true, songs: openLpSongs, format: 'openlp' };
         }
         return { ok: false, error: 'Unsupported SQLite database structure. EasyWorship and OpenLP databases are supported.' };
