@@ -110,12 +110,40 @@ export function MediaPanel() {
     }
   };
 
+  const setCurrentScene = useAppStore((s) => s.setCurrentScene);
+  const setPreviewScene = useAppStore((s) => s.setPreviewScene);
+
+  const isSceneUsingItem = (scene: Scene | null, item: MediaItem) => {
+    if (!scene) return false;
+    const bgUrl = scene.background?.mediaUrl;
+    if (!bgUrl) return false;
+    return bgUrl === item.url || bgUrl === absoluteUrl(item);
+  };
+
   /* Removes the entry, not the operator's file. The library only ever pointed
-     at it, so deleting it here would destroy something the app does not own. */
+     at it, so deleting it here would destroy something the app does not own.
+     If the item is currently on Program or Preview, clear it immediately. */
   const handleRemove = async (item: MediaItem) => {
     const result = await window.BSP?.media?.remove(item.id).catch(() => null);
-    if (result?.ok) refresh();
-    else notify(result?.error || 'Could not remove that entry', 'warning');
+    if (result?.ok) {
+      if (isSceneUsingItem(currentScene, item)) {
+        if (currentScene?.type === 'media') {
+          setCurrentScene(null);
+        } else if (currentScene) {
+          setCurrentScene({ ...currentScene, background: undefined });
+        }
+      }
+      if (isSceneUsingItem(previewScene, item)) {
+        if (previewScene?.type === 'media') {
+          setPreviewScene(null);
+        } else if (previewScene) {
+          setPreviewScene({ ...previewScene, background: undefined });
+        }
+      }
+      refresh();
+    } else {
+      notify(result?.error || 'Could not remove that entry', 'warning');
+    }
   };
 
   const handleRelink = async (item: MediaItem) => {
