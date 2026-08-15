@@ -1452,6 +1452,55 @@ app.whenReady().then(async () => {
   ipcMain.handle('store:save', (_, p) => appStoreService?.save(p?.value) || { ok: false });
   ipcMain.handle('store:clear', () => appStoreService?.clear() || { ok: false });
 
+  // In-App Feedback to GitHub handler
+  ipcMain.handle('feedback:send', async (_, payload) => {
+    try {
+      const typeLabel = payload?.type === 'feature' ? '💡 Feature Request' : '🐛 Bug Report';
+      const church = payload?.churchName ? payload.churchName.trim() : 'Not specified';
+      const isBlocking = payload?.isBlocking ? 'Yes (Blocking issue)' : 'No';
+      const desc = payload?.description ? payload.description.trim() : '(No description provided)';
+      
+      const issueTitle = `[${payload?.type === 'feature' ? 'FEATURE' : 'BUG'}] Feedback from ${church !== 'Not specified' ? church : 'App User'}`;
+      const issueBody = `### ${typeLabel}\n\n` +
+        `**Church / Community**: ${church}\n` +
+        `**Blocking Issue**: ${isBlocking}\n` +
+        `**App Version**: ${app.getVersion()}\n` +
+        `**OS**: ${process.platform} (${process.arch})\n\n` +
+        `---\n` +
+        `### Description\n\n${desc}\n`;
+
+      const issueUrl = `https://github.com/Johnbatey/bible-song-pro-studio/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}`;
+
+      const webhookUrl = process.env.BSP_FEEDBACK_WEBHOOK_URL;
+      if (webhookUrl) {
+        const https = require('https');
+        const url = new URL(webhookUrl);
+        const postData = JSON.stringify({
+          title: issueTitle,
+          body: issueBody,
+          type: payload?.type,
+          churchName: church,
+          version: app.getVersion(),
+        });
+        const req = https.request(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData),
+          },
+        });
+        req.on('error', () => {});
+        req.write(postData);
+        req.end();
+      }
+
+      return { ok: true, issueUrl };
+    } catch (err) {
+      console.error('Feedback handler error:', err);
+      return { ok: false, error: err.message || String(err) };
+    }
+  });
+
   /* No audio:getInputDevices handler, deliberately.
      It used to return a hardcoded [] — and because that resolves rather than
      throws, the renderer's fallback to enumerateDevices never ran and the

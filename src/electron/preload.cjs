@@ -276,4 +276,7 @@ contextBridge.exposeInMainWorld('BSP', {
     detect: (text) => ipcRenderer.invoke('lexicon:detect', text),
     annotate: (text, book) => ipcRenderer.invoke('lexicon:annotate', { text, book }),
   },
+  feedback: {
+    send: (payload) => ipcRenderer.invoke('feedback:send', payload),
+  },
 });

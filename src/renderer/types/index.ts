@@ -881,8 +881,19 @@ declare global {
         importFile: () =>
           Promise<{ ok: boolean; canceled?: boolean; json?: string; filePath?: string; error?: string }>;
       };
+      feedback?: {
+        send: (payload: FeedbackPayload) => Promise<{ ok: boolean; issueUrl?: string; error?: string }>;
+      };
     };
   }
+}
+
+export interface FeedbackPayload {
+  type: 'bug' | 'feature';
+  churchName?: string;
+  description: string;
+  isBlocking?: boolean;
+  includeDiag?: boolean;
 }
 
 /** One of the on-device recognisers an operator can pick from. */

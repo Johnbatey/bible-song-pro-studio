@@ -223,9 +223,11 @@ export function SettingsModal() {
 
   // Feedback form state
   const [feedbackType, setFeedbackType] = useState<'bug' | 'feature'>('bug');
-  const [feedbackEmail, setFeedbackEmail] = useState('');
+  const [churchName, setChurchName] = useState('');
   const [feedbackDesc, setFeedbackDesc] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
+  const [feedbackSending, setFeedbackSending] = useState(false);
+  const [feedbackStatus, setFeedbackStatus] = useState<{ ok: boolean; msg: string; issueUrl?: string } | null>(null);
   const [wordStudy, setWordStudy] = useState(true);
   const [inputGain, setInputGain] = useState(0);
   const [voiceCommands, setVoiceCommands] = useState(true);
@@ -1327,7 +1329,7 @@ export function SettingsModal() {
                     }}
                     onClick={() => setFeedbackType('bug')}
                   >
-                    🐛 Bug
+                    🐛 Bug Report
                   </button>
                   <button
                     style={{
@@ -1337,49 +1339,142 @@ export function SettingsModal() {
                     }}
                     onClick={() => setFeedbackType('feature')}
                   >
-                    💡 Feature request
+                    💡 Feature Request
                   </button>
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
-                    Email <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
+                    Church / Community Name <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
                   </div>
                   <input
-                    type="email"
-                    placeholder="name@example.com"
-                    value={feedbackEmail}
-                    onChange={(e) => setFeedbackEmail(e.target.value)}
+                    type="text"
+                    placeholder="e.g. Grace Chapel / City Youth Ministry"
+                    value={churchName}
+                    onChange={(e) => setChurchName(e.target.value)}
                     style={modalStyles.textInput}
                   />
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>Report a bug</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>A clear report helps us reproduce it quickly.</div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                    <span style={modalStyles.chipBadge}>What you were doing</span>
-                    <span style={modalStyles.chipBadge}>What you expected</span>
-                    <span style={modalStyles.chipBadge}>What actually happened</span>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                    {feedbackType === 'bug' ? 'Describe the bug' : 'Describe the feature request'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                    {feedbackType === 'bug'
+                      ? 'A clear report helps us reproduce and fix it quickly.'
+                      : 'Let us know how this feature would help your church or media team.'}
                   </div>
                   <textarea
-                    rows={4}
-                    placeholder="Describe the issue in a few sentences..."
+                    rows={5}
+                    placeholder={
+                      feedbackType === 'bug'
+                        ? 'Describe what you were doing, what you expected, and what happened...'
+                        : 'Describe the feature you would like to see in Bible Song Pro Studio...'
+                    }
                     value={feedbackDesc}
                     onChange={(e) => setFeedbackDesc(e.target.value)}
                     style={modalStyles.textareaInput}
                   />
                 </div>
 
-                <button style={modalStyles.actionBtn}>
-                  📤 Add screenshot
-                </button>
-
-                <div style={{ ...modalStyles.formRow, marginTop: 16 }}>
+                <div style={{ ...modalStyles.formRow, marginBottom: 16 }}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Blocking issue</div>
+                    <div style={modalStyles.rowTitle}>Blocking Issue</div>
+                    <div style={modalStyles.rowSubtitle}>This issue prevents normal service or presentation setup</div>
                   </div>
                   <AppleToggle checked={isBlocking} onChange={setIsBlocking} />
+                </div>
+
+                {feedbackStatus && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      marginBottom: 16,
+                      fontSize: 12,
+                      background: feedbackStatus.ok ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      border: `1px solid ${feedbackStatus.ok ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                      color: feedbackStatus.ok ? '#22C55E' : '#EF4444',
+                    }}
+                  >
+                    <div>{feedbackStatus.msg}</div>
+                    {feedbackStatus.issueUrl && (
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => void window.BSP?.openExternal(feedbackStatus.issueUrl!)}
+                        style={{ marginTop: 6, fontSize: 11, background: '#FF5500', color: '#FFF', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '4px 10px' }}
+                      >
+                        🔗 Open Issue on GitHub
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    style={{
+                      ...modalStyles.actionBtn,
+                      background: '#FF5500',
+                      color: '#FFF',
+                      borderColor: '#FF5500',
+                      fontWeight: 700,
+                      opacity: feedbackSending || !feedbackDesc.trim() ? 0.6 : 1,
+                      cursor: feedbackSending || !feedbackDesc.trim() ? 'not-allowed' : 'pointer',
+                    }}
+                    disabled={feedbackSending || !feedbackDesc.trim()}
+                    onClick={async () => {
+                      if (!feedbackDesc.trim()) return;
+                      setFeedbackSending(true);
+                      setFeedbackStatus(null);
+                      try {
+                        const res = await window.BSP?.feedback?.send({
+                          type: feedbackType,
+                          churchName,
+                          description: feedbackDesc,
+                          isBlocking,
+                          includeDiag: true,
+                        });
+                        if (res && res.ok) {
+                          setFeedbackStatus({
+                            ok: true,
+                            msg: 'Thank you! Your feedback has been prepared for GitHub.',
+                            issueUrl: res.issueUrl,
+                          });
+                          setFeedbackDesc('');
+                        } else {
+                          setFeedbackStatus({
+                            ok: false,
+                            msg: res?.error || 'Failed to submit feedback. You can use the link below.',
+                          });
+                        }
+                      } catch (err) {
+                        setFeedbackStatus({
+                          ok: false,
+                          msg: 'Could not send directly. Click below to submit on GitHub.',
+                        });
+                      } finally {
+                        setFeedbackSending(false);
+                      }
+                    }}
+                  >
+                    {feedbackSending ? 'Sending…' : '📤 Submit Feedback to GitHub'}
+                  </button>
+
+                  <button
+                    style={modalStyles.actionBtn}
+                    onClick={() => {
+                      const issueTitle = `[${feedbackType.toUpperCase()}] Feedback from ${churchName ? churchName.trim() : 'App User'}`;
+                      const issueBody = `### ${feedbackType === 'bug' ? '🐛 Bug Report' : '💡 Feature Request'}\n\n` +
+                        `**Church / Community**: ${churchName ? churchName.trim() : 'Not specified'}\n` +
+                        `**Blocking Issue**: ${isBlocking ? 'Yes' : 'No'}\n\n` +
+                        `---\n### Description\n\n${feedbackDesc.trim() || '(No description)'}\n`;
+                      const url = `https://github.com/Johnbatey/bible-song-pro-studio/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}`;
+                      void window.BSP?.openExternal(url);
+                    }}
+                  >
+                    🔗 Open directly on GitHub
+                  </button>
                 </div>
               </div>
             )}
