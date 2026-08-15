@@ -94,6 +94,13 @@ function createSettingsService({ app }) {
     return getPublic();
   }
 
+  function clearSecret(key) {
+    if (!SECRET_KEYS.has(key)) return { ok: false, error: 'Not a secret setting' };
+    readAll()[key] = '';
+    persist();
+    return getPublic();
+  }
+
   function reset() {
     cache = { ...DEFAULTS };
     try {

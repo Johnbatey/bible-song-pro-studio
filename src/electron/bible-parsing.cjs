@@ -313,7 +313,7 @@ function parseJsonBible(jsonObj, fallbackId) {
   const localizedBookNames = [];
   let bookIndex = 1;
 
-  const root = jsonObj.versions?.[fallbackId] || jsonObj.bible || jsonObj;
+  const root = jsonObj.books || jsonObj.versions?.[fallbackId] || jsonObj.bible || jsonObj;
 
   if (typeof root === 'object' && !Array.isArray(root)) {
     Object.keys(root).forEach((bName) => {
