@@ -24,6 +24,10 @@ const DEFAULTS = {
   obsUrl: 'ws://127.0.0.1:4455',
   obsPassword: '',
   obsAutoConnect: false,
+  audioOutputDeviceId: 'default',
+  audioCueDeviceId: 'default',
+  audioMasterVolume: 100,
+  audioMonoMixdown: false,
 };
 
 /**
