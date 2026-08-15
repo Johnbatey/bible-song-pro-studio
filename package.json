@@ -115,7 +115,6 @@
     "@deepgram/sdk": "^3.6.0",
     "@huggingface/transformers": "^3.8.1",
     "animejs": "^3.2.2",
-    "better-sqlite3": "^13.0.3",
     "dockview": "^7.0.4",
     "dockview-react": "^7.0.4",
     "jszip": "^3.10.1",
@@ -125,6 +124,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
+    "sql.js": "^1.14.2",
     "uuid": "^11.0.0",
     "ws": "^8.18.0",
     "zustand": "^5.0.0"
