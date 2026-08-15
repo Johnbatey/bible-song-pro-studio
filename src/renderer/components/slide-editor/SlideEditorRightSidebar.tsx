@@ -667,13 +667,13 @@ export function SlideEditorRightSidebar({
     };
   }, []);
 
-  // Accordion Section Expansion States
+  // Accordion Section Expansion States (collapsed by default)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    canvas: true,
-    typography: true,
-    shape: true,
-    effects: true,
-    geometry: true,
+    canvas: false,
+    typography: false,
+    shape: false,
+    effects: false,
+    geometry: false,
   });
 
   const [lockAspect, setLockAspect] = useState(true);
@@ -2027,38 +2027,44 @@ export function SlideEditorRightSidebar({
 
         {/* ---- AI STUDIO TAB ---------------------------------------------- */}
         {activeTab === 'ai' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)', textTransform: 'uppercase' }}>
-              AI Studio Generator
-            </span>
-            <textarea
-              placeholder="Describe the slide theme or sermon content..."
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 280, padding: '32px 16px', textAlign: 'center', gap: 12 }}>
+            <div
               style={{
-                height: 80,
-                background: '#1c1e26',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: 6,
-                color: '#ffffff',
-                padding: 8,
-                fontSize: 12,
-                resize: 'none',
-              }}
-            />
-            <button
-              type="button"
-              style={{
-                padding: '8px 12px',
-                background: '#FF5500',
-                border: 'none',
-                borderRadius: 6,
-                color: '#ffffff',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                background: 'rgba(255, 85, 0, 0.12)',
+                border: '1px solid rgba(255, 85, 0, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 22,
+                color: '#FF5500',
               }}
             >
-              Generate AI Slide
-            </button>
+              ✨
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }}>
+              AI Studio
+            </div>
+            <div
+              style={{
+                padding: '4px 12px',
+                borderRadius: 12,
+                background: 'rgba(244, 114, 182, 0.15)',
+                border: '1px solid rgba(244, 114, 182, 0.3)',
+                color: '#f472b6',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Coming Soon
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0, maxWidth: 220 }}>
+              AI-powered slide generation, smart sermon layouts, and automated theme styling are currently in development.
+            </p>
           </div>
         )}
       </div>
