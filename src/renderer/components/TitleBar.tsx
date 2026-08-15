@@ -11,8 +11,14 @@ export function TitleBar() {
   const takeToProgram = useAppStore((s) => s.takeToProgram);
   const setExternalDisplay = useAppStore((s) => s.setExternalDisplay);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
+  const activeAlert = useAppStore((s) => s.activeAlert);
   const triggerAlert = useAppStore((s) => s.triggerAlert);
+  const dismissAlert = useAppStore((s) => s.dismissAlert);
   const notify = useAppStore((s) => s.notify);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertText, setAlertText] = useState('Nursery Call #402');
+  const [alertType, setAlertType] = useState<'announcement' | 'warning' | 'info'>('announcement');
+  const [alertDuration, setAlertDuration] = useState<number>(10);
   const openDockIds = useAppStore((s) => s.openDockIds);
 
   /* Blackout lives in the store, not in this component.
@@ -97,6 +103,25 @@ export function TitleBar() {
       duration: 3,
       animation: 'slideDown',
     });
+  };
+
+  const handleSendAlert = () => {
+    if (!alertText.trim()) return;
+    triggerAlert({
+      id: String(Date.now()),
+      text: alertText.trim(),
+      type: alertType,
+      duration: alertDuration,
+      animation: 'fade',
+    });
+    notify({
+      id: `alert-sent-${Date.now()}`,
+      text: `Alert broadcast to screens: "${alertText.trim()}"`,
+      type: 'info',
+      duration: 3,
+      animation: 'slideDown',
+    });
+    setShowAlertModal(false);
   };
 
   return (
@@ -286,26 +311,26 @@ export function TitleBar() {
 
           {/* Alerts Button */}
           <button
-            style={styles.toolbarBtn}
-            onClick={() => {
-              const msg = prompt('Enter Alert Message for Screen:', 'Nursery Call #402');
-              if (msg) {
-                triggerAlert({
-                  id: String(Date.now()),
-                  text: msg,
-                  type: 'announcement',
-                  duration: 6000,
-                  animation: 'fade',
-                });
-              }
+            style={{
+              ...styles.toolbarBtn,
+              background: activeAlert ? 'rgba(255, 85, 0, 0.2)' : styles.toolbarBtn.background,
+              borderColor: activeAlert ? '#FF5500' : 'transparent',
+              color: activeAlert ? '#FF5500' : 'var(--text-secondary)',
+              fontWeight: activeAlert ? 700 : 500,
             }}
-            title="Trigger On-Screen Lower-Third Alert"
+            onClick={() => setShowAlertModal((v) => !v)}
+            title={activeAlert ? `Alert ON AIR: "${activeAlert.text}" — Click to manage` : 'Broadcast On-Screen Alert to Display Screens'}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            Alerts
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Alerts
+              {activeAlert && (
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FF5500', boxShadow: '0 0 6px #FF5500' }} />
+              )}
+            </span>
           </button>
 
           {/* Settings Button */}
@@ -354,6 +379,274 @@ export function TitleBar() {
 
         {/* No window controls here — the OS frame already draws them. */}
       </div>
+
+      {/* On-Screen Display Alert Trigger Modal Dialog */}
+      {showAlertModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 20,
+          }}
+          onClick={() => setShowAlertModal(false)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 12,
+              padding: 24,
+              maxWidth: 480,
+              width: '100%',
+              boxShadow: '0 16px 32px rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: 'rgba(255, 85, 0, 0.15)',
+                    border: '1px solid rgba(255, 85, 0, 0.4)',
+                    color: '#FF5500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Project On-Screen Alert
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: 12, color: 'var(--text-dim)' }}>
+                    Broadcast a ticker alert to audience and stage display screens
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAlertModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-dim)',
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  padding: 4,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Active Alert Banner if running */}
+            {activeAlert && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  background: 'rgba(255, 85, 0, 0.12)',
+                  border: '1px solid rgba(255, 85, 0, 0.4)',
+                  borderRadius: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}
+              >
+                <div style={{ fontSize: 13, color: '#FF5500', fontWeight: 600 }}>
+                  Active On Air: <strong>"{activeAlert.text}"</strong>
+                </div>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => dismissAlert()}
+                  style={{
+                    background: '#EF4444',
+                    color: '#FFF',
+                    fontSize: 12,
+                    padding: '4px 10px',
+                    borderRadius: 4,
+                    border: 'none',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Clear Alert
+                </button>
+              </div>
+            )}
+
+            {/* Presets */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', marginBottom: 8 }}>
+                Quick Presets
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[
+                  'Nursery Call #101',
+                  'Nursery Call #402',
+                  'Car Lights On (ABC-123)',
+                  'Service Starting Soon',
+                  'Quiet Please',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setAlertText(preset)}
+                    style={{
+                      fontSize: 12,
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      background: alertText === preset ? 'rgba(255, 85, 0, 0.15)' : 'var(--chrome-control)',
+                      borderColor: alertText === preset ? '#FF5500' : 'var(--border-primary)',
+                      color: alertText === preset ? '#FF5500' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Input Message */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Alert Message
+              </label>
+              <input
+                className="input"
+                value={alertText}
+                onChange={(e) => setAlertText(e.target.value)}
+                placeholder="Enter alert text..."
+                style={{
+                  height: 38,
+                  padding: '0 12px',
+                  fontSize: 13,
+                  borderRadius: 6,
+                  border: '1px solid var(--border-primary)',
+                  background: 'var(--chrome-control)',
+                  color: 'var(--text-primary)',
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSendAlert();
+                  }
+                }}
+              />
+            </div>
+
+            {/* Alert Type & Duration */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Alert Style / Severity
+                </label>
+                <select
+                  className="input"
+                  value={alertType}
+                  onChange={(e) => setAlertType(e.target.value as any)}
+                  style={{
+                    height: 36,
+                    padding: '0 8px',
+                    fontSize: 12,
+                    borderRadius: 6,
+                    border: '1px solid var(--border-primary)',
+                    background: 'var(--chrome-control)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value="announcement">Announcement (Orange)</option>
+                  <option value="warning">Warning (Red)</option>
+                  <option value="info">Info (Blue)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  On-Screen Duration
+                </label>
+                <select
+                  className="input"
+                  value={alertDuration}
+                  onChange={(e) => setAlertDuration(Number(e.target.value))}
+                  style={{
+                    height: 36,
+                    padding: '0 8px',
+                    fontSize: 12,
+                    borderRadius: 6,
+                    border: '1px solid var(--border-primary)',
+                    background: 'var(--chrome-control)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value={10}>10 Seconds</option>
+                  <option value={30}>30 Seconds</option>
+                  <option value={60}>60 Seconds</option>
+                  <option value={0}>Until Manually Cleared</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+              {activeAlert && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => dismissAlert()}
+                  style={{ padding: '8px 14px', fontSize: 13, borderRadius: 6, color: '#EF4444' }}
+                >
+                  Clear Active Alert
+                </button>
+              )}
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowAlertModal(false)}
+                style={{ padding: '8px 14px', fontSize: 13, borderRadius: 6 }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                onClick={handleSendAlert}
+                style={{
+                  padding: '8px 18px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  borderRadius: 6,
+                  background: '#FF5500',
+                  color: '#FFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Send Alert
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

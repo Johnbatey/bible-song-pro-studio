@@ -11,6 +11,8 @@ import { createDefaultTheme } from '../utils/defaultTheme';
  * Persisted slices live in a JSON file under the app's userData dir (via store:* IPC),
  * falling back to localStorage when running in a plain browser (`npm run dev`).
  */
+let _alertTimer: any = null;
+
 const bspStorage: StateStorage = {
   getItem: async (name) => {
     if (window.BSP?.store) {
@@ -520,8 +522,36 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
 
   alerts: [],
   activeAlert: null,
-  triggerAlert: (alert) => set({ activeAlert: alert }),
-  dismissAlert: () => set({ activeAlert: null }),
+  triggerAlert: (alert) => {
+    if (_alertTimer) clearTimeout(_alertTimer);
+    set({ activeAlert: alert });
+    try {
+      if (window.BSP?.display?.sendState) {
+        window.BSP.display.sendState({ activeAlert: alert });
+      }
+    } catch (_) {}
+    const sec = alert.duration || 10;
+    const durationMs = sec > 100 ? sec : sec * 1000;
+    if (durationMs > 0 && durationMs < 86400000) {
+      _alertTimer = setTimeout(() => {
+        set({ activeAlert: null });
+        try {
+          if (window.BSP?.display?.sendState) {
+            window.BSP.display.sendState({ activeAlert: null });
+          }
+        } catch (_) {}
+      }, durationMs);
+    }
+  },
+  dismissAlert: () => {
+    if (_alertTimer) clearTimeout(_alertTimer);
+    set({ activeAlert: null });
+    try {
+      if (window.BSP?.display?.sendState) {
+        window.BSP.display.sendState({ activeAlert: null });
+      }
+    } catch (_) {}
+  },
   notices: [],
   notify: (notice) =>
     set((s) => ({
