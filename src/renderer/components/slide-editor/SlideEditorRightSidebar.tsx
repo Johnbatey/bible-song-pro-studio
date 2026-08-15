@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { LayerList, type LayerRow } from './LayerList';
 import { ShapeInspector } from '../ShapeInspector';
 import { SlideTextPanel } from '../SlideTextPanel';
@@ -8,6 +8,7 @@ import { slideElementsFor } from '../NativeSlideBoard';
 import type { ParsedShape } from '../../slide-engine/parser/slide-parser';
 import type { PresentationSlide, SlideElement } from '../../types';
 import { parseBackgroundInfo, gradientCss } from '../../utils/background';
+import { fetchInstalledSystemFonts, type FontOptionItem } from '../../utils/system-fonts';
 
 export interface PptxInspector {
   selected: ParsedShape[];
@@ -650,6 +651,18 @@ export function SlideEditorRightSidebar({
   const [activeTab, setActiveTab] = useState<'design' | 'layer' | 'ai'>('design');
   const bgFileInputRef = useRef<HTMLInputElement>(null);
 
+  const [systemFontItems, setSystemFontItems] = useState<FontOptionItem[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchInstalledSystemFonts().then((items) => {
+      if (isMounted) setSystemFontItems(items);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Accordion Section Expansion States
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     canvas: true,
@@ -713,6 +726,26 @@ export function SlideEditorRightSidebar({
   const currentFontFamily = pptx
     ? (firstPptxRun?.fontFamily || firstPptxRun?.fontFace || 'Inter')
     : (targetTextElement?.fontFamily || 'Inter');
+
+  const fontOptions = useMemo(() => {
+    const list: FontOptionItem[] = systemFontItems.length > 0
+      ? [...systemFontItems]
+      : FONT_FAMILIES.map((f) => ({ value: f.value, label: f.label, isSystemFont: false }));
+
+    if (currentFontFamily && !list.some((f) => f.value.toLowerCase() === currentFontFamily.toLowerCase())) {
+      list.unshift({ value: currentFontFamily, label: currentFontFamily, isSystemFont: true });
+    }
+
+    return list.map((f) => ({
+      value: f.value,
+      label: (
+        <span style={{ fontFamily: `"${f.value}", sans-serif`, fontSize: 13 }}>
+          {f.label}
+        </span>
+      ),
+      sublabel: f.isSystemFont ? 'System Font' : 'App Font',
+    }));
+  }, [systemFontItems, currentFontFamily]);
 
   const currentFontWeight = pptx
     ? (firstPptxRun?.fontWeight ?? (firstPptxRun?.bold ? 700 : 600))
@@ -1073,7 +1106,7 @@ export function SlideEditorRightSidebar({
                     <span style={styles.propLabel}>Font</span>
                     <CustomDropdown
                       value={currentFontFamily}
-                      options={FONT_FAMILIES}
+                      options={fontOptions}
                       onChange={(font) => setText({ fontFamily: font })}
                       style={{ width: '100%' }}
                       zIndex={100005}
