@@ -753,6 +753,8 @@ declare global {
         getBooks: (versionId: string) => Promise<BibleBook[]>;
         getChapter: (payload: { versionId: string; book: string; chapter: number }) => Promise<BibleVerse[]>;
         search: (payload: { versionId: string; query: string; limit?: number; book?: string }) => Promise<BibleSearchResult[]>;
+        pick: (payload?: any) => Promise<{ ok: boolean; filePaths?: string[]; canceled?: boolean }>;
+        importFile: (payload: { filePath: string; overwrite?: boolean }) => Promise<{ ok: boolean; exists?: boolean; imported?: boolean; versionId?: string; versionName?: string; filePath?: string; error?: string }>;
       };
 
       verse: {

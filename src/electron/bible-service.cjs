@@ -118,21 +118,145 @@ function parseKjvXml(xml) {
   return bible;
 }
 
+function getUserBibleDir() {
+  let userDataPath = '';
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.getPath === 'function') userDataPath = app.getPath('userData');
+  } catch (_) {}
+  if (!userDataPath) {
+    userDataPath = path.join(__dirname, '../../userData');
+  }
+  const dir = path.join(userDataPath, 'bibles');
+  if (!fs.existsSync(dir)) {
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+  }
+  return dir;
+}
+
+function getAllVersionMeta() {
+  const metaList = [...VERSION_META];
+  const userDir = getUserBibleDir();
+  if (fs.existsSync(userDir)) {
+    try {
+      const files = fs.readdirSync(userDir);
+      files.forEach((file) => {
+        if (!file.endsWith('.json') && !file.endsWith('.xml')) return;
+        const baseId = path.basename(file, path.extname(file));
+        const existing = metaList.find((m) => m.id.toLowerCase() === baseId.toLowerCase());
+        if (!existing) {
+          let metaName = baseId;
+          const filePath = path.join(userDir, file);
+          try {
+            if (file.endsWith('.json')) {
+              const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              if (parsed && parsed.name) metaName = parsed.name;
+            }
+          } catch (_) {}
+          metaList.push({
+            id: baseId,
+            name: metaName,
+            abbreviation: baseId,
+            language: 'en',
+            file,
+            type: file.endsWith('.xml') ? 'xml' : 'json',
+            isUser: true,
+            userPath: filePath,
+          });
+        }
+      });
+    } catch (_) {}
+  }
+  return metaList;
+}
+
 function loadVersion(meta) {
-  const filePath = path.join(getBibleDir(), meta.file);
+  const filePath = meta.userPath || path.join(getBibleDir(), meta.file);
   if (!fs.existsSync(filePath)) return {};
   if (meta.type === 'xml') return parseKjvXml(fs.readFileSync(filePath, 'utf8'));
-  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (parsed && parsed.books && typeof parsed.books === 'object') {
+      return parsed.books;
+    }
+    return parsed;
+  } catch (_) {
+    return {};
+  }
 }
 
 function getData() {
   if (cache) return cache;
   const versions = {};
-  VERSION_META.forEach((meta) => {
+  const allMeta = getAllVersionMeta();
+  allMeta.forEach((meta) => {
     versions[meta.id] = loadVersion(meta);
   });
   cache = { versions };
   return cache;
+}
+
+function importBibleFile({ filePath, overwrite = false }) {
+  if (!filePath || !fs.existsSync(filePath)) return { ok: false, error: 'File not found: ' + filePath };
+  const ext = path.extname(filePath).toLowerCase();
+  let baseId = path.basename(filePath, ext).replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase() || 'CUSTOM';
+  let versionName = baseId;
+  let booksData = {};
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    if (ext === '.xml' || content.trim().startsWith('<?xml') || content.trim().startsWith('<b ')) {
+      booksData = parseKjvXml(content);
+    } else {
+      const parsed = JSON.parse(content);
+      if (parsed.id) baseId = String(parsed.id).trim().toUpperCase();
+      if (parsed.name) versionName = String(parsed.name).trim();
+      if (parsed.books && typeof parsed.books === 'object') {
+        booksData = parsed.books;
+      } else {
+        booksData = parsed;
+      }
+    }
+  } catch (err) {
+    return { ok: false, error: 'Failed to parse Bible file: ' + (err.message || String(err)) };
+  }
+
+  if (!booksData || typeof booksData !== 'object' || Object.keys(booksData).length === 0) {
+    return { ok: false, error: 'No valid books or verses found in Bible file.' };
+  }
+
+  const allMeta = getAllVersionMeta();
+  const existing = allMeta.find((m) => m.id.toLowerCase() === baseId.toLowerCase() || m.name.toLowerCase() === versionName.toLowerCase());
+
+  if (existing && !overwrite) {
+    return {
+      ok: true,
+      exists: true,
+      versionId: existing.id,
+      versionName: existing.name,
+      filePath,
+    };
+  }
+
+  const userDir = getUserBibleDir();
+  const targetPath = path.join(userDir, `${baseId}.json`);
+  const payload = {
+    id: baseId,
+    name: versionName,
+    abbreviation: baseId,
+    books: booksData,
+  };
+
+  fs.writeFileSync(targetPath, JSON.stringify(payload, null, 2), 'utf8');
+  cache = null;
+  bibleSearchCache.clear();
+
+  return {
+    ok: true,
+    imported: true,
+    versionId: baseId,
+    versionName,
+  };
 }
 
 function normalizeBookName(input, versionId = 'KJV') {
@@ -183,7 +307,8 @@ function parseReference(query, versionId = 'KJV') {
 
 function getVersions() {
   const data = getData();
-  return VERSION_META.map((meta) => {
+  const allMeta = getAllVersionMeta();
+  return allMeta.map((meta) => {
     const books = Object.entries(data.versions[meta.id] || {}).map(([name, chapters]) => ({
       name,
       chapters: Object.keys(chapters || {}).length,
@@ -289,4 +414,5 @@ module.exports = {
   parseReference,
   normalizeReferenceQuery,
   normalizeSearchText,
+  importBibleFile,
 };

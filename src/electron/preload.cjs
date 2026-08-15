@@ -72,6 +72,8 @@ contextBridge.exposeInMainWorld('BSP', {
     getBooks: (versionId) => ipcRenderer.invoke('bible:getBooks', versionId),
     getChapter: (payload) => ipcRenderer.invoke('bible:getChapter', payload),
     search: (payload) => ipcRenderer.invoke('bible:search', payload),
+    pick: () => ipcRenderer.invoke('bible:pick'),
+    importFile: (payload) => ipcRenderer.invoke('bible:importFile', payload),
   },
 
   verse: {

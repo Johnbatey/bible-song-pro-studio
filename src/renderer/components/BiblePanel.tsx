@@ -324,10 +324,80 @@ export function BiblePanel() {
   const [enableHoverLookup, setEnableHoverLookup] = useState(true);
   const [hoveredStrongs, setHoveredStrongs] = useState<{ entry: WordStudyEntry; x: number; y: number } | null>(null);
   const [pinnedStrongs, setPinnedStrongs] = useState<{ entry: WordStudyEntry; x: number; y: number } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [pendingOverwrite, setPendingOverwrite] = useState<{
+    versionId: string;
+    versionName: string;
+    filePath: string;
+  } | null>(null);
   /** Where the control bar sits — above the verse list, or under it. */
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_bibleBarPosition', 'bottom');
   const [isLoading, setIsLoading] = useState(false);
   const searchTimerRef = useRef<number | null>(null);
+
+  const reloadVersions = async (selectVersionId?: string) => {
+    try {
+      const loaded = await window.BSP?.bible?.getVersions();
+      if (loaded && loaded.length) {
+        setVersions(loaded);
+        if (selectVersionId) {
+          setSelectedVersion(selectVersionId);
+        }
+      }
+    } catch (_) {}
+  };
+
+  const handlePickImport = async (filePathsToImport?: string[]) => {
+    try {
+      setImporting(true);
+      let paths = filePathsToImport;
+      if (!paths || !paths.length) {
+        const picked = await window.BSP?.bible?.pick();
+        if (picked && picked.ok && picked.filePaths && picked.filePaths.length) {
+          paths = picked.filePaths;
+        }
+      }
+      if (!paths || !paths.length) return;
+
+      for (const filePath of paths) {
+        const res = await window.BSP?.bible?.importFile({ filePath });
+        if (res && res.exists) {
+          setPendingOverwrite({
+            versionId: res.versionId || 'BIBLE',
+            versionName: res.versionName || res.versionId || 'Translation',
+            filePath,
+          });
+          break;
+        }
+        if (res && res.imported && res.versionId) {
+          await reloadVersions(res.versionId);
+        }
+      }
+    } catch (err) {
+      console.error('Bible import failed:', err);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleConfirmOverwrite = async () => {
+    if (!pendingOverwrite) return;
+    try {
+      setImporting(true);
+      const res = await window.BSP?.bible?.importFile({
+        filePath: pendingOverwrite.filePath,
+        overwrite: true,
+      });
+      if (res && res.ok && res.versionId) {
+        await reloadVersions(res.versionId);
+      }
+    } catch (err) {
+      console.error('Bible overwrite failed:', err);
+    } finally {
+      setPendingOverwrite(null);
+      setImporting(false);
+    }
+  };
   /* Keyed by reference, not verse number: search results span books, so verse
      numbers collide and the wrong row would be scrolled to. */
   const verseRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -1113,6 +1183,32 @@ export function BiblePanel() {
             label="Bible"
             style={styles.iconNavBtn}
           />
+          {/* Import Custom Bible Translation Button */}
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => { void handlePickImport(); }}
+            disabled={importing}
+            style={{
+              height: 38,
+              padding: '0 12px',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 11,
+              fontWeight: 700,
+              flexShrink: 0,
+              cursor: 'pointer',
+            }}
+            title="Import custom Bible translation (.json, .xml, .bible)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <span>{importing ? 'Importing...' : 'Import'}</span>
+          </button>
         </div>
       </div>
   );
@@ -1415,6 +1511,104 @@ export function BiblePanel() {
           </div>
         );
       })()}
+
+      {/* Overwrite Confirmation Modal Dialog */}
+      {pendingOverwrite && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 20,
+          }}
+          onClick={() => setPendingOverwrite(null)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 12,
+              padding: 24,
+              maxWidth: 440,
+              width: '100%',
+              boxShadow: '0 16px 32px rgba(0, 0, 0, 0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '50%',
+                  background: 'rgba(255, 85, 0, 0.15)',
+                  border: '1px solid rgba(255, 85, 0, 0.4)',
+                  color: '#FF5500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Bible Translation Already Exists
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  <strong>{pendingOverwrite.versionName} ({pendingOverwrite.versionId})</strong> is already installed in your library.
+                </p>
+              </div>
+            </div>
+
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+              Would you like to overwrite the existing translation file with your newly imported version, or cancel?
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setPendingOverwrite(null)}
+                style={{ padding: '8px 16px', fontSize: 13, borderRadius: 6, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                onClick={() => { void handleConfirmOverwrite(); }}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: 13,
+                  borderRadius: 6,
+                  background: '#FF5500',
+                  color: '#FFF',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Overwrite Translation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

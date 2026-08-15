@@ -1205,6 +1205,23 @@ app.whenReady().then(async () => {
   ipcMain.handle('bible:getBooks', (_, v) => bibleService.getBooks(v));
   ipcMain.handle('bible:getChapter', (_, p) => bibleService.getChapter(p?.versionId, p?.book, p?.chapter));
   ipcMain.handle('bible:search', (_, p) => bibleService.search(p?.versionId, p?.query, p?.limit, { book: p?.book || '' }));
+  ipcMain.handle('bible:pick', async () => {
+    const res = await dialog.showOpenDialog({
+      title: 'Import Bible Translation',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Bible Translations (*.json, *.xml, *.bible)', extensions: ['json', 'xml', 'bible'] },
+        { name: 'JSON Files (*.json)', extensions: ['json'] },
+        { name: 'XML Files (*.xml)', extensions: ['xml'] },
+        { name: 'All Files (*.*)', extensions: ['*'] },
+      ],
+    });
+    if (res.canceled || !res.filePaths || !res.filePaths.length) {
+      return { ok: false, canceled: true };
+    }
+    return { ok: true, filePaths: res.filePaths };
+  });
+  ipcMain.handle('bible:importFile', (_, p) => bibleService.importBibleFile(p || {}));
 
   ipcMain.handle('verse:detect', (_, p) => verseDetectionService.detect(p?.text, p?.options || {}));
   ipcMain.handle('verse:warmIndex', (_, p) => verseDetectionService.warmIndex(p?.versionId || 'KJV'));
