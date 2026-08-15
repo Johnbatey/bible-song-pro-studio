@@ -169,9 +169,9 @@ function ElementBox({ el }: { el: SlideElement }) {
             boxShadow: computeBoxShadow(el),
             boxSizing: 'border-box',
             pointerEvents: 'none',
-            WebkitUserDrag: 'none' as any,
+            WebkitUserDrag: 'none',
             userSelect: 'none',
-          }}
+          } as React.CSSProperties & { WebkitUserDrag?: string }}
         />
       </div>
     );

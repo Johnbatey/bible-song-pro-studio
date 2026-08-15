@@ -640,9 +640,9 @@ export function SlideEditorCanvasBoard({
                     opacity: el.opacity ?? 1,
                     boxSizing: 'border-box',
                     pointerEvents: 'none',
-                    WebkitUserDrag: 'none' as any,
+                    WebkitUserDrag: 'none',
                     userSelect: 'none',
-                  }}
+                  } as React.CSSProperties & { WebkitUserDrag?: string }}
                 />
               )}
 
