@@ -154,68 +154,88 @@ const LANG_ALIASES = {
 };
 
 function resolveLocalizedBookName(extractedName, bNumber, detectedLang) {
-  let clean = stripTags(extractedName || '').trim();
   const bKey = String(bNumber);
   const targetKey = detectedLang ? (LANG_ALIASES[detectedLang.toLowerCase()] || detectedLang) : null;
   const translationMap = targetKey ? (BIBLE_BOOK_TRANSLATIONS[targetKey] || BIBLE_BOOK_TRANSLATIONS[targetKey.toLowerCase()]) : null;
 
-  if (!clean || /^\d+$/.test(clean) || clean.toLowerCase().startsWith('book ')) {
-    if (translationMap && translationMap[bKey]) {
-      return translationMap[bKey];
-    }
-    const canonical = CANONICAL_BOOKS[bNumber - 1];
-    return canonical ? canonical.name : `Book ${bNumber}`;
+  if (translationMap && translationMap[bKey]) {
+    return translationMap[bKey];
   }
-  return clean;
+
+  let clean = stripTags(extractedName || '').trim();
+  if (clean && !/^\d+$/.test(clean) && !clean.toLowerCase().startsWith('book ')) {
+    return clean;
+  }
+
+  const canonical = CANONICAL_BOOKS[bNumber - 1];
+  return canonical ? canonical.name : `Book ${bNumber}`;
 }
 
-function parseZefaniaXml(xmlText, fallbackId) {
+function parseXmlBible(xmlText, fallbackId) {
   const bibleData = {};
   const localizedBookNames = [];
 
-  const bibleAttrsMatch = xmlText.match(/<xmlbible\b([^>]*)>/i) || xmlText.match(/<BIBLEBOOK\b/i);
-  const sysAttrs = parseXmlAttributes(bibleAttrsMatch ? bibleAttrsMatch[1] || '' : '');
-  const name = sysAttrs.biblename || sysAttrs.title || fallbackId;
+  const titleMatch = xmlText.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i) || xmlText.match(/biblename="([^"]+)"/i);
+  const name = titleMatch ? stripTags(titleMatch[1] || titleMatch[0]) : fallbackId;
   const detectedLang = detectBibleLanguage(xmlText, name);
 
-  const bookRegex = /<BIBLEBOOK\b([^>]*)>([\s\S]*?)<\/BIBLEBOOK>/gi;
+  const bookRegex = /<(BIBLEBOOK|book|b|div)\b([^>]*)>([\s\S]*?)<\/(?:BIBLEBOOK|book|b|div)>/gi;
   let bookMatch = null;
   let bookIndex = 1;
 
   while ((bookMatch = bookRegex.exec(xmlText))) {
-    const attrs = parseXmlAttributes(bookMatch[1] || '');
-    const bookXml = bookMatch[2] || '';
-    const bNumber = parseInt(attrs.bnumber || attrs.bno || String(bookIndex), 10);
-    const canonical = CANONICAL_BOOKS[bNumber - 1] || matchCanonicalBook(attrs.bnumber || attrs.bname) || CANONICAL_BOOKS[bookIndex - 1] || { name: `Book ${bNumber}`, code: `B${bNumber}` };
+    const tagName = bookMatch[1].toLowerCase();
+    const attrString = bookMatch[2] || '';
+    const bookXml = bookMatch[3] || '';
 
-    const rawName = attrs.bname || attrs.name || '';
-    const localizedName = resolveLocalizedBookName(rawName, canonical.number || bNumber, detectedLang);
+    if (tagName === 'div' && !attrString.toLowerCase().includes('type="book"') && !attrString.toLowerCase().includes('osisid')) {
+      continue;
+    }
 
+    const attrs = parseXmlAttributes(attrString);
+    const bNumber = parseInt(attrs.bnumber || attrs.number || attrs.n || attrs.bno || String(bookIndex), 10);
+    const rawIdentifier = attrs.bname || attrs.name || attrs.n || attrs.osisid || attrs.id || '';
+    const canonical = CANONICAL_BOOKS[bNumber - 1] || matchCanonicalBook(rawIdentifier) || CANONICAL_BOOKS[bookIndex - 1] || { name: `Book ${bNumber}`, code: `B${bNumber}` };
+
+    const localizedName = resolveLocalizedBookName(rawIdentifier, canonical.number || bNumber, detectedLang);
     localizedBookNames.push({ number: canonical.number || bNumber, code: canonical.code || `B${bNumber}`, name: localizedName });
 
     if (!bibleData[localizedName]) bibleData[localizedName] = {};
 
-    const chapterRegex = /<CHAPTER\b([^>]*)>([\s\S]*?)<\/CHAPTER>/gi;
+    const chapterRegex = /<(CHAPTER|chapter|c)\b([^>]*)>([\s\S]*?)<\/(?:CHAPTER|chapter|c)>/gi;
     let chapterMatch = null;
+    let chIndex = 1;
+
     while ((chapterMatch = chapterRegex.exec(bookXml))) {
-      const chAttrs = parseXmlAttributes(chapterMatch[1] || '');
-      const chXml = chapterMatch[2] || '';
-      const cNum = String(chAttrs.cnumber || chAttrs.number || chAttrs.n || '1');
+      const chAttrs = parseXmlAttributes(chapterMatch[2] || '');
+      const chXml = chapterMatch[3] || '';
+      const cRaw = chAttrs.cnumber || chAttrs.number || chAttrs.n || chAttrs.osisid || String(chIndex);
+      const cNum = String(cRaw).split('.').pop() || String(chIndex);
+
       if (!bibleData[localizedName][cNum]) bibleData[localizedName][cNum] = {};
 
-      const verseRegex = /<VERS\b([^>]*)>([\s\S]*?)<\/VERS>/gi;
+      const verseRegex = /<(VERS|verse|v)\b([^>]*)>([\s\S]*?)(?:<\/(?:VERS|verse|v)>|(?=<(?:VERS|verse|v)\b))/gi;
       let verseMatch = null;
+      let vIndex = 1;
+
       while ((verseMatch = verseRegex.exec(chXml))) {
-        const vAttrs = parseXmlAttributes(verseMatch[1] || '');
-        const vNum = String(vAttrs.vnumber || vAttrs.number || vAttrs.n || '1');
-        const vText = stripTags(verseMatch[2] || '');
+        const vAttrs = parseXmlAttributes(verseMatch[2] || '');
+        const vRaw = vAttrs.vnumber || vAttrs.number || vAttrs.n || vAttrs.osisid || String(vIndex);
+        const vNum = String(vRaw).split('.').pop() || String(vIndex);
+        const vText = stripTags(verseMatch[3] || '');
         if (vText) bibleData[localizedName][cNum][vNum] = vText;
+        vIndex++;
       }
+      chIndex++;
     }
     bookIndex++;
   }
 
   return { name, bibleData, localizedBookNames };
+}
+
+function parseZefaniaXml(xmlText, fallbackId) {
+  return parseXmlBible(xmlText, fallbackId);
 }
 
 function parseOsisXml(xmlText, fallbackId) {
@@ -404,6 +424,7 @@ module.exports = {
   matchCanonicalBook,
   detectBibleLanguage,
   resolveLocalizedBookName,
+  parseXmlBible,
   parseZefaniaXml,
   parseOsisXml,
   parseOpenSongXml,
