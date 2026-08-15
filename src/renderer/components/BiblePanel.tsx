@@ -730,7 +730,18 @@ export function BiblePanel() {
   }
 
   const handleRowClick = (verse: BibleVerse, index: number, e: React.MouseEvent, isDoubleClick = false) => {
-    const list = results.length ? results : chapterVerses;
+    const isSearchResult = results.length > 0;
+    const list = isSearchResult ? results : chapterVerses;
+
+    if (isSearchResult && verse.book && verse.chapter) {
+      setSelectedBook(verse.book);
+      setChapter(verse.chapter);
+      setHighlightedVerse(verse.verse);
+      setSelectedVerseNumbers([verse.verse]);
+      setResults([]);
+      setQuery('');
+    }
+
     if (e.shiftKey && lastClickedIndex !== null) {
       const start = Math.min(lastClickedIndex, index);
       const end = Math.max(lastClickedIndex, index);
