@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { LayerList, type LayerRow } from './LayerList';
 import { ShapeInspector } from '../ShapeInspector';
 import { SlideTextPanel } from '../SlideTextPanel';
@@ -196,7 +196,7 @@ function ScrubbableInput({
   precision = 0,
   style,
   inputStyle,
-  badge,
+  badge = '⤌⤍',
   suffix,
   title,
 }: ScrubbableInputProps) {
@@ -204,8 +204,16 @@ function ScrubbableInput({
   const startXRef = useRef(0);
   const startValRef = useRef(0);
 
+  const [localText, setLocalText] = useState<string>(String(value ?? ''));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalText(String(value ?? ''));
+    }
+  }, [value, isFocused]);
+
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    // Prefer deltaX (horizontal trackpad swipe) if present, else use -deltaY (vertical swipe)
     const rawDelta = Math.abs(e.deltaX) >= Math.abs(e.deltaY) ? e.deltaX : -e.deltaY;
     if (Math.abs(rawDelta) < 0.5) return;
 
@@ -213,7 +221,7 @@ function ScrubbableInput({
     const direction = rawDelta > 0 ? 1 : -1;
     const deltaAmount = direction * step * multiplier;
 
-    let nextVal = value + deltaAmount;
+    let nextVal = (value || 0) + deltaAmount;
     if (precision === 0) nextVal = Math.round(nextVal);
     else nextVal = parseFloat(nextVal.toFixed(precision));
 
@@ -221,13 +229,14 @@ function ScrubbableInput({
     if (max !== undefined) nextVal = Math.min(max, nextVal);
 
     onChange(nextVal);
+    setLocalText(String(nextVal));
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).tagName === 'INPUT') return;
     isDraggingRef.current = true;
     startXRef.current = e.clientX;
-    startValRef.current = value;
+    startValRef.current = value || 0;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isDraggingRef.current) return;
@@ -243,6 +252,7 @@ function ScrubbableInput({
       if (max !== undefined) nextVal = Math.min(max, nextVal);
 
       onChange(nextVal);
+      setLocalText(String(nextVal));
     };
 
     const handleMouseUp = () => {
@@ -255,6 +265,39 @@ function ScrubbableInput({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setLocalText(raw);
+
+    if (raw === '' || raw === '-') return;
+
+    const parsed = precision === 0 ? parseInt(raw, 10) : parseFloat(raw);
+    if (Number.isFinite(parsed)) {
+      let clamped = parsed;
+      if (min !== undefined) clamped = Math.max(min, clamped);
+      if (max !== undefined) clamped = Math.min(max, clamped);
+      onChange(clamped);
+    }
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    if (localText === '' || localText === '-') {
+      setLocalText(String(value ?? (min !== undefined ? Math.max(0, min) : 0)));
+    } else {
+      const parsed = precision === 0 ? parseInt(localText, 10) : parseFloat(localText);
+      if (Number.isFinite(parsed)) {
+        let clamped = parsed;
+        if (min !== undefined) clamped = Math.max(min, clamped);
+        if (max !== undefined) clamped = Math.min(max, clamped);
+        onChange(clamped);
+        setLocalText(String(clamped));
+      } else {
+        setLocalText(String(value ?? (min !== undefined ? Math.max(0, min) : 0)));
+      }
+    }
+  };
+
   return (
     <div
       onWheel={handleWheel}
@@ -264,15 +307,12 @@ function ScrubbableInput({
     >
       {badge && <span style={styles.iconInputBadge}>{badge}</span>}
       <input
-        type="number"
-        step={step}
-        min={min}
-        max={max}
-        value={value === 0 ? '0' : (value ?? '')}
-        onChange={(e) => {
-          const parsed = precision === 0 ? parseInt(e.target.value, 10) : parseFloat(e.target.value);
-          if (Number.isFinite(parsed)) onChange(parsed);
-        }}
+        type="text"
+        inputMode="decimal"
+        value={localText}
+        onFocus={() => setIsFocused(true)}
+        onChange={handleInputChange}
+        onBlur={handleBlur}
         onWheel={handleWheel}
         style={{ ...styles.iconInput, ...inputStyle }}
       />
@@ -1004,12 +1044,15 @@ export function SlideEditorRightSidebar({
                     </div>
                     <div style={styles.propRowCol}>
                       <span style={styles.propLabel}>Size</span>
-                      <CustomDropdown
-                        value={String(currentFontSize)}
-                        options={FONT_SIZES}
-                        onChange={(sz) => setText({ fontSize: parseInt(sz, 10) })}
-                        style={{ width: '100%' }}
-                        zIndex={100005}
+                      <ScrubbableInput
+                        value={currentFontSize}
+                        onChange={(v) => setText({ fontSize: v })}
+                        min={6}
+                        max={300}
+                        step={1}
+                        badge="⤌⤍"
+                        suffix="px"
+                        title="Font size: swipe left/right, drag, or click to type any custom value"
                       />
                     </div>
                   </div>
@@ -1025,7 +1068,7 @@ export function SlideEditorRightSidebar({
                         max={3.0}
                         step={0.1}
                         precision={1}
-                        badge="⤢"
+                        badge="⤌⤍"
                       />
                     </div>
                     <div style={styles.propRowCol}>
@@ -1037,7 +1080,7 @@ export function SlideEditorRightSidebar({
                         max={80}
                         step={1}
                         precision={0}
-                        badge="|A|"
+                        badge="⤌⤍"
                         suffix="px"
                       />
                     </div>
