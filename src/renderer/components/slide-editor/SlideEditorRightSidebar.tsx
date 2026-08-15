@@ -7,6 +7,7 @@ import { AppleToggle } from '../AppleToggle';
 import { slideElementsFor } from '../NativeSlideBoard';
 import type { ParsedShape } from '../../slide-engine/parser/slide-parser';
 import type { PresentationSlide, SlideElement } from '../../types';
+import { parseBackgroundInfo, gradientCss } from '../../utils/background';
 
 export interface PptxInspector {
   selected: ParsedShape[];
@@ -276,6 +277,272 @@ function ScrubbableInput({
         style={{ ...styles.iconInput, ...inputStyle }}
       />
       {suffix && <span style={{ fontSize: 10, color: 'var(--text-dim)', paddingRight: 6, flexShrink: 0 }}>{suffix}</span>}
+    </div>
+  );
+}
+
+interface GradientRampPickerProps {
+  value: string;
+  onChange: (nextGradientCss: string) => void;
+}
+
+function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
+  const info = parseBackgroundInfo(value, undefined);
+  const [activeStop, setActiveStop] = useState<'start' | 'end'>('start');
+
+  const startColor = info.start || '#F97316';
+  const endColor = info.end || '#7C2D12';
+  const direction = info.dir || '135deg';
+
+  const angleDeg = direction.includes('deg') ? parseInt(direction.replace('deg', ''), 10) || 135 : 135;
+  const isRadial = direction === 'radial';
+
+  const updateGradient = (newStart: string, newEnd: string, newDir: string) => {
+    const css = gradientCss(newStart, newEnd, newDir);
+    onChange(css);
+  };
+
+  const handleAngleChange = (newAngle: number) => {
+    updateGradient(startColor, endColor, `${newAngle}deg`);
+  };
+
+  const handleDirToggle = (dir: string) => {
+    updateGradient(startColor, endColor, dir);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+      {/* Visual Gradient Ramp Track Bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={styles.propLabel}>Gradient Ramp</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)' }}>
+            {isRadial ? 'Radial' : `${angleDeg}°`}
+          </span>
+        </div>
+
+        {/* Ramp Track Preview Bar */}
+        <div
+          style={{
+            height: 26,
+            width: '100%',
+            borderRadius: 6,
+            background: gradientCss(startColor, endColor, direction),
+            boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.3)',
+            position: 'relative',
+          }}
+        />
+
+        {/* Color Stop Track Pins */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px', marginTop: -2 }}>
+          {/* Start / Highlight Stop Pin */}
+          <div
+            onClick={() => setActiveStop('start')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              cursor: 'pointer',
+              gap: 2,
+            }}
+          >
+            <div
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                background: startColor,
+                border: activeStop === 'start' ? '2px solid #FF5500' : '2px solid #ffffff',
+                boxShadow: activeStop === 'start' ? '0 0 8px rgba(255, 85, 0, 0.8)' : '0 1px 4px rgba(0, 0, 0, 0.5)',
+                transition: 'all 0.15s ease',
+              }}
+            />
+            <span style={{ fontSize: 9, fontWeight: 700, color: activeStop === 'start' ? '#FF5500' : 'var(--text-dim)' }}>
+              Highlight
+            </span>
+          </div>
+
+          {/* End / Shadow Stop Pin */}
+          <div
+            onClick={() => setActiveStop('end')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              cursor: 'pointer',
+              gap: 2,
+            }}
+          >
+            <div
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                background: endColor,
+                border: activeStop === 'end' ? '2px solid #FF5500' : '2px solid #ffffff',
+                boxShadow: activeStop === 'end' ? '0 0 8px rgba(255, 85, 0, 0.8)' : '0 1px 4px rgba(0, 0, 0, 0.5)',
+                transition: 'all 0.15s ease',
+              }}
+            />
+            <span style={{ fontSize: 9, fontWeight: 700, color: activeStop === 'end' ? '#FF5500' : 'var(--text-dim)' }}>
+              Shadow
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Dual Color Selectors (Highlight & Shadow Swatches) */}
+      <div style={styles.twoColRow}>
+        {/* Highlight Color */}
+        <div
+          onClick={() => setActiveStop('start')}
+          style={{
+            ...styles.propRowCol,
+            flex: 1,
+            padding: 8,
+            background: activeStop === 'start' ? 'var(--accent-glow)' : 'var(--bg-primary)',
+            borderRadius: 6,
+            border: activeStop === 'start' ? '1px solid rgba(255, 85, 0, 0.4)' : '1px solid var(--border-primary)',
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: 10, fontWeight: 700, color: activeStop === 'start' ? '#FF5500' : 'var(--text-secondary)' }}>
+            Highlight Color
+          </span>
+          <div style={styles.colorPillRow}>
+            <input
+              type="color"
+              value={normalizeHex(startColor) || '#F97316'}
+              onChange={(e) => updateGradient(e.target.value, endColor, direction)}
+              style={styles.colorSwatch}
+            />
+            <input
+              type="text"
+              spellCheck={false}
+              value={startColor.toUpperCase()}
+              onChange={(e) => updateGradient(e.target.value, endColor, direction)}
+              style={styles.colorHexInput}
+            />
+          </div>
+        </div>
+
+        {/* Shadow Color */}
+        <div
+          onClick={() => setActiveStop('end')}
+          style={{
+            ...styles.propRowCol,
+            flex: 1,
+            padding: 8,
+            background: activeStop === 'end' ? 'var(--accent-glow)' : 'var(--bg-primary)',
+            borderRadius: 6,
+            border: activeStop === 'end' ? '1px solid rgba(255, 85, 0, 0.4)' : '1px solid var(--border-primary)',
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: 10, fontWeight: 700, color: activeStop === 'end' ? '#FF5500' : 'var(--text-secondary)' }}>
+            Shadow Color
+          </span>
+          <div style={styles.colorPillRow}>
+            <input
+              type="color"
+              value={normalizeHex(endColor) || '#7C2D12'}
+              onChange={(e) => updateGradient(startColor, e.target.value, direction)}
+              style={styles.colorSwatch}
+            />
+            <input
+              type="text"
+              spellCheck={false}
+              value={endColor.toUpperCase()}
+              onChange={(e) => updateGradient(startColor, e.target.value, direction)}
+              style={styles.colorHexInput}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Direction & Angle Selector */}
+      <div style={styles.propRowCol}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={styles.propLabel}>Angle & Direction</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-primary)' }}>
+            {isRadial ? 'Radial' : `${angleDeg}°`}
+          </span>
+        </div>
+
+        {/* Direction Presets */}
+        <div style={styles.segmentGroup}>
+          {[
+            { label: '↘ 135°', dir: '135deg' },
+            { label: '➔ 90°', dir: '90deg' },
+            { label: '⬇ 180°', dir: '180deg' },
+            { label: '⬆ 0°', dir: '0deg' },
+            { label: '⭕ Radial', dir: 'radial' },
+          ].map((preset) => {
+            const on = direction === preset.dir;
+            return (
+              <button
+                key={preset.dir}
+                type="button"
+                onClick={() => handleDirToggle(preset.dir)}
+                style={{
+                  ...styles.segmentBtn,
+                  background: on ? 'var(--chrome-control-active)' : 'transparent',
+                  color: on ? '#FF5500' : 'var(--text-secondary)',
+                  fontWeight: on ? 700 : 500,
+                  fontSize: 10,
+                  padding: '3px 4px',
+                }}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom Angle Slider (when linear) */}
+        {!isRadial && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <input
+              type="range"
+              min="0"
+              max="360"
+              step="5"
+              value={angleDeg}
+              onChange={(e) => handleAngleChange(parseInt(e.target.value, 10))}
+              style={{ flex: 1, accentColor: '#FF5500' }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Quick Gradient Presets Grid */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+        <span style={styles.propLabel}>Presets</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+          {[
+            'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)',
+            'linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%)',
+            'linear-gradient(135deg, #10b981 0%, #064e3b 100%)',
+            'linear-gradient(135deg, #8b5cf6 0%, #4c1d95 100%)',
+            'linear-gradient(135deg, #ec4899 0%, #831843 100%)',
+            'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+          ].map((grad, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onChange(grad)}
+              style={{
+                height: 26,
+                background: grad,
+                border: value === grad ? '2px solid #FF5500' : '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: 5,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -636,31 +903,12 @@ export function SlideEditorRightSidebar({
                     </div>
                   )}
 
-                  {/* Gradient Presets */}
+                  {/* Gradient Ramp & Dual Stop Color Controls */}
                   {bgType === 'gradient' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                      {[
-                        'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)',
-                        'linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%)',
-                        'linear-gradient(135deg, #10b981 0%, #064e3b 100%)',
-                        'linear-gradient(135deg, #8b5cf6 0%, #4c1d95 100%)',
-                        'linear-gradient(135deg, #ec4899 0%, #831843 100%)',
-                        'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-                      ].map((grad, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => onUpdateSlide({ background: { type: 'gradient', value: grad } })}
-                          style={{
-                            height: 28,
-                            background: grad,
-                            border: bgValue === grad ? '2px solid #FF5500' : '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: 6,
-                            cursor: 'pointer',
-                          }}
-                        />
-                      ))}
-                    </div>
+                    <GradientRampPicker
+                      value={bgValue}
+                      onChange={(css) => onUpdateSlide({ background: { type: 'gradient', value: css } })}
+                    />
                   )}
 
                   {/* Background Image Upload & Presets */}
