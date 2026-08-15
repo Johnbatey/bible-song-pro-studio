@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import type { ImportedSong, Song } from '../types';
 
-export const SONG_FILE_ACCEPT = '.xml,.pro,.chordpro,.chopro,.txt';
+export const SONG_FILE_ACCEPT = '.xml,.pro,.chordpro,.chopro,.txt,.db,.ddb,.sqlite,.sqlite3';
 
 /** Map the import service's `{ title, verses[] }` shape onto the app's Song type. */
 export function toSong(imported: ImportedSong): Song {
@@ -45,8 +45,7 @@ function readAsText(file: File): Promise<string> {
 
 /**
  * Parse dropped/selected song files through the main-process parsers
- * (OpenLyrics, ChordPro, plain lyrics). Files are sent as text rather than
- * paths — Electron 32+ removed `File.path`.
+ * (OpenLyrics, ChordPro, plain lyrics, EasyWorship DB, OpenLP SQLite DB).
  */
 export async function importSongFiles(files: File[]): Promise<{ songs: Song[]; errors: string[] }> {
   const songs: Song[] = [];
@@ -54,15 +53,27 @@ export async function importSongFiles(files: File[]): Promise<{ songs: Song[]; e
 
   for (const file of files) {
     try {
-      const text = await readAsText(file);
-      const result = await window.BSP?.song?.importText({ text });
+      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+      const isDatabase = ext === '.db' || ext === '.ddb' || ext === '.sqlite' || ext === '.sqlite3';
+      const filePath = (file as any).path;
+
+      let result;
+      if (isDatabase && filePath) {
+        result = await window.BSP?.song?.importFile({ filePath });
+      } else if (isDatabase) {
+        errors.push(`${file.name}: Database imports require local file path access.`);
+        continue;
+      } else {
+        const text = await readAsText(file);
+        result = await window.BSP?.song?.importText({ text });
+      }
+
       if (!result?.ok || !result.songs?.length) {
         errors.push(`${file.name}: ${result?.error || 'no songs found'}`);
         continue;
       }
-      result.songs.forEach((imported) => {
+      result.songs.forEach((imported: ImportedSong) => {
         const song = toSong(imported);
-        // A ChordPro file with no {title} directive falls back to the filename
         if (song.title === 'Untitled') song.title = file.name.replace(/\.[^.]+$/, '');
         if (song.slides.length > 0) songs.push(song);
         else errors.push(`${file.name}: parsed but contained no lyrics`);

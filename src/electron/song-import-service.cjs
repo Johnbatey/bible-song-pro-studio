@@ -170,9 +170,229 @@ function createSongImportService() {
     }];
   }
 
+  let _BetterSqliteDatabase = null;
+  function getBetterSqliteDatabase() {
+    if (_BetterSqliteDatabase) return _BetterSqliteDatabase;
+    _BetterSqliteDatabase = require('better-sqlite3');
+    return _BetterSqliteDatabase;
+  }
+
+  function readSqliteTables(filePath) {
+    const Database = getBetterSqliteDatabase();
+    const db = new Database(filePath, { readonly: true, fileMustExist: true });
+    try {
+      const tableNames = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        .all()
+        .map((row) => String((row && row.name) || '').trim())
+        .filter(Boolean);
+      const tables = {};
+      tableNames.forEach((tableName) => {
+        const safeName = tableName.replace(/"/g, '""');
+        tables[tableName] = db.prepare(`SELECT rowid, * FROM "${safeName}"`).all();
+      });
+      return tables;
+    } finally {
+      db.close();
+    }
+  }
+
+  function decodeRtfUnicode(value) {
+    let text = String(value || '');
+    text = text.replace(/\\'([0-9a-fA-F]{2})/g, (_match, hex) => {
+      return String.fromCharCode(parseInt(hex, 16));
+    });
+    return text.replace(/\\u(-?\d+)\??/g, (_match, rawCode) => {
+      let code = Number(rawCode);
+      if (!Number.isFinite(code)) return '';
+      if (code < 0) code = 65536 + code;
+      try {
+        return String.fromCodePoint(code);
+      } catch (_) {
+        return '';
+      }
+    });
+  }
+
+  function rtfToPlainText(rtfValue) {
+    const rtf = decodeRtfUnicode(rtfValue);
+    let output = '';
+    const stack = [];
+    let ignorable = false;
+    const destinationControls = new Set([
+      'fonttbl', 'colortbl', 'stylesheet', 'info', 'pict',
+      'object', 'datastore', 'themedata', 'generator', 'pnseclvl',
+      'listtable', 'listoverridetable',
+    ]);
+
+    for (let i = 0; i < rtf.length; i += 1) {
+      const ch = rtf[i];
+      if (ch === '{') {
+        stack.push(ignorable);
+        continue;
+      }
+      if (ch === '}') {
+        ignorable = stack.length ? stack.pop() : false;
+        continue;
+      }
+      if (ch === '\r' || ch === '\n') {
+        continue;
+      }
+      if (ch !== '\\') {
+        if (!ignorable) output += ch;
+        continue;
+      }
+
+      const next = rtf[i + 1] || '';
+      if (next === '*') {
+        ignorable = true;
+        i += 1;
+        continue;
+      }
+      if (next === '\\' || next === '{' || next === '}') {
+        if (!ignorable) output += next;
+        i += 1;
+        continue;
+      }
+      if (next === '~') {
+        if (!ignorable) output += ' ';
+        i += 1;
+        continue;
+      }
+      if (next === '-') {
+        i += 1;
+        continue;
+      }
+
+      const controlMatch = rtf.slice(i + 1).match(/^([a-zA-Z]+)(-?\d+)? ?/);
+      if (!controlMatch) {
+        i += 1;
+        continue;
+      }
+      const control = controlMatch[1].toLowerCase();
+      if (destinationControls.has(control)) ignorable = true;
+      if (!ignorable) {
+        if (control === 'par' || control === 'line') output += '\n';
+        else if (control === 'tab') output += '\t';
+      }
+      i += controlMatch[0].length;
+    }
+
+    return output
+      .replace(/\r\n?/g, '\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .join('\n')
+      .trim();
+  }
+
+  function parseOpenLpLyrics(xml) {
+    const verses = [...String(xml || '').matchAll(/<verse\b[^>]*name=["']([^"']*)["'][^>]*>([\s\S]*?)<\/verse>/gi)]
+      .map((m) => {
+        const verseName = m[1] || 'v1';
+        const cdata = m[2].match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+        let text = cdata ? cdata[1] : m[2].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+        text = text.replace(/\{[^}]*\}/g, '');
+        text = text.replace(/\[[A-G][#b♯♭]?(?:maj|min|sus|dim|aug|add|m|M)?\d{0,2}(?:\/[A-G][#b♯♭]?)?\]/g, '');
+        const lines = text.replace(/\r\n?/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
+        return { name: verseName, lines };
+      })
+      .filter((v) => v.lines.length > 0);
+    return verses;
+  }
+
+  function importEasyWorshipDatabase(filePath) {
+    const tables = readSqliteTables(filePath);
+    const titleRows = Array.isArray(tables.song) ? tables.song : [];
+    const wordRows = Array.isArray(tables.word) ? tables.word : [];
+
+    if (!wordRows.length) {
+      throw new Error('No song words found in EasyWorship database.');
+    }
+
+    const titlesByRowId = new Map();
+    titleRows.forEach((row) => {
+      const rowId = Number(row && row.rowid);
+      if (Number.isFinite(rowId)) titlesByRowId.set(rowId, row);
+    });
+
+    const songs = wordRows.map((wordsRow, index) => {
+      const songId = Number(wordsRow && wordsRow.song_id);
+      const songRow = Number.isFinite(songId) ? titlesByRowId.get(songId) : null;
+      const rawText = rtfToPlainText(wordsRow && wordsRow.words);
+      const title = (songRow && songRow.title) ? String(songRow.title).trim() : `EasyWorship Song ${index + 1}`;
+      const author = (songRow && songRow.author) ? String(songRow.author).trim() : '';
+
+      const { sections, verseOrder } = arrangeLyrics(rawText);
+      return {
+        title: title || 'Untitled EasyWorship Song',
+        author,
+        verses: sections.map((sec) => ({ name: sec.name, lines: sec.lines })),
+        format: 'easyworship',
+        verseOrder,
+      };
+    }).filter((s) => s.verses.length > 0);
+
+    return songs;
+  }
+
+  function importOpenLpDatabase(filePath) {
+    const tables = readSqliteTables(filePath);
+    const songsRows = Array.isArray(tables.songs) ? tables.songs : [];
+
+    if (!songsRows.length) {
+      throw new Error('No songs table found in OpenLP database.');
+    }
+
+    const songs = songsRows.map((row, index) => {
+      const title = row.title ? String(row.title).trim() : `OpenLP Song ${index + 1}`;
+      const author = row.authors || row.search_title || '';
+      const ccli = row.ccli_number ? String(row.ccli_number) : '';
+      const copyright = row.copyright ? String(row.copyright) : '';
+      const xmlLyrics = row.lyrics ? String(row.lyrics) : '';
+
+      const verses = parseOpenLpLyrics(xmlLyrics);
+      const labels = labelsFor(verses.map((v) => v.name));
+      const formattedVerses = verses.map((v, i) => ({ name: labels[i] || v.name, lines: v.lines }));
+
+      return {
+        title: title || 'Untitled OpenLP Song',
+        author,
+        ccli,
+        copyright,
+        verses: formattedVerses,
+        format: 'openlp',
+        verseOrder: [],
+      };
+    }).filter((s) => s.verses.length > 0);
+
+    return songs;
+  }
+
   function importFile(filePath) {
     if (!fs.existsSync(filePath)) return { ok: false, error: 'File not found: ' + filePath };
     const ext = path.extname(filePath).toLowerCase();
+
+    // Check for SQLite database formats (EasyWorship & OpenLP)
+    if (ext === '.db' || ext === '.ddb' || ext === '.sqlite' || ext === '.sqlite3') {
+      try {
+        const tables = readSqliteTables(filePath);
+        if (Array.isArray(tables.word)) {
+          const songs = importEasyWorshipDatabase(filePath);
+          return { ok: true, songs, format: 'easyworship' };
+        }
+        if (Array.isArray(tables.songs)) {
+          const songs = importOpenLpDatabase(filePath);
+          return { ok: true, songs, format: 'openlp' };
+        }
+        return { ok: false, error: 'Unsupported SQLite database structure. EasyWorship and OpenLP databases are supported.' };
+      } catch (err) {
+        return { ok: false, error: 'Failed to parse database file: ' + (err.message || String(err)) };
+      }
+    }
+
     const content = fs.readFileSync(filePath, 'utf8');
     if (looksBinary(content)) return { ok: false, error: BINARY_ERROR };
 
@@ -183,7 +403,7 @@ function createSongImportService() {
     const songs = parseLyricSheet(content);
     if (songs.length > 0) return { ok: true, songs, format: songs[0].format };
 
-    return { ok: false, error: 'Unrecognized format. Supported: OpenLyrics (.xml), ChordPro (.chordpro, .chopro), plain lyrics (.txt)' };
+    return { ok: false, error: 'Unrecognized format. Supported: EasyWorship (.db, .ddb), OpenLP (.sqlite, .sqlite3), OpenLyrics (.xml), ChordPro (.chordpro, .chopro), plain lyrics (.txt)' };
   }
 
   function importText(text) {
