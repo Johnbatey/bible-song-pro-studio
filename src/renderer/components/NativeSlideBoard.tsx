@@ -169,7 +169,7 @@ function ElementBox({ el }: { el: SlideElement }) {
             boxShadow: computeBoxShadow(el),
             boxSizing: 'border-box',
             pointerEvents: 'none',
-            WebkitUserDrag: 'none',
+            WebkitUserDrag: 'none' as any,
             userSelect: 'none',
           }}
         />

@@ -640,7 +640,7 @@ export function SlideEditorCanvasBoard({
                     opacity: el.opacity ?? 1,
                     boxSizing: 'border-box',
                     pointerEvents: 'none',
-                    WebkitUserDrag: 'none',
+                    WebkitUserDrag: 'none' as any,
                     userSelect: 'none',
                   }}
                 />
