@@ -1,7 +1,33 @@
 import React, { useRef, useState, useEffect } from 'react';
 import type { PresentationSlide, SlideElement } from '../../types';
-import { slideElementsFor, hexToRgba, computeTextShadow, computeBoxShadow } from '../NativeSlideBoard';
+import { slideElementsFor, hexToRgba } from '../NativeSlideBoard';
 import type { ActiveTool } from './SlideEditorQuickToolbar';
+
+function computeTextShadow(el: SlideElement): string | undefined {
+  if (el.shadowEnabled) {
+    const col = el.shadowColor || '#000000';
+    const blur = el.shadowBlur ?? 8;
+    const x = el.shadowOffsetX ?? 0;
+    const y = el.shadowOffsetY ?? 4;
+    const opacity = el.shadowOpacity ?? 0.5;
+    return `${x}px ${y}px ${blur}px ${hexToRgba(col, opacity)}`;
+  }
+  if (el.shadowEnabled === false) return undefined;
+  return el.textShadow || undefined;
+}
+
+function computeBoxShadow(el: SlideElement): string | undefined {
+  if (el.boxShadowEnabled) {
+    const col = el.boxShadowColor || '#000000';
+    const blur = el.boxShadowBlur ?? 12;
+    const x = el.boxShadowOffsetX ?? 0;
+    const y = el.boxShadowOffsetY ?? 6;
+    const opacity = el.boxShadowOpacity ?? 0.4;
+    return `${x}px ${y}px ${blur}px ${hexToRgba(col, opacity)}`;
+  }
+  if (el.boxShadowEnabled === false) return undefined;
+  return el.boxShadow || undefined;
+}
 
 interface SlideEditorCanvasBoardProps {
   slide: PresentationSlide;
