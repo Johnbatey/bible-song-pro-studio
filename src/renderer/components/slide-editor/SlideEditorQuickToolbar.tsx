@@ -567,7 +567,42 @@ export function SlideEditorQuickToolbar({
             <span>Image</span>
           </button>
 
-        {/* 5. Song Tool Button (Worship Songs with 2nd-level Section Selector) */}
+          {/* 5. Pencil Freehand Draw Tool */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTool('pencil');
+              setActiveDropdown(null);
+            }}
+            style={activeTool === 'pencil' ? PILL_BTN_ACTIVE : PILL_BTN}
+            title="Pencil / Freehand Draw Tool"
+          >
+            <svg viewBox="0 0 24 24" style={ICON}>
+              <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+            </svg>
+            <span>Pencil</span>
+          </button>
+
+          {/* 6. Pen Vector Tool */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTool('bezier');
+              setActiveDropdown(null);
+            }}
+            style={activeTool === 'bezier' ? PILL_BTN_ACTIVE : PILL_BTN}
+            title="Pen / Bezier Vector Tool"
+          >
+            <svg viewBox="0 0 24 24" style={ICON}>
+              <path d="M12 19l7-7 3 3-7 7-3-3z" />
+              <path d="M18 13l-1.5-7.5L2 2l4 14.5L13 18l5-5z" />
+              <path d="M2 2l7.586 7.586" />
+              <circle cx="11" cy="11" r="2" />
+            </svg>
+            <span>Pen</span>
+          </button>
+
+        {/* 7. Song Tool Button (Worship Songs with 2nd-level Section Selector) */}
         <div style={{ position: 'relative' }}>
           <button
             type="button"

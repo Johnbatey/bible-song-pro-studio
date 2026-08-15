@@ -660,6 +660,25 @@ export function SlideEditorModal() {
       handleUpdateSlideElements([...activeSlideElements, newElement]);
       handleSelectElement(newElement.id);
       setActiveTool('select');
+    } else if (tool === 'pencil' || tool === 'bezier') {
+      const isPencil = tool === 'pencil';
+      const newElement: SlideElement = {
+        id: `${tool}-${Date.now()}`,
+        type: 'shape',
+        x: 35,
+        y: 40,
+        width: 30,
+        height: isPencil ? 2 : 20,
+        content: isPencil ? 'line' : 'rectangle',
+        backgroundColor: '#FF5500',
+        borderColor: '#FF5500',
+        borderWidth: 2,
+        borderRadius: 4,
+        zIndex: (activeSlideElements.length) + 1,
+      };
+      handleUpdateSlideElements([...activeSlideElements, newElement]);
+      handleSelectElement(newElement.id);
+      setActiveTool('select');
     } else if (['box', 'rectangle', 'rounded', 'circle', 'triangle', 'star', 'line'].includes(tool)) {
       const isCircle = tool === 'circle';
       const isRounded = tool === 'rounded';
