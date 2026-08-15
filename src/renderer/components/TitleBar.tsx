@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type, fontSize, fontWeight } from '../styles/type';
 import { NAV_DOCK_SECTIONS } from './dock/docks';
@@ -105,6 +105,60 @@ export function TitleBar() {
     });
   };
 
+  const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
+  const [isModalDragging, setIsModalDragging] = useState(false);
+  const modalPosRef = useRef({ x: 0, y: 0 });
+  modalPosRef.current = modalPosition;
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (showAlertModal) {
+      setModalPosition({ x: 0, y: 0 });
+    }
+  }, [showAlertModal]);
+
+  useEffect(() => {
+    if (!showAlertModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowAlertModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAlertModal]);
+
+  const handleModalMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, select, textarea, a, [role="button"]')) return;
+
+    setIsModalDragging(true);
+    isDraggingRef.current = true;
+    dragStartRef.current = {
+      x: e.clientX - modalPosRef.current.x,
+      y: e.clientY - modalPosRef.current.y,
+    };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const newX = moveEvent.clientX - dragStartRef.current.x;
+      const newY = moveEvent.clientY - dragStartRef.current.y;
+      setModalPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsModalDragging(false);
+      isDraggingRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
   const handleSendAlert = () => {
     if (!alertText.trim()) return;
     triggerAlert({
@@ -121,7 +175,6 @@ export function TitleBar() {
       duration: 3,
       animation: 'slideDown',
     });
-    setShowAlertModal(false);
   };
 
   return (
@@ -389,15 +442,14 @@ export function TitleBar() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(4px)',
+            background: 'transparent',
+            pointerEvents: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9999,
             padding: 20,
           }}
-          onClick={() => setShowAlertModal(false)}
         >
           <div
             style={{
@@ -407,15 +459,25 @@ export function TitleBar() {
               padding: 24,
               maxWidth: 480,
               width: '100%',
-              boxShadow: '0 16px 32px rgba(0, 0, 0, 0.5)',
+              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.6)',
               display: 'flex',
               flexDirection: 'column',
               gap: 16,
+              pointerEvents: 'auto',
+              transform: `translate3d(${modalPosition.x}px, ${modalPosition.y}px, 0px)`,
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* Header (Draggable Handle) */}
+            <div
+              onMouseDown={handleModalMouseDown}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: isModalDragging ? 'grabbing' : 'grab',
+                userSelect: 'none',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div
                   style={{
