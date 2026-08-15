@@ -175,8 +175,10 @@ function parseXmlBible(xmlText, fallbackId) {
   const bibleData = {};
   const localizedBookNames = [];
 
-  const titleMatch = xmlText.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i) || xmlText.match(/biblename="([^"]+)"/i);
-  const name = titleMatch ? stripTags(titleMatch[1] || titleMatch[0]) : fallbackId;
+  const bibleTagMatch = xmlText.match(/<bible\b([^>]*)>/i) || xmlText.match(/<xmlbible\b([^>]*)>/i);
+  const sysAttrs = bibleTagMatch ? parseXmlAttributes(bibleTagMatch[1] || '') : {};
+  const titleTagMatch = xmlText.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
+  const name = sysAttrs.translation || sysAttrs.biblename || sysAttrs.title || sysAttrs.name || (titleTagMatch ? stripTags(titleTagMatch[1]) : fallbackId);
   const detectedLang = detectBibleLanguage(xmlText, name);
 
   const bookRegex = /<(BIBLEBOOK|book|b|div)\b([^>]*)>([\s\S]*?)<\/(?:BIBLEBOOK|book|b|div)>/gi;

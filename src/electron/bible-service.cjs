@@ -4,6 +4,7 @@ const { ALL_BOOKS } = require('./scripture-reference.cjs');
 const {
   CANONICAL_BOOKS,
   matchCanonicalBook,
+  parseXmlBible,
   parseZefaniaXml,
   parseOsisXml,
   parseOpenSongXml,
@@ -226,25 +227,11 @@ function importBibleFile({ filePath, overwrite = false }) {
 
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    if (ext === '.xml' || ext === '.osis' || ext === '.usfx' || ext === '.xmm' || content.trim().startsWith('<?xml')) {
-      if (content.includes('<xmlbible') || content.includes('<BIBLEBOOK')) {
-        const res = parseZefaniaXml(content, baseId);
-        versionName = res.name || baseId;
-        booksData = res.bibleData;
-        localizedBookNames = res.localizedBookNames;
-      } else if (content.includes('<osis') || content.includes('osisID')) {
-        const res = parseOsisXml(content, baseId);
-        versionName = res.name || baseId;
-        booksData = res.bibleData;
-        localizedBookNames = res.localizedBookNames;
-      } else if (content.includes('<b n=')) {
-        const res = parseOpenSongXml(content, baseId);
-        versionName = res.name || baseId;
-        booksData = res.bibleData;
-        localizedBookNames = res.localizedBookNames;
-      } else {
-        booksData = parseKjvXml(content);
-      }
+    if (ext === '.xml' || ext === '.osis' || ext === '.usfx' || ext === '.xmm' || content.trim().startsWith('<?xml') || content.includes('<bible')) {
+      const res = parseXmlBible(content, baseId);
+      versionName = res.name || baseId;
+      booksData = res.bibleData;
+      localizedBookNames = res.localizedBookNames;
     } else if (ext === '.usfm' || ext === '.sfm' || content.trim().startsWith('\\id')) {
       const res = parseUsfmText(content, baseId);
       booksData = res.bibleData;
