@@ -11,7 +11,7 @@ import { SONG_PACKS, songFromPack, isInstalled, type SongPack } from '../../data
 export function SongPacks() {
   const songs = useAppStore((s) => s.songs);
   const setSongs = useAppStore((s) => s.setSongs);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [openPacks, setOpenPacks] = useState<Record<string, boolean>>({});
 
   function addSongs(titles: Array<{ pack: SongPack; title: string }>) {
     const fresh = titles
@@ -27,12 +27,15 @@ export function SongPacks() {
   return (
     <div style={styles.stack}>
       {SONG_PACKS.map((pack) => {
-        const isOpen = !collapsed[pack.id];
+        const isOpen = Boolean(openPacks[pack.id]);
         const pending = pack.songs.filter((song) => !isInstalled(songs, song.title));
 
         return (
           <section key={pack.id} style={styles.group}>
-            <header style={styles.groupHeader}>
+            <header
+              style={{ ...styles.groupHeader, cursor: 'pointer' }}
+              onClick={() => setOpenPacks((prev) => ({ ...prev, [pack.id]: !isOpen }))}
+            >
               <div style={styles.groupLabel}>
                 <span style={styles.groupIcon} aria-hidden>♪</span>
                 <span style={styles.groupName}>{pack.name}</span>
@@ -41,7 +44,10 @@ export function SongPacks() {
                 {pending.length > 0 ? (
                   <button
                     style={styles.downloadAll}
-                    onClick={() => addSongs(pending.map((song) => ({ pack, title: song.title })))}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addSongs(pending.map((song) => ({ pack, title: song.title })));
+                    }}
                   >
                     Download all ({pending.length} {pending.length === 1 ? 'song' : 'songs'})
                   </button>
@@ -50,7 +56,10 @@ export function SongPacks() {
                 )}
                 <button
                   style={styles.chevron}
-                  onClick={() => setCollapsed((prev) => ({ ...prev, [pack.id]: isOpen }))}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenPacks((prev) => ({ ...prev, [pack.id]: !isOpen }));
+                  }}
                   title={isOpen ? 'Collapse' : 'Expand'}
                   aria-expanded={isOpen}
                 >
