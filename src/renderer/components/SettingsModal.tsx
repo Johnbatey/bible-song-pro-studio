@@ -15,6 +15,7 @@ export type SettingsCategory =
   | 'lowerthird'
   | 'help'
   | 'feedback'
+  | 'support'
   | 'language'
   | 'hotkeys';
 
@@ -30,25 +31,23 @@ const categories: CategoryItem[] = [
     label: 'System',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 2l-2 2m-2-2l2 2M3 21l8-8" />
-        <circle cx="7.5" cy="16.5" r="3.5" />
-        <path d="M16 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" />
+        <path d="M12 2v20M2 12h20" />
       </svg>
     ),
   },
   {
     id: 'scripture',
-    label: 'Bible',
+    label: 'Live Scripture AI',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" />
+        <path d="M12 6v6l4 2" />
       </svg>
     ),
   },
   {
     id: 'songs',
-    label: 'Songs',
+    label: 'Songs & CCLI',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 18V5l12-2v13" />
@@ -59,18 +58,19 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'audio',
-    label: 'Audio & Speech AI',
+    label: 'Audio Input (Microphone)',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+        <line x1="12" y1="19" x2="12" y2="23" />
+        <line x1="8" y1="23" x2="16" y2="23" />
       </svg>
     ),
   },
   {
     id: 'output',
-    label: 'Displays & NDI',
+    label: 'Outputs (Displays & NDI)',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -81,7 +81,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'fullscreen',
-    label: 'Full Screen Mode',
+    label: 'Full Screen display',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
@@ -90,11 +90,10 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'lowerthird',
-    label: 'Lower Third Mode',
+    label: 'Lower Third display',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-        <line x1="3" y1="15" x2="21" y2="15" />
+        <rect x="3" y="14" width="18" height="7" rx="2" />
       </svg>
     ),
   },
@@ -111,7 +110,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'hotkeys',
-    label: 'Keyboard Shortcuts',
+    label: 'Hotkeys',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="4" width="20" height="16" rx="2" />
@@ -140,6 +139,19 @@ const categories: CategoryItem[] = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'support',
+    label: 'Support the Creator',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
+        <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
+        <line x1="6" y1="1" x2="6" y2="4" />
+        <line x1="10" y1="1" x2="10" y2="4" />
+        <line x1="14" y1="1" x2="14" y2="4" />
       </svg>
     ),
   },
@@ -482,7 +494,19 @@ export function SettingsModal() {
           </div>
 
           <div style={modalStyles.sidebarFooter}>
-            <span style={modalStyles.versionText}>{appVersion ? `version ${appVersion}` : ''}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <img src="./bible-song-pro-icon-small.svg" alt="" style={{ width: 16, height: 16, objectFit: 'contain' }} />
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                  Bible Song Pro<sup style={{ fontFamily: 'var(--font-signal)', fontSize: 8, fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', marginLeft: '0.4em', verticalAlign: '0.3em', lineHeight: 0, color: 'var(--text-dim)' }}>Studio</sup>
+                </span>
+              </div>
+              {appVersion && (
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 500 }}>
+                  v{appVersion}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1475,6 +1499,95 @@ export function SettingsModal() {
                   >
                     🔗 Open directly on GitHub
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* 11. Support the Creator View */}
+            {activeCategory === 'support' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    background: 'var(--chrome-control)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 12,
+                    padding: 24,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: '50%',
+                        background: 'rgba(255, 85, 0, 0.15)',
+                        border: '1px solid rgba(255, 85, 0, 0.4)',
+                        color: '#FF5500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 24,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ☕
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                        Johnson Olakotan
+                      </h3>
+                      <p style={{ margin: '3px 0 0 0', fontSize: 12, color: '#FF5500', fontWeight: 600 }}>
+                        Lead Engineer & Creator of Bible Song Pro Studio
+                      </p>
+                    </div>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    Bible Song Pro Studio is built to empower churches, ministries, and live production teams with reliable, modern presentation tools and live scripture AI. Your support directly helps fund ongoing engineering, hosting costs, and future feature developments.
+                  </p>
+
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
+                    <button
+                      className="btn"
+                      onClick={() => void window.BSP?.openExternal('https://buymeacoffee.com/johnsonolakotan')}
+                      style={{
+                        background: '#FF5500',
+                        color: '#FFF',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        padding: '10px 18px',
+                        borderRadius: 6,
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      ☕ Buy Me a Coffee / Support
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => void window.BSP?.openExternal('https://www.instagram.com/johnsonolakotan')}
+                      style={{ padding: '10px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer' }}
+                    >
+                      📷 Instagram @johnsonolakotan
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => void window.BSP?.openExternal(TUTORIALS_URL)}
+                      style={{ padding: '10px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer' }}
+                    >
+                      ▶️ YouTube Tutorials
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, padding: '0 4px' }}>
+                  Thank you for using Bible Song Pro Studio to serve your church and media team!
                 </div>
               </div>
             )}
