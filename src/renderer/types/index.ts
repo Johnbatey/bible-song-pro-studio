@@ -790,8 +790,7 @@ declare global {
         importFile: (payload: { filePath: string }) => Promise<SongImportResult>;
         importText: (payload: { text: string }) => Promise<SongImportResult>;
         arrangeText: (payload: { text: string }) => Promise<ArrangeResult>;
-        pick: () => Promise<{ ok: boolean; filePaths?: string[]; canceled?: boolean }>;
-        pathForFile: (file: File) => string;
+        pick: (payload?: any) => Promise<{ ok: boolean; filePaths?: string[]; canceled?: boolean }>;
       };
       deck: {
         /** Reads a .pptx back from disk. Only the path is persisted with a deck. */
