@@ -494,10 +494,11 @@ export function MediaPanel() {
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
             style={{
               position: 'fixed',
-              left: Math.min(menu.x, window.innerWidth - 200),
-              top: Math.min(menu.y, window.innerHeight - 140),
+              left: Math.min(menu.x, window.innerWidth - 230),
+              top: Math.min(menu.y, window.innerHeight - 160),
               zIndex: 1000,
-              minWidth: 184,
+              width: 220,
+              maxWidth: 240,
               padding: 4,
               background: 'var(--bsp-raised)',
               border: '1px solid var(--border-primary)',
@@ -544,8 +545,12 @@ export function MediaPanel() {
                 padding: '6px 10px 4px',
                 borderTop: '1px solid var(--border-primary)',
                 marginTop: 4,
-                wordBreak: 'break-all',
+                overflowX: 'auto',
+                whiteSpace: 'nowrap',
+                fontSize: 10,
+                lineHeight: 1.4,
               }}
+              title={menu.item.sourcePath || ''}
             >
               {menu.item.sourcePath || 'Imported by an older build — stored in the app folder'}
             </div>
