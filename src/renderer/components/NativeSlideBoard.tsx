@@ -42,6 +42,32 @@ export function hexToRgba(color: string | undefined, opacity: number = 1): strin
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
+export function computeTextShadow(el: SlideElement): string | undefined {
+  if (el.shadowEnabled) {
+    const col = el.shadowColor || '#000000';
+    const blur = el.shadowBlur ?? 8;
+    const x = el.shadowOffsetX ?? 0;
+    const y = el.shadowOffsetY ?? 4;
+    const opacity = el.shadowOpacity ?? 0.5;
+    return `${x}px ${y}px ${blur}px ${hexToRgba(col, opacity)}`;
+  }
+  if (el.shadowEnabled === false) return undefined;
+  return el.textShadow || undefined;
+}
+
+export function computeBoxShadow(el: SlideElement): string | undefined {
+  if (el.boxShadowEnabled) {
+    const col = el.boxShadowColor || '#000000';
+    const blur = el.boxShadowBlur ?? 12;
+    const x = el.boxShadowOffsetX ?? 0;
+    const y = el.boxShadowOffsetY ?? 6;
+    const opacity = el.boxShadowOpacity ?? 0.4;
+    return `${x}px ${y}px ${blur}px ${hexToRgba(col, opacity)}`;
+  }
+  if (el.boxShadowEnabled === false) return undefined;
+  return el.boxShadow || undefined;
+}
+
 /**
  * What a slide with no layers of its own looks like: a title and a body, the
  * pair the editor drops onto a fresh slide. The editor renders these when
@@ -137,6 +163,7 @@ function ElementBox({ el }: { el: SlideElement }) {
             borderColor: el.borderColor || 'transparent',
             borderWidth: el.borderWidth !== undefined ? `${el.borderWidth}px` : '0px',
             borderStyle: (el.borderWidth ?? 0) > 0 ? 'solid' : 'none',
+            boxShadow: computeBoxShadow(el),
             boxSizing: 'border-box',
           }}
         />
@@ -169,6 +196,7 @@ function ElementBox({ el }: { el: SlideElement }) {
             borderWidth: `${borderWidth}px`,
             borderStyle: borderWidth > 0 ? 'solid' : 'none',
             borderRadius: computedRadius,
+            boxShadow: computeBoxShadow(el),
             clipPath:
               el.content === 'triangle'
                 ? 'polygon(50% 0%, 0% 100%, 100% 100%)'
@@ -199,7 +227,8 @@ function ElementBox({ el }: { el: SlideElement }) {
           letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
           textTransform: el.textTransform || 'none',
           textDecoration: el.textDecoration || 'none',
-          textShadow: el.textShadow || '0 2px 8px rgba(0, 0, 0, 0.6)',
+          textShadow: computeTextShadow(el),
+          boxShadow: computeBoxShadow(el),
           backgroundColor: el.backgroundColor || 'transparent',
           borderColor: el.borderColor || 'transparent',
           borderWidth: `${borderWidth}px`,

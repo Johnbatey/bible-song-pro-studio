@@ -1161,6 +1161,216 @@ export function SlideEditorRightSidebar({
               </div>
             )}
 
+            {/* Effects & Shadows Section */}
+            {selectedElement && (
+              <div style={styles.sectionCard}>
+                <div style={styles.sectionHeader} onClick={() => toggleSection('effects')}>
+                  <span style={styles.sectionTitle}>Effects & Shadows</span>
+                  <ChevronIcon open={Boolean(openSections.effects)} />
+                </div>
+
+                {openSections.effects && (
+                  <div style={styles.sectionBody}>
+                    {/* Text Drop Shadow (For Text & Shape elements with content) */}
+                    {(selectedElement.type === 'text' || selectedElement.type === 'shape') && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 10, borderBottom: '1px solid var(--border-primary)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>Text Drop Shadow</span>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedElement.shadowEnabled)}
+                            onChange={(e) => onUpdateElement(selectedElement.id, { shadowEnabled: e.target.checked })}
+                            style={{ cursor: 'pointer', accentColor: '#FF5500' }}
+                          />
+                        </div>
+
+                        {selectedElement.shadowEnabled && (
+                          <>
+                            {/* Color */}
+                            <div style={styles.propRowCol}>
+                              <span style={styles.propLabel}>Shadow Color</span>
+                              <div style={styles.colorPillRow}>
+                                <input
+                                  type="color"
+                                  value={normalizeHex(selectedElement.shadowColor) || '#000000'}
+                                  onChange={(e) => onUpdateElement(selectedElement.id, { shadowColor: e.target.value })}
+                                  style={styles.colorSwatch}
+                                />
+                                <input
+                                  type="text"
+                                  spellCheck={false}
+                                  value={(selectedElement.shadowColor || '#000000').toUpperCase()}
+                                  onChange={(e) => onUpdateElement(selectedElement.id, { shadowColor: e.target.value })}
+                                  style={styles.colorHexInput}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Blur Radius */}
+                            <div style={styles.propRowCol}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={styles.propLabel}>Blur Radius</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                                  {selectedElement.shadowBlur ?? 8}px
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="40"
+                                value={selectedElement.shadowBlur ?? 8}
+                                onChange={(e) => onUpdateElement(selectedElement.id, { shadowBlur: parseInt(e.target.value, 10) })}
+                                style={{ accentColor: '#FF5500' }}
+                              />
+                            </div>
+
+                            {/* Offset X & Y */}
+                            <div style={styles.twoColRow}>
+                              <div style={styles.propRowCol}>
+                                <span style={styles.propLabel}>Offset X</span>
+                                <ScrubbableInput
+                                  value={selectedElement.shadowOffsetX ?? 0}
+                                  onChange={(v) => onUpdateElement(selectedElement.id, { shadowOffsetX: v })}
+                                  min={-30}
+                                  max={30}
+                                  step={1}
+                                />
+                              </div>
+                              <div style={styles.propRowCol}>
+                                <span style={styles.propLabel}>Offset Y</span>
+                                <ScrubbableInput
+                                  value={selectedElement.shadowOffsetY ?? 4}
+                                  onChange={(v) => onUpdateElement(selectedElement.id, { shadowOffsetY: v })}
+                                  min={-30}
+                                  max={30}
+                                  step={1}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Opacity */}
+                            <div style={styles.propRowCol}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={styles.propLabel}>Shadow Opacity</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                                  {Math.round((selectedElement.shadowOpacity ?? 0.5) * 100)}%
+                                </span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={Math.round((selectedElement.shadowOpacity ?? 0.5) * 100)}
+                                onChange={(e) => onUpdateElement(selectedElement.id, { shadowOpacity: parseFloat(e.target.value) / 100 })}
+                                style={{ accentColor: '#FF5500' }}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Container Box Shadow (For Shapes, Images, & Containers) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: (selectedElement.type === 'text' || selectedElement.type === 'shape') ? 6 : 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>Container Box Shadow</span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selectedElement.boxShadowEnabled)}
+                          onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowEnabled: e.target.checked })}
+                          style={{ cursor: 'pointer', accentColor: '#FF5500' }}
+                        />
+                      </div>
+
+                      {selectedElement.boxShadowEnabled && (
+                        <>
+                          {/* Color */}
+                          <div style={styles.propRowCol}>
+                            <span style={styles.propLabel}>Box Shadow Color</span>
+                            <div style={styles.colorPillRow}>
+                              <input
+                                type="color"
+                                value={normalizeHex(selectedElement.boxShadowColor) || '#000000'}
+                                onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowColor: e.target.value })}
+                                style={styles.colorSwatch}
+                              />
+                              <input
+                                type="text"
+                                spellCheck={false}
+                                value={(selectedElement.boxShadowColor || '#000000').toUpperCase()}
+                                onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowColor: e.target.value })}
+                                style={styles.colorHexInput}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Blur Radius */}
+                          <div style={styles.propRowCol}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={styles.propLabel}>Blur Radius</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {selectedElement.boxShadowBlur ?? 12}px
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="50"
+                              value={selectedElement.boxShadowBlur ?? 12}
+                              onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowBlur: parseInt(e.target.value, 10) })}
+                              style={{ accentColor: '#FF5500' }}
+                            />
+                          </div>
+
+                          {/* Offset X & Y */}
+                          <div style={styles.twoColRow}>
+                            <div style={styles.propRowCol}>
+                              <span style={styles.propLabel}>Offset X</span>
+                              <ScrubbableInput
+                                value={selectedElement.boxShadowOffsetX ?? 0}
+                                onChange={(v) => onUpdateElement(selectedElement.id, { boxShadowOffsetX: v })}
+                                min={-30}
+                                max={30}
+                                step={1}
+                              />
+                            </div>
+                            <div style={styles.propRowCol}>
+                              <span style={styles.propLabel}>Offset Y</span>
+                              <ScrubbableInput
+                                value={selectedElement.boxShadowOffsetY ?? 6}
+                                onChange={(v) => onUpdateElement(selectedElement.id, { boxShadowOffsetY: v })}
+                                min={-30}
+                                max={30}
+                                step={1}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Opacity */}
+                          <div style={styles.propRowCol}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={styles.propLabel}>Box Shadow Opacity</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {Math.round((selectedElement.boxShadowOpacity ?? 0.4) * 100)}%
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={Math.round((selectedElement.boxShadowOpacity ?? 0.4) * 100)}
+                              onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowOpacity: parseFloat(e.target.value) / 100 })}
+                              style={{ accentColor: '#FF5500' }}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Geometry & Transform Section */}
             {selectedElement && (
               <div style={styles.sectionCard}>

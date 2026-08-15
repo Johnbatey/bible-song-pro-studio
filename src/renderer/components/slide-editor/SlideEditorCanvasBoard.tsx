@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import type { PresentationSlide, SlideElement } from '../../types';
-import { slideElementsFor, hexToRgba } from '../NativeSlideBoard';
+import { slideElementsFor, hexToRgba, computeTextShadow, computeBoxShadow } from '../NativeSlideBoard';
 import type { ActiveTool } from './SlideEditorQuickToolbar';
 
 interface SlideEditorCanvasBoardProps {
@@ -474,8 +474,8 @@ export function SlideEditorCanvasBoard({
                    moment it was taken. */
                 transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
                 cursor: isEditing ? 'text' : 'move',
-                border: isSelected ? '1.5px solid rgba(255, 255, 255, 0.7)' : '1px transparent solid',
-                boxShadow: isSelected ? '0 0 0 3px rgba(255, 255, 255, 0.15), 0 4px 16px rgba(0, 0, 0, 0.4)' : undefined,
+                border: isSelected ? '1.5px solid #FF5500' : '1px transparent solid',
+                boxShadow: computeBoxShadow(el) || (isSelected ? '0 0 0 2px rgba(255, 85, 0, 0.3)' : undefined),
                 borderRadius: isSelected ? 4 : undefined,
                 boxSizing: 'border-box',
               }}
@@ -509,6 +509,7 @@ export function SlideEditorCanvasBoard({
                       letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
                       textTransform: el.textTransform || 'none',
                       textDecoration: el.textDecoration || 'none',
+                      textShadow: computeTextShadow(el),
                       resize: 'none',
                     }}
                   />
@@ -533,7 +534,7 @@ export function SlideEditorCanvasBoard({
                       letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
                       textTransform: el.textTransform || 'none',
                       textDecoration: el.textDecoration || 'none',
-                      textShadow: el.textShadow || '0 2px 8px rgba(0, 0, 0, 0.6)',
+                      textShadow: computeTextShadow(el),
                       display: 'flex',
                       alignItems: el.vAlign === 'top' ? 'flex-start' : el.vAlign === 'bottom' ? 'flex-end' : 'center',
                       justifyContent: el.textAlign === 'left' ? 'flex-start' : el.textAlign === 'right' ? 'flex-end' : 'center',
