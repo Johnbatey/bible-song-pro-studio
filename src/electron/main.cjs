@@ -20,6 +20,7 @@ nativeTheme.themeSource = 'dark';
    Set here because switches are read when Chromium starts, and app.whenReady()
    is already too late.
    ------------------------------------------------------------------------- */
+app.commandLine.appendSwitch('log-level', '3');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
