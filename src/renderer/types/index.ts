@@ -655,6 +655,9 @@ export interface Alert {
   type: 'info' | 'warning' | 'announcement' | 'custom';
   duration: number;
   animation: string;
+  position?: 'top' | 'bottom';
+  speed?: number;
+  cycles?: number;
 }
 
 /**

@@ -167,7 +167,6 @@
 
 .program-alert {
   position: absolute;
-  bottom: 0;
   left: 0;
   right: 0;
   width: 100%;
@@ -177,10 +176,22 @@
   background: rgba(14, 14, 18, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-top: 2px solid var(--accent, #FF5500);
   display: flex;
   align-items: center;
+}
+
+.program-alert-bottom {
+  bottom: 0;
+  top: auto;
+  border-top: 2px solid var(--accent, #FF5500);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.program-alert-top {
+  top: 0;
+  bottom: auto;
+  border-bottom: 2px solid var(--accent, #FF5500);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .program-alert-warning {

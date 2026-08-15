@@ -530,8 +530,15 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         window.BSP.display.sendState({ activeAlert: alert });
       }
     } catch (_) {}
-    const sec = alert.duration || 10;
-    const durationMs = sec > 100 ? sec : sec * 1000;
+    let durationMs = 0;
+    const speed = alert.speed || 1;
+    const singleLoopSec = 16 / speed;
+    if (alert.cycles && alert.cycles > 0) {
+      durationMs = alert.cycles * singleLoopSec * 1000;
+    } else if (alert.duration) {
+      const sec = alert.duration;
+      durationMs = sec > 100 ? sec : sec * 1000;
+    }
     if (durationMs > 0 && durationMs < 86400000) {
       _alertTimer = setTimeout(() => {
         set({ activeAlert: null });

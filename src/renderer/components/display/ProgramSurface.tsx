@@ -674,9 +674,16 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
       )}
 
       {state.activeAlert && (
-        <div className={`program-alert program-alert-${state.activeAlert.type}`}>
+        <div className={`program-alert program-alert-${state.activeAlert.type} program-alert-${state.activeAlert.position || 'bottom'}`}>
           <div className="program-alert-track">
-            <span className="program-alert-text">{state.activeAlert.text}</span>
+            <span
+              className="program-alert-text"
+              style={{
+                animationDuration: `${16 / (state.activeAlert.speed || 1)}s`,
+              }}
+            >
+              {state.activeAlert.text}
+            </span>
           </div>
         </div>
       )}
