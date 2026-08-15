@@ -123,6 +123,7 @@ export interface SlideElement {
   opacity?: number;
   rotation?: number;
   zIndex?: number;
+  locked?: boolean;
 }
 
 export interface SlideBackground {

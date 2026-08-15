@@ -53,6 +53,7 @@ function nativeLayerRows(elements: SlideElement[], selectedId: string | null): L
       label: (el.content || '').trim().slice(0, 34) || el.type,
       kind: el.type === 'text' ? 'text' : el.type === 'image' ? 'image' : 'shape',
       selected: el.id === selectedId,
+      locked: Boolean(el.locked),
     }));
 }
 
@@ -1848,6 +1849,10 @@ export function SlideEditorRightSidebar({
                 onSelect={(id) => onSelectElement(id)}
                 onReorder={handleNativeReorder}
                 onDelete={onDeleteElement}
+                onToggleLock={(id) => {
+                  const target = nativeElements.find((e) => e.id === id);
+                  if (target) onUpdateElement(id, { locked: !target.locked });
+                }}
                 emptyHint="This slide has no elements yet. Add a text box or a shape from the toolbar."
               />
             )}

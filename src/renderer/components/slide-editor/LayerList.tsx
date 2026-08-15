@@ -4,7 +4,7 @@
    One presentation for both deck kinds. The PowerPoint side feeds it layer
    units from the parsed shapes; the native side feeds it the slide's elements
    sorted by z-index. Either way a row is one thing the operator can select,
-   drag to restack, or remove.
+   drag to restack, lock, or remove.
 
    Rows are given topmost-first, the way every layer panel reads, and the drop
    index is in that same space — the callers own the translation back to paint
@@ -19,6 +19,7 @@ export interface LayerRow {
   /** 'group', 'text', 'shape', 'image', … — drives the leading glyph. */
   kind: string;
   selected: boolean;
+  locked?: boolean;
 }
 
 export interface LayerListProps {
@@ -28,6 +29,7 @@ export interface LayerListProps {
   /** Both indices are into `rows`; the dragged row lands at `to`. */
   onReorder: (from: number, to: number) => void;
   onDelete?: (id: string) => void;
+  onToggleLock?: (id: string) => void;
   emptyHint: string;
 }
 
@@ -41,7 +43,47 @@ const GLYPH: Record<string, string> = {
   table: '▦',
 };
 
-export function LayerList({ rows, onSelect, onReorder, onDelete, emptyHint }: LayerListProps) {
+export function LockedIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+export function UnlockedIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 7.5-2" />
+    </svg>
+  );
+}
+
+export function LayerList({ rows, onSelect, onReorder, onDelete, onToggleLock, emptyHint }: LayerListProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
@@ -62,11 +104,13 @@ export function LayerList({ rows, onSelect, onReorder, onDelete, emptyHint }: La
         return (
           <div
             key={row.id}
-            draggable
+            draggable={!row.locked}
             onDragStart={(e) => {
+              if (row.locked) {
+                e.preventDefault();
+                return;
+              }
               setDragIndex(index);
-              /* Firefox will not start a drag without payload, and the row
-                 order is all this drag actually carries. */
               e.dataTransfer.effectAllowed = 'move';
               e.dataTransfer.setData('text/plain', row.id);
             }}
@@ -92,16 +136,51 @@ export function LayerList({ rows, onSelect, onReorder, onDelete, emptyHint }: La
                 : 'rgba(255,255,255,0.07)',
               opacity: dragging ? 0.4 : 1,
             }}
-            title={row.label}
+            title={row.label + (row.locked ? ' (Locked)' : '')}
           >
             <span style={styles.grip}>⠿</span>
             <span style={styles.glyph}>{GLYPH[row.kind] || '◆'}</span>
             <span style={styles.label}>{row.label}</span>
+
+            {/* Lock / Unlock Toggle Button */}
+            {onToggleLock && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleLock(row.id);
+                }}
+                style={{
+                  flexShrink: 0,
+                  width: 22,
+                  height: 22,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  background: row.locked ? 'rgba(255, 85, 0, 0.2)' : 'transparent',
+                  border: row.locked ? '1px solid rgba(255, 85, 0, 0.4)' : 'none',
+                  borderRadius: 4,
+                  color: row.locked ? '#FF5500' : 'rgba(255, 255, 255, 0.4)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title={row.locked ? 'Unlock layer' : 'Lock layer — stops canvas selection/movement'}
+              >
+                {row.locked ? <LockedIcon size={12} /> : <UnlockedIcon size={12} />}
+              </button>
+            )}
+
+            {/* Remove Button */}
             {onDelete && (
               <button
                 type="button"
                 onMouseDown={(e) => e.stopPropagation()}
-                onClick={() => onDelete(row.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(row.id);
+                }}
                 style={styles.remove}
                 title="Remove from slide"
               >

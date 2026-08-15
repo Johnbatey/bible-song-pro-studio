@@ -446,6 +446,7 @@ export function SlideEditorCanvasBoard({
         {elements.map((el) => {
           const isSelected = el.id === selectedElementId;
           const isEditing = el.id === editingTextId;
+          const isLocked = Boolean(el.locked);
 
           /* Element geometry is a percentage of the slide, everywhere.
              This used to read `el.x > 100 ? (el.x / 1280) * 100 : el.x`,
@@ -469,12 +470,13 @@ export function SlideEditorCanvasBoard({
                 onSelectElement(el.id);
               }}
               onDoubleClick={(e) => {
+                if (isLocked) return;
                 e.stopPropagation();
                 onSelectElement(el.id);
                 if (el.type === 'text') setEditingTextId(el.id);
               }}
               onPointerDown={(e) => {
-                if (isEditing) return;
+                if (isEditing || isLocked) return;
                 e.stopPropagation();
                 onSelectElement(el.id);
                 setDragState({
@@ -499,8 +501,8 @@ export function SlideEditorCanvasBoard({
                    it a rotated block sat square in the editor and turned the
                    moment it was taken. */
                 transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
-                cursor: isEditing ? 'text' : 'move',
-                border: isSelected ? '1.5px solid #FF5500' : '1px transparent solid',
+                cursor: isEditing ? 'text' : isLocked ? 'not-allowed' : 'move',
+                border: isSelected ? (isLocked ? '1.5px dashed #FF5500' : '1.5px solid #FF5500') : '1px transparent solid',
                 boxShadow: computeBoxShadow(el) || (isSelected ? '0 0 0 2px rgba(255, 85, 0, 0.3)' : undefined),
                 borderRadius: isSelected ? 4 : undefined,
                 boxSizing: 'border-box',
@@ -631,8 +633,35 @@ export function SlideEditorCanvasBoard({
                 );
               })()}
 
+              {/* Lock Badge for Locked Selected Elements */}
+              {isSelected && isLocked && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: -10,
+                    right: -10,
+                    background: '#FF5500',
+                    color: '#ffffff',
+                    borderRadius: '50%',
+                    width: 20,
+                    height: 20,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+                    zIndex: 12,
+                  }}
+                  title="Layer is locked (unmovable)"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="4" y="10" width="16" height="11" rx="2" />
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                  </svg>
+                </div>
+              )}
+
               {/* PowerPoint-style 8 Handle Resizing HUD */}
-              {isSelected && !isEditing && (
+              {isSelected && !isEditing && !isLocked && (
                 <>
                   {[
                     { name: 'tl', style: { top: -6, left: -6, cursor: 'nwse-resize' } },

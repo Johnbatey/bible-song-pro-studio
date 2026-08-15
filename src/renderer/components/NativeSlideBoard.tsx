@@ -138,6 +138,7 @@ function vJustify(vAlign?: SlideElement['vAlign']) {
 }
 
 function ElementBox({ el }: { el: SlideElement }) {
+  const isLocked = Boolean(el.locked);
   const outer: CSSProperties = {
     position: 'absolute',
     left: `${el.x}%`,
@@ -147,6 +148,7 @@ function ElementBox({ el }: { el: SlideElement }) {
     zIndex: el.zIndex || 1,
     transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
     opacity: el.opacity ?? 1,
+    pointerEvents: isLocked ? 'none' : 'auto',
   };
 
   if (el.type === 'image') {
