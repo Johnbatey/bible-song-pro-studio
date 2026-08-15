@@ -1210,9 +1210,11 @@ app.whenReady().then(async () => {
       title: 'Import Bible Translation',
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Bible Translations (*.json, *.xml, *.bible)', extensions: ['json', 'xml', 'bible'] },
-        { name: 'JSON Files (*.json)', extensions: ['json'] },
-        { name: 'XML Files (*.xml)', extensions: ['xml'] },
+        { name: 'Bible Files (*.xml, *.osis, *.usfx, *.xmm, *.usfm, *.sfm, *.json, *.csv, *.sqlite, *.db)', extensions: ['xml', 'osis', 'usfx', 'xmm', 'usfm', 'sfm', 'json', 'csv', 'sqlite', 'db', 'bible'] },
+        { name: 'XML / OSIS / USFX / OpenSong (*.xml, *.osis, *.usfx, *.xmm)', extensions: ['xml', 'osis', 'usfx', 'xmm'] },
+        { name: 'USFM Scripture Files (*.usfm, *.sfm)', extensions: ['usfm', 'sfm'] },
+        { name: 'JSON & CSV Files (*.json, *.csv)', extensions: ['json', 'csv'] },
+        { name: 'SQLite / OpenLP Databases (*.sqlite, *.db)', extensions: ['sqlite', 'db'] },
         { name: 'All Files (*.*)', extensions: ['*'] },
       ],
     });

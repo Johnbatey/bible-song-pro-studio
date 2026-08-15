@@ -1,6 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 const { ALL_BOOKS } = require('./scripture-reference.cjs');
+const {
+  CANONICAL_BOOKS,
+  matchCanonicalBook,
+  parseZefaniaXml,
+  parseOsisXml,
+  parseOpenSongXml,
+  parseUsfmText,
+  parseJsonBible,
+} = require('./bible-parsing.cjs');
 
 // Bundled scripture is public domain and 66-book Protestant canon only — see
 // BIBLES.md. Copyrighted translations (NIV, NKJV, NLT, NASB, ESV) are not shipped;
@@ -176,10 +185,19 @@ function loadVersion(meta) {
   if (meta.type === 'xml') return parseKjvXml(fs.readFileSync(filePath, 'utf8'));
   try {
     const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    if (parsed && parsed.books && typeof parsed.books === 'object') {
-      return parsed.books;
+    const books = (parsed && parsed.books && typeof parsed.books === 'object') ? parsed.books : parsed;
+    if (parsed && Array.isArray(parsed.localizedBookNames)) {
+      meta.localizedBookNames = parsed.localizedBookNames;
+      parsed.localizedBookNames.forEach((b) => {
+        if (b.name) {
+          const canonical = matchCanonicalBook(b.code || b.name);
+          if (canonical) {
+            addBookAlias(b.name, canonical.name);
+          }
+        }
+      });
     }
-    return parsed;
+    return books;
   } catch (_) {
     return {};
   }
@@ -202,20 +220,40 @@ function importBibleFile({ filePath, overwrite = false }) {
   let baseId = path.basename(filePath, ext).replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase() || 'CUSTOM';
   let versionName = baseId;
   let booksData = {};
+  let localizedBookNames = [];
 
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    if (ext === '.xml' || content.trim().startsWith('<?xml') || content.trim().startsWith('<b ')) {
-      booksData = parseKjvXml(content);
+    if (ext === '.xml' || ext === '.osis' || ext === '.usfx' || ext === '.xmm' || content.trim().startsWith('<?xml')) {
+      if (content.includes('<xmlbible') || content.includes('<BIBLEBOOK')) {
+        const res = parseZefaniaXml(content, baseId);
+        versionName = res.name || baseId;
+        booksData = res.bibleData;
+        localizedBookNames = res.localizedBookNames;
+      } else if (content.includes('<osis') || content.includes('osisID')) {
+        const res = parseOsisXml(content, baseId);
+        versionName = res.name || baseId;
+        booksData = res.bibleData;
+        localizedBookNames = res.localizedBookNames;
+      } else if (content.includes('<b n=')) {
+        const res = parseOpenSongXml(content, baseId);
+        versionName = res.name || baseId;
+        booksData = res.bibleData;
+        localizedBookNames = res.localizedBookNames;
+      } else {
+        booksData = parseKjvXml(content);
+      }
+    } else if (ext === '.usfm' || ext === '.sfm' || content.trim().startsWith('\\id')) {
+      const res = parseUsfmText(content, baseId);
+      booksData = res.bibleData;
+      localizedBookNames = res.localizedBookNames;
     } else {
       const parsed = JSON.parse(content);
       if (parsed.id) baseId = String(parsed.id).trim().toUpperCase();
       if (parsed.name) versionName = String(parsed.name).trim();
-      if (parsed.books && typeof parsed.books === 'object') {
-        booksData = parsed.books;
-      } else {
-        booksData = parsed;
-      }
+      const res = parseJsonBible(parsed, baseId);
+      booksData = res.bibleData;
+      localizedBookNames = res.localizedBookNames;
     }
   } catch (err) {
     return { ok: false, error: 'Failed to parse Bible file: ' + (err.message || String(err)) };
@@ -245,6 +283,7 @@ function importBibleFile({ filePath, overwrite = false }) {
     name: versionName,
     abbreviation: baseId,
     books: booksData,
+    localizedBookNames,
   };
 
   fs.writeFileSync(targetPath, JSON.stringify(payload, null, 2), 'utf8');
