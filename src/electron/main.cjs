@@ -27,6 +27,7 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 /* ── Where the operator's data lives, and why renaming is expensive ─────────
  *

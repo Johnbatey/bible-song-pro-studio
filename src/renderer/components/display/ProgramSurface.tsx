@@ -250,10 +250,18 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     if (Number.isFinite(transport.seekTo)) el.currentTime = transport.seekTo;
   }, [transport?.seekNonce]);
 
-  /* Audio output device routing & master volume */
+  const scene = state.scene || null;
+
+  /* Audio output device routing, mute state & master volume */
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
+
+    const isMuted = Boolean(
+      scene?.background?.muted ?? transport?.muted ?? (preview && !state.settings?.audioCueDeviceId)
+    );
+    el.muted = isMuted;
+
     const targetDeviceId = preview
       ? state.settings?.audioCueDeviceId
       : state.settings?.audioOutputDeviceId;
@@ -261,17 +269,23 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
 
     const masterVol = (state.settings?.audioMasterVolume ?? 100) / 100;
     el.volume = Math.max(0, Math.min(1, masterVol));
-  }, [preview, state.settings?.audioOutputDeviceId, state.settings?.audioCueDeviceId, state.settings?.audioMasterVolume]);
+  }, [
+    preview,
+    scene?.background?.muted,
+    transport?.muted,
+    state.settings?.audioOutputDeviceId,
+    state.settings?.audioCueDeviceId,
+    state.settings?.audioMasterVolume,
+  ]);
 
   const mode = state.outputMode || state.mode || 'fullscreen';
   const themeSection = mode === 'lowerThird' ? state.theme?.lowerThird : state.theme?.fullScreen;
-  const scene = state.scene || null;
   const content = contentFromScene(scene);
   const secondaryVerse = content?.secondaryVerse;
   const isCompare = Boolean(secondaryVerse?.text);
   const baseRef = (content?.reference || '').replace(/\s*\([^)]*\/[^)]*\)\s*$/, '').trim();
   const primaryVersionTag = content?.version ? content.version.split('/')[0] : '';
-  const secondaryVersionTag = secondaryVerse?.version || (content?.version ? content.version.split('/')[1] : '');
+  const secondaryVersionTag = secondaryVerse?.version || (content?.version && content.version.includes('/') ? content.version.split('/')[1] : '');
 
   const hasVersionInRef = Boolean(
     content?.reference &&
@@ -366,7 +380,6 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           className="program-surface-video"
           src={video}
           autoPlay
-          muted
           loop={state.bgVideoLoop !== false}
           playsInline
           onPlay={() => onVideoPlayState?.(true)}
