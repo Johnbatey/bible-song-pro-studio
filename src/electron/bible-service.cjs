@@ -190,9 +190,11 @@ function loadVersion(meta) {
       meta.localizedBookNames = parsed.localizedBookNames;
       parsed.localizedBookNames.forEach((b) => {
         if (b.name) {
-          const canonical = matchCanonicalBook(b.code || b.name);
+          const canonical = matchCanonicalBook(b.code || b.name || String(b.number));
           if (canonical) {
             addBookAlias(b.name, canonical.name);
+            addBookAlias(canonical.name, b.name);
+            addBookAlias(canonical.code, b.name);
           }
         }
       });
@@ -301,16 +303,30 @@ function importBibleFile({ filePath, overwrite = false }) {
 function normalizeBookName(input, versionId = 'KJV') {
   const raw = String(input || '').trim();
   if (!raw) return '';
-  const books = Object.keys(getData().versions[versionId] || getData().versions.KJV || {});
+  const bible = getData().versions[versionId] || getData().versions.KJV || {};
+  const books = Object.keys(bible);
   const rawKey = fold(raw);
   const compactRaw = rawKey.replace(/\s+/g, '');
+
   const exact = books.find((book) => fold(book) === rawKey);
   if (exact) return exact;
+
+  const canonical = matchCanonicalBook(raw);
+  if (canonical) {
+    const meta = getAllVersionMeta().find((m) => m.id === versionId);
+    if (meta && Array.isArray(meta.localizedBookNames)) {
+      const loc = meta.localizedBookNames.find((b) => b.number === canonical.number || b.code === canonical.code);
+      if (loc && books.includes(loc.name)) return loc.name;
+    }
+    if (books[canonical.number - 1]) return books[canonical.number - 1];
+  }
+
   const aliased = BOOK_ALIASES.get(rawKey) || BOOK_ALIASES.get(compactRaw);
   if (aliased) {
     const aliasExact = books.find((book) => fold(book) === fold(aliased));
     if (aliasExact) return aliasExact;
   }
+
   return books.find((book) => fold(book) === rawKey)
     || books.find((book) => fold(book).startsWith(rawKey))
     || books.find((book) => fold(book).replace(/\s+/g, '').startsWith(compactRaw))

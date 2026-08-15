@@ -116,6 +116,59 @@ function matchCanonicalBook(identifier = '') {
   return CANONICAL_BOOKS.find((b) => b.name.toLowerCase() === lower || b.aliases.includes(lower));
 }
 
+const { BIBLE_BOOK_TRANSLATIONS } = require('./bible-translations.cjs');
+
+function detectBibleLanguage(text = '', nameHint = '') {
+  const hintRaw = `${nameHint || ''} ${typeof text === 'string' ? text.slice(0, 4000) : ''}`.toLowerCase();
+  const commonMap = [
+    { key: 'yoruba', patterns: ['yoruba', 'bibeli mimo', 'yor'] },
+    { key: 'french', patterns: ['french', 'français', 'francais', ' segond', ' ostervald', 'lsg'] },
+    { key: 'spanish', patterns: ['spanish', 'español', 'espanol', ' reina', ' valera', 'rvr'] },
+    { key: 'chinese', patterns: ['chinese', '中文', '汉语', '繁體', '和合本'] },
+    { key: 'german', patterns: ['german', 'deutsch', 'luther'] },
+    { key: 'portuguese', patterns: ['portuguese', 'português', 'almeida'] },
+    { key: 'tagalog', patterns: ['tagalog', 'filipino', 'ang biblia'] },
+    { key: 'russian', patterns: ['russian', 'русский', 'синодальный'] },
+    { key: 'swahili', patterns: ['swahili', 'kiswahili', 'biblia takatifu'] },
+    { key: 'amharic', patterns: ['amharic', 'አማርኛ'] },
+    { key: 'arabic', patterns: ['arabic', 'العربية'] },
+    { key: 'hindi', patterns: ['hindi', 'हिंदी'] },
+    { key: 'igbo', patterns: ['igbo'] },
+    { key: 'hausa', patterns: ['hausa'] },
+    { key: 'zulu', patterns: ['zulu', 'ibhayibheli'] },
+  ];
+  for (const entry of commonMap) {
+    if (entry.patterns.some((p) => hintRaw.includes(p))) return entry.key;
+  }
+  for (const langKey of Object.keys(BIBLE_BOOK_TRANSLATIONS)) {
+    if (langKey.length > 3 && hintRaw.includes(langKey.toLowerCase())) return langKey;
+  }
+  return null;
+}
+
+const LANG_ALIASES = {
+  french: 'fr',
+  français: 'fr',
+  francais: 'fr',
+  hindi: 'hi',
+};
+
+function resolveLocalizedBookName(extractedName, bNumber, detectedLang) {
+  let clean = stripTags(extractedName || '').trim();
+  const bKey = String(bNumber);
+  const targetKey = detectedLang ? (LANG_ALIASES[detectedLang.toLowerCase()] || detectedLang) : null;
+  const translationMap = targetKey ? (BIBLE_BOOK_TRANSLATIONS[targetKey] || BIBLE_BOOK_TRANSLATIONS[targetKey.toLowerCase()]) : null;
+
+  if (!clean || /^\d+$/.test(clean) || clean.toLowerCase().startsWith('book ')) {
+    if (translationMap && translationMap[bKey]) {
+      return translationMap[bKey];
+    }
+    const canonical = CANONICAL_BOOKS[bNumber - 1];
+    return canonical ? canonical.name : `Book ${bNumber}`;
+  }
+  return clean;
+}
+
 function parseZefaniaXml(xmlText, fallbackId) {
   const bibleData = {};
   const localizedBookNames = [];
@@ -123,6 +176,7 @@ function parseZefaniaXml(xmlText, fallbackId) {
   const bibleAttrsMatch = xmlText.match(/<xmlbible\b([^>]*)>/i) || xmlText.match(/<BIBLEBOOK\b/i);
   const sysAttrs = parseXmlAttributes(bibleAttrsMatch ? bibleAttrsMatch[1] || '' : '');
   const name = sysAttrs.biblename || sysAttrs.title || fallbackId;
+  const detectedLang = detectBibleLanguage(xmlText, name);
 
   const bookRegex = /<BIBLEBOOK\b([^>]*)>([\s\S]*?)<\/BIBLEBOOK>/gi;
   let bookMatch = null;
@@ -134,8 +188,8 @@ function parseZefaniaXml(xmlText, fallbackId) {
     const bNumber = parseInt(attrs.bnumber || attrs.bno || String(bookIndex), 10);
     const canonical = CANONICAL_BOOKS[bNumber - 1] || matchCanonicalBook(attrs.bnumber || attrs.bname) || CANONICAL_BOOKS[bookIndex - 1] || { name: `Book ${bNumber}`, code: `B${bNumber}` };
 
-    const rawName = attrs.bname || attrs.name || canonical.name;
-    const localizedName = stripTags(rawName) || canonical.name;
+    const rawName = attrs.bname || attrs.name || '';
+    const localizedName = resolveLocalizedBookName(rawName, canonical.number || bNumber, detectedLang);
 
     localizedBookNames.push({ number: canonical.number || bNumber, code: canonical.code || `B${bNumber}`, name: localizedName });
 
@@ -170,6 +224,7 @@ function parseOsisXml(xmlText, fallbackId) {
 
   const titleMatch = xmlText.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
   const name = titleMatch ? stripTags(titleMatch[1]) : fallbackId;
+  const detectedLang = detectBibleLanguage(xmlText, name);
 
   const bookRegex = /<div\b([^>]*\btype="book"[^>]*)>([\s\S]*?)<\/div>/gi;
   let bookMatch = null;
@@ -183,7 +238,7 @@ function parseOsisXml(xmlText, fallbackId) {
 
     const titleInnerMatch = bookXml.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
     const rawTitle = titleInnerMatch ? stripTags(titleInnerMatch[1]) : canonical.name;
-    const localizedName = rawTitle || canonical.name;
+    const localizedName = resolveLocalizedBookName(rawTitle, canonical.number || bookIndex, detectedLang);
 
     localizedBookNames.push({ number: canonical.number || bookIndex, code: canonical.code || `B${bookIndex}`, name: localizedName });
     if (!bibleData[localizedName]) bibleData[localizedName] = {};
@@ -219,6 +274,7 @@ function parseOpenSongXml(xmlText, fallbackId) {
   const localizedBookNames = [];
 
   const name = fallbackId;
+  const detectedLang = detectBibleLanguage(xmlText, fallbackId);
   const bookRegex = /<b\b([^>]*)>([\s\S]*?)<\/b>/gi;
   let bookMatch = null;
   let bookIndex = 1;
@@ -229,7 +285,7 @@ function parseOpenSongXml(xmlText, fallbackId) {
     const rawName = attrs.n || attrs.name || `Book ${bookIndex}`;
     const canonical = matchCanonicalBook(rawName) || CANONICAL_BOOKS[bookIndex - 1] || { name: rawName, code: `B${bookIndex}` };
 
-    const localizedName = stripTags(rawName) || canonical.name;
+    const localizedName = resolveLocalizedBookName(rawName, canonical.number || bookIndex, detectedLang);
     localizedBookNames.push({ number: canonical.number || bookIndex, code: canonical.code || `B${bookIndex}`, name: localizedName });
 
     if (!bibleData[localizedName]) bibleData[localizedName] = {};
@@ -260,6 +316,7 @@ function parseOpenSongXml(xmlText, fallbackId) {
 function parseUsfmText(usfmText, fallbackId) {
   const bibleData = {};
   const localizedBookNames = [];
+  const detectedLang = detectBibleLanguage(usfmText, fallbackId);
 
   const lines = usfmText.split(/\r?\n/);
   let currentBookName = '';
@@ -275,10 +332,10 @@ function parseUsfmText(usfmText, fallbackId) {
     if (line.startsWith('\\id ')) {
       const code = line.split(/\s+/)[1]?.toUpperCase();
       currentBookCanonical = matchCanonicalBook(code) || CANONICAL_BOOKS[bookIndex - 1] || { name: code, code };
-      currentBookName = currentBookCanonical.name;
+      currentBookName = resolveLocalizedBookName(currentBookCanonical.name, currentBookCanonical.number || bookIndex, detectedLang);
     } else if (line.startsWith('\\h ') || line.startsWith('\\toc2 ')) {
       const hTitle = line.replace(/^\\[a-z0-9]+\s+/, '').trim();
-      if (hTitle) currentBookName = hTitle;
+      if (hTitle) currentBookName = resolveLocalizedBookName(hTitle, currentBookCanonical?.number || bookIndex, detectedLang);
     } else if (line.startsWith('\\c ')) {
       currentChapter = line.split(/\s+/)[1] || '1';
       if (currentBookName) {
@@ -312,13 +369,14 @@ function parseJsonBible(jsonObj, fallbackId) {
   const bibleData = {};
   const localizedBookNames = [];
   let bookIndex = 1;
+  const detectedLang = detectBibleLanguage(JSON.stringify(jsonObj), fallbackId);
 
   const root = jsonObj.books || jsonObj.versions?.[fallbackId] || jsonObj.bible || jsonObj;
 
   if (typeof root === 'object' && !Array.isArray(root)) {
     Object.keys(root).forEach((bName) => {
       const canonical = matchCanonicalBook(bName) || CANONICAL_BOOKS[bookIndex - 1] || { name: bName, code: `B${bookIndex}` };
-      const localizedName = bName.trim() || canonical.name;
+      const localizedName = resolveLocalizedBookName(bName, canonical.number || bookIndex, detectedLang);
       localizedBookNames.push({ number: canonical.number || bookIndex, code: canonical.code || `B${bookIndex}`, name: localizedName });
 
       bibleData[localizedName] = {};
@@ -344,6 +402,8 @@ function parseJsonBible(jsonObj, fallbackId) {
 module.exports = {
   CANONICAL_BOOKS,
   matchCanonicalBook,
+  detectBibleLanguage,
+  resolveLocalizedBookName,
   parseZefaniaXml,
   parseOsisXml,
   parseOpenSongXml,
