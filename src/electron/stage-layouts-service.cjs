@@ -109,7 +109,16 @@ function createStageLayoutsService({ app }) {
     }
   }
 
-  return { list, save, remove, setActive, filePath };
+  function clearAll() {
+    try {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  return { list, save, remove, setActive, clearAll, filePath };
 }
 
 module.exports = { createStageLayoutsService };

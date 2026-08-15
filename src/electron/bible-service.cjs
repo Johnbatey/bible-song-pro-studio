@@ -443,6 +443,23 @@ function search(versionId = 'KJV', query = '', limit = 30, options = {}) {
   return [];
 }
 
+function clearUserBibles() {
+  const userDir = getUserBibleDir();
+  if (fs.existsSync(userDir)) {
+    try {
+      const files = fs.readdirSync(userDir);
+      files.forEach((file) => {
+        try {
+          fs.unlinkSync(path.join(userDir, file));
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+  cache = null;
+  bibleSearchCache.clear();
+  return { ok: true };
+}
+
 module.exports = {
   getData,
   getVersions,
@@ -454,4 +471,5 @@ module.exports = {
   normalizeReferenceQuery,
   normalizeSearchText,
   importBibleFile,
+  clearUserBibles,
 };

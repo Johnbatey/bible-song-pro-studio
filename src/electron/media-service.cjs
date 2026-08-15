@@ -224,7 +224,14 @@ function createMediaService({ app }) {
     return byFile ? locate(byFile) : null;
   }
 
-  return { list, importPaths, relink, remove, rename, resolve, mediaDir, IMAGE_EXTS, VIDEO_EXTS };
+  function clearAll() {
+    try {
+      if (fs.existsSync(indexPath)) fs.unlinkSync(indexPath);
+    } catch (_) {}
+    return { ok: true };
+  }
+
+  return { list, importPaths, relink, remove, rename, resolve, clearAll, mediaDir, IMAGE_EXTS, VIDEO_EXTS };
 }
 
 module.exports = { createMediaService, IMAGE_EXTS, VIDEO_EXTS };

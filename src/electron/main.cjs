@@ -1452,7 +1452,20 @@ app.whenReady().then(async () => {
   // Persisted renderer state IPC
   ipcMain.handle('store:load', () => appStoreService?.load() || { ok: false, state: null });
   ipcMain.handle('store:save', (_, p) => appStoreService?.save(p?.value) || { ok: false });
-  ipcMain.handle('store:clear', () => appStoreService?.clear() || { ok: false });
+  ipcMain.handle('store:clear', () => {
+    try {
+      appStoreService?.clear();
+      bibleService?.clearUserBibles();
+      settingsService?.reset();
+      mediaService?.clearAll();
+      stageLayoutsService?.clearAll();
+      sessionHistoryService?.clearAll();
+      return { ok: true };
+    } catch (err) {
+      console.error('Factory reset error:', err);
+      return { ok: false, error: err.message || String(err) };
+    }
+  });
 
   // In-App Feedback to GitHub handler
   ipcMain.handle('feedback:send', async (_, payload) => {

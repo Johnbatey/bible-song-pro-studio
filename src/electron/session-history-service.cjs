@@ -108,7 +108,21 @@ function createSessionHistoryService({ app }) {
     };
   }
 
-  return { startSession, endSession, addEntry, listSessions, getSession, exportSession, getStatus };
+  function clearAll() {
+    currentSession = null;
+    entries = [];
+    if (fs.existsSync(historyDir)) {
+      try {
+        const files = fs.readdirSync(historyDir);
+        files.forEach((f) => {
+          try { fs.unlinkSync(path.join(historyDir, f)); } catch (_) {}
+        });
+      } catch (_) {}
+    }
+    return { ok: true };
+  }
+
+  return { startSession, endSession, addEntry, listSessions, getSession, exportSession, getStatus, clearAll };
 }
 
 module.exports = { createSessionHistoryService };

@@ -94,14 +94,15 @@ function createSettingsService({ app }) {
     return getPublic();
   }
 
-  function clearSecret(key) {
-    if (!SECRET_KEYS.has(key)) return { ok: false, error: 'Not a secret setting' };
-    readAll()[key] = '';
-    persist();
+  function reset() {
+    cache = { ...DEFAULTS };
+    try {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch (_) {}
     return getPublic();
   }
 
-  return { get, set, getPublic, clearSecret, filePath };
+  return { get, set, getPublic, clearSecret, reset, filePath };
 }
 
 module.exports = { createSettingsService, DEFAULTS };
