@@ -675,11 +675,12 @@ function createMainWindow({ autoShow = true } = {}) {
   const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 640, minHeight: 480, frame: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0c0e14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false } });
   win.setResizable(true);
   win.setMinimumSize(640, 480);
+  win.maximize();
   win.loadURL(isDev ? 'http://localhost:5173' : `file://${path.join(__dirname, '../../dist/index.html')}`);
   if (isDev) win.webContents.openDevTools();
   /* Bring-up passes autoShow:false and shows the window itself, so the
      console cannot appear from behind the splash mid-animation. */
-  if (autoShow) win.once('ready-to-show', () => { win.show(); win.focus(); });
+  if (autoShow) win.once('ready-to-show', () => { win.maximize(); win.show(); win.focus(); });
   return win;
 }
 
@@ -1459,7 +1460,7 @@ app.whenReady().then(async () => {
       settingsService?.reset();
       mediaService?.clearAll();
       stageLayoutsService?.clearAll();
-      sessionHistoryService?.clearAll();
+      sessionHistory?.clearAll();
       return { ok: true };
     } catch (err) {
       console.error('Factory reset error:', err);
@@ -1560,7 +1561,11 @@ app.whenReady().then(async () => {
     handedOver = true;
     if (splash && !splash.isDestroyed()) splash.close();
     splash = null;
-    if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus(); }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.maximize();
+      mainWindow.show();
+      mainWindow.focus();
+    }
   };
   const handOverAfterFloor = () => {
     setTimeout(handOver, Math.max(0, SPLASH_FLOOR_MS - (Date.now() - splashUpAt)));
