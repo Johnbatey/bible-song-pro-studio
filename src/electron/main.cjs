@@ -675,7 +675,6 @@ function createMainWindow({ autoShow = true } = {}) {
   const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 640, minHeight: 480, frame: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0c0e14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false } });
   win.setResizable(true);
   win.setMinimumSize(640, 480);
-  win.maximize();
   win.loadURL(isDev ? 'http://localhost:5173' : `file://${path.join(__dirname, '../../dist/index.html')}`);
   if (isDev) win.webContents.openDevTools();
   /* Bring-up passes autoShow:false and shows the window itself, so the
