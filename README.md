@@ -33,6 +33,8 @@ One operator machine drives an audience projector, an on-stage confidence monito
 - **Multi-Monitor Projection**: Dedicated Audience Display, Stage Display, and Remote Web Control interfaces.
 - **Workspace Memory**: Save, export, and load custom window arrangements tailored for worship leaders, media operators, and streaming engineers.
 
+![Bible Song Pro Studio Workspace Console](assets/screenshots/console-shot.png)
+
 ### 🌐 5. Universal 227-Language Bible Engine
 - **250 to 1,000+ Bible XML Support**: Import USFX, OSIS, XML Bible translations smoothly.
 - **Native Localized 66-Book Names**: Displays book names in native regional languages (`创世记`, `Jẹ́nefísì`, `Genèse`, `Génesis`) instead of fallback English names.
