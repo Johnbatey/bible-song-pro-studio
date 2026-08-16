@@ -21,6 +21,8 @@ One operator machine drives an audience projector, an on-stage confidence monito
 - **Root Word Analysis**: Detects Greek and Hebrew root words during live sermon delivery.
 - **Concordance & Definitions**: Highlights Strong's concordance numbers, transliterations, and deep original language word definitions for enhanced biblical context.
 
+![Greek & Hebrew Original Language Study](assets/screenshots/greek-hebrew-study.png)
+
 ### 🎨 3. Custom Slide Designer & Presentation Canvas
 - **Drag-and-Drop Canvas Editor**: Full visual slide designer with 27+ editable properties, custom shapes (circles, rectangles, stars, triangles), custom fonts, and zero-width border controls.
 - **Dynamic Lower-Thirds & Overlays**: Broadcast-quality lower-thirds, customizable themes, and lyrics presentation.
