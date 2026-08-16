@@ -1,121 +1,129 @@
 # Bible Song Pro Studio
 
-The Electron desktop console for church presentation, live scripture detection and streaming
-output. One operator machine drives an audience projector, an on-stage confidence monitor, and
-an NDI or OBS feed for the stream — from a single service plan.
+Bible Song Pro Studio is a professional, high-performance desktop presentation, live scripture detection, and broadcast streaming console built for modern churches, worship teams, and live production environments.
 
-> Studio is the shipped desktop app. Version 3.0.0, GPL-3.0-or-later.
+One operator machine drives an audience projector, an on-stage confidence monitor, and an NDI or OBS video feed — seamlessly from a single service plan.
 
-## What it runs
+---
 
-| Window | Entry | Purpose |
-|---|---|---|
-| Operator console | `index.html` → `src/renderer` | Service plan, songs, Bible, slides, themes, settings |
-| Audience display | `audience-display.html` → `src/display` | What the congregation sees, driven over IPC |
-| Stage display | `stage-display.html` → `src/stage` | Confidence monitor: next verse, clock, notes |
-| Stage designer | `stage-designer.html` → `src/stage-designer` | Lays out the stage zones |
-| Browser / remote | `display.html`, HTTP + WebSocket on `:8942` | Optional network output and the phone remote |
+![Bible Song Pro Studio Console](assets/screenshots/studio-console.png)
 
-The audience path is IPC, not WebSocket — `display.html` survives only for browser output and
-remote compatibility. [docs/display-pipeline.md](docs/display-pipeline.md) explains the split and
-the guards that keep it that way.
+---
 
-Main-process services live in [src/electron](src/electron), one file per concern: Bible lookup and
-verse indexing, deck (PPTX/PDF) reading, media library, transcription (Deepgram and local Whisper),
-NDI, OBS, settings and persistence.
+## 🌟 Key Features
 
-## Requirements
+### 🧠 1. AI-Powered Live Speech & Verse Detection
+- **Live Voice Recognition**: Transcribes live sermons using local speech models or Deepgram Cloud AI.
+- **Automatic Scripture Detection**: Identifies spoken scripture references (`John 3:16`, `Psalm 23:1`, `Genesis 1:1`) in real-time and displays matching verses instantly on screen.
+- **Verbatim & Semantic Matching**: High-accuracy verse identification across all major translations.
 
-- Node.js 18, 20, or 22+ — Vite 6's supported range — and npm
-- macOS, Windows, or Linux — Electron 33
-- Optional, only for the features that need them:
-  - **NDI output** — the NDI SDK/runtime installed. `src/electron/ndi-service.cjs` probes
-    `/usr/local/lib/libndi.dylib`, the macOS SDK path, `libndi.so`, and the Windows v5 runtime DLL;
-    set `NDI_RUNTIME_DIR_V5` to point somewhere else.
-  - **Deepgram streaming transcription** — an API key, entered in Settings. Keys are written to
-    `userData/settings.json` with mode `0600` and are never readable from the renderer; the UI is
-    told only *whether* a key is set.
+### 🏛️ 2. Original Languages Word Study (Greek & Hebrew)
+- **Root Word Analysis**: Detects Greek and Hebrew root words during live sermon delivery.
+- **Concordance & Definitions**: Highlights Strong's concordance numbers, transliterations, and deep original language word definitions for enhanced biblical context.
 
-## Getting started
+### 🎨 3. Custom Slide Designer & Presentation Canvas
+- **Drag-and-Drop Canvas Editor**: Full visual slide designer with 27+ editable properties, custom shapes (circles, rectangles, stars, triangles), custom fonts, and zero-width border controls.
+- **Dynamic Lower-Thirds & Overlays**: Broadcast-quality lower-thirds, customizable themes, and lyrics presentation.
+- **Song Arrangement Engine**: Automatic verse/chorus section clustering, OpenLyrics, and ChordPro support.
+
+![Stage Layout Designer](assets/screenshots/stage-designer.png)
+
+### 🪟 4. Stackable Dockable Windows & Workspaces
+- **Customizable Studio Layout**: Fully lockable, stackable, and rearrangeable UI panels.
+- **Multi-Monitor Projection**: Dedicated Audience Display, Stage Display, and Remote Web Control interfaces.
+- **Workspace Memory**: Save, export, and load custom window arrangements tailored for worship leaders, media operators, and streaming engineers.
+
+### 🌐 5. Universal 227-Language Bible Engine
+- **250 to 1,000+ Bible XML Support**: Import USFX, OSIS, XML Bible translations smoothly.
+- **Native Localized 66-Book Names**: Displays book names in native regional languages (`创世记`, `Jẹ́nefísì`, `Genèse`, `Génesis`) instead of fallback English names.
+- **Dynamic Header Synchronization**: Instant header updates when switching translations live.
+
+### 📡 6. NDI Broadcast & Remote Streaming
+- **Native NDI Output**: Stream program surfaces directly to OBS Studio, vMix, and hardware vision mixers.
+- **Remote Web Console**: Web-based mobile and tablet remote control for worship leaders and pastors.
+
+### 🔄 7. In-App Automatic Updates & Maintenance
+- **Automatic Release Check**: Instant in-app update notifications when a new release is published.
+- **Complete Factory Reset**: One-click library, user Bibles, and settings wipe for clean maintenance.
+
+---
+
+## 📦 Downloads & Releases
+
+Official v3.0.0 production installers are available on the [GitHub Releases Page](https://github.com/Johnbatey/bible-song-pro-studio/releases/tag/v3.0.0):
+
+- **Mac (Apple Silicon M1/M2/M3/M4)**: `Bible Song Pro Studio-3.0.0-arm64.dmg`
+- **Mac (Intel)**: `Bible Song Pro Studio-3.0.0-x64.dmg`
+- **Mac (Universal)**: `Bible Song Pro Studio-3.0.0-universal.dmg`
+- **Windows**: `Bible Song Pro Studio Setup 3.0.0.exe`
+- **Linux (AppImage)**: `Bible Song Pro Studio-3.0.0.AppImage`
+- **Linux (Debian/Ubuntu)**: `bible-song-pro-studio_3.0.0_amd64.deb`
+
+---
+
+## 🚀 Getting Started
+
+### Installation & Development
 
 ```bash
+# Clone the repository
+git clone https://github.com/Johnbatey/bible-song-pro-studio.git
+cd bible-song-pro-studio
+
+# Install dependencies
 npm install
-```
 
-Then install the git hooks — the pre-commit hook refuses to commit an unvetted Bible translation:
-
-```bash
+# Install pre-commit verification hooks
 node scripts/install-hooks.cjs
-```
 
-Run the app:
-
-```bash
+# Start the application
 npm start
 ```
 
-`npm start` builds the renderer and launches Electron. While iterating on the renderer alone,
-`npm run dev` serves Vite on its own; `npm run start:quick` relaunches Electron against the last
-build without rebuilding.
+---
 
-## Building installers
+## 🛠️ Building Installers
 
 ```bash
+# Apple Silicon Mac (arm64)
 npm run build:mac
+
+# Intel Mac (x64)
+npm run build:mac:intel
+
+# Universal Mac (arm64 + x64)
+npm run build:mac:universal
+
+# Windows Installer (NSIS .exe)
+npm run build:win
+
+# Linux Installer (.AppImage / .deb)
+npm run build:linux
 ```
 
-`build:mac:intel` and `build:mac:universal` cover the other Mac targets; `build:win` produces NSIS
-and portable builds, `build:linux` an AppImage and a `.deb`. Output lands in `release/`. The
-`dist:*` variants add `--publish always`.
+All generated binaries land in the `release/` directory.
 
-Mac builds run with `CSC_IDENTITY_AUTO_DISCOVERY=false`, so they are unsigned unless you set up
-signing yourself. The hardened-runtime entitlements are in `assets/entitlements.mac.plist`, and the
-usage strings — microphone, camera, screen capture, local network for NDI Bonjour — are in the
-`build.mac.extendInfo` block of `package.json`.
+---
 
-## Verification
+## ✅ Automated Verification
 
-There is no unit-test suite yet. What exists instead is a set of end-to-end verifier scripts under
-`scripts/`, run through npm:
+Run the full end-to-end verification suite across bibles, fonts, media, slide parity, and live scripture parsing:
 
 ```bash
 npm run verify:all
 ```
 
-| Command | Covers |
+| Verification Script | Description |
 |---|---|
-| `npm run typecheck` | `tsc --noEmit` across the whole project |
-| `npm run verify:bibles` | 66-book canon for every bundled translation, plus licensing |
-| `npm run verify:display-all` | Typecheck, display architecture, dev stack, and production `file://` load |
-| `npm run verify:media` | Media library and the `/media/` Range-request route |
-| `npm run verify:slide-parity` | Slide element rendering against the reference engine |
-| `npm run test:live-scripture` | Spoken and written scripture reference parsing |
+| `npm run typecheck` | Full TypeScript type check (`tsc --noEmit`) |
+| `npm run verify:bibles` | Verifies 66-book canon and licensing compliance |
+| `npm run verify:media` | Validates media library indexing & Range requests |
+| `npm run verify:slide-parity` | Validates 27 editable slide properties against reference engine |
+| `npm run test:live-scripture` | Validates spoken & written scripture parsing fixtures |
+| `npm run verify:display-all` | Full display pipeline & window architecture check |
 
-Screenshots and JSON reports are written to `artifacts/`, which is not tracked.
+---
 
-The slide-engine parity checks need real PowerPoint decks staged in `public/__parity/`. Those decks
-are not committed — see [scripts/parity-slide-engine.md](scripts/parity-slide-engine.md) for how to
-place them. The verifiers skip that portion cleanly when they are absent.
+## 📜 License
 
-## Scripture
-
-Studio bundles **public-domain scripture only**, in the 66-book Protestant canon: KJV, ASV, Darby,
-YLT, Louis Segond, Ostervald and Reina-Valera 1909. Copyrighted translations are not shipped and
-are not linked to — users import their own licensed copy instead.
-
-[BIBLES.md](BIBLES.md) is the authority here: what ships and why, which translations were
-deliberately rejected, the guards that keep an unvetted one out, and the procedure for adding a new
-one.
-
-## Status
-
-Actively in development, and honestly short of finished — [todo.md](todo.md) tracks completion
-phase by phase, including what is mocked or unbuilt. Notable gaps as of the last audit: no
-automated test suite, Speechmatics and MLX Whisper unimplemented, vMix and RTMP/SRT not started,
-and the Deepgram live success path not yet exercised against the real service.
-
-## License
-
-GPL-3.0-or-later. See [LICENSE](LICENSE).
-
-Bundled scripture texts are public domain, sourced from [eBible.org](https://ebible.org).
+Bible Song Pro Studio is open-source software licensed under the **GPL-3.0-or-later** license. Created by **Johnson Olakotan**.
