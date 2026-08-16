@@ -6,7 +6,7 @@ One operator machine drives an audience projector, an on-stage confidence monito
 
 ---
 
-![Bible Song Pro Studio Console](assets/screenshots/studio-console.png)
+![Bible Song Pro Studio Console](assets/screenshots/console-shot.png)
 
 ---
 
@@ -34,8 +34,6 @@ One operator machine drives an audience projector, an on-stage confidence monito
 - **Customizable Studio Layout**: Fully lockable, stackable, and rearrangeable UI panels.
 - **Multi-Monitor Projection**: Dedicated Audience Display, Stage Display, and Remote Web Control interfaces.
 - **Workspace Memory**: Save, export, and load custom window arrangements tailored for worship leaders, media operators, and streaming engineers.
-
-![Bible Song Pro Studio Workspace Console](assets/screenshots/console-shot.png)
 
 ### 🌐 5. Universal 227-Language Bible Engine
 - **250 to 1,000+ Bible XML Support**: Import USFX, OSIS, XML Bible translations smoothly.
