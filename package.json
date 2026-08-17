@@ -71,7 +71,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "**/node_modules/koffi/**/*"
+      "**/node_modules/koffi/**/*",
+      "**/node_modules/@koromix/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -125,6 +126,10 @@
   "dependencies": {
     "@deepgram/sdk": "^3.6.0",
     "@huggingface/transformers": "^3.8.1",
+    "@koromix/koffi-darwin-arm64": "3.1.2",
+    "@koromix/koffi-darwin-x64": "3.1.2",
+    "@koromix/koffi-linux-x64": "3.1.2",
+    "@koromix/koffi-win32-x64": "3.1.2",
     "animejs": "^3.2.2",
     "dockview": "^7.0.4",
     "dockview-react": "^7.0.4",
