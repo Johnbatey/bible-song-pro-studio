@@ -285,6 +285,22 @@ export function SlideEditorQuickToolbar({
 
         {/* Floating Toolbar Buttons Row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* 0. Select & Move Pointer Tool */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTool('select');
+              setActiveDropdown(null);
+            }}
+            style={activeTool === 'select' ? PILL_BTN_ACTIVE : PILL_BTN}
+            title="Select & Move Tool (Esc)"
+          >
+            <svg viewBox="0 0 24 24" style={ICON}>
+              <path d="M3 3l7 18 3-7 7-3L3 3z" />
+            </svg>
+            <span>Select</span>
+          </button>
+
           {/* 1. Text Tool */}
           <button
             type="button"

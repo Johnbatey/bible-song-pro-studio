@@ -242,6 +242,12 @@ export function SlideEditorModal() {
         return;
       }
 
+      // Escape (Reset active tool to Select & Move mode)
+      if (e.key === 'Escape') {
+        setActiveTool('select');
+        return;
+      }
+
       // Delete / Backspace
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (isPptxDeck) {
