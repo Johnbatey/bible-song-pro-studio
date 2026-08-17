@@ -1,5 +1,20 @@
-const koffi = require('koffi');
 const fs = require('fs');
+
+let koffiModule = null;
+let koffiLoadError = null;
+
+function getKoffi() {
+  if (koffiModule) return koffiModule;
+  if (koffiLoadError) return null;
+  try {
+    koffiModule = require('koffi');
+    return koffiModule;
+  } catch (err) {
+    koffiLoadError = err;
+    console.warn('Failed to load Koffi native module:', err.message);
+    return null;
+  }
+}
 
 // NDIlib_FourCC_video_type_BGRA — ('B') | ('G'<<8) | ('R'<<16) | ('A'<<24).
 // Electron's capturePage().toBitmap() already hands back BGRA, so the frame buffer
@@ -70,6 +85,11 @@ function createNdiService() {
 
   function initLibrary() {
     if (api) return true;
+    const koffi = getKoffi();
+    if (!koffi) {
+      lastError = koffiLoadError ? `Koffi native module error: ${koffiLoadError.message}` : 'Koffi native module unavailable';
+      return false;
+    }
     const libPath = findLib();
     if (!libPath) {
       lastError = 'NDI runtime not found. Install the NDI SDK/Runtime from https://ndi.video';
@@ -106,7 +126,7 @@ function createNdiService() {
         initialize: lib.func('bool NDIlib_initialize()'),
         destroy: lib.func('void NDIlib_destroy()'),
         sendCreate: lib.func('void * NDIlib_send_create(const NDIlib_send_create_t *settings)'),
-        sendDestroy: lib.func('void NDIlib_send_destroy(void *instance)'),
+        sendDestroy: lib.func('void * NDIlib_send_destroy(void *instance)'),
         sendVideo: lib.func('void NDIlib_send_send_video_v2(void *instance, const NDIlib_video_frame_v2_t *frame)'),
         getConnections: lib.func('int NDIlib_send_get_no_connections(void *instance, uint32_t timeout_ms)'),
       };

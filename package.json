@@ -70,6 +70,9 @@
       "src/electron/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "**/node_modules/koffi/**/*"
+    ],
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "assets/icons/bible-song-pro-icon.icns",
