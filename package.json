@@ -103,17 +103,21 @@
     "win": {
       "icon": "assets/icons/bible-song-pro-icon.ico",
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "publisherName": "Bible Song Pro"
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
+      "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "Bible Song Pro Studio"
+      "shortcutName": "Bible Song Pro Studio",
+      "uninstallDisplayName": "Bible Song Pro Studio",
+      "differentialPackage": false,
+      "runAfterFinish": true
     },
     "linux": {
       "icon": "assets/icons/bible-song-pro-icon.png",
