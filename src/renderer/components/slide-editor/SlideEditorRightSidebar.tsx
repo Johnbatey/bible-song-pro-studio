@@ -1691,7 +1691,7 @@ export function SlideEditorRightSidebar({
                           onChange={(e) => {
                             const bw = parseInt(e.target.value, 10);
                             if (pptxShape) (pptx as PptxInspector | null)?.onStroke((typeof pptxShape?.strokeColor === 'string' ? pptxShape.strokeColor : '#FF5500'), bw);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, { borderWidth: bw });
+                            else if (selectedElement) onUpdateElement(selectedElement.id, { borderWidth: bw, strokeWidth: bw });
                           }}
                           style={{ flex: 1, accentColor: '#FF5500' }}
                         />

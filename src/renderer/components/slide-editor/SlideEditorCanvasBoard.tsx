@@ -40,6 +40,7 @@ interface SlideEditorCanvasBoardProps {
   onDuplicateElements?: (ids?: string[]) => void;
   onAddElements?: (newEls: SlideElement[]) => void;
   smartSnap: boolean;
+  strokeWidth?: number;
 }
 
 export function SlideEditorCanvasBoard({
@@ -53,6 +54,7 @@ export function SlideEditorCanvasBoard({
   onDuplicateElements,
   onAddElements,
   smartSnap,
+  strokeWidth = 4,
 }: SlideEditorCanvasBoardProps) {
   const activeSelection = selectedElementIds && selectedElementIds.length > 0
     ? selectedElementIds
@@ -363,9 +365,11 @@ export function SlideEditorCanvasBoard({
 
   /* Pointer events on viewport for canvas panning & vector drawing */
   const onViewportPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const isAnchorClick = Boolean((e.target as HTMLElement)?.title?.includes('Anchor') || (e.target as HTMLElement)?.classList?.contains('se-node-anchor'));
+    const isCanvasClick = !isAnchorClick && !(e.target as HTMLElement)?.closest('button, input, select, textarea');
     const isBgClick = e.target === viewportRef.current || (e.target as HTMLElement).id === 'slide-canvas-root';
 
-    if (activeTool === 'pencil' && isBgClick) {
+    if (activeTool === 'pencil' && isCanvasClick) {
       e.stopPropagation();
       const pt = getCanvasPoint(e);
       const newId = `pencil-${Date.now()}`;
@@ -374,7 +378,7 @@ export function SlideEditorCanvasBoard({
         type: 'pencil',
         x: 0, y: 0, width: 100, height: 100, content: 'pencil',
         points: [[pt.x, pt.y]],
-        strokeColor: '#FF5500', strokeWidth: 4, isLoopFilled: false, fillColor: '#FF5500',
+        strokeColor: '#FF5500', strokeWidth: strokeWidth || 4, isLoopFilled: false, fillColor: '#FF5500',
         zIndex: (elements.length || 0) + 1,
       };
       if (onAddElements) onAddElements([newPencil]);
@@ -383,7 +387,7 @@ export function SlideEditorCanvasBoard({
       return;
     }
 
-    if (activeTool === 'bezier' && isBgClick) {
+    if (activeTool === 'bezier' && isCanvasClick) {
       e.stopPropagation();
       const pt = getCanvasPoint(e);
       let target = elements.find((el) => el.id === selectedElementId && el.type === 'bezier' && !el.closed);
@@ -394,7 +398,7 @@ export function SlideEditorCanvasBoard({
           id: newId,
           type: 'bezier',
           x: 0, y: 0, width: 100, height: 100, content: 'bezier',
-          points: [], closed: false, strokeColor: '#FF5500', strokeWidth: 4,
+          points: [], closed: false, strokeColor: '#FF5500', strokeWidth: strokeWidth || 4,
           zIndex: (elements.length || 0) + 1,
         };
         isNew = true;
@@ -569,7 +573,7 @@ export function SlideEditorCanvasBoard({
         position: 'relative',
         overflow: 'hidden',
         userSelect: 'none',
-        cursor: isPanning || spaceHeld ? 'grabbing' : activeTool === 'pencil' || activeTool === 'bezier' ? 'crosshair' : 'grab',
+        cursor: isPanning || spaceHeld ? 'grabbing' : activeTool === 'pencil' || activeTool === 'bezier' ? 'crosshair' : 'default',
       }}
     >
       {/* Top-Left Mode Indicator */}

@@ -114,6 +114,7 @@ export function SlideEditorModal() {
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const selectedElementId = selectedElementIds[selectedElementIds.length - 1] || null;
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
+  const [activeStrokeWidth, setActiveStrokeWidth] = useState<number>(4);
   const [smartSnap, setSmartSnap] = useState(true);
 
   /* An imported PowerPoint deck is rendered from its own package, not from the
@@ -1353,6 +1354,7 @@ export function SlideEditorModal() {
         <SlideEditorCanvasBoard
           slide={activeSlide}
           activeTool={activeTool}
+          strokeWidth={activeStrokeWidth}
           selectedElementId={selectedElementId}
           selectedElementIds={selectedElementIds}
           onSelectElement={handleSelectElement}
@@ -1367,6 +1369,8 @@ export function SlideEditorModal() {
         {/* Top Floating Quick Toolbar */}
         <SlideEditorQuickToolbar
           activeTool={activeTool}
+          strokeWidth={activeStrokeWidth}
+          onChangeStrokeWidth={setActiveStrokeWidth}
           onSelectTool={handleSelectTool}
           smartSnap={smartSnap}
           onToggleSmartSnap={() => setSmartSnap(!smartSnap)}

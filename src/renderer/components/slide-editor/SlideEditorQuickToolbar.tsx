@@ -36,6 +36,8 @@ interface SlideEditorQuickToolbarProps {
   onUpdateElement?: (id: string, updates: Partial<SlideElement>) => void;
   pptx?: PptxToolbarActions | null;
   onAddElements?: (elements: SlideElement[]) => void;
+  strokeWidth?: number;
+  onChangeStrokeWidth?: (w: number) => void;
 }
 
 export function SlideEditorQuickToolbar({
@@ -47,8 +49,16 @@ export function SlideEditorQuickToolbar({
   onUpdateElement,
   pptx = null,
   onAddElements,
+  strokeWidth = 4,
+  onChangeStrokeWidth,
 }: SlideEditorQuickToolbarProps) {
   const songs = useAppStore((s) => s.songs);
+  const [localStrokeWidth, setLocalStrokeWidth] = useState(strokeWidth);
+  const currentStrokeWidth = onChangeStrokeWidth ? strokeWidth : localStrokeWidth;
+  const setPenStrokeWidth = (w: number) => {
+    setLocalStrokeWidth(w);
+    if (onChangeStrokeWidth) onChangeStrokeWidth(w);
+  };
 
   /* Popover dropdown states */
   const [activeDropdown, setActiveDropdown] = useState<'shapes' | 'draw' | 'image' | 'scripture' | 'song' | null>(null);
@@ -296,7 +306,7 @@ export function SlideEditorQuickToolbar({
             title="Select & Move Tool (Esc)"
           >
             <svg viewBox="0 0 24 24" style={ICON}>
-              <path d="M3 3l7 18 3-7 7-3L3 3z" />
+              <path d="M3 3l7 18 3-7 7-3L3 3z" fill="currentColor" />
             </svg>
             <span>Select</span>
           </button>
@@ -599,7 +609,7 @@ export function SlideEditorQuickToolbar({
             </button>
 
             {activeDropdown === 'draw' && (
-              <div style={{ ...POPOVER_SHELL, width: 175, padding: 6, gap: 2 }}>
+              <div style={{ ...POPOVER_SHELL, width: 195, padding: 6, gap: 2 }}>
                 {/* 1. Freehand Pencil */}
                 <button
                   type="button"
@@ -650,6 +660,47 @@ export function SlideEditorQuickToolbar({
                     <span style={{ fontSize: 10, opacity: 0.6 }}>Node & curve tool</span>
                   </div>
                 </button>
+
+                {/* 3. Pen Stroke Thickness Selector */}
+                <div style={{ height: 1, background: 'var(--border-primary)', margin: '4px 0' }} />
+                <div style={{ padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pen Thickness</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#FF5500' }}>{currentStrokeWidth}px</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    {[2, 4, 8, 14].map((w) => (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => setPenStrokeWidth(w)}
+                        style={{
+                          flex: 1,
+                          height: 22,
+                          borderRadius: 4,
+                          border: '1px solid var(--border-primary)',
+                          background: currentStrokeWidth === w ? 'rgba(255, 85, 0, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                          color: currentStrokeWidth === w ? '#FF5500' : 'var(--text-primary)',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                        title={`${w}px Stroke`}
+                      >
+                        {w === 2 ? 'Fine' : w === 4 ? 'Med' : w === 8 ? 'Bold' : 'Thick'}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="32"
+                    value={currentStrokeWidth}
+                    onChange={(e) => setPenStrokeWidth(parseInt(e.target.value, 10))}
+                    style={{ width: '100%', accentColor: '#FF5500', cursor: 'pointer', marginTop: 2 }}
+                    title="Adjust Pen Thickness (1px - 32px)"
+                  />
+                </div>
               </div>
             )}
           </div>
