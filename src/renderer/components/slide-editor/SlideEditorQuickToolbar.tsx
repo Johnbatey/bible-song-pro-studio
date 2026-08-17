@@ -51,7 +51,7 @@ export function SlideEditorQuickToolbar({
   const songs = useAppStore((s) => s.songs);
 
   /* Popover dropdown states */
-  const [activeDropdown, setActiveDropdown] = useState<'shapes' | 'image' | 'scripture' | 'song' | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'shapes' | 'draw' | 'image' | 'scripture' | 'song' | null>(null);
 
   /* Scripture Tool states */
   const [bibleVersion, setBibleVersion] = useState('KJV');
@@ -567,40 +567,76 @@ export function SlideEditorQuickToolbar({
             <span>Image</span>
           </button>
 
-          {/* 5. Pencil Freehand Draw Tool */}
-          <button
-            type="button"
-            onClick={() => {
-              onSelectTool('pencil');
-              setActiveDropdown(null);
-            }}
-            style={activeTool === 'pencil' ? PILL_BTN_ACTIVE : PILL_BTN}
-            title="Pencil / Freehand Draw Tool"
-          >
-            <svg viewBox="0 0 24 24" style={ICON}>
-              <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-            </svg>
-            <span>Pencil</span>
-          </button>
+          {/* 5. Draw Category Dropdown (Pencil Freehand & Pen Bezier Vector) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setActiveDropdown(activeDropdown === 'draw' ? null : 'draw')}
+              style={activeTool === 'pencil' || activeTool === 'bezier' || activeDropdown === 'draw' ? PILL_BTN_ACTIVE : PILL_BTN}
+              title="Drawing Tools (Freehand Pencil & Bezier Pen)"
+            >
+              <svg viewBox="0 0 24 24" style={ICON}>
+                <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
+              <span>Draw</span>
+              <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
+            </button>
 
-          {/* 6. Pen Vector Tool */}
-          <button
-            type="button"
-            onClick={() => {
-              onSelectTool('bezier');
-              setActiveDropdown(null);
-            }}
-            style={activeTool === 'bezier' ? PILL_BTN_ACTIVE : PILL_BTN}
-            title="Pen / Bezier Vector Tool"
-          >
-            <svg viewBox="0 0 24 24" style={ICON}>
-              <path d="M12 19l7-7 3 3-7 7-3-3z" />
-              <path d="M18 13l-1.5-7.5L2 2l4 14.5L13 18l5-5z" />
-              <path d="M2 2l7.586 7.586" />
-              <circle cx="11" cy="11" r="2" />
-            </svg>
-            <span>Pen</span>
-          </button>
+            {activeDropdown === 'draw' && (
+              <div style={{ ...POPOVER_SHELL, width: 175, padding: 6, gap: 2 }}>
+                {/* 1. Freehand Pencil */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectTool('pencil');
+                    setActiveDropdown(null);
+                  }}
+                  style={{
+                    ...DROPDOWN_ITEM_CLEAN,
+                    background: activeTool === 'pencil' ? 'rgba(255, 85, 0, 0.15)' : 'transparent',
+                    color: activeTool === 'pencil' ? '#FF5500' : 'var(--text-primary)',
+                  }}
+                  onMouseEnter={(e) => { if (activeTool !== 'pencil') e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onMouseLeave={(e) => { if (activeTool !== 'pencil') e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <svg viewBox="0 0 24 24" style={ICON}>
+                    <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                  </svg>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span style={{ fontWeight: 600 }}>Freehand Pencil</span>
+                    <span style={{ fontSize: 10, opacity: 0.6 }}>Draw lines & loops</span>
+                  </div>
+                </button>
+
+                {/* 2. Bezier Pen */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectTool('bezier');
+                    setActiveDropdown(null);
+                  }}
+                  style={{
+                    ...DROPDOWN_ITEM_CLEAN,
+                    background: activeTool === 'bezier' ? 'rgba(255, 85, 0, 0.15)' : 'transparent',
+                    color: activeTool === 'bezier' ? '#FF5500' : 'var(--text-primary)',
+                  }}
+                  onMouseEnter={(e) => { if (activeTool !== 'bezier') e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                  onMouseLeave={(e) => { if (activeTool !== 'bezier') e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <svg viewBox="0 0 24 24" style={ICON}>
+                    <path d="M12 19l7-7 3 3-7 7-3-3z" />
+                    <path d="M18 13l-1.5-7.5L2 2l4 14.5L13 18l5-5z" />
+                    <path d="M2 2l7.586 7.586" />
+                    <circle cx="11" cy="11" r="2" />
+                  </svg>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span style={{ fontWeight: 600 }}>Bezier Pen</span>
+                    <span style={{ fontSize: 10, opacity: 0.6 }}>Node & curve tool</span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
 
         {/* 7. Song Tool Button (Worship Songs with 2nd-level Section Selector) */}
         <div style={{ position: 'relative' }}>

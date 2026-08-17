@@ -53,8 +53,8 @@ function nativeLayerRows(elements: SlideElement[], selectedIds: string[]): Layer
     .sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0))
     .map((el) => ({
       id: el.id,
-      label: (el.content || '').trim().slice(0, 34) || el.type,
-      kind: el.type === 'text' ? 'text' : el.type === 'image' ? 'image' : 'shape',
+      label: el.type === 'pencil' ? 'Freehand Drawing' : el.type === 'bezier' ? 'Pen Curve' : (el.content || '').trim().slice(0, 34) || el.type,
+      kind: el.type === 'text' ? 'text' : el.type === 'image' ? 'image' : el.type === 'pencil' ? 'pencil' : el.type === 'bezier' ? 'bezier' : 'shape',
       selected: selectedIds.includes(el.id),
       locked: Boolean(el.locked),
     }));

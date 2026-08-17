@@ -78,9 +78,18 @@ export interface SongCredit {
   ccli?: string;
 }
 
+export interface BezierNode {
+  x: number;
+  y: number;
+  h1x: number;
+  h1y: number;
+  h2x: number;
+  h2y: number;
+}
+
 export interface SlideElement {
   id: string;
-  type: 'text' | 'image' | 'shape';
+  type: 'text' | 'image' | 'shape' | 'pencil' | 'bezier';
   /* Geometry is PERCENT of the slide, not pixels — the canvas writes these
      straight into left/top/width/height as `%`, and dragging converts pointer
      pixels back through the board size. Passing pixel values here puts the
@@ -90,6 +99,16 @@ export interface SlideElement {
   width: number;
   height: number;
   content: string;
+  /* Vector drawing & Bezier node properties */
+  points?: (number[] | BezierNode)[];
+  closed?: boolean;
+  isLoopFilled?: boolean;
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeEnabled?: boolean;
+  vbW?: number;
+  vbH?: number;
   fontSize?: number;
   fontFamily?: string;
   fontWeight?: string | number;

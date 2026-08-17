@@ -177,6 +177,67 @@ function ElementBox({ el }: { el: SlideElement }) {
     );
   }
 
+  if (el.type === 'pencil' || el.type === 'bezier') {
+    const isPencil = el.type === 'pencil';
+    const pts = (el.points || []) as any[];
+    let d = '';
+    if (isPencil) {
+      if (pts.length > 0) {
+        d = `M ${pts[0][0]} ${pts[0][1]}`;
+        for (let i = 1; i < pts.length; i++) {
+          d += ` L ${pts[i][0]} ${pts[i][1]}`;
+        }
+      }
+    } else {
+      if (pts.length > 0) {
+        d = `M ${pts[0].x} ${pts[0].y}`;
+        for (let i = 1; i < pts.length; i++) {
+          const prev = pts[i - 1];
+          const curr = pts[i];
+          d += ` C ${prev.h2x} ${prev.h2y} ${curr.h1x} ${curr.h1y} ${curr.x} ${curr.y}`;
+        }
+        if (el.closed && pts.length > 1) {
+          const last = pts[pts.length - 1];
+          const first = pts[0];
+          d += ` C ${last.h2x} ${last.h2y} ${first.h1x} ${first.h1y} ${first.x} ${first.y} Z`;
+        }
+      }
+    }
+
+    const fillOn = !!(el.isLoopFilled && (el.fillColor || el.backgroundColor) && (el.fillColor || el.backgroundColor) !== 'none');
+    const fillColor = fillOn ? (el.fillColor || el.backgroundColor || '#FF5500') : 'none';
+    const strokeColor = el.strokeColor || el.borderColor || '#FF5500';
+    const strokeWidth = el.strokeWidth ?? el.borderWidth ?? 4;
+    const vbW = el.vbW || (el.width / 100 * 1280);
+    const vbH = el.vbH || (el.height / 100 * 720);
+
+    return (
+      <div style={outer}>
+        <svg
+          viewBox={`0 0 ${vbW} ${vbH}`}
+          preserveAspectRatio="none"
+          style={{
+            width: '100%',
+            height: '100%',
+            overflow: 'visible',
+            filter: computeBoxShadow(el),
+            boxSizing: 'border-box',
+          }}
+        >
+          <path
+            d={d}
+            fill={fillOn ? fillColor : 'none'}
+            fillOpacity={fillOn && el.fillOpacity != null ? el.fillOpacity : 1}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    );
+  }
+
   if (el.type === 'shape') {
     const computedRadius =
       el.content === 'circle'

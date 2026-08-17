@@ -80,7 +80,6 @@ export function SlideEditorCanvasBoard({
   const BOARD_WIDTH = 1280;
   const BOARD_HEIGHT = 720;
 
-  // Auto-fit function
   const fitToViewport = () => {
     if (!viewportRef.current) return;
     const rect = viewportRef.current.getBoundingClientRect();
@@ -94,135 +93,6 @@ export function SlideEditorCanvasBoard({
     setPanY((rect.height - BOARD_HEIGHT) / 2);
   };
 
-  useEffect(() => {
-    fitToViewport();
-    window.addEventListener('resize', fitToViewport);
-    return () => window.removeEventListener('resize', fitToViewport);
-  }, []);
-
-  /* Keyboard CMD/Ctrl +/-/0 for Canvas-only zoom */
-  useEffect(() => {
-    function handleCanvasZoomKeys(e: KeyboardEvent) {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+' || e.key === 'NumpadAdd') {
-          e.preventDefault();
-          e.stopPropagation();
-          setScale((s) => Math.min(2.5, s + 0.1));
-        } else if (e.key === '-' || e.key === '_' || e.key === 'NumpadSubtract') {
-          e.preventDefault();
-          e.stopPropagation();
-          setScale((s) => Math.max(0.2, s - 0.1));
-        } else if (e.key === '0' || e.key === 'Numpad0') {
-          e.preventDefault();
-          e.stopPropagation();
-          fitToViewport();
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleCanvasZoomKeys, { capture: true });
-    return () => window.removeEventListener('keydown', handleCanvasZoomKeys, { capture: true });
-  }, []);
-
-  // Wheel zoom / pan
-  const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-      setScale((s) => Math.min(Math.max(s * zoomFactor, 0.2), 2.5));
-    } else {
-      setPanX((px) => px - e.deltaX);
-      setPanY((py) => py - e.deltaY);
-    }
-  };
-
-  // Pointer drag for moving / resizing elements
-  useEffect(() => {
-    if (!dragState) return;
-
-    function onPointerMove(e: PointerEvent) {
-      if (!dragState) return;
-      const dxPx = (e.clientX - dragState.startX) / scale;
-      const dyPx = (e.clientY - dragState.startY) / scale;
-
-      const dxPercent = (dxPx / BOARD_WIDTH) * 100;
-      const dyPercent = (dyPx / BOARD_HEIGHT) * 100;
-
-      if (!dragState.handle) {
-        let newX = dragState.initialX + dxPercent;
-        let newY = dragState.initialY + dyPercent;
-        const guides: { x?: number; y?: number } = {};
-
-        if (smartSnap) {
-          // Snap center X (50%)
-          const centerX = newX + dragState.initialW / 2;
-          if (Math.abs(centerX - 50) < 1.5) {
-            newX = 50 - dragState.initialW / 2;
-            guides.x = 50;
-          }
-          // Snap center Y (50%)
-          const centerY = newY + dragState.initialH / 2;
-          if (Math.abs(centerY - 50) < 1.5) {
-            newY = 50 - dragState.initialH / 2;
-            guides.y = 50;
-          }
-        }
-
-        setSnapGuides(guides);
-        onUpdateElement(dragState.elementId, {
-          x: Math.max(0, Math.min(100 - dragState.initialW, Math.round(newX * 10) / 10)),
-          y: Math.max(0, Math.min(100 - dragState.initialH, Math.round(newY * 10) / 10)),
-        });
-      } else {
-        const handle = dragState.handle;
-        let nx = dragState.initialX;
-        let ny = dragState.initialY;
-        let nw = dragState.initialW;
-        let nh = dragState.initialH;
-
-        if (handle.includes('r')) nw = Math.min(Math.max(dragState.initialW + dxPercent, 2), 100 - dragState.initialX);
-        if (handle.includes('l')) {
-          const newX = Math.min(Math.max(dragState.initialX + dxPercent, 0), dragState.initialX + dragState.initialW - 2);
-          nx = newX;
-          nw = dragState.initialW - (newX - dragState.initialX);
-        }
-        if (handle.includes('b')) nh = Math.min(Math.max(dragState.initialH + dyPercent, 2), 100 - dragState.initialY);
-        if (handle.includes('t')) {
-          const newY = Math.min(Math.max(dragState.initialY + dyPercent, 0), dragState.initialY + dragState.initialH - 2);
-          ny = newY;
-          nh = dragState.initialH - (newY - dragState.initialY);
-        }
-
-        onUpdateElement(dragState.elementId, {
-          x: Math.round(nx * 10) / 10,
-          y: Math.round(ny * 10) / 10,
-          width: Math.round(nw * 10) / 10,
-          height: Math.round(nh * 10) / 10,
-        });
-      }
-    }
-
-    function onPointerUp() {
-      setDragState(null);
-      setSnapGuides({});
-    }
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    return () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-    };
-  }, [dragState, scale, smartSnap, onUpdateElement]);
-
-  /* Shared with the projected board and the deck cards: an untouched slide has
-     to show the same two layers wherever it is drawn. */
-  const elements: SlideElement[] = slideElementsFor(slide);
-
-  const bgValue = slide.background?.value || '#18181b';
-  const bgType = slide.background?.type || 'color';
-
-  /* Spacebar key listener for Space+Drag panning */
   const [spaceHeld, setSpaceHeld] = useState(false);
 
   useEffect(() => {
@@ -247,25 +117,111 @@ export function SlideEditorCanvasBoard({
     };
   }, []);
 
-  /* Native non-passive wheel listener for smooth wheel pan & Ctrl/Cmd zoom */
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
+  const elements: SlideElement[] = slideElementsFor(slide);
+  const bgValue = slide.background?.value || '#18181b';
+  const bgType = slide.background?.type || 'color';
 
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
-        const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-        setScale((s) => Math.min(Math.max(s * zoomFactor, 0.2), 2.5));
-      } else {
-        setPanX((px) => px - e.deltaX);
-        setPanY((py) => py - e.deltaY);
-      }
+  const [drawingPencilId, setDrawingPencilId] = useState<string | null>(null);
+  const [selectedBezierNodeIdx, setSelectedBezierNodeIdx] = useState<number | null>(null);
+  const [selectedBezierHandleType, setSelectedBezierHandleType] = useState<'anchor' | 'h1' | 'h2' | null>(null);
+
+  const getCanvasPoint = (e: React.PointerEvent | PointerEvent) => {
+    const root = document.getElementById('slide-canvas-root');
+    if (!root) return { x: 0, y: 0 };
+    const rect = root.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(BOARD_WIDTH, (e.clientX - rect.left) / scale)),
+      y: Math.max(0, Math.min(BOARD_HEIGHT, (e.clientY - rect.top) / scale)),
     };
+  };
 
-    viewport.addEventListener('wheel', onWheel, { passive: false });
-    return () => viewport.removeEventListener('wheel', onWheel);
-  }, []);
+  const optimizeBezierBounds = (bezierEl: SlideElement) => {
+    const pts = (bezierEl.points || []) as any[];
+    if (pts.length < 2) return;
+
+    let minX = BOARD_WIDTH, maxX = 0, minY = BOARD_HEIGHT, maxY = 0;
+    const parentAbsX = (bezierEl.x / 100) * BOARD_WIDTH;
+    const parentAbsY = (bezierEl.y / 100) * BOARD_HEIGHT;
+
+    const absPoints = pts.map((node) => ({
+      x: node.x + parentAbsX,
+      y: node.y + parentAbsY,
+      h1x: node.h1x + parentAbsX,
+      h1y: node.h1y + parentAbsY,
+      h2x: node.h2x + parentAbsX,
+      h2y: node.h2y + parentAbsY,
+    }));
+
+    absPoints.forEach((node) => {
+      const coords = [node.x, node.y, node.h1x, node.h1y, node.h2x, node.h2y];
+      for (let i = 0; i < coords.length; i += 2) {
+        if (coords[i] < minX) minX = coords[i];
+        if (coords[i] > maxX) maxX = coords[i];
+        if (coords[i + 1] < minY) minY = coords[i + 1];
+        if (coords[i + 1] > maxY) maxY = coords[i + 1];
+      }
+    });
+
+    const padding = 15;
+    minX = Math.max(0, minX - padding);
+    maxX = Math.min(BOARD_WIDTH, maxX + padding);
+    minY = Math.max(0, minY - padding);
+    maxY = Math.min(BOARD_HEIGHT, maxY + padding);
+
+    const width = maxX - minX;
+    const height = maxY - minY;
+
+    if (width > 2 && height > 2) {
+      const newPoints = absPoints.map((node) => ({
+        x: node.x - minX,
+        y: node.y - minY,
+        h1x: node.h1x - minX,
+        h1y: node.h1y - minY,
+        h2x: node.h2x - minX,
+        h2y: node.h2y - minY,
+      }));
+
+      const nx = Math.round((minX / BOARD_WIDTH) * 1000) / 10;
+      const ny = Math.round((minY / BOARD_HEIGHT) * 1000) / 10;
+      const nw = Math.round((width / BOARD_WIDTH) * 1000) / 10;
+      const nh = Math.round((height / BOARD_HEIGHT) * 1000) / 10;
+
+      onUpdateElement(bezierEl.id, {
+        points: newPoints,
+        x: nx,
+        y: ny,
+        width: nw,
+        height: nh,
+        vbW: width,
+        vbH: height,
+      });
+    }
+  };
+
+  /* Keyboard Delete / Backspace for Bezier nodes */
+  useEffect(() => {
+    function handleNodeDeleteKeys(e: KeyboardEvent) {
+      if (selectedBezierNodeIdx === null || !selectedElementId) return;
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        const target = elements.find((el) => el.id === selectedElementId && el.type === 'bezier');
+        if (!target || !target.points) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const newPts = [...(target.points as any[])];
+        newPts.splice(selectedBezierNodeIdx, 1);
+        if (newPts.length < 2) {
+          onUpdateElement(target.id, { points: newPts });
+          setSelectedBezierNodeIdx(null);
+        } else {
+          onUpdateElement(target.id, { points: newPts });
+          setSelectedBezierNodeIdx(Math.max(0, selectedBezierNodeIdx - 1));
+          optimizeBezierBounds({ ...target, points: newPts });
+        }
+      }
+    }
+    window.addEventListener('keydown', handleNodeDeleteKeys, { capture: true });
+    return () => window.removeEventListener('keydown', handleNodeDeleteKeys, { capture: true });
+  }, [selectedBezierNodeIdx, selectedElementId, elements, onUpdateElement]);
 
   return (
     <section
@@ -273,6 +229,122 @@ export function SlideEditorCanvasBoard({
       id="canvas-viewport"
       onPointerDown={(e) => {
         const isBgClick = e.target === viewportRef.current || (e.target as HTMLElement).id === 'slide-canvas-root';
+        
+        if (activeTool === 'pencil' && isBgClick) {
+          e.stopPropagation();
+          const pt = getCanvasPoint(e);
+          const newId = `pencil-${Date.now()}`;
+          const newPencil: SlideElement = {
+            id: newId,
+            type: 'pencil',
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            content: 'pencil',
+            points: [[pt.x, pt.y]],
+            strokeColor: '#FF5500',
+            strokeWidth: 4,
+            isLoopFilled: false,
+            fillColor: '#FF5500',
+            zIndex: (elements.length || 0) + 1,
+          };
+          if (onAddElements) onAddElements([newPencil]);
+          onSelectElement(newId, false);
+          setDrawingPencilId(newId);
+          return;
+        }
+
+        if (activeTool === 'bezier' && isBgClick) {
+          e.stopPropagation();
+          const pt = getCanvasPoint(e);
+          let target = elements.find((el) => el.id === selectedElementId && el.type === 'bezier' && !el.closed);
+          let isNew = false;
+          if (!target) {
+            const newId = `bezier-${Date.now()}`;
+            target = {
+              id: newId,
+              type: 'bezier',
+              x: 0,
+              y: 0,
+              width: 100,
+              height: 100,
+              content: 'bezier',
+              points: [],
+              closed: false,
+              strokeColor: '#FF5500',
+              strokeWidth: 4,
+              zIndex: (elements.length || 0) + 1,
+            };
+            isNew = true;
+          }
+
+          const localX = pt.x - ((target.x / 100) * BOARD_WIDTH);
+          const localY = pt.y - ((target.y / 100) * BOARD_HEIGHT);
+
+          const pts = (target.points || []) as any[];
+
+          if (pts.length >= 2) {
+            const first = pts[0];
+            const dx = localX - first.x;
+            const dy = localY - first.y;
+            if (Math.sqrt(dx * dx + dy * dy) <= 18) {
+              onUpdateElement(target.id, { closed: true });
+              optimizeBezierBounds({ ...target, closed: true });
+              return;
+            }
+          }
+
+          const newNode = {
+            x: localX,
+            y: localY,
+            h1x: localX,
+            h1y: localY,
+            h2x: localX,
+            h2y: localY,
+          };
+          const newPts = [...pts, newNode];
+          const newIdx = newPts.length - 1;
+
+          if (isNew) {
+            if (onAddElements) onAddElements([{ ...target, points: newPts }]);
+            onSelectElement(target.id, false);
+          } else {
+            onUpdateElement(target.id, { points: newPts });
+          }
+
+          setSelectedBezierNodeIdx(newIdx);
+          setSelectedBezierHandleType('h2');
+
+          const targetId = target.id;
+          function onDragNewHandle(moveEv: PointerEvent) {
+            const movePt = getCanvasPoint(moveEv);
+            const dragLocalX = movePt.x - ((target!.x / 100) * BOARD_WIDTH);
+            const dragLocalY = movePt.y - ((target!.y / 100) * BOARD_HEIGHT);
+
+            const currPts = [...newPts];
+            const currNode = { ...currPts[newIdx] };
+            currNode.h2x = dragLocalX;
+            currNode.h2y = dragLocalY;
+            currNode.h1x = currNode.x - (dragLocalX - currNode.x);
+            currNode.h1y = currNode.y - (dragLocalY - currNode.y);
+            currPts[newIdx] = currNode;
+
+            onUpdateElement(targetId, { points: currPts });
+          }
+
+          function onUpNewHandle() {
+            window.removeEventListener('pointermove', onDragNewHandle);
+            window.removeEventListener('pointerup', onUpNewHandle);
+            const curEl = elements.find((el) => el.id === targetId);
+            if (curEl) optimizeBezierBounds(curEl);
+          }
+
+          window.addEventListener('pointermove', onDragNewHandle);
+          window.addEventListener('pointerup', onUpNewHandle);
+          return;
+        }
+
         if (spaceHeld || e.button === 1 || (e.button === 0 && e.altKey) || isBgClick) {
           setIsPanning(true);
           setPanStart({ x: e.clientX - panX, y: e.clientY - panY });
@@ -280,16 +352,84 @@ export function SlideEditorCanvasBoard({
         if (isBgClick) {
           onSelectElement(null);
           setEditingTextId(null);
+          setSelectedBezierNodeIdx(null);
+          setSelectedBezierHandleType(null);
         }
       }}
       onPointerMove={(e) => {
         if (isPanning) {
           setPanX(e.clientX - panStart.x);
           setPanY(e.clientY - panStart.y);
+        } else if (drawingPencilId) {
+          const pt = getCanvasPoint(e);
+          const el = elements.find((item) => item.id === drawingPencilId);
+          if (el && Array.isArray(el.points)) {
+            const updatedPts = [...el.points, [pt.x, pt.y]];
+            onUpdateElement(drawingPencilId, { points: updatedPts });
+          }
         }
       }}
-      onPointerUp={() => setIsPanning(false)}
-      onPointerLeave={() => setIsPanning(false)}
+      onPointerUp={() => {
+        setIsPanning(false);
+        if (drawingPencilId) {
+          const el = elements.find((item) => item.id === drawingPencilId);
+          if (el && Array.isArray(el.points) && el.points.length > 0) {
+            let pts = [...(el.points as number[][])];
+            let isLoopFilled = false;
+
+            if (pts.length > 2) {
+              const startPt = pts[0];
+              const endPt = pts[pts.length - 1];
+              const dist = Math.sqrt((startPt[0] - endPt[0]) ** 2 + (startPt[1] - endPt[1]) ** 2);
+              if (dist < 20) {
+                pts.push([startPt[0], startPt[1]]);
+                isLoopFilled = true;
+              }
+            }
+
+            let minX = BOARD_WIDTH, maxX = 0, minY = BOARD_HEIGHT, maxY = 0;
+            pts.forEach((p) => {
+              if (p[0] < minX) minX = p[0];
+              if (p[0] > maxX) maxX = p[0];
+              if (p[1] < minY) minY = p[1];
+              if (p[1] > maxY) maxY = p[1];
+            });
+
+            const padding = 10;
+            minX = Math.max(0, minX - padding);
+            maxX = Math.min(BOARD_WIDTH, maxX + padding);
+            minY = Math.max(0, minY - padding);
+            maxY = Math.min(BOARD_HEIGHT, maxY + padding);
+
+            const w = maxX - minX;
+            const h = maxY - minY;
+
+            if (w > 2 && h > 2) {
+              const normPoints = pts.map((p) => [p[0] - minX, p[1] - minY]);
+              const nx = Math.round((minX / BOARD_WIDTH) * 1000) / 10;
+              const ny = Math.round((minY / BOARD_HEIGHT) * 1000) / 10;
+              const nw = Math.round((w / BOARD_WIDTH) * 1000) / 10;
+              const nh = Math.round((h / BOARD_HEIGHT) * 1000) / 10;
+
+              onUpdateElement(drawingPencilId, {
+                points: normPoints,
+                isLoopFilled,
+                x: nx,
+                y: ny,
+                width: nw,
+                height: nh,
+                vbW: w,
+                vbH: h,
+              });
+            }
+          }
+          setDrawingPencilId(null);
+        }
+      }}
+      onPointerLeave={() => {
+        setIsPanning(false);
+        setDrawingPencilId(null);
+      }}
       style={{
         flex: 1,
         backgroundColor: 'var(--bg-primary)',
@@ -299,7 +439,7 @@ export function SlideEditorCanvasBoard({
         position: 'relative',
         overflow: 'hidden',
         userSelect: 'none',
-        cursor: isPanning || spaceHeld ? 'grabbing' : 'default',
+        cursor: isPanning || spaceHeld ? 'grabbing' : activeTool === 'pencil' || activeTool === 'bezier' ? 'crosshair' : 'default',
       }}
     >
       {/* Top-Left Mode Indicator */}
@@ -330,7 +470,7 @@ export function SlideEditorCanvasBoard({
             boxShadow: '0 0 10px #FF5500',
           }}
         />
-        <span>Slide Builder Mode: Creating Custom Slide Canvas</span>
+        <span>Slide Builder Mode: {activeTool === 'pencil' ? 'Freehand Pencil Draw' : activeTool === 'bezier' ? 'Bezier Vector Pen Tool' : 'Creating Custom Slide Canvas'}</span>
       </div>
 
       {/* Sleek Bottom-Center Canvas Zoom Pill Bar */}
@@ -476,14 +616,13 @@ export function SlideEditorCanvasBoard({
                 if (el.type === 'text') setEditingTextId(el.id);
               }}
               onPointerDown={(e) => {
-                if (isEditing || isLocked) return;
+                if (isEditing || isLocked || activeTool === 'pencil' || activeTool === 'bezier') return;
                 e.stopPropagation();
 
                 const isShift = e.shiftKey || e.metaKey || e.ctrlKey;
                 const isAlt = e.altKey;
 
                 if (isAlt) {
-                  // Alt / Option + Drag to Duplicate
                   const now = Date.now();
                   const targetsToDup = activeSelection.includes(el.id)
                     ? elements.filter((item) => activeSelection.includes(item.id))
@@ -541,11 +680,8 @@ export function SlideEditorCanvasBoard({
                 width: `${elW}%`,
                 height: `${elH}%`,
                 zIndex: el.zIndex || 1,
-                /* Rotation is applied on air, so it is applied here. Without
-                   it a rotated block sat square in the editor and turned the
-                   moment it was taken. */
                 transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
-                cursor: isEditing ? 'text' : isLocked ? 'not-allowed' : 'move',
+                cursor: isEditing ? 'text' : isLocked ? 'not-allowed' : activeTool === 'pencil' || activeTool === 'bezier' ? 'crosshair' : 'move',
                 border: isSelected ? (isLocked ? '1.5px dashed #FF5500' : '1.5px solid #FF5500') : '1px transparent solid',
                 boxShadow: computeBoxShadow(el) || (isSelected ? '0 0 0 2px rgba(255, 85, 0, 0.3)' : undefined),
                 borderRadius: isSelected ? 4 : undefined,
@@ -578,8 +714,6 @@ export function SlideEditorCanvasBoard({
                       fontStyle: el.fontStyle || 'normal',
                       textAlign: el.textAlign || 'center',
                       lineHeight: el.lineHeight || 1.3,
-                      /* Typing into a block must not change how it is set, or
-                         the text reflows the moment you double-click it. */
                       letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
                       textTransform: el.textTransform || 'none',
                       textDecoration: el.textDecoration || 'none',
@@ -588,13 +722,6 @@ export function SlideEditorCanvasBoard({
                     }}
                   />
                 ) : (
-                  /* Letter spacing, Case, Decoration, vertical alignment and
-                     opacity were all missing here while the renderer that goes
-                     to air honoured every one of them. Setting any of them did
-                     nothing visible, so they read as broken controls — the
-                     change was real, it just could not be seen until the slide
-                     was on screen. This block now matches ElementBox in
-                     NativeSlideBoard property for property. */
                   <div
                     style={{
                       width: '100%',
@@ -644,6 +771,267 @@ export function SlideEditorCanvasBoard({
                     userSelect: 'none',
                   } as React.CSSProperties & { WebkitUserDrag?: string }}
                 />
+              )}
+
+              {/* Pencil or Bezier Vector Element */}
+              {(el.type === 'pencil' || el.type === 'bezier') && (() => {
+                const isPencil = el.type === 'pencil';
+                const pts = (el.points || []) as any[];
+                let d = '';
+                if (isPencil) {
+                  if (pts.length > 0) {
+                    d = `M ${pts[0][0]} ${pts[0][1]}`;
+                    for (let i = 1; i < pts.length; i++) {
+                      d += ` L ${pts[i][0]} ${pts[i][1]}`;
+                    }
+                  }
+                } else {
+                  if (pts.length > 0) {
+                    d = `M ${pts[0].x} ${pts[0].y}`;
+                    for (let i = 1; i < pts.length; i++) {
+                      const prev = pts[i - 1];
+                      const curr = pts[i];
+                      d += ` C ${prev.h2x} ${prev.h2y} ${curr.h1x} ${curr.h1y} ${curr.x} ${curr.y}`;
+                    }
+                    if (el.closed && pts.length > 1) {
+                      const last = pts[pts.length - 1];
+                      const first = pts[0];
+                      d += ` C ${last.h2x} ${last.h2y} ${first.h1x} ${first.h1y} ${first.x} ${first.y} Z`;
+                    }
+                  }
+                }
+
+                const fillOn = !!(el.isLoopFilled && (el.fillColor || el.backgroundColor) && (el.fillColor || el.backgroundColor) !== 'none');
+                const fillColor = fillOn ? (el.fillColor || el.backgroundColor || '#FF5500') : 'none';
+                const strokeColor = el.strokeColor || el.borderColor || '#FF5500';
+                const strokeWidth = el.strokeWidth ?? el.borderWidth ?? 4;
+                const vbW = el.vbW || ((el.width / 100) * BOARD_WIDTH);
+                const vbH = el.vbH || ((el.height / 100) * BOARD_HEIGHT);
+
+                return (
+                  <svg
+                    viewBox={`0 0 ${vbW} ${vbH}`}
+                    preserveAspectRatio="none"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      overflow: 'visible',
+                      filter: computeBoxShadow(el),
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <path
+                      d={d}
+                      fill={fillOn ? fillColor : 'none'}
+                      fillOpacity={fillOn && el.fillOpacity != null ? el.fillOpacity : 1}
+                      stroke={strokeColor}
+                      strokeWidth={strokeWidth}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                );
+              })()}
+
+              {/* Bezier Node Control Guides Overlay */}
+              {isSelected && el.type === 'bezier' && el.points && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    pointerEvents: 'none',
+                    zIndex: 20,
+                  }}
+                >
+                  {((el.points as any[]) || []).map((node, nodeIdx) => {
+                    const localW = (el.width / 100) * BOARD_WIDTH;
+                    const localH = (el.height / 100) * BOARD_HEIGHT;
+
+                    const canClosePath = nodeIdx === 0 && el.points!.length >= 2 && !el.closed;
+                    const isAnchorSelected = selectedBezierNodeIdx === nodeIdx && selectedBezierHandleType === 'anchor';
+
+                    const axPct = (node.x / localW) * 100;
+                    const ayPct = (node.y / localH) * 100;
+
+                    const h1xPct = (node.h1x / localW) * 100;
+                    const h1yPct = (node.h1y / localH) * 100;
+                    const h2xPct = (node.h2x / localW) * 100;
+                    const h2yPct = (node.h2y / localH) * 100;
+
+                    const showH1 = node.h1x !== node.x || node.h1y !== node.y;
+                    const showH2 = node.h2x !== node.x || node.h2y !== node.y;
+
+                    const handleDrag = (type: 'anchor' | 'h1' | 'h2', evt: React.PointerEvent) => {
+                      evt.stopPropagation();
+                      evt.preventDefault();
+                      setSelectedBezierNodeIdx(nodeIdx);
+                      setSelectedBezierHandleType(type);
+
+                      const elId = el.id;
+                      function onNodeMove(moveEv: PointerEvent) {
+                        const movePt = getCanvasPoint(moveEv);
+                        const localMoveX = movePt.x - ((el.x / 100) * BOARD_WIDTH);
+                        const localMoveY = movePt.y - ((el.y / 100) * BOARD_HEIGHT);
+
+                        const currentEl = elements.find((item) => item.id === elId);
+                        if (!currentEl || !currentEl.points) return;
+                        const ptsCopy = [...(currentEl.points as any[])];
+                        const currNode = { ...ptsCopy[nodeIdx] };
+
+                        if (type === 'anchor') {
+                          const dx = localMoveX - currNode.x;
+                          const dy = localMoveY - currNode.y;
+                          currNode.x = localMoveX;
+                          currNode.y = localMoveY;
+                          currNode.h1x += dx;
+                          currNode.h1y += dy;
+                          currNode.h2x += dx;
+                          currNode.h2y += dy;
+                        } else if (type === 'h1') {
+                          currNode.h1x = localMoveX;
+                          currNode.h1y = localMoveY;
+                          const rdx = currNode.x - localMoveX;
+                          const rdy = currNode.y - localMoveY;
+                          currNode.h2x = currNode.x + rdx;
+                          currNode.h2y = currNode.y + rdy;
+                        } else if (type === 'h2') {
+                          currNode.h2x = localMoveX;
+                          currNode.h2y = localMoveY;
+                          const rdx = currNode.x - localMoveX;
+                          const rdy = currNode.y - localMoveY;
+                          currNode.h1x = currNode.x + rdx;
+                          currNode.h1y = currNode.y + rdy;
+                        }
+
+                        ptsCopy[nodeIdx] = currNode;
+                        onUpdateElement(elId, { points: ptsCopy });
+                      }
+
+                      function onNodeUp() {
+                        window.removeEventListener('pointermove', onNodeMove);
+                        window.removeEventListener('pointerup', onNodeUp);
+                        const curEl = elements.find((item) => item.id === elId);
+                        if (curEl) optimizeBezierBounds(curEl);
+                      }
+
+                      window.addEventListener('pointermove', onNodeMove);
+                      window.addEventListener('pointerup', onNodeUp);
+                    };
+
+                    return (
+                      <React.Fragment key={nodeIdx}>
+                        {/* Anchor Node Dot */}
+                        <div
+                          onPointerDown={(evt) => handleDrag('anchor', evt)}
+                          style={{
+                            position: 'absolute',
+                            left: `${axPct}%`,
+                            top: `${ayPct}%`,
+                            transform: 'translate(-50%, -50%)',
+                            width: 10,
+                            height: 10,
+                            background: canClosePath ? '#22c55e' : isAnchorSelected ? '#3b82f6' : '#ffffff',
+                            border: '2px solid #FF5500',
+                            borderRadius: canClosePath ? '50%' : 2,
+                            cursor: 'pointer',
+                            pointerEvents: 'auto',
+                            zIndex: 25,
+                            boxShadow: '0 0 6px rgba(0,0,0,0.6)',
+                          }}
+                          title={canClosePath ? 'First Anchor: Click to Close Bezier Curve Loop' : `Anchor ${nodeIdx + 1}`}
+                        />
+
+                        {/* Tangent Line & Handle Dot H1 */}
+                        {showH1 && (() => {
+                          const dx = node.h1x - node.x;
+                          const dy = node.h1y - node.y;
+                          const len = Math.sqrt(dx * dx + dy * dy);
+                          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                          return (
+                            <>
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  left: `${axPct}%`,
+                                  top: `${ayPct}%`,
+                                  width: `${(len / localW) * 100}%`,
+                                  height: 1.5,
+                                  background: 'rgba(255, 85, 0, 0.75)',
+                                  transformOrigin: '0 50%',
+                                  transform: `rotate(${angle}deg)`,
+                                  pointerEvents: 'none',
+                                  zIndex: 22,
+                                }}
+                              />
+                              <div
+                                onPointerDown={(evt) => handleDrag('h1', evt)}
+                                style={{
+                                  position: 'absolute',
+                                  left: `${h1xPct}%`,
+                                  top: `${h1yPct}%`,
+                                  transform: 'translate(-50%, -50%)',
+                                  width: 8,
+                                  height: 8,
+                                  background: '#FF5500',
+                                  border: '1.5px solid #ffffff',
+                                  borderRadius: '50%',
+                                  cursor: 'grab',
+                                  pointerEvents: 'auto',
+                                  zIndex: 24,
+                                }}
+                                title="Control Handle 1"
+                              />
+                            </>
+                          );
+                        })()}
+
+                        {/* Tangent Line & Handle Dot H2 */}
+                        {showH2 && (() => {
+                          const dx = node.h2x - node.x;
+                          const dy = node.h2y - node.y;
+                          const len = Math.sqrt(dx * dx + dy * dy);
+                          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                          return (
+                            <>
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  left: `${axPct}%`,
+                                  top: `${ayPct}%`,
+                                  width: `${(len / localW) * 100}%`,
+                                  height: 1.5,
+                                  background: 'rgba(255, 85, 0, 0.75)',
+                                  transformOrigin: '0 50%',
+                                  transform: `rotate(${angle}deg)`,
+                                  pointerEvents: 'none',
+                                  zIndex: 22,
+                                }}
+                              />
+                              <div
+                                onPointerDown={(evt) => handleDrag('h2', evt)}
+                                style={{
+                                  position: 'absolute',
+                                  left: `${h2xPct}%`,
+                                  top: `${h2yPct}%`,
+                                  transform: 'translate(-50%, -50%)',
+                                  width: 8,
+                                  height: 8,
+                                  background: '#FF5500',
+                                  border: '1.5px solid #ffffff',
+                                  borderRadius: '50%',
+                                  cursor: 'grab',
+                                  pointerEvents: 'auto',
+                                  zIndex: 24,
+                                }}
+                                title="Control Handle 2"
+                              />
+                            </>
+                          );
+                        })()}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
               )}
 
               {/* Shape Element */}

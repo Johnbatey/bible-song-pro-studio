@@ -42,6 +42,8 @@ const GLYPH: Record<string, string> = {
   imagefill: '▤',
   connector: '⟋',
   table: '▦',
+  pencil: '✎',
+  bezier: '∿',
 };
 
 export function LockedIcon({ size = 12 }: { size?: number }) {
