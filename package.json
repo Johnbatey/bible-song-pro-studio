@@ -105,6 +105,13 @@
       ],
       "publisherName": "Bible Song Pro"
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Bible Song Pro Studio"
+    },
     "linux": {
       "icon": "assets/icons/bible-song-pro-icon.png",
       "target": [
