@@ -843,7 +843,13 @@ const TOOLBAR_CARD: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  padding: '4px 8px 6px',
+  padding: '6px 10px 8px',
+  background: 'rgba(24, 24, 27, 0.92)',
+  border: '1px solid var(--border-primary)',
+  borderRadius: 12,
+  boxShadow: '0 12px 36px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
 };
 
 const HEADER_LABEL: React.CSSProperties = {
