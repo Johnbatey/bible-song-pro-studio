@@ -94,7 +94,7 @@ export function BackupSystem() {
 
       const pkg: BackupPackage = {
         appName: 'Bible Song Pro Studio',
-        version: '3.0.0',
+        version: '3.1.0',
         timestamp: Date.now(),
         exportDate: new Date().toLocaleDateString('en-US', { dateStyle: 'full' }),
         data: dataPayload,
@@ -447,7 +447,7 @@ export function BackupSystem() {
               Backup Package Detected: {importSummary.file.name}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
-              Exported: {importSummary.pkg.exportDate || 'Unknown date'} • App Version: {importSummary.pkg.version || '3.0.0'}
+              Exported: {importSummary.pkg.exportDate || 'Unknown date'} • App Version: {importSummary.pkg.version || '3.1.0'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
               {importSummary.pkg.data.themes && <div>• {importSummary.pkg.data.themes.length} Themes</div>}

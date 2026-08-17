@@ -572,7 +572,7 @@ export function SettingsModal() {
                   <div>
                     <div style={modalStyles.rowTitle}>Software Updates</div>
                     <div style={modalStyles.rowSub}>
-                      App Version {appVersion || '3.0.0'} {updateStatusText ? `• ${updateStatusText}` : ''}
+                      App Version {appVersion || '3.1.0'} {updateStatusText ? `• ${updateStatusText}` : ''}
                     </div>
                   </div>
                   <button
