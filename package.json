@@ -72,7 +72,9 @@
     ],
     "asarUnpack": [
       "**/node_modules/koffi/**/*",
-      "**/node_modules/@koromix/**/*"
+      "**/node_modules/@koromix/**/*",
+      "**/node_modules/sharp/**/*",
+      "**/node_modules/@img/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -126,6 +128,14 @@
   "dependencies": {
     "@deepgram/sdk": "^3.6.0",
     "@huggingface/transformers": "^3.8.1",
+    "@img/sharp-darwin-arm64": "0.34.5",
+    "@img/sharp-darwin-x64": "0.34.5",
+    "@img/sharp-libvips-darwin-arm64": "1.2.4",
+    "@img/sharp-libvips-darwin-x64": "1.2.4",
+    "@img/sharp-libvips-linux-x64": "1.2.4",
+    "@img/sharp-libvips-win32-x64": "1.2.4",
+    "@img/sharp-linux-x64": "0.34.5",
+    "@img/sharp-win32-x64": "0.34.5",
     "@koromix/koffi-darwin-arm64": "3.1.2",
     "@koromix/koffi-darwin-x64": "3.1.2",
     "@koromix/koffi-linux-x64": "3.1.2",
@@ -140,6 +150,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
+    "sharp": "^0.34.5",
     "sql.js": "^1.14.2",
     "uuid": "^11.0.0",
     "ws": "^8.18.0",
