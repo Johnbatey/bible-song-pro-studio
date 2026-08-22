@@ -77,7 +77,7 @@ export function createDefaultTheme(): Theme {
     },
     bibleOptions: {
       showVersion: true,
-      shortenVersions: false,
+      shortenVersions: true,
       shortenBooks: false,
       showVerseNumbers: false,
       versionSwitchUpdatesOutput: true,
@@ -107,6 +107,18 @@ export function ensureTheme(theme: Theme | null | undefined): Theme {
     fullScreen: {
       ...def.fullScreen,
       ...theme.fullScreen,
+    },
+    bibleOptions: {
+      showVersion: theme.bibleOptions?.showVersion ?? def.bibleOptions!.showVersion,
+      shortenVersions: theme.bibleOptions?.shortenVersions ?? def.bibleOptions!.shortenVersions,
+      shortenBooks: theme.bibleOptions?.shortenBooks ?? def.bibleOptions!.shortenBooks,
+      showVerseNumbers: theme.bibleOptions?.showVerseNumbers ?? def.bibleOptions!.showVerseNumbers,
+      versionSwitchUpdatesOutput: theme.bibleOptions?.versionSwitchUpdatesOutput ?? def.bibleOptions!.versionSwitchUpdatesOutput,
+    },
+    songOptions: {
+      textTransform: theme.songOptions?.textTransform ?? def.songOptions!.textTransform,
+      showCategoryName: theme.songOptions?.showCategoryName ?? def.songOptions!.showCategoryName,
+      displayBySections: theme.songOptions?.displayBySections ?? def.songOptions!.displayBySections,
     },
   };
 }

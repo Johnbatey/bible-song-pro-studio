@@ -44,10 +44,11 @@ export function useStageSync(): void {
        of the library, not something a musician needs. */
     const isPresentation = currentScene?.type === 'presentation';
     const isMedia = currentScene?.type === 'media';
+    const isSong = currentScene?.type === 'song';
     publishStage({
       current: currentScene
         ? {
-            title: isPresentation || isMedia ? '' : (currentScene.content?.reference || currentScene.name),
+            title: isPresentation || isMedia || isSong ? '' : (currentScene.content?.reference || currentScene.name),
             body: currentScene.content?.text || '',
             bodyHtml: currentScene.content?.html || '',
           }

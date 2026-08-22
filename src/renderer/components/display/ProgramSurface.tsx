@@ -3,6 +3,7 @@ import { memo, useEffect, useRef } from 'react';
 import type React from 'react';
 import { SlideStage } from './SlideStage';
 import { attachAudioOutputSink } from '../../utils/audio-output';
+import { formatBibleReference } from '../../utils/bible-abbreviations';
 import './ProgramSurface.css';
 
 export interface ProgramSurfaceState {
@@ -287,26 +288,25 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   const primaryVersionTag = content?.version ? content.version.split('/')[0] : '';
   const secondaryVersionTag = secondaryVerse?.version || (content?.version && content.version.includes('/') ? content.version.split('/')[1] : '');
 
-  const hasVersionInRef = Boolean(
-    content?.reference &&
-      primaryVersionTag &&
-      (content.reference.toLowerCase().includes(`(${primaryVersionTag.toLowerCase()})`) ||
-        content.reference.toLowerCase().includes(` ${primaryVersionTag.toLowerCase()}`))
-  );
+  const bibleOptions = state.theme?.bibleOptions;
+  const showVersion = state.showTranslation !== undefined ? state.showTranslation : (bibleOptions?.showVersion !== false);
+  const refOptions = {
+    showVersion,
+    shortenVersions: bibleOptions?.shortenVersions !== false,
+    shortenBooks: Boolean(bibleOptions?.shortenBooks),
+  };
 
   const formattedRef = content?.reference
-    ? hasVersionInRef || !primaryVersionTag
-      ? content.reference
-      : `${content.reference} (${primaryVersionTag})`
+    ? formatBibleReference(content.reference, primaryVersionTag, refOptions)
     : '';
 
-  const primaryRef = isCompare && primaryVersionTag && !content?.reference?.includes(`(${primaryVersionTag})`)
-    ? `${baseRef} (${primaryVersionTag})`
+  const primaryRef = isCompare
+    ? formatBibleReference(content?.reference || baseRef, primaryVersionTag, refOptions)
     : formattedRef;
 
-  const secondaryRef = isCompare && secondaryVersionTag && !secondaryVerse?.reference?.includes(`(${secondaryVersionTag})`)
-    ? `${(secondaryVerse?.reference || baseRef).replace(/\s*\([^)]*\/[^)]*\)\s*$/, '').trim()} (${secondaryVersionTag})`
-    : secondaryVerse?.reference;
+  const secondaryRef = isCompare
+    ? formatBibleReference(secondaryVerse?.reference || baseRef, secondaryVersionTag, refOptions)
+    : (secondaryVerse?.reference ? formatBibleReference(secondaryVerse.reference, secondaryVersionTag, refOptions) : undefined);
   const video = videoSource(state, assetBaseUrl);
   const fontFamily = state.fontFamily || themeSection?.fontFamily || defaultTheme.fontFamily;
   const fontWeight = state.fontWeight || themeSection?.fontWeight || defaultTheme.fontWeight;
@@ -324,7 +324,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   const shadowBlur = typeof themeSection?.textShadowBlur === 'number' ? themeSection.textShadowBlur : (shadowLevel === 'heavy' ? 12 : shadowLevel === 'subtle' ? 3 : 6);
   const shadowCss = shadowEnabled ? `0px 2px ${shadowBlur}px ${shadowColor}` : undefined;
 
-  const showReference = state.showReference !== false && scene?.type !== 'presentation';
+  const showReference = state.showReference !== false && scene?.type !== 'presentation' && scene?.type !== 'song';
   const showStageBackground = !scene || mode === 'fullscreen';
 
   const textStyle: React.CSSProperties = {

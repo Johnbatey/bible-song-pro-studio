@@ -130,6 +130,7 @@ interface AppState {
   setSongLinesPerSlide: (value: number | 'auto') => void;
   addSong: (song: Song) => void;
   removeSong: (id: string) => void;
+  removeSongs: (ids: string[]) => void;
   updateSong: (id: string, updates: Partial<Song>) => void;
   setSongs: (songs: Song[]) => void;
   setShowSongCredits: (show: boolean) => void;
@@ -445,6 +446,10 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   songLinesPerSlide: 'auto',
   addSong: (song) => set((s) => ({ songs: [...s.songs, song] })),
   removeSong: (id) => set((s) => ({ songs: s.songs.filter((so) => so.id !== id) })),
+  removeSongs: (ids) => set((s) => {
+    const idSet = new Set(ids);
+    return { songs: s.songs.filter((so) => !idSet.has(so.id)) };
+  }),
   updateSong: (id, updates) =>
     set((s) => ({
       songs: s.songs.map((so) => (so.id === id ? { ...so, ...updates } : so)),

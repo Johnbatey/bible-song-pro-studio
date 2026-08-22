@@ -310,6 +310,7 @@ export function BiblePanel() {
   const addToQueue = useAppStore((s) => s.addToQueue);
   const outputMode = useAppStore((s) => s.display.outputMode);
   const operatingMode = useAppStore((s) => s.display.mode);
+  const activeTheme = useAppStore((s) => s.activeTheme);
 
   const [versions, setVersions] = useState<BibleVersion[]>([]);
   const [books, setBooks] = useState<BibleBook[]>([]);
@@ -768,6 +769,48 @@ export function BiblePanel() {
     }
   }
 
+  const handleVersionChange = async (val: string) => {
+    setSelectedVersion(val);
+    const bibleOptions = activeTheme?.bibleOptions;
+    if (bibleOptions?.versionSwitchUpdatesOutput !== false && operatingMode === 'basic' && currentScene?.type === 'bible') {
+      const activeRef = currentScene.name;
+      const refMatch = activeRef.match(/^((?:\d\s+)?[A-Za-zÀ-ÿ\s]+?)\s+(\d+)[:](\d+)/);
+      if (refMatch) {
+        const book = refMatch[1].trim();
+        const chapterNum = parseInt(refMatch[2], 10);
+        const verseNum = parseInt(refMatch[3], 10);
+        try {
+          const res = await window.BSP?.bible?.getChapter?.({ versionId: val, book, chapter: chapterNum });
+          const target = Array.isArray(res) ? res.find((v: BibleVerse) => v.verse === verseNum) : undefined;
+          if (target) {
+            void sendVerse(target, { direct: true, forceUpdate: true });
+          }
+        } catch (_) {}
+      }
+    }
+  };
+
+  const handleSecondaryVersionChange = async (val: string) => {
+    setSecondaryVersion(val);
+    const bibleOptions = activeTheme?.bibleOptions;
+    if (dualVersion && bibleOptions?.versionSwitchUpdatesOutput !== false && operatingMode === 'basic' && currentScene?.type === 'bible') {
+      const activeRef = currentScene.name;
+      const refMatch = activeRef.match(/^((?:\d\s+)?[A-Za-zÀ-ÿ\s]+?)\s+(\d+)[:](\d+)/);
+      if (refMatch) {
+        const book = refMatch[1].trim();
+        const chapterNum = parseInt(refMatch[2], 10);
+        const verseNum = parseInt(refMatch[3], 10);
+        try {
+          const res = await window.BSP?.bible?.getChapter?.({ versionId: selectedVersion, book, chapter: chapterNum });
+          const target = Array.isArray(res) ? res.find((v: BibleVerse) => v.verse === verseNum) : undefined;
+          if (target) {
+            void sendVerse(target, { direct: true, forceUpdate: true }, val, true);
+          }
+        } catch (_) {}
+      }
+    }
+  };
+
   async function sendVerses(verses: BibleVerse[], opts: { direct?: boolean } = {}) {
     if (!verses || verses.length === 0) return;
     if (verses.length === 1) return sendVerse(verses[0], opts);
@@ -1053,7 +1096,7 @@ export function BiblePanel() {
           <CustomDropdown
             value={selectedVersion}
             options={versionOptions.map((v) => ({ value: v.id, label: v.abbreviation, sublabel: v.name }))}
-            onChange={(val) => setSelectedVersion(val)}
+            onChange={(val) => handleVersionChange(val)}
             title="Select Translation"
             buttonStyle={{ height: 38 }}
           />
@@ -1140,17 +1183,10 @@ export function BiblePanel() {
               }}
               title={enableHoverLookup ? "Hover lookup active (Click to disable hover popovers; right-click still works)" : "Hover lookup disabled (Right-click still works)"}
             >
-              {enableHoverLookup ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                  <line x1="1" y1="1" x2="23" y2="23" />
-                </svg>
-              )}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
               <span>Hover: {enableHoverLookup ? 'ON' : 'OFF'}</span>
             </button>
           )}
@@ -1160,7 +1196,7 @@ export function BiblePanel() {
             <CustomDropdown
               value={secondaryVersion}
               options={versionOptions.map((v) => ({ value: v.id, label: `+ ${v.abbreviation}`, sublabel: v.name }))}
-              onChange={(val) => setSecondaryVersion(val)}
+              onChange={(val) => handleSecondaryVersionChange(val)}
               title="Secondary Parallel Translation"
               buttonStyle={{ height: 38 }}
             />

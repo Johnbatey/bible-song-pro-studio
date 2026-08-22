@@ -104,7 +104,6 @@ export function buildSongScene(
     type: 'song',
     content: {
       text: slide.text,
-      reference: `${song.title} (${song.key || ''})`,
       songCredit: (opts.includeCredits && (song.author || song.copyright || song.ccli))
         ? { title: song.title, author: song.author || song.artist, copyright: song.copyright, ccli: song.ccli }
         : undefined,

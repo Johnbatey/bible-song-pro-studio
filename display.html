@@ -188,6 +188,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
   // ── Helpers ──
   function esc(s) { return String(s || '').replace(/[&<>"']/g, function(c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }
 
+  var BIBLE_MAP = {
+    newlivingtranslation: 'NLT', newlivingtranslation1996: 'NLT', nlt: 'NLT',
+    newinternationalversion: 'NIV', niv: 'NIV',
+    kingjamesversion: 'KJV', kjv: 'KJV',
+    newkingjamesversion: 'NKJV', nkjv: 'NKJV',
+    englishstandardversion: 'ESV', esv: 'ESV',
+    newamericanstandardbible: 'NASB', nasb: 'NASB',
+    themessage: 'MSG', message: 'MSG', msg: 'MSG',
+    amplifiedbible: 'AMP', amp: 'AMP',
+    christianstandardbible: 'CSB', csb: 'CSB',
+    americanstandardversion: 'ASV', asv: 'ASV',
+    darbytranslation: 'DBY', darby: 'DBY', dby: 'DBY',
+    youngsliteraltranslation: 'YLT', ylt: 'YLT',
+    louissegond: 'LSG', lsg: 'LSG',
+    ostervald: 'OST', ost: 'OST',
+    reinavalera: 'RVR', reinavalera1909: 'RVR', rvr: 'RVR',
+  };
+
+  function shortenVer(name) {
+    if (!name) return '';
+    var str = String(name).trim();
+    var norm = str.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (BIBLE_MAP[norm]) return BIBLE_MAP[norm];
+    var withoutYear = norm.replace(/\d{4}$/, '');
+    if (BIBLE_MAP[withoutYear]) return BIBLE_MAP[withoutYear];
+    var paren = str.match(/\(([A-Za-z][A-Za-z0-9]{1,5})\)/);
+    if (paren) return paren[1].toUpperCase();
+    var withoutParenYear = str.replace(/\s*\(\d{4}\)\s*/g, '').trim();
+    if (/^[A-Z0-9]{2,6}$/.test(withoutParenYear)) return withoutParenYear;
+    var words = withoutParenYear.replace(/([a-z])([A-Z])/g, '$1 $2').split(/[\s_\-]+/).filter(Boolean);
+    var initials = words.filter(function(w){ return /[A-Za-z]/.test(w); }).map(function(w){ return w[0].toUpperCase(); }).join('');
+    if (initials.length >= 2 && initials.length <= 6) return initials;
+    return str;
+  }
+
   // ── Theme Application ──
   function applyTheme(name) {
     app.className = app.className.split(/\s+/).filter(function(c) { return !c.startsWith('theme-'); }).join(' ');
@@ -214,8 +249,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
     }
 
     const text = verse.text || verse.displayText || '';
-    const ref = verse.displayReference || verse.reference || '';
-    const trans = verse.songCredit ? (verse.translation || '') : (verse.translation || config.translation || '');
+    let ref = verse.displayReference || verse.reference || '';
+    const rawTrans = verse.songCredit ? (verse.translation || '') : (verse.translation || config.translation || '');
+    const trans = config.shortenVersions !== false ? shortenVer(rawTrans) : rawTrans;
+
+    if (config.shortenVersions !== false && ref) {
+      ref = ref.replace(/\(([^)]+)\)$/, function(m, p) {
+        return '(' + shortenVer(p) + ')';
+      });
+    }
 
     const bookmark = verse.bookmark || '';
 
@@ -392,17 +434,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
     if (typeof state.showTranslation === 'boolean') config.showTranslation = state.showTranslation;
     if (typeof state.showReference === 'boolean') config.showReference = state.showReference;
 
-    // Extract verse from scene.content format (used by session history and REST API)
+    // Extract verse / lyrics from scene.content format (used by session history and REST API)
     var verseData = state.verse || state.displayVerse || null;
     if (!verseData && state.scene && state.scene.content) {
       var sc = state.scene.content;
-      if (sc.text && sc.reference) {
+      var isSong = state.scene.type === 'song';
+      if (sc.text && (sc.reference || isSong)) {
         // Only Bible content inherits the default translation; a song has none, and
         // would otherwise be labelled with whatever version was last used.
         verseData = {
           text: sc.text,
-          reference: sc.reference,
-          translation: sc.version || (sc.songCredit ? '' : config.translation),
+          reference: isSong ? '' : (sc.reference || ''),
+          translation: isSong ? '' : (sc.version || (sc.songCredit ? '' : config.translation)),
         };
         if (sc.secondaryVerse && sc.secondaryVerse.text) {
           var baseRef = (sc.reference || '').replace(/\s*\([^)]*\/[^)]*\)\s*$/, '').trim();

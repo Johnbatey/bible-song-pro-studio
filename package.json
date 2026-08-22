@@ -29,6 +29,7 @@
     "typecheck": "tsc --noEmit",
     "test:live-scripture": "node scripts/test-live-scripture-parser.cjs",
     "verify:local-models": "node scripts/verify-local-models.cjs",
+    "verify:ndi": "node scripts/verify-ndi-bundling.cjs",
     "verify:bibles": "node scripts/test-bible-canon.cjs && node scripts/check-bible-licensing.cjs",
     "verify:display-architecture": "node scripts/verify-display-architecture.cjs",
     "verify:window-resizing": "node scripts/verify-window-resizing.cjs",
@@ -47,7 +48,7 @@
     "verify:stage-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-stage-display.cjs",
     "verify:dist-audience-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-dist-audience-display.cjs",
     "verify:display-all": "npm run typecheck && npm run verify:display-fields && npm run verify:display-architecture && npm run verify:stage-architecture && npm run verify:port-fallback && npm run verify:window-resizing && npm run verify:display-stack && npm run verify:dist-audience-display && npm run verify:stage-layouts && npm run verify:stage-designer && npm run verify:song-arrange-ui && npm run verify:fonts-render",
-    "verify:all": "npm run verify:bibles && npm run verify:fonts && npm run verify:media && npm run verify:slide-parity && npm run verify:song-arrange && npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all",
+    "verify:all": "npm run verify:bibles && npm run verify:ndi && npm run verify:fonts && npm run verify:media && npm run verify:slide-parity && npm run verify:song-arrange && npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all",
     "verify:stage-designer": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-stage-designer.cjs",
     "verify:stage-layouts": "node scripts/verify-stage-layouts.cjs",
     "verify:media": "node scripts/verify-media-library.cjs",
@@ -67,6 +68,7 @@
     "files": [
       "dist/**/*",
       "assets/**/*",
+      "!assets/bin/**/*",
       "src/electron/**/*",
       "package.json"
     ],
@@ -85,6 +87,13 @@
       ],
       "hardenedRuntime": true,
       "entitlements": "assets/entitlements.mac.plist",
+      "extraResources": [
+        {
+          "from": "assets/bin/ndi/darwin",
+          "to": "bin/ndi",
+          "filter": ["**/*"]
+        }
+      ],
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Bible Song Pro needs microphone access for live speech transcription and voice audio input.",
         "NSCameraUsageDescription": "Bible Song Pro needs camera access for video capture and live feeds.",
@@ -105,7 +114,14 @@
       "target": [
         "nsis"
       ],
-      "publisherName": "Bible Song Pro"
+      "publisherName": "Bible Song Pro",
+      "extraResources": [
+        {
+          "from": "assets/bin/ndi/win32-x64",
+          "to": "bin/ndi",
+          "filter": ["**/*"]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -126,7 +142,14 @@
         "deb"
       ],
       "category": "AudioVideo",
-      "maintainer": "Johnson Olakotan <support@biblesongpro.com>"
+      "maintainer": "Johnson Olakotan <support@biblesongpro.com>",
+      "extraResources": [
+        {
+          "from": "assets/bin/ndi/linux-x64",
+          "to": "bin/ndi",
+          "filter": ["**/*"]
+        }
+      ]
     }
   },
   "dependencies": {

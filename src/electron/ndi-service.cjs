@@ -16,34 +16,145 @@ function getKoffi() {
   }
 }
 
+const path = require('path');
+
 // NDIlib_FourCC_video_type_BGRA — ('B') | ('G'<<8) | ('R'<<16) | ('A'<<24).
 // Electron's capturePage().toBitmap() already hands back BGRA, so the frame buffer
 // can go straight to NDI with no per-pixel conversion.
 const FOURCC_BGRA = 0x41524742;
 const FRAME_FORMAT_PROGRESSIVE = 1;
 
-const LIB_CANDIDATES = [
-  '/usr/local/lib/libndi.dylib',
-  '/Library/NDI SDK for Apple/lib/macOS/libndi.dylib',
-  '/Library/NDI SDK for Apple/lib/macOS/libndi.5.dylib',
-  '/usr/local/lib/libndi.so',
-  '/usr/lib/libndi.so',
-  'C:\\Program Files\\NDI\\NDI 5 Runtime\\v5\\Processing.NDI.Lib.x64.dll',
-];
-
+/**
+ * Universal dynamic NDI library locator across Windows, macOS, and Linux.
+ * Adapts to NDI 5, NDI 6, NDI 7+, custom SDK directories, and system paths.
+ */
 function findLib() {
-  if (process.env.NDI_RUNTIME_DIR_V5) {
-    const candidates = [
-      `${process.env.NDI_RUNTIME_DIR_V5}/libndi.dylib`,
-      `${process.env.NDI_RUNTIME_DIR_V5}/libndi.so`,
-    ];
-    for (const candidate of candidates) {
-      try { fs.accessSync(candidate); return candidate; } catch { /* keep looking */ }
+  const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+  const isLinux = process.platform === 'linux';
+
+  const platformFolder = isWin ? 'win32-x64' : isMac ? 'darwin' : 'linux-x64';
+
+  const targetNames = isWin
+    ? ['Processing.NDI.Lib.x64.dll', 'Processing.NDI.Lib.x86.dll']
+    : isMac
+    ? ['libndi.dylib', 'libndi.6.dylib', 'libndi.5.dylib', 'libndi.4.dylib']
+    : ['libndi.so', 'libndi.so.6', 'libndi.so.5', 'libndi.so.4'];
+
+  function checkDir(dir) {
+    if (!dir || typeof dir !== 'string') return null;
+    for (const name of targetNames) {
+      const full = path.join(dir, name);
+      try {
+        if (fs.existsSync(full)) return full;
+      } catch (_) {}
+    }
+
+    const subdirs = isWin
+      ? ['v6', 'v5', 'v4', 'Bin/x64', 'Runtime', 'Runtime/v6', 'Runtime/v5', 'x64']
+      : isMac
+      ? ['lib/macOS', 'macOS', 'lib']
+      : ['lib/x86_64-linux-gnu', 'x86_64-linux-gnu', 'lib', 'lib64'];
+
+    for (const sub of subdirs) {
+      for (const name of targetNames) {
+        const full = path.join(dir, sub, name);
+        try {
+          if (fs.existsSync(full)) return full;
+        } catch (_) {}
+      }
+    }
+    return null;
+  }
+
+  // 1. Dynamic Environment Variables (e.g. NDI_RUNTIME_DIR_V6, NDI_RUNTIME_DIR_V5, NDILIB_REDIST_DIR, NDI_SDK_DIR)
+  // Sort descending so newer NDI versions (V7, V6) take precedence over older (V5, V4)
+  const envKeys = Object.keys(process.env)
+    .filter((k) => /^NDI/i.test(k) || /NDILIB/i.test(k))
+    .sort((a, b) => b.localeCompare(a));
+
+  for (const key of envKeys) {
+    const val = process.env[key];
+    if (val) {
+      const found = checkDir(val);
+      if (found) return found;
     }
   }
-  for (const candidate of LIB_CANDIDATES) {
-    try { fs.accessSync(candidate); return candidate; } catch { /* keep looking */ }
+
+  // 2. Standard System Installation Candidates
+  const baseCandidates = isWin
+    ? [
+        process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'NDI'),
+        process.env['ProgramFiles(x86)'] && path.join(process.env['ProgramFiles(x86)'], 'NDI'),
+        process.env.ProgramW6432 && path.join(process.env.ProgramW6432, 'NDI'),
+        'C:\\Program Files\\NDI',
+        'C:\\Program Files (x86)\\NDI',
+        process.env.SystemRoot && path.join(process.env.SystemRoot, 'System32'),
+        'C:\\Windows\\System32',
+      ].filter(Boolean)
+    : isMac
+    ? [
+        '/Library/NDI SDK for Apple/lib/macOS',
+        '/Library/NDI Runtimes/macOS',
+        '/Library/NDI SDK for Apple',
+        '/opt/homebrew/lib',
+        '/usr/local/lib',
+        '/usr/lib',
+      ]
+    : [
+        '/usr/lib/x86_64-linux-gnu',
+        '/usr/lib64',
+        '/usr/lib',
+        '/usr/local/lib',
+        '/opt/ndi/lib/x86_64-linux-gnu',
+        '/opt/ndi/lib',
+        '/opt/ndi',
+      ];
+
+  for (const base of baseCandidates) {
+    const directFound = checkDir(base);
+    if (directFound) return directFound;
+
+    // On Windows, dynamically inspect subdirectories inside C:\Program Files\NDI (e.g. NDI 6 Runtime, NDI 5 Tools, NDI 6 SDK, etc.)
+    if (isWin && fs.existsSync(base)) {
+      try {
+        const subfolders = fs.readdirSync(base);
+        subfolders.sort((a, b) => b.localeCompare(a));
+        for (const sub of subfolders) {
+          const subPath = path.join(base, sub);
+          const found = checkDir(subPath);
+          if (found) return found;
+        }
+      } catch (_) {}
+    }
   }
+
+  // 3. Bundled Application Fallback (Zero-configuration out-of-the-box support)
+  let appPath = null;
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.getAppPath === 'function') {
+      appPath = app.getAppPath();
+    }
+  } catch (_) {}
+
+  const bundledCandidates = [
+    // Production extraResources path
+    process.resourcesPath && path.join(process.resourcesPath, 'bin/ndi'),
+    process.resourcesPath && path.join(process.resourcesPath, 'assets/bin/ndi', platformFolder),
+    process.resourcesPath && path.join(process.resourcesPath, 'app.asar.unpacked/assets/bin/ndi', platformFolder),
+    // App path / Source tree development paths
+    appPath && path.join(appPath, 'assets/bin/ndi', platformFolder),
+    path.join(__dirname, '../../assets/bin/ndi', platformFolder),
+    path.join(__dirname, '../assets/bin/ndi', platformFolder),
+    path.join(process.cwd(), 'assets/bin/ndi', platformFolder),
+  ].filter(Boolean);
+
+  for (const bundledDir of bundledCandidates) {
+    const bundledFound = checkDir(bundledDir);
+    if (bundledFound) return bundledFound;
+  }
+
   return null;
 }
 
@@ -90,13 +201,27 @@ function createNdiService() {
       lastError = koffiLoadError ? `Koffi native module error: ${koffiLoadError.message}` : 'Koffi native module unavailable';
       return false;
     }
-    const libPath = findLib();
-    if (!libPath) {
+    let libPath = findLib();
+    try {
+      if (libPath) {
+        lib = koffi.load(libPath);
+      } else {
+        const fallbackName = process.platform === 'win32'
+          ? 'Processing.NDI.Lib.x64.dll'
+          : process.platform === 'darwin'
+          ? 'libndi.dylib'
+          : 'libndi.so';
+        lib = koffi.load(fallbackName);
+        libPath = fallbackName;
+      }
+    } catch (err) {
       lastError = 'NDI runtime not found. Install the NDI SDK/Runtime from https://ndi.video';
+      lib = null;
+      api = null;
       return false;
     }
+
     try {
-      lib = koffi.load(libPath);
 
       koffi.struct('NDIlib_send_create_t', {
         p_ndi_name: 'const char *',

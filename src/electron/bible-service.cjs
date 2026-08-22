@@ -48,6 +48,110 @@ ALL_BOOKS.forEach((book) => {
   addBookAlias(book.name, book.name);
   book.abbrev.forEach((alias) => addBookAlias(alias, book.name));
 });
+
+const BIBLE_VERSION_MAP = {
+  newlivingtranslation: 'NLT',
+  newlivingtranslation1996: 'NLT',
+  newlivingtranslation2015: 'NLT',
+  newliving: 'NLT',
+  nlt: 'NLT',
+  newinternationalversion: 'NIV',
+  niv: 'NIV',
+  kingjamesversion: 'KJV',
+  kjv: 'KJV',
+  newkingjamesversion: 'NKJV',
+  nkjv: 'NKJV',
+  englishstandardversion: 'ESV',
+  esv: 'ESV',
+  newamericanstandardbible: 'NASB',
+  nasb: 'NASB',
+  themessage: 'MSG',
+  message: 'MSG',
+  msg: 'MSG',
+  amplifiedbible: 'AMP',
+  amplified: 'AMP',
+  amp: 'AMP',
+  christianstandardbible: 'CSB',
+  csb: 'CSB',
+  holmanchristianstandardbible: 'HCSB',
+  hcsb: 'HCSB',
+  contemporaryenglishversion: 'CEV',
+  cev: 'CEV',
+  goodnewstranslation: 'GNT',
+  goodnewsbible: 'GNB',
+  gnt: 'GNT',
+  gnb: 'GNB',
+  revisedstandardversion: 'RSV',
+  rsv: 'RSV',
+  newrevisedstandardversion: 'NRSV',
+  nrsv: 'NRSV',
+  thepassiontranslation: 'TPT',
+  passiontranslation: 'TPT',
+  tpt: 'TPT',
+  americanstandardversion: 'ASV',
+  asv: 'ASV',
+  darbytranslation: 'DBY',
+  darby: 'DBY',
+  dby: 'DBY',
+  youngsliteraltranslation: 'YLT',
+  ylt: 'YLT',
+  louissegond: 'LSG',
+  lsg: 'LSG',
+  ostervald: 'OST',
+  ost: 'OST',
+  reinavalera: 'RVR',
+  reinavalera1909: 'RVR',
+  reinavalera1960: 'RVR60',
+  rvr: 'RVR',
+  nvi: 'NVI',
+  arc: 'ARC',
+  ara: 'ARA',
+};
+
+function shortenBibleVersionName(name) {
+  if (!name || typeof name !== 'string') return name || '';
+  const trimmed = name.trim();
+  if (!trimmed) return trimmed;
+
+  const normalized = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (BIBLE_VERSION_MAP[normalized]) return BIBLE_VERSION_MAP[normalized];
+  const withoutYear = normalized.replace(/\d{4}$/, '');
+  if (BIBLE_VERSION_MAP[withoutYear]) return BIBLE_VERSION_MAP[withoutYear];
+
+  const parenMatch = trimmed.match(/\(([A-Za-z][A-Za-z0-9]{1,5})\)/);
+  if (parenMatch) return parenMatch[1].toUpperCase();
+
+  const withoutParenYear = trimmed.replace(/\s*\(\d{4}\)\s*/g, '').trim();
+  if (/^[A-Z0-9]{2,6}$/.test(withoutParenYear)) return withoutParenYear;
+
+  const splitWords = withoutParenYear
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/([A-Za-z]+)(\d+)/g, '$1 $2')
+    .split(/[\s_\-]+/)
+    .filter(Boolean);
+
+  const cleanTokens = splitWords
+    .map((token) => token.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, ''))
+    .filter(Boolean);
+  const wordTokens = cleanTokens.filter((token) => /[A-Za-z]/.test(token));
+  const numberTokens = cleanTokens.filter((token) => /^\d+$/.test(token));
+
+  if (
+    wordTokens.length === 1 &&
+    wordTokens[0].length <= 6 &&
+    wordTokens.length + numberTokens.length === cleanTokens.length
+  ) {
+    return wordTokens[0].toUpperCase();
+  }
+
+  const initials = wordTokens.map((token) => token[0].toUpperCase()).join('');
+  if (initials.length >= 2 && initials.length <= 6) return initials;
+
+  const letters = trimmed.replace(/[^A-Za-z0-9]/g, '');
+  if (letters) return letters.slice(0, 6).toUpperCase();
+  return trimmed;
+}
 [
   ['psalm', 'Psalms'],
   ['psalms', 'Psalms'],
@@ -166,7 +270,7 @@ function getAllVersionMeta() {
           metaList.push({
             id: baseId,
             name: metaName,
-            abbreviation: baseId,
+            abbreviation: shortenBibleVersionName(metaName || baseId),
             language: 'en',
             file,
             type: file.endsWith('.xml') ? 'xml' : 'json',
@@ -267,10 +371,11 @@ function importBibleFile({ filePath, overwrite = false }) {
 
   const userDir = getUserBibleDir();
   const targetPath = path.join(userDir, `${baseId}.json`);
+  const abbr = shortenBibleVersionName(versionName || baseId);
   const payload = {
     id: baseId,
     name: versionName,
-    abbreviation: baseId,
+    abbreviation: abbr,
     books: booksData,
     localizedBookNames,
   };

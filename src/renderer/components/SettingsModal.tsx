@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { AppleToggle } from './AppleToggle';
-import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, LocalModelStatus, NdiStatus, SermonLanguage } from '../types';
+import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, LocalModelStatus, NdiStatus, SermonLanguage, BibleDisplayOptions } from '../types';
 import { SongPacks } from './settings/SongPacks';
 import { BackupSystem } from './settings/BackupSystem';
+import { createDefaultTheme } from '../utils/defaultTheme';
 
 export type SettingsCategory =
   | 'system'
+  | 'bible'
   | 'scripture'
   | 'songs'
   | 'audio'
@@ -32,6 +34,16 @@ const categories: CategoryItem[] = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2v20M2 12h20" />
+      </svg>
+    ),
+  },
+  {
+    id: 'bible',
+    label: 'Bible Options',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
       </svg>
     ),
   },
@@ -416,6 +428,21 @@ export function SettingsModal() {
     });
   }
 
+  function patchBibleOptions(patch: Partial<BibleDisplayOptions>) {
+    if (!activeTheme) return;
+    const def = createDefaultTheme();
+    const current = activeTheme.bibleOptions || def.bibleOptions!;
+    updateTheme(activeTheme.id, {
+      bibleOptions: {
+        showVersion: patch.showVersion ?? current.showVersion,
+        shortenVersions: patch.shortenVersions ?? current.shortenVersions,
+        shortenBooks: patch.shortenBooks ?? current.shortenBooks,
+        showVerseNumbers: patch.showVerseNumbers ?? current.showVerseNumbers,
+        versionSwitchUpdatesOutput: patch.versionSwitchUpdatesOutput ?? current.versionSwitchUpdatesOutput,
+      },
+    });
+  }
+
   function patchLowerThird(patch: Partial<NonNullable<typeof activeTheme>['lowerThird']>) {
     if (!activeTheme) return;
     updateTheme(activeTheme.id, {
@@ -594,6 +621,66 @@ export function SettingsModal() {
                 </div>
 
                 <BackupSystem />
+              </div>
+            )}
+
+            {/* Bible Options */}
+            {activeCategory === 'bible' && (
+              <div>
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Show Bible Version</div>
+                    <div style={modalStyles.rowSub}>Display the translation label (e.g. NLT, KJV) in Scripture references on screen</div>
+                  </div>
+                  <AppleToggle
+                    checked={activeTheme?.bibleOptions?.showVersion !== false}
+                    onChange={(checked) => patchBibleOptions({ showVersion: checked })}
+                  />
+                </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Shorten Bible Version</div>
+                    <div style={modalStyles.rowSub}>Display concise abbreviations (e.g. NLT, NIV, KJV) instead of full version names</div>
+                  </div>
+                  <AppleToggle
+                    checked={activeTheme?.bibleOptions?.shortenVersions !== false}
+                    onChange={(checked) => patchBibleOptions({ shortenVersions: checked })}
+                  />
+                </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Shorten Bible Book Names</div>
+                    <div style={modalStyles.rowSub}>Abbreviate book names in citations (e.g. Gen. 1:1, Matt. 5:14, 1 Cor. 13:4)</div>
+                  </div>
+                  <AppleToggle
+                    checked={Boolean(activeTheme?.bibleOptions?.shortenBooks)}
+                    onChange={(checked) => patchBibleOptions({ shortenBooks: checked })}
+                  />
+                </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Show Verse Numbers</div>
+                    <div style={modalStyles.rowSub}>Include superscript verse numbers in displayed Scripture text</div>
+                  </div>
+                  <AppleToggle
+                    checked={Boolean(activeTheme?.bibleOptions?.showVerseNumbers)}
+                    onChange={(checked) => patchBibleOptions({ showVerseNumbers: checked })}
+                  />
+                </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Version Switch Updates Output</div>
+                    <div style={modalStyles.rowSub}>Switching Bible version immediately updates the live display in Basic mode</div>
+                  </div>
+                  <AppleToggle
+                    checked={activeTheme?.bibleOptions?.versionSwitchUpdatesOutput !== false}
+                    onChange={(checked) => patchBibleOptions({ versionSwitchUpdatesOutput: checked })}
+                  />
+                </div>
               </div>
             )}
 

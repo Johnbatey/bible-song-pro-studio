@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { importSongFiles, pickAndImportSongs, SONG_FILE_ACCEPT } from '../utils/song-import';
 import type { Scene, Song } from '../types';
@@ -12,6 +12,7 @@ import { useMediaLibrary } from '../hooks/useMediaLibrary';
 import { backgroundSwatchCss, describeBackground } from '../utils/background';
 import { isFocusedDock } from './dock/dockFocus';
 import { arrangeExistingSong, describeArrangement, shortLabel, type ArrangeProposal } from '../utils/song-arrange';
+import { ImportConflictModal, type ConflictResolution, type ImportConflict } from './ImportConflictModal';
 
 const DEMO_SONGS: Song[] = [
   {
@@ -47,10 +48,18 @@ const DEMO_SONGS: Song[] = [
   },
 ];
 
+/** Pending import data held while the conflict modal is up. */
+interface PendingImport {
+  fresh: Song[];
+  conflicts: ImportConflict[];
+  errors: string[];
+}
+
 export function SongsPanel() {
   const songs = useAppStore((s) => s.songs);
   const setSongs = useAppStore((s) => s.setSongs);
   const updateSong = useAppStore((s) => s.updateSong);
+  const removeSongs = useAppStore((s) => s.removeSongs);
   const projectScene = useAppStore((s) => s.projectScene);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
@@ -64,6 +73,8 @@ export function SongsPanel() {
 
   const [search, setSearch] = useState('');
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
+  /** Multi-select: ids of songs the operator has checked for bulk delete. */
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [bgOpen, setBgOpen] = useState(false);
   const [arrOpen, setArrOpen] = useState(false);
   const [arranging, setArranging] = useState(false);
@@ -78,6 +89,8 @@ export function SongsPanel() {
   const [importing, setImporting] = useState(false);
   /** The lyric a search sent us to, so the right block can point at it. */
   const [lyricTarget, setLyricTarget] = useState<string | null>(null);
+  /** Pending import held while the conflict modal is up. */
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const [listWidth, setListWidth] = useState<number>(() => {
     const saved = localStorage.getItem('bsp_songsListWidth');
     return saved ? parseInt(saved, 10) : 300;
@@ -98,22 +111,75 @@ export function SongsPanel() {
     pushNotice({ id: `import-${Date.now()}`, text, type, duration: 4, animation: 'slideDown' });
   };
 
+  /* ── Delete songs ── */
+  const handleDeleteSongs = (ids: string[]) => {
+    if (ids.length === 0) return;
+    const label = ids.length === 1
+      ? songs.find((s) => s.id === ids[0])?.title ?? 'this song'
+      : `${ids.length} songs`;
+    const ok = window.confirm(`Delete ${label}? This cannot be undone.`);
+    if (!ok) return;
+    removeSongs(ids);
+    /* Clear selection state for any deleted songs. */
+    if (selectedSong && ids.includes(selectedSong.id)) setSelectedSong(null);
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+    notify(`Deleted ${ids.length} song${ids.length === 1 ? '' : 's'}.`);
+  };
+
+  const toggleChecked = (id: string) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  /* ── Import with duplicate detection ── */
+
+  /** Shared logic: given a list of parsed songs, split them into fresh vs
+      duplicate, show the conflict modal if needed, else import silently. */
+  const processImported = (imported: Song[], errors: string[]) => {
+    if (imported.length === 0) {
+      if (errors.length > 0) notify(errors[0], 'warning');
+      return;
+    }
+
+    const existingByTitle = new Map(
+      songs.map((s) => [s.title.toLowerCase(), s]),
+    );
+    const fresh: Song[] = [];
+    const conflicts: ImportConflict[] = [];
+
+    for (const incoming of imported) {
+      const existing = existingByTitle.get(incoming.title.toLowerCase());
+      if (existing) {
+        conflicts.push({ incoming, existing });
+      } else {
+        fresh.push(incoming);
+      }
+    }
+
+    if (conflicts.length > 0) {
+      /* Show the modal and wait for the operator's decision. */
+      setPendingImport({ fresh, conflicts, errors });
+    } else {
+      /* No conflicts — import silently as before. */
+      setSongs([...songs, ...fresh]);
+      notify(`Imported ${fresh.length} song${fresh.length === 1 ? '' : 's'}.`);
+      if (errors.length > 0) notify(errors[0], 'warning');
+    }
+  };
+
   const handleImport = async (files: File[]) => {
     if (files.length === 0) return;
     setImporting(true);
     try {
       const { songs: imported, errors } = await importSongFiles(files);
-      if (imported.length > 0) {
-        const existingTitles = new Set(songs.map((s) => s.title.toLowerCase()));
-        const fresh = imported.filter((s) => !existingTitles.has(s.title.toLowerCase()));
-        setSongs([...songs, ...fresh]);
-        const skipped = imported.length - fresh.length;
-        notify(
-          `Imported ${fresh.length} song${fresh.length === 1 ? '' : 's'}` +
-            (skipped > 0 ? ` · ${skipped} already in library` : '')
-        );
-      }
-      if (errors.length > 0) notify(errors[0], 'warning');
+      processImported(imported, errors);
     } finally {
       setImporting(false);
     }
@@ -123,21 +189,52 @@ export function SongsPanel() {
     setImporting(true);
     try {
       const { songs: imported, errors } = await pickAndImportSongs();
-      if (imported.length > 0) {
-        const existingTitles = new Set(songs.map((s) => s.title.toLowerCase()));
-        const fresh = imported.filter((s) => !existingTitles.has(s.title.toLowerCase()));
-        setSongs([...songs, ...fresh]);
-        const skipped = imported.length - fresh.length;
-        notify(
-          `Imported ${fresh.length} song${fresh.length === 1 ? '' : 's'}` +
-            (skipped > 0 ? ` · ${skipped} already in library` : '')
-        );
-      }
-      if (errors.length > 0) notify(errors[0], 'warning');
+      processImported(imported, errors);
     } finally {
       setImporting(false);
     }
   };
+
+  /** Called by ImportConflictModal when the operator makes their choice. */
+  const resolveImportConflict = useCallback((resolution: ConflictResolution) => {
+    if (!pendingImport) { setPendingImport(null); return; }
+    const { fresh, conflicts, errors } = pendingImport;
+    setPendingImport(null);
+
+    if (resolution === 'cancel') {
+      notify('Import cancelled.');
+      return;
+    }
+
+    if (resolution === 'skip') {
+      /* Add only the new songs. */
+      if (fresh.length > 0) {
+        setSongs([...songs, ...fresh]);
+        notify(
+          `Imported ${fresh.length} song${fresh.length === 1 ? '' : 's'}` +
+            ` · skipped ${conflicts.length} existing`,
+        );
+      } else {
+        notify(`Skipped ${conflicts.length} existing song${conflicts.length === 1 ? '' : 's'} — nothing new to import.`);
+      }
+    } else if (resolution === 'overwrite') {
+      /* Replace existing songs with the incoming versions (keep the existing id
+         so any queue or scene references survive). */
+      const overwritten = conflicts.map((c) => ({ ...c.incoming, id: c.existing.id }));
+      const updatedSongs = songs.map((s) => {
+        const replacement = overwritten.find((o) => o.id === s.id);
+        return replacement ?? s;
+      });
+      setSongs([...updatedSongs, ...fresh]);
+      const total = fresh.length + conflicts.length;
+      notify(
+        `Imported ${total} song${total === 1 ? '' : 's'}` +
+          ` (${conflicts.length} overwritten)`,
+      );
+    }
+
+    if (errors.length > 0) notify(errors[0], 'warning');
+  }, [pendingImport, songs, setSongs, notify]);
 
   const searchQuery = search.trim().toLowerCase();
 
@@ -254,6 +351,15 @@ export function SongsPanel() {
         }}
       />
 
+      {/* Import conflict modal — rendered outside the layout blocks. */}
+      {pendingImport && (
+        <ImportConflictModal
+          freshCount={pendingImport.fresh.length}
+          conflicts={pendingImport.conflicts}
+          onResolve={resolveImportConflict}
+        />
+      )}
+
       {/* Left block: search & song list */}
       <Block
         title="Songs"
@@ -261,6 +367,14 @@ export function SongsPanel() {
         style={{ flex: `0 0 ${listWidth}px`, minWidth: 180 }}
         tools={(
           <>
+            {checkedIds.size > 0 && (
+              <BlockButton
+                onClick={() => handleDeleteSongs(Array.from(checkedIds))}
+                title={`Delete ${checkedIds.size} selected song${checkedIds.size === 1 ? '' : 's'}`}
+              >
+                Delete ({checkedIds.size})
+              </BlockButton>
+            )}
             {songs.length === 0 && (
               <BlockButton onClick={handleAddDemoSongs}>Demo</BlockButton>
             )}
@@ -307,26 +421,69 @@ export function SongsPanel() {
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 2 }}>
             {filteredSongs.map((song) => {
               const isSelected = selectedSong?.id === song.id;
+              const isChecked = checkedIds.has(song.id);
               return (
                 <div
                   key={song.id}
                   className={`card card-hover`}
                   style={{
                     cursor: 'pointer',
-                    borderColor: isSelected ? 'var(--chrome-control-active)' : 'rgba(255, 255, 255, 0.08)',
+                    borderColor: isSelected
+                      ? 'var(--chrome-control-active)'
+                      : isChecked
+                        ? 'var(--tally-fault, #ff6b6b)'
+                        : 'rgba(255, 255, 255, 0.08)',
                     background: isSelected ? 'var(--chrome-control-active)' : 'var(--bg-secondary)',
                     padding: 10,
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
                   }}
-                  onClick={() => setSelectedSong(song)}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('[data-song-check]')) return;
+                    setSelectedSong(song);
+                  }}
                 >
-                  <div style={{ ...type.heading, fontWeight: isSelected ? fontWeight.semibold : fontWeight.medium, color: 'var(--text-primary)' }}>
-                    {song.title}
-                  </div>
-                  <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 2 }}>
-                    {song.artist || 'Unknown Artist'} {song.key ? `· Key: ${song.key}` : ''}
-                  </div>
-                  <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 2 }}>
-                    {song.slides.length} slides
+                  {/* Multi-select checkbox */}
+                  <input
+                    type="checkbox"
+                    data-song-check
+                    checked={isChecked}
+                    onChange={() => toggleChecked(song.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Select for bulk delete"
+                    style={{
+                      accentColor: 'var(--tally-fault, #ff6b6b)',
+                      cursor: 'pointer',
+                      marginTop: 3,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                      <div style={{ ...type.heading, fontWeight: isSelected ? fontWeight.semibold : fontWeight.medium, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {song.title}
+                      </div>
+                      {/* Single-song delete button */}
+                      <button
+                        type="button"
+                        title={`Delete ${song.title}`}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSongs([song.id]); }}
+                        style={songDeleteBtnStyle}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                          <path d="M2.5 4.5h11" />
+                          <path d="M5.5 4.5V3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.5" />
+                          <path d="M3.5 4.5l.7 9a1 1 0 0 0 1 .9h5.6a1 1 0 0 0 1-.9l.7-9" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 2 }}>
+                      {song.artist || 'Unknown Artist'} {song.key ? `· Key: ${song.key}` : ''}
+                    </div>
+                    <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 2 }}>
+                      {song.slides.length} slides
+                    </div>
                   </div>
                 </div>
               );
@@ -556,6 +713,26 @@ export function SongsPanel() {
     </div>
   );
 }
+
+/** Trash icon on each song row — visible on hover via CSS, but we use opacity
+    since the layout is inline-style. Always visible by default so keyboard and
+    touch users can reach it; the hover dimming is a visual nicety only. */
+const songDeleteBtnStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 22,
+  height: 22,
+  borderRadius: 4,
+  border: 'none',
+  background: 'transparent',
+  color: 'var(--text-dim)',
+  cursor: 'pointer',
+  padding: 0,
+  opacity: 0.5,
+  transition: 'opacity 0.1s, color 0.1s',
+  flexShrink: 0,
+};
 
 const styles: Record<string, React.CSSProperties> = {
   bgSection: {
