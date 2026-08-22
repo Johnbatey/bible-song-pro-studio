@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme } from 'dockview-react';
 import { useAppStore } from '../../stores/appStore';
 import { DOCK_COMPONENTS, DOCKS, type DockId } from './docks';
-import { getDockApi, setDockApi, toggleDock } from './dockController';
+import { getDockApi, setDockApi, toggleDock, openDock } from './dockController';
 import { DockTab } from './DockTab';
 import { DockEmptyState } from './DockEmptyState';
 
@@ -181,6 +181,7 @@ function buildDefaultLayout(api: DockviewApi) {
 export function DockHost() {
   const apiRef = useRef<DockviewApi | null>(null);
   const setOpenDockIds = useAppStore((s) => s.setOpenDockIds);
+  const setPoppedOutDockIds = useAppStore((s) => s.setPoppedOutDockIds);
   const openDockIds = useAppStore((s) => s.openDockIds);
 
   const syncOpenDocks = useCallback((api: DockviewApi) => {
@@ -265,6 +266,10 @@ export function DockHost() {
   // Returns are cleanup functions so React removes the listeners on unmount.
   useEffect(() => {
     const unsubToggle = window.BSP?.dock?.onToggle((id: string) => {
+      if (useAppStore.getState().poppedOutDockIds.includes(id)) {
+        void window.BSP?.dock?.focusPopout?.(id);
+        return;
+      }
       toggleDock(id as DockId);
     });
     const unsubReset = window.BSP?.dock?.onResetLayout(() => {
@@ -275,6 +280,28 @@ export function DockHost() {
       unsubReset?.();
     };
   }, []);
+
+  useEffect(() => {
+    const apply = (ids: string[]) => {
+      const prev = useAppStore.getState().poppedOutDockIds;
+      setPoppedOutDockIds(ids);
+      const api = apiRef.current;
+      if (!api) return;
+      for (const id of ids) {
+        const panel = api.getPanel(id);
+        if (panel) panel.api.close();
+      }
+      for (const id of prev) {
+        if (!ids.includes(id)) openDock(id as DockId);
+      }
+    };
+    void window.BSP?.dock?.listPopouts?.().then((ids) => {
+      if (Array.isArray(ids)) apply(ids);
+    });
+    return window.BSP?.dock?.onPopoutsChanged?.((ids) => {
+      apply(Array.isArray(ids) ? ids : []);
+    });
+  }, [setPoppedOutDockIds]);
 
   /* Closing the last dock used to leave the window blank, which is
      indistinguishable from a failed render. The empty state sits over

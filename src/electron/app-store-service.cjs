@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { stripHugeDataUrlsFromJson } = require('./strip-data-urls.cjs');
 
 // Persists renderer store slices (scenes, songs, themes, preferences) to userData
 // so nothing is lost on quit. Mirrors the file-IO pattern in session-history-service.cjs.
@@ -17,7 +18,9 @@ function createAppStoreService({ app }) {
       const raw = fs.readFileSync(filePath, 'utf8');
       if (!raw.trim()) return { ok: true, state: null };
       JSON.parse(raw); // validate; a truncated file should read as "no saved state"
-      return { ok: true, state: raw };
+      /* A saved deck that inlined a 33 MB photo as a data URL would come back
+         over IPC as a 44 MB string and abort() the renderer. Drop those here. */
+      return { ok: true, state: stripHugeDataUrlsFromJson(raw) };
     } catch (err) {
       console.error('app-store load failed:', err.message);
       return { ok: false, state: null, error: err.message };
@@ -41,7 +44,8 @@ function createAppStoreService({ app }) {
   // Coalesce bursts of writes — the store can update many times per second while
   // scenes are being cut.
   function save(value) {
-    pending = typeof value === 'string' ? value : JSON.stringify(value);
+    const raw = typeof value === 'string' ? value : JSON.stringify(value);
+    pending = stripHugeDataUrlsFromJson(raw);
     if (!writeTimer) writeTimer = setTimeout(flush, 400);
     return { ok: true };
   }

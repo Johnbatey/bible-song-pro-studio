@@ -1397,7 +1397,8 @@ export function BiblePanel() {
                           };
                           projectScene(scene, { direct: isDoubleClick });
                           window.BSP?.display?.sendState?.({
-                            mode: 'lowerthird',
+                            mode: 'lowerThird',
+                            outputMode: 'lowerThird',
                             lowerThirdText: `${entry.lemma} (${entry.transliteration} • ${entry.strongs})`,
                             lowerThirdSub: `${entry.gloss}: ${entry.definition}`,
                           });

@@ -68,6 +68,7 @@ export default defineConfig({
         audienceDisplayFixture: path.resolve(__dirname, 'audience-display-fixture.html'),
         programSurfaceHarness: path.resolve(__dirname, 'program-surface-harness.html'),
         programSurfaceSingle: path.resolve(__dirname, 'program-surface-single.html'),
+        dockPopout: path.resolve(__dirname, 'dock-popout.html'),
       },
       output: {
         manualChunks(id) {

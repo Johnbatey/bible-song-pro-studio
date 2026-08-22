@@ -60,7 +60,8 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
     };
     projectScene(scene);
     window.BSP?.display?.sendState?.({
-      mode: 'lowerthird',
+      mode: 'lowerThird',
+      outputMode: 'lowerThird',
       lowerThirdText: `${currentEntry.lemma} (${currentEntry.transliteration} • ${currentEntry.strongs})`,
       lowerThirdSub: `${currentEntry.gloss}: ${currentEntry.definition}`,
     });

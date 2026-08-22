@@ -22,6 +22,7 @@ export function TitleBar() {
   const [alertSpeed, setAlertSpeed] = useState<number>(1.0);
   const [alertCycles, setAlertCycles] = useState<number>(2);
   const openDockIds = useAppStore((s) => s.openDockIds);
+  const poppedOutDockIds = useAppStore((s) => s.poppedOutDockIds);
 
   /* Blackout lives in the store, not in this component.
    *
@@ -203,7 +204,8 @@ export function TitleBar() {
             <div key={section.id} style={styles.pillGroup}>
               {index > 0 && <span style={styles.pillDivider} aria-hidden="true" />}
               {section.docks.map((dock) => {
-                const isOpen = openDockIds.includes(dock.id);
+                const isPopped = poppedOutDockIds.includes(dock.id);
+                const isOpen = isPopped || openDockIds.includes(dock.id);
                 return (
                   <button
                     key={dock.id}
@@ -213,8 +215,14 @@ export function TitleBar() {
                       color: isOpen ? 'var(--text-primary)' : 'var(--text-secondary)',
                       fontWeight: isOpen ? fontWeight.semibold : fontWeight.medium,
                     }}
-                    onClick={() => toggleDock(dock.id)}
-                    title={`${section.label} · ${isOpen ? `Close the ${dock.title} dock` : `Open the ${dock.title} dock`}`}
+                    onClick={() => {
+                      if (isPopped) {
+                        void window.BSP?.dock?.focusPopout?.(dock.id);
+                        return;
+                      }
+                      toggleDock(dock.id);
+                    }}
+                    title={`${section.label} · ${isPopped ? `${dock.title} is in its own window` : isOpen ? `Close the ${dock.title} dock` : `Open the ${dock.title} dock`}`}
                   >
                     {dock.title}
                   </button>

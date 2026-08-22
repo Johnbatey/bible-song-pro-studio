@@ -11,12 +11,14 @@ import { StatusBar } from './components/StatusBar';
 import { ThemeTransitionOverlay } from './components/ThemeTransitionOverlay';
 import { useBroadcastSync } from './hooks/useBroadcastSync';
 import { useStageSync } from './hooks/useStageSync';
+import { useStoreSync } from './hooks/useStoreSync';
 /* Flattening for the browser display lives in its own module: it is pure, it
    is the only description of what that page shows, and a check can call it
    there without pulling the store and the component tree in behind it. */
 export { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
 import { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
 import { ensureTheme } from './utils/defaultTheme';
+import { sanitizeForIpc } from './utils/sanitize-ipc';
 
 export function App() {
   const platform = useAppStore((s) => s.platform);
@@ -61,13 +63,14 @@ export function App() {
   useBroadcastSync();
   // Feeds the stage display's zones: current, next, song cue and messages.
   useStageSync();
+  useStoreSync();
 
   useEffect(() => {
     if (!window.BSP?.display?.sendState) return;
     const sendState = () => {
       const state = useAppStore.getState();
       const activeTheme = ensureTheme(state.activeTheme);
-      window.BSP.display.sendState({
+      window.BSP.display.sendState(sanitizeForIpc({
         scene: state.display.currentScene,
         outputMode: state.display.outputMode,
         theme: activeTheme,
@@ -84,7 +87,7 @@ export function App() {
           : null,
         ...displayFieldsFor(activeTheme, state.display.outputMode),
         ...backgroundFieldsFor(state.display.currentScene, activeTheme, state.display.outputMode),
-      }).then((nextState) => {
+      })).then((nextState) => {
         useAppStore.getState().setOutputStatus({
           updatedAt: nextState?.updatedAt || Date.now(),
         });

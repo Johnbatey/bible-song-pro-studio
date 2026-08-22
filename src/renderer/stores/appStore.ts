@@ -6,6 +6,7 @@ import type {
   OperatingMode, QueueItem, PresentationDeck, Workspace
 } from '../types';
 import { createDefaultTheme } from '../utils/defaultTheme';
+import { sanitizeForIpc } from '../utils/sanitize-ipc';
 
 /**
  * Persisted slices live in a JSON file under the app's userData dir (via store:* IPC),
@@ -22,11 +23,15 @@ const bspStorage: StateStorage = {
     return localStorage.getItem(name);
   },
   setItem: async (name, value) => {
+    let payload = value;
+    try {
+      payload = JSON.stringify(sanitizeForIpc(JSON.parse(value)));
+    } catch { /* keep the original string */ }
     if (window.BSP?.store) {
-      await window.BSP.store.save(value).catch(() => {});
+      await window.BSP.store.save(payload).catch(() => {});
       return;
     }
-    localStorage.setItem(name, value);
+    localStorage.setItem(name, payload);
   },
   removeItem: async (name) => {
     if (window.BSP?.store) {
@@ -198,6 +203,9 @@ interface AppState {
    * tabs can light up; the layout tree itself lives in localStorage, not here.
    */
   openDockIds: string[];
+  /** Docks currently living in their own OS window. */
+  poppedOutDockIds: string[];
+  setPoppedOutDockIds: (ids: string[]) => void;
   setOpenDockIds: (ids: string[]) => void;
 
   /**
@@ -569,6 +577,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   dismissNotice: (id) => set((s) => ({ notices: s.notices.filter((n) => n.id !== id) })),
 
   openDockIds: [],
+  poppedOutDockIds: [],
+  setPoppedOutDockIds: (ids) => set((s) => (
+    s.poppedOutDockIds.length === ids.length && ids.every((id, i) => s.poppedOutDockIds[i] === id)
+      ? s
+      : { poppedOutDockIds: ids }
+  )),
   setOpenDockIds: (ids) => set((s) => (
     // dockview fires layout changes constantly while dragging; only push a new
     // array when the set of open docks actually differs.

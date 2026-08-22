@@ -7,6 +7,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 const main = read('src/electron/main.cjs');
 const remote = read('public/remote.html');
+const display = read('display.html');
 const viteConfig = read('vite.config.ts');
 
 assert.match(main, /function startHttpServer\(\)/, 'main process must keep the local HTTP server');
@@ -17,7 +18,9 @@ assert.match(main, /'POST \/api\/display\/project'\s*:/, 'HTTP server must expos
 assert.match(main, /'POST \/api\/display\/clear'\s*:/, 'HTTP server must expose clear endpoint for mobile remote');
 assert.match(main, /'POST \/api\/display\/blackout'\s*:/, 'HTTP server must expose blackout endpoint for mobile remote');
 assert.match(main, /pn\.startsWith\('\/media\/'\)/, 'HTTP server must keep /media/* serving for imported media');
-assert.match(main, /new WebSocketServer\(\{ server \}\)/, 'HTTP server must keep WebSocket support for remote/browser clients');
+assert.match(main, /new WebSocketServer\(\{ server/, 'HTTP server must keep WebSocket support for remote/browser clients');
+assert.match(display, /new WebSocket\(/, 'display.html must keep a WebSocket client');
+assert.match(display, /\/api\/display\/state/, 'display.html must poll /api/display/state so OBS Browser Source still updates when WebSockets fail');
 /* This used to read `displayPort = startHttpServer()`, from when the server
    bound one port synchronously and handed it back. Since ec6a5f3 it walks a
    range instead, so the port is not known until the listen callback fires and

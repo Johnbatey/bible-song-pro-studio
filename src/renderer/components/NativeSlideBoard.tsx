@@ -12,7 +12,9 @@
    touched projects as the same two lines the editor shows.
    ========================================================================= */
 import type { CSSProperties } from 'react';
+import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import type { PresentationSlide, SlideBackground, SlideElement } from '../types';
+import { assetUrl } from '../utils/asset-url';
 
 /** Board logical size. Matches <SlideCanvas>'s BOARD_W so the two agree. */
 export const NATIVE_BOARD_W = 1280;
@@ -137,7 +139,7 @@ function vJustify(vAlign?: SlideElement['vAlign']) {
   return 'center';
 }
 
-function ElementBox({ el }: { el: SlideElement }) {
+function ElementBox({ el, src }: { el: SlideElement; src: (value?: string) => string }) {
   const isLocked = Boolean(el.locked);
   const outer: CSSProperties = {
     position: 'absolute',
@@ -155,7 +157,7 @@ function ElementBox({ el }: { el: SlideElement }) {
     return (
       <div style={outer}>
         <img
-          src={el.content}
+          src={src(el.content)}
           alt=""
           draggable={false}
           style={{
@@ -335,6 +337,8 @@ export function NativeSlideBoard({
   className,
   style,
 }: NativeSlideBoardProps) {
+  const assetBaseUrl = useAssetBaseUrl();
+  const src = (value?: string) => assetUrl(value, assetBaseUrl);
   const scale = (width ?? NATIVE_BOARD_W) / NATIVE_BOARD_W;
   const isImage = background?.type === 'image' && background.value;
   const isVideo = background?.type === 'video' && background.value;
@@ -355,14 +359,14 @@ export function NativeSlideBoard({
     >
       {isImage && (
         <img
-          src={background!.value}
+          src={src(background!.value)}
           alt=""
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
       )}
       {isVideo && (
         <video
-          src={background!.value}
+          src={src(background!.value)}
           autoPlay
           muted
           loop
@@ -380,7 +384,7 @@ export function NativeSlideBoard({
           }}
         />
       )}
-      {elements.map((el) => <ElementBox key={el.id} el={el} />)}
+      {elements.map((el) => <ElementBox key={el.id} el={el} src={src} />)}
     </div>
   );
 

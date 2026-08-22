@@ -30,26 +30,37 @@
 @font-face{font-family:Cinzel;src:url(fonts/Cinzel-Variable.ttf) format("truetype");font-weight:400 900;font-display:swap}
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-html, body, #root { width: 100%; height: 100%; background: #000; overflow: hidden; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; background: #000; }
+html, body, #root { width: 100%; height: 100%; background: transparent; overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; background: transparent; }
 
 /* ── App Container ── */
-.app-container { height: 100vh; width: 100vw; background: #000; overflow: hidden; }
-.app { width: 100vw; height: 100vh; position: relative; background: #000; background-size: cover; background-position: center; background-repeat: no-repeat; overflow: hidden; }
+.app-container { height: 100vh; width: 100vw; background: transparent; overflow: hidden; }
+.app {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1920px;
+  height: 1080px;
+  transform: translate(-50%, -50%) scale(var(--stage-scale, 1));
+  transform-origin: center center;
+  overflow: hidden;
+  background: transparent;
+}
+.app.app-fs { background: #000; }
 .app-bg-layer { position: absolute; inset: 0; pointer-events: none; background-size: cover; background-position: center; background-repeat: no-repeat; transform: translateZ(0); }
 .app-bg-previous { animation: backgroundFadeOut .5s ease forwards; }
 .app-bg-video { width: 100%; height: 100%; object-fit: cover; }
 
-/* ── Verse Display ── */
-.verse-display { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: transparent; padding: 0; box-sizing: border-box; overflow: hidden; }
+/* ── Verse Display — same 1920×1080 box as ProgramSurface ── */
+.verse-display { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: transparent; padding: 32px 72px; box-sizing: border-box; overflow: hidden; z-index: 2; }
 .verse-display.hidden { opacity: 0; pointer-events: none; }
 .verse-display.fading-in, .verse-display.visible { opacity: 1; }
 .verse-display.fading-out { opacity: 0; transition: opacity .35s ease; }
-.verse-container { width: 100%; max-width: 100%; background: transparent; padding: 0; box-sizing: border-box; }
+.verse-container { width: 100%; max-width: 1740px; background: transparent; padding: 0; box-sizing: border-box; }
 .verse-reference { font-family: inherit; }
-.verse-reference-row { display: flex; align-items: baseline; justify-content: center; gap: .75rem; margin-bottom: 2rem; }
+.verse-reference-row { display: flex; align-items: baseline; justify-content: center; gap: .75rem; margin-bottom: 1.4rem; width: 100%; }
 .verse-reference-translation { font-family: inherit; font-weight: 700; }
-.verse-text { font-family: inherit; white-space: pre-line; }
+.verse-text { font-family: inherit; white-space: pre-line; width: 100%; line-height: 1.24; }
 
 /* ── Compare / Dual-Translation ── */
 .compare-layout { display: flex; align-items: stretch; justify-content: center; gap: 2.5rem; width: 100%; }
@@ -76,12 +87,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 .song-credit { margin-top: 1.75rem; font-size: clamp(11px, 1vw, 17px); opacity: .72; letter-spacing: .02em; text-align: center; line-height: 1.5; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 .lower-third .song-credit { margin-top: .5rem; text-align: left; font-size: clamp(9px, .7vw, 13px); }
 
-/* ── Lower Third ── */
-.verse-display.lower-third { align-items: flex-end; background: transparent; }
-.lower-third .verse-container { max-width: 100%; padding: 0; background: transparent; border-radius: 12px; animation: slideUpTauri .6s cubic-bezier(.16,1,.3,1); }
-.lower-third .verse-reference-row { justify-content: flex-start; margin-bottom: .5rem; }
-.lower-third .verse-text { line-height: 1.4; }
-@keyframes slideUpTauri { 0% { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+/* ── Lower Third: box pinned to the bottom of the 1080p stage ── */
+.verse-display.lower-third { display: block; padding: 0; background: transparent; }
+.lower-third .verse-container { position: absolute; inset: 0; max-width: none; width: auto; padding: 0; background: transparent; }
+.lt-box {
+  position: absolute;
+  left: 50%;
+  bottom: 5%;
+  transform: translateX(-50%);
+  width: 75%;
+  padding: 24px 34px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(10, 18, 32, .94), rgba(37, 52, 78, .94));
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .36);
+  box-sizing: border-box;
+}
+.lt-box-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  z-index: 0;
+}
+.lt-box > :not(.lt-box-media) { position: relative; z-index: 1; }
+.lt-box.lt-top { bottom: auto; top: 5%; }
+.lower-third .verse-text { line-height: 1.22; }
+.lower-third .lt-ref { margin-top: .45rem; opacity: .9; }
 
 /* ── LT Broadcast Variant ── */
 .verse-display.lt-broadcast .verse-reference-row { margin-bottom: .6rem; }
@@ -107,14 +143,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 .pulse-dot { width: 12px; height: 12px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }
 
 /* ── Blackout ── */
-.blackout-screen { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000 !important; z-index: 9999; display: none; }
+.blackout-screen { position: absolute; inset: 0; width: auto; height: auto; background-color: #000 !important; z-index: 9999; display: none; }
 .blackout-screen.active { display: block; }
-
-/* ── Fullscreen Button ── */
-
-/* ── Responsive ── */
-@media(max-width:1200px){ .verse-text { font-size: 2.5rem; } .verse-reference { font-size: 1.5rem; } .verse-container { padding: 0; } }
-@media(max-width:768px){ .verse-text { font-size: 2rem; } .verse-reference { font-size: 1.2rem; } .verse-container, .verse-display { padding: 0; } }
 </style>
 </head>
 <body>
@@ -188,13 +218,88 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
   // ── Helpers ──
   function esc(s) { return String(s || '').replace(/[&<>"']/g, function(c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }
 
+  function normalizeMode(mode) {
+    var value = String(mode || '').toLowerCase().replace(/[-_\s]/g, '');
+    if (value === 'lowerthird' || value === 'lt') return 'lowerThird';
+    if (value === 'fullscreen' || value === 'fs') return 'fullscreen';
+    return config.mode || 'fullscreen';
+  }
+
+  function isLowerThird() {
+    return config.mode === 'lowerThird';
+  }
+
   // ── Theme Application ──
   function applyTheme(name) {
-    app.className = app.className.split(/\s+/).filter(function(c) { return !c.startsWith('theme-'); }).join(' ');
-    if (name && name !== 'none') app.classList.add('theme-' + name);
-    if (name === 'custom-image' && config.bgCustomImage) {
+    var classes = app.className.split(/\s+/).filter(function(c) { return c && c !== 'app' && c !== 'app-fs' && c !== 'app-lt' && c.indexOf('theme-') !== 0; });
+    classes.unshift('app');
+    if (isLowerThird()) classes.push('app-lt');
+    else classes.push('app-fs');
+    if (name && name !== 'none' && !isLowerThird()) classes.push('theme-' + name);
+    app.className = classes.join(' ');
+    if (!isLowerThird() && name === 'custom-image' && config.bgCustomImage) {
       bgLayer.style.backgroundImage = 'url(' + esc(config.bgCustomImage) + ')';
     }
+  }
+
+  function clearStageFill() {
+    bgLayer.style.backgroundImage = '';
+    bgLayer.style.backgroundColor = '';
+    bgLayer.style.opacity = '1';
+    bgVideo.style.display = 'none';
+    bgVideo.removeAttribute('src');
+    var motionEl = document.getElementById('motionBg');
+    if (motionEl) { motionEl.style.display = 'none'; motionEl.src = ''; }
+  }
+
+  function applyStageFill(state) {
+    if (isLowerThird()) {
+      clearStageFill();
+      return;
+    }
+    var bgImage = state.bgCustomImage || '';
+    var bgFill = state.bgFill || '';
+    config.bgCustomImage = bgImage || null;
+    config.bgFill = bgFill || null;
+
+    if (state.bgVideo) {
+      if (config.bgVideo !== state.bgVideo) {
+        config.bgVideo = state.bgVideo;
+        bgVideo.src = state.bgVideo;
+      }
+      bgVideo.loop = state.bgVideoLoop !== false;
+      bgVideo.style.objectFit = state.bgFit || 'cover';
+      bgVideo.style.display = 'block';
+      bgVideo.play().catch(function(){});
+    } else {
+      config.bgVideo = null;
+      bgVideo.style.display = 'none';
+      bgVideo.removeAttribute('src');
+    }
+
+    if (bgImage) {
+      bgLayer.style.backgroundColor = '#000';
+      bgLayer.style.backgroundImage = 'url("' + String(bgImage).replace(/"/g, '%22') + '")';
+      bgLayer.style.backgroundSize = state.bgFit === 'contain' ? 'contain' : 'cover';
+    } else if (bgFill && bgFill !== 'transparent') {
+      var isGradient = bgFill.indexOf('gradient') !== -1;
+      bgLayer.style.backgroundImage = isGradient ? bgFill : '';
+      bgLayer.style.backgroundColor = isGradient ? '' : bgFill;
+    } else if (bgFill === 'transparent') {
+      bgLayer.style.backgroundImage = '';
+      bgLayer.style.backgroundColor = 'transparent';
+    } else {
+      var themeBg = state.theme && state.theme.fullScreen ? (state.theme.fullScreen.background || state.theme.fullScreen.backgroundColor) : '';
+      if (themeBg) {
+        var isGrad = themeBg.indexOf('gradient') !== -1;
+        bgLayer.style.backgroundImage = isGrad ? themeBg : '';
+        bgLayer.style.backgroundColor = isGrad ? '' : themeBg;
+      } else {
+        bgLayer.style.backgroundImage = '';
+        bgLayer.style.backgroundColor = '#0c0e14';
+      }
+    }
+    bgLayer.style.opacity = typeof state.bgOpacity === 'number' ? String(state.bgOpacity) : '1';
   }
 
   // ── Render Verse ──
@@ -208,22 +313,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
 
     // Mode classes
     verseDisplay.classList.remove('lower-third', 'lt-broadcast');
-    if (config.mode === 'lowerThird') {
+    if (isLowerThird()) {
       verseDisplay.classList.add('lower-third');
       if (config.lowerThird === 'broadcast') verseDisplay.classList.add('lt-broadcast');
     }
 
     const text = verse.text || verse.displayText || '';
     const ref = verse.displayReference || verse.reference || '';
-    const trans = verse.songCredit ? (verse.translation || '') : (verse.translation || config.translation || '');
-
-    const bookmark = verse.bookmark || '';
 
     // Style from config
-    var fs = config.fontSize > 0 ? config.fontSize + 'px' : (config.mode === 'lowerThird' ? 'clamp(16px,2.2vw,44px)' : 'clamp(20px,2.8vw,64px)');
+    var fs = config.fontSize > 0 ? config.fontSize + 'px' : (isLowerThird() ? 'clamp(16px,2.2vw,44px)' : 'clamp(20px,2.8vw,64px)');
     var refFs = config.referenceFontSize > 0 ? config.referenceFontSize + 'px' : 'clamp(12px,1.4vw,28px)';
 
-    var themeSec = config.mode === 'lowerThird' ? (state.theme ? state.theme.lowerThird : null) : (state.theme ? state.theme.fullScreen : null);
+    var themeSec = isLowerThird()
+      ? (currentTheme && currentTheme.lowerThird)
+      : (currentTheme && currentTheme.fullScreen);
     var syncRef = themeSec && themeSec.syncRefColor;
     var refColor = syncRef ? config.fontColor : (themeSec && themeSec.referenceColor ? themeSec.referenceColor : config.referenceColor);
 
@@ -236,26 +340,67 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
     var isCompare = verse.compareLeft && verse.compareRight;
 
     var html = '';
-    if (isCompare) {
+    if (verse.wordStudy) {
+      var ws = verse.wordStudy;
+      html =
+        '<div style="width:min(92vw,1400px);display:grid;grid-template-columns:1fr 1.4fr;gap:3vw;align-items:center;padding:4vh 4vw;box-sizing:border-box;">' +
+          '<div style="border-right:1px solid rgba(255,255,255,.14);padding-right:3vw;">' +
+            '<div style="font-size:clamp(40px,6vw,96px);font-weight:900;color:#FF5500;line-height:1.05;font-family:' + (ws.language === 'Hebrew' ? 'serif' : config.fontFamily) + ';">' + esc(ws.lemma || '') + '</div>' +
+            (ws.transliteration ? '<div style="margin-top:.4em;font-size:clamp(18px,2.4vw,32px);font-style:italic;opacity:.9;">/ ' + esc(ws.transliteration) + ' /</div>' : '') +
+            (ws.strongs ? '<div style="display:inline-block;margin-top:.8em;padding:.25em .7em;border-radius:8px;background:rgba(255,85,0,.25);color:#FF5500;border:1px solid rgba(255,85,0,.5);font-weight:800;letter-spacing:.04em;">' + esc(ws.strongs) + (ws.language ? ' (' + esc(ws.language) + ')' : '') + '</div>' : '') +
+            (ws.gloss ? '<div style="margin-top:.8em;font-size:clamp(20px,2.8vw,36px);font-weight:800;">' + esc(ws.gloss) + '</div>' : '') +
+          '</div>' +
+          '<div style="font-size:clamp(18px,2.4vw,34px);line-height:1.35;font-weight:600;">' + esc(ws.definition || text) + '</div>' +
+        '</div>';
+    } else if (isCompare) {
       html = '<div class="compare-layout">' +
         '<div class="compare-pane">' +
-          (verse.compareLeft.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-family:' + config.fontFamily + ';font-size:' + refFs + '"><span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(refColor) + ';font-weight:' + config.fontWeight + ';' + shadowStyle + '">' + esc(verse.compareLeft.ref) + '</span>' +
-          (config.showTranslation && verse.compareLeft.translation ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.56;font-size:.85em;' + shadowStyle + '">' + esc(verse.compareLeft.translation) + '</span>' : '') + '</div>' : '') +
+          (verse.compareLeft.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-family:' + config.fontFamily + ';font-size:' + refFs + '"><span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(refColor) + ';font-weight:' + config.fontWeight + ';' + shadowStyle + '">' + esc(verse.compareLeft.ref) + '</span></div>' : '') +
         '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + ';' + shadowStyle + '">' + esc(verse.compareLeft.text) + '</div></div>' +
         '<div class="compare-divider"></div>' +
         '<div class="compare-pane">' +
-          (verse.compareRight.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-family:' + config.fontFamily + ';font-size:' + refFs + '"><span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(refColor) + ';font-weight:' + config.fontWeight + ';' + shadowStyle + '">' + esc(verse.compareRight.ref) + '</span>' +
-          (config.showTranslation && verse.compareRight.translation ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.56;font-size:.85em;' + shadowStyle + '">' + esc(verse.compareRight.translation) + '</span>' : '') + '</div>' : '') +
+          (verse.compareRight.ref ? '<div class="verse-reference-row" style="justify-content:center;gap:.75rem;margin-bottom:1.5rem;font-family:' + config.fontFamily + ';font-size:' + refFs + '"><span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(refColor) + ';font-weight:' + config.fontWeight + ';' + shadowStyle + '">' + esc(verse.compareRight.ref) + '</span></div>' : '') +
         '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + ';' + shadowStyle + '">' + esc(verse.compareRight.text) + '</div></div>' +
       '</div>';
+    } else if (isLowerThird()) {
+      var lt = (currentTheme && currentTheme.lowerThird) || {};
+      var width = typeof lt.width === 'number' ? lt.width : 75;
+      var radius = typeof lt.borderRadius === 'number' ? lt.borderRadius : 6;
+      var boxBg = lt.background || 'linear-gradient(135deg, rgba(10, 18, 32, .94), rgba(37, 52, 78, .94))';
+      var anchor = lt.anchor || 'bottom';
+      var ltMediaUrl = lt.backgroundMediaUrl || '';
+      var ltMediaType = lt.backgroundMediaType || '';
+      var ltFit = lt.backgroundFit === 'contain' ? 'contain' : lt.backgroundFit === 'fill' ? 'fill' : 'cover';
+      var ltBoxStyle = 'width:' + width + '%;border-radius:' + radius + 'px;text-align:' + config.textAlign + ';';
+      if (ltMediaType === 'image' && ltMediaUrl) {
+        ltBoxStyle += 'background-color:#000;background-image:url("' + String(ltMediaUrl).replace(/"/g, '%22') + '");background-size:' + (ltFit === 'fill' ? '100% 100%' : ltFit) + ';background-position:center;background-repeat:no-repeat;';
+      } else if (ltMediaType === 'video' && ltMediaUrl) {
+        ltBoxStyle += 'background:#000;';
+      } else {
+        ltBoxStyle += 'background:' + boxBg + ';';
+      }
+      var ltVideo = (ltMediaType === 'video' && ltMediaUrl)
+        ? '<video class="lt-box-media" src="' + esc(ltMediaUrl) + '" autoplay muted playsinline' + (lt.backgroundLoop === false ? '' : ' loop') + ' style="object-fit:' + ltFit + ';"></video>'
+        : '';
+      verseDisplay.style.alignItems = '';
+      verseDisplay.style.justifyContent = '';
+      html = '<div class="lt-box' + (anchor === 'top' ? ' lt-top' : '') + '" style="' + ltBoxStyle + '">' +
+        ltVideo +
+        '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + ';' + shadowStyle + '">' + esc(text) + '</div>' +
+        (config.showReference && ref ? '<div class="lt-ref" style="font-family:' + config.fontFamily + ';font-size:' + refFs + ';font-weight:' + config.fontWeight + ';color:' + esc(refColor) + ';text-align:' + config.textAlign + ';' + shadowStyle + '">' + esc(ref) + '</div>' : '') +
+      '</div>';
     } else {
+      var vAlign = (currentTheme && currentTheme.fullScreen && currentTheme.fullScreen.verticalAlign) || 'middle';
+      verseDisplay.style.justifyContent = vAlign === 'top' ? 'flex-start' : (vAlign === 'bottom' ? 'flex-end' : 'center');
+      verseDisplay.style.alignItems = 'center';
       var refJustify = config.textAlign === 'left' ? 'flex-start' : (config.textAlign === 'right' ? 'flex-end' : 'center');
-      html = '<div class="verse-reference-row" style="font-family:' + config.fontFamily + ';font-size:' + refFs + '; justify-content:' + refJustify + '; text-align:' + config.textAlign + '">' +
-        (config.showReference && ref ? '<span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(refColor) + ';font-weight:' + config.fontWeight + ';' + shadowStyle + '">' + esc(ref) + '</span>' : '') +
-        (config.showTranslation && trans ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.56;font-size:.85em;' + shadowStyle + '">' + esc(trans) + '</span>' : '') +
-        (bookmark ? '<span class="verse-reference-translation" style="font-family:' + config.fontFamily + ';opacity:.4;font-size:.8em;' + shadowStyle + '">' + esc(bookmark) + '</span>' : '') +
-      '</div>' +
-      '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + ';' + shadowStyle + '">' + esc(text) + '</div>';
+      html = '';
+      if (config.showReference && ref) {
+        html += '<div class="verse-reference-row" style="font-family:' + config.fontFamily + ';font-size:' + refFs + ';justify-content:' + refJustify + ';text-align:' + config.textAlign + '">' +
+          '<span class="verse-reference" style="font-family:' + config.fontFamily + ';color:' + esc(refColor) + ';font-weight:' + config.fontWeight + ';' + shadowStyle + '">' + esc(ref) + '</span>' +
+        '</div>';
+      }
+      html += '<div class="verse-text" style="font-family:' + config.fontFamily + ';font-size:' + fs + ';font-weight:' + config.fontWeight + ';color:' + esc(config.fontColor) + ';text-align:' + config.textAlign + ';line-height:' + ((currentTheme && currentTheme.fullScreen && currentTheme.fullScreen.lineHeight) || 1.25) + ';' + shadowStyle + '">' + esc(text) + '</div>';
     }
 
     // Song credit footer — small, low-contrast, always last. Most CCLI licences
@@ -307,64 +452,30 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
   // ── Handle State ──
   function handleStateUpdate(state) {
     if (!state) return;
+    try {
 
-    // Theme
-    if (state.bgTheme) {
-      config.bgTheme = state.bgTheme;
-      applyTheme(state.bgTheme);
-    }
-    // Background video. Reassigning the same src restarts playback mid-service, so
-    // only touch the element when the source actually changes.
-    if (state.bgVideo) {
-      if (config.bgVideo !== state.bgVideo) {
-        config.bgVideo = state.bgVideo;
-        bgVideo.src = state.bgVideo;
-      }
-      bgVideo.loop = state.bgVideoLoop !== false;
-      bgVideo.style.objectFit = state.bgFit || 'cover';
-      bgVideo.style.display = 'block';
-      bgVideo.play().catch(function(){});
-    } else if (state.bgVideo === null || state.bgVideo === '') {
-      config.bgVideo = null;
-      bgVideo.style.display = 'none';
-      bgVideo.removeAttribute('src');
-      bgVideo.load();
-    }
+    if (state.theme) currentTheme = state.theme;
+    if (state.fontFamily) config.fontFamily = state.fontFamily;
+    if (typeof state.fontSize === 'number') config.fontSize = state.fontSize;
+    if (state.fontWeight) config.fontWeight = state.fontWeight;
+    if (state.fontColor) config.fontColor = state.fontColor;
+    if (state.textAlign) config.textAlign = state.textAlign;
+    if (state.referenceColor) config.referenceColor = state.referenceColor;
+    if (typeof state.referenceFontSize === 'number') config.referenceFontSize = state.referenceFontSize;
+    if (state.outputMode || state.mode) config.mode = normalizeMode(state.outputMode || state.mode);
+    if (state.lowerThird) config.lowerThird = state.lowerThird;
+    if (state.translation) config.translation = state.translation;
+    if (typeof state.showTranslation === 'boolean') config.showTranslation = state.showTranslation;
+    if (typeof state.showReference === 'boolean') config.showReference = state.showReference;
 
-    // Scene background — image or gradient/solid fill. Single writer on purpose: these
-    // share one element, and the `background` shorthand silently wipes background-image,
-    // so only longhands are used here.
-    if ('bgCustomImage' in state || 'bgFill' in state) {
-      var bgImage = state.bgCustomImage || '';
-      var bgFill = state.bgFill || '';
-      config.bgCustomImage = bgImage || null;
-      config.bgFill = bgFill || null;
+    applyTheme(state.bgTheme || config.bgTheme);
+    applyStageFill(state);
 
-      if (bgImage) {
-        bgLayer.style.backgroundColor = '#000';
-        bgLayer.style.backgroundImage = 'url("' + String(bgImage).replace(/"/g, '%22') + '")';
-        bgLayer.style.backgroundSize = state.bgFit === 'contain' ? 'contain' : 'cover';
-      } else if (bgFill) {
-        var isGradient = bgFill.indexOf('gradient') !== -1;
-        bgLayer.style.backgroundImage = isGradient ? bgFill : '';
-        bgLayer.style.backgroundColor = isGradient ? '' : bgFill;
-      } else {
-        var themeBg = state.theme && state.theme.fullScreen ? (state.theme.fullScreen.background || state.theme.fullScreen.backgroundColor) : '';
-        if (themeBg) {
-          var isGrad = themeBg.indexOf('gradient') !== -1;
-          bgLayer.style.backgroundImage = isGrad ? themeBg : '';
-          bgLayer.style.backgroundColor = isGrad ? '' : themeBg;
-        } else {
-          bgLayer.style.backgroundImage = '';
-          bgLayer.style.backgroundColor = config.mode === 'fullscreen' ? '#0c0e14' : '';
-        }
-      }
-      bgLayer.style.opacity = typeof state.bgOpacity === 'number' ? String(state.bgOpacity) : '1';
-    }
-
-    // Motion background (canvas HTML)
+    // Motion background (canvas HTML) — fullscreen only
     var motionEl = document.getElementById('motionBg');
-    if (state.bgMotion) {
+    if (isLowerThird()) {
+      if (motionEl) { motionEl.style.display = 'none'; motionEl.src = ''; }
+    } else if (state.bgMotion) {
       config.bgMotion = state.bgMotion;
       motionEl.src = state.bgMotion;
       motionEl.style.display = 'block';
@@ -379,24 +490,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
       blackoutScreen.classList.toggle('active', state.blackout);
     }
 
-    // Config
-    if (state.fontFamily) config.fontFamily = state.fontFamily;
-    if (state.fontSize) config.fontSize = state.fontSize;
-    if (state.fontWeight) config.fontWeight = state.fontWeight;
-    if (state.fontColor) config.fontColor = state.fontColor;
-    if (state.textAlign) config.textAlign = state.textAlign;
-    if (state.referenceColor) config.referenceColor = state.referenceColor;
-    if (state.mode) config.mode = state.mode;
-    if (state.lowerThird) config.lowerThird = state.lowerThird;
-    if (state.translation) config.translation = state.translation;
-    if (typeof state.showTranslation === 'boolean') config.showTranslation = state.showTranslation;
-    if (typeof state.showReference === 'boolean') config.showReference = state.showReference;
-
     // Extract verse from scene.content format (used by session history and REST API)
     var verseData = state.verse || state.displayVerse || null;
     if (!verseData && state.scene && state.scene.content) {
       var sc = state.scene.content;
-      if (sc.text && sc.reference) {
+      if (sc.text) {
         // Only Bible content inherits the default translation; a song has none, and
         // would otherwise be labelled with whatever version was last used.
         verseData = {
@@ -409,7 +507,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
           var pVer = sc.version ? sc.version.split('/')[0] : '';
           var sVer = sc.secondaryVerse.version || (sc.version ? sc.version.split('/')[1] : '');
 
-          var lRef = pVer && !sc.reference.includes('(' + pVer + ')') ? (baseRef.split(' (')[0] + ' (' + pVer + ')') : sc.reference;
+          var lRef = pVer && sc.reference && !sc.reference.includes('(' + pVer + ')') ? (baseRef.split(' (')[0] + ' (' + pVer + ')') : sc.reference;
           var rRef = sVer && !(sc.secondaryVerse.reference || '').includes('(' + sVer + ')') ? ((sc.secondaryVerse.reference || baseRef).split(' (')[0] + ' (' + sVer + ')') : (sc.secondaryVerse.reference || sc.reference);
 
           verseData.compareLeft = { text: sc.text, ref: lRef, translation: '' };
@@ -420,7 +518,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
           };
         }
         if (sc.songCredit) verseData.songCredit = sc.songCredit;
+        if (sc.wordStudy) verseData.wordStudy = sc.wordStudy;
       }
+    }
+    if (!verseData && (state.lowerThirdText || state.lowerThirdSub)) {
+      verseData = {
+        text: state.lowerThirdText || state.lowerThirdSub,
+        reference: state.lowerThirdText && state.lowerThirdSub ? state.lowerThirdSub : '',
+      };
     }
     if (!verseData && state.type === 'verse' && state.scene && state.scene.content) {
       var sc = state.scene.content;
@@ -429,43 +534,99 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxyge
       }
     }
 
-    // Verse rendering
+    // Verse rendering. Once the operator console has pushed any state, the
+    // standby card must not stay on air — OBS would broadcast "Waiting for
+    // connection" over the sermon. Empty program is black / transparent.
+    waitingScreen.style.display = 'none';
     if (verseData) {
       renderVerse(verseData);
-      waitingScreen.style.display = 'none';
-    } else if (state.type === 'hide_verse' || state.type === 'clear') {
+    } else if (!state.scene || state.type === 'hide_verse' || state.type === 'clear') {
       hideVerse();
     }
 
     // Lyrics
     if (state.lyrics) renderLyrics(state.lyrics);
-
-    // Connection
+    } catch (err) {
+      console.error('display state update failed', err);
+    }
   }
 
-  // ── WebSocket ──
-  function connect() {
+  function applyPayload(raw) {
+    var msg = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!msg) return;
+    if (msg.type === 'display:update') handleStateUpdate(msg.state);
+    else if (msg.state) handleStateUpdate(msg.state);
+    else handleStateUpdate(msg);
+  }
+
+  function applySocketData(data) {
+    if (typeof Blob !== 'undefined' && data instanceof Blob) {
+      data.text().then(function(text) { try { applyPayload(text); } catch (e) { /* ignore */ } });
+      return;
+    }
+    applyPayload(typeof data === 'string' ? data : String(data));
+  }
+
+  /* OBS Browser Source on macOS often loads http://localhost but fails to open
+     ws://localhost (IPv6 ::1 vs an IPv4-only listener, and CEF without a
+     reliable WebSocket). The page itself arrived over HTTP, so polling
+     /api/display/state is the path that actually reaches Program. WebSocket
+     stays as a faster path when the host allows it. */
+  function pollState() {
+    fetch('/api/display/state', { cache: 'no-store' })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data && data.state) handleStateUpdate(data.state);
+      })
+      .catch(function() { /* retry on the next interval */ });
+  }
+
+  function socketUrls() {
     var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var host = location.host || 'localhost:8942';
-    var ws = new WebSocket(protocol + '//' + host);
-    ws.onopen = function() { /* connected — no on-screen indicator on the audience output */ };
+    var port = location.port || '8942';
+    var host = location.hostname || '127.0.0.1';
+    var urls = [protocol + '//' + host + (port ? ':' + port : '')];
+    if (host === 'localhost') urls.push(protocol + '//127.0.0.1' + (port ? ':' + port : ''));
+    else if (host === '127.0.0.1') urls.push(protocol + '//localhost' + (port ? ':' + port : ''));
+    return urls;
+  }
+
+  var reconnectTimer = null;
+  function connectSocket(urlIndex) {
+    var urls = socketUrls();
+    var index = urlIndex || 0;
+    var url = urls[index];
+    if (!url) {
+      reconnectTimer = setTimeout(function() { connectSocket(0); }, 2000);
+      return;
+    }
+    var ws;
+    try { ws = new WebSocket(url); } catch (err) {
+      connectSocket(index + 1);
+      return;
+    }
     ws.onmessage = function(event) {
-      try {
-        var msg = JSON.parse(event.data);
-        if (msg.type === 'display:update') handleStateUpdate(msg.state);
-        else handleStateUpdate(msg);
-      } catch(e) { /* ignore parse errors */ }
+      try { applySocketData(event.data); } catch (e) { /* ignore parse errors */ }
     };
     ws.onclose = function() {
-      setTimeout(connect, 1000);
+      if (index + 1 < urls.length) connectSocket(index + 1);
+      else reconnectTimer = setTimeout(function() { connectSocket(0); }, 1000);
     };
-    ws.onerror = function() { ws.close(); };
+    ws.onerror = function() { try { ws.close(); } catch (e) { /* already closed */ } };
   }
 
   // ── Init ──
+  function updateStageScale() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    app.style.setProperty('--stage-scale', String(s));
+  }
+  updateStageScale();
+  window.addEventListener('resize', updateStageScale);
   applyTheme(config.bgTheme);
   waitingScreen.style.display = 'flex';
-  connect();
+  pollState();
+  setInterval(pollState, 150);
+  connectSocket(0);
 })();
 </script>
 </body>

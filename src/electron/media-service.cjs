@@ -5,6 +5,65 @@ const crypto = require('crypto');
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.avif']);
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.m4v', '.webm', '.mkv', '.avi']);
 
+/** Longest edge after resize — enough for 1080p output without a 40 MB string. */
+const MAX_IMAGE_EDGE = 1920;
+const JPEG_QUALITY = 82;
+const MAX_SOURCE_BYTES = 80 * 1024 * 1024;
+/** SVG/GIF (and Node tests without Electron) are copied as-is up to this size. */
+const COPY_AS_IS_MAX_BYTES = 4 * 1024 * 1024;
+
+function tryNativeImage() {
+  try {
+    return require('electron').nativeImage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resize a photo to MAX_IMAGE_EDGE. Vector/animated formats, and environments
+ * without Electron's nativeImage, are copied as-is when they are small enough.
+ */
+function optimizeImageFile(sourcePath, ext, sourceSize) {
+  const copyAsIs = ext === '.svg' || ext === '.gif';
+  const nativeImage = tryNativeImage();
+
+  if (copyAsIs || !nativeImage) {
+    if (sourceSize > COPY_AS_IS_MAX_BYTES) {
+      return {
+        ok: false,
+        error: nativeImage
+          ? 'That image cannot be resized. Export a JPEG or PNG under 4 MB.'
+          : 'That image is too large to import without Electron.',
+      };
+    }
+    return { ok: true, buffer: fs.readFileSync(sourcePath), ext: ext || '.bin' };
+  }
+
+  const image = nativeImage.createFromPath(sourcePath);
+  if (image.isEmpty()) {
+    return { ok: false, error: 'Could not read that image' };
+  }
+
+  const size = image.getSize();
+  let processed = image;
+  const longest = Math.max(size.width, size.height);
+  if (longest > MAX_IMAGE_EDGE) {
+    const scale = MAX_IMAGE_EDGE / longest;
+    processed = image.resize({
+      width: Math.max(1, Math.round(size.width * scale)),
+      height: Math.max(1, Math.round(size.height * scale)),
+      quality: 'best',
+    });
+  }
+
+  const keepPng = ext === '.png' || ext === '.webp' || ext === '.avif';
+  if (keepPng) {
+    return { ok: true, buffer: processed.toPNG(), ext: '.png' };
+  }
+  return { ok: true, buffer: processed.toJPEG(JPEG_QUALITY), ext: '.jpg' };
+}
+
 function kindFor(ext) {
   if (IMAGE_EXTS.has(ext)) return 'image';
   if (VIDEO_EXTS.has(ext)) return 'video';
@@ -82,6 +141,59 @@ function createMediaService({ app }) {
       missing: locate(item) === null,
     }));
     return { ok: true, items };
+  }
+
+  /**
+   * Copy an image into userData/media, resized to 1920 on the long edge.
+   *
+   * Slide import used to `readAsDataURL` the original file. A 33 MB phone
+   * JPEG becomes a ~44 MB string, the editor history copies it, and sending
+   * the scene over IPC abort()s Electron (`node::OnFatalError` in
+   * ValueDeserializer) — especially on 8 GB machines. The slide stores a
+   * `/media/<id>` URL; the display server already knows how to serve it.
+   *
+   * Unlike `importPaths`, this *does* write a copy: the original stays where
+   * it is, and the playable file is the resized one. `locate` therefore uses
+   * `file`, not `sourcePath`.
+   */
+  function importOptimizedImage(sourcePath) {
+    ensureDir();
+    if (!sourcePath || !fs.existsSync(sourcePath)) {
+      return { ok: false, error: 'File not found' };
+    }
+    const stat = fs.statSync(sourcePath);
+    if (stat.isDirectory()) return { ok: false, error: 'Choose a file, not a folder' };
+    if (stat.size > MAX_SOURCE_BYTES) {
+      return { ok: false, error: 'That image is over 80 MB. Export a 1920×1080 JPEG and try again.' };
+    }
+
+    const rawExt = path.extname(sourcePath);
+    const ext = rawExt.toLowerCase();
+    if (!IMAGE_EXTS.has(ext)) {
+      return { ok: false, error: `Unsupported image type (${ext || 'no extension'})` };
+    }
+
+    const optimized = optimizeImageFile(sourcePath, ext, stat.size);
+    if (!optimized.ok) return optimized;
+
+    const id = crypto.randomUUID();
+    const destName = id + optimized.ext;
+    const destPath = path.join(mediaDir, destName);
+    fs.writeFileSync(destPath, optimized.buffer);
+
+    const items = readIndex();
+    const item = {
+      id,
+      file: destName,
+      name: path.basename(sourcePath, rawExt),
+      type: 'image',
+      size: optimized.buffer.length,
+      addedAt: Date.now(),
+      url: '/media/' + id,
+    };
+    items.push(item);
+    writeIndex(items);
+    return { ok: true, item: { ...item, missing: false } };
   }
 
   function importPaths(paths) {
@@ -231,7 +343,7 @@ function createMediaService({ app }) {
     return { ok: true };
   }
 
-  return { list, importPaths, relink, remove, rename, resolve, clearAll, mediaDir, IMAGE_EXTS, VIDEO_EXTS };
+  return { list, importPaths, importOptimizedImage, relink, remove, rename, resolve, clearAll, mediaDir, IMAGE_EXTS, VIDEO_EXTS };
 }
 
 module.exports = { createMediaService, IMAGE_EXTS, VIDEO_EXTS };

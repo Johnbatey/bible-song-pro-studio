@@ -133,9 +133,26 @@
   bottom: 5%;
   z-index: 2;
   padding: 24px 34px;
+  overflow: hidden;
   border-radius: var(--bsp-r-base, 4px);
   background: linear-gradient(135deg, rgba(10, 18, 32, .94), rgba(37, 52, 78, .94));
+  background-position: center;
+  background-repeat: no-repeat;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .36);
+}
+
+.program-lt-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.program-lower-third > :not(.program-lt-media) {
+  position: relative;
+  z-index: 1;
 }
 
 .program-lt-text {

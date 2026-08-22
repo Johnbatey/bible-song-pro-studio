@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import type { Theme } from '../types';
-import { v4 as uuid } from 'uuid';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton } from './Block';
-import { AppleToggle } from './AppleToggle';
-import { MediaGrid } from './MediaGrid';
-import { gradientCss, parseBackgroundInfo } from '../utils/background';
+import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
+import { assetUrl } from '../utils/asset-url';
+import { ThemeEditorForm, type ThemeSurface } from './ThemeEditorForm';
 
 const PRESET_THEMES: Theme[] = [
   {
@@ -414,6 +413,7 @@ export function ThemePanel() {
   const activeTheme = useAppStore((s) => s.activeTheme);
   const setActiveTheme = useAppStore((s) => s.setActiveTheme);
   const [editTheme, setEditTheme] = useState<Theme | null>(null);
+  const [editSurface, setEditSurface] = useState<ThemeSurface>('full');
   /* Which output each card is previewing. Per card, not one setting for the
      grid: comparing two themes usually means looking at the same output on
      both, but checking one theme's lower third should not reframe the other
@@ -421,6 +421,11 @@ export function ThemePanel() {
      is. */
   const [thumbMode, setThumbMode] = useState<Record<string, ThumbMode>>({});
   const thumbModeFor = (id: string): ThumbMode => thumbMode[id] ?? 'full';
+
+  const openEditor = (theme: Theme, surface: ThemeSurface = 'full') => {
+    setEditSurface(surface);
+    setEditTheme(theme);
+  };
 
   // Combine default preset themes with custom user created/modified themes smoothly
   const themeMap = new Map<string, Theme>();
@@ -484,7 +489,7 @@ export function ThemePanel() {
           tools={(
             <>
               {activeTheme && (
-                <BlockButton onClick={() => setEditTheme(activeTheme)}>
+                <BlockButton onClick={() => openEditor(activeTheme, thumbModeFor(activeTheme.id))}>
                   Customize Active
                 </BlockButton>
               )}
@@ -530,7 +535,7 @@ export function ThemePanel() {
                   };
                   addTheme(t);
                   setActiveTheme(t);
-                  setEditTheme(t);
+                  openEditor(t, 'full');
                 }}
               >
                 + Custom Design
@@ -605,7 +610,7 @@ export function ThemePanel() {
                          which is why the click stops here. */
                       onClick={(event) => {
                         event.stopPropagation();
-                        setEditTheme(theme);
+                        openEditor(theme, thumbModeFor(theme.id));
                       }}
                     >
                       Edit Design
@@ -631,6 +636,7 @@ export function ThemePanel() {
         /* PAGE 2: PRESET EDITOR VIEW */
         <Block
           title={<>Edit Design: <span style={{ color: 'var(--accent)' }}>{editTheme.name}</span></>}
+          bodyStyle={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
           tools={(
             <>
               <BlockButton onClick={() => setEditTheme(null)}>← Presets</BlockButton>
@@ -646,7 +652,7 @@ export function ThemePanel() {
             <div style={styles.editorCard}>
               <div style={styles.editorHeader}>
                 <label style={styles.nameField}>
-                  <span style={styles.nameLabel}>Design Preset Name</span>
+                  <span style={styles.nameLabel}>Design name</span>
                   <input
                     className="input"
                     value={editTheme.name}
@@ -655,35 +661,50 @@ export function ThemePanel() {
                   />
                 </label>
               </div>
-              <div style={styles.editorBody}>
-                {/* Column 1: FULL SCREEN (Left Column) */}
-                <div style={styles.editorColumn}>
-                  <div className="section-title" style={{ color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span className="badge" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>FULL SCREEN</span>
-                  </div>
-                  <ThemeFormSection
-                    allowMedia
-                    values={editTheme.fullScreen}
-                    onChange={(updates) => applyThemeEdit({
-                      ...editTheme,
-                      fullScreen: { ...editTheme.fullScreen, ...updates },
-                    })}
-                  />
-                </div>
 
-                {/* Column 2: LOWER THIRD (Right Column) */}
-                <div style={styles.editorColumn}>
-                  <div className="section-title" style={{ color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span className="badge" style={{ background: 'var(--blue-dim)', color: 'var(--blue)' }}>LOWER THIRD</span>
-                  </div>
-                  <ThemeFormSection
-                    values={editTheme.lowerThird}
-                    onChange={(updates) => applyThemeEdit({
-                      ...editTheme,
-                      lowerThird: { ...editTheme.lowerThird, ...updates },
-                    })}
-                  />
-                </div>
+              <div style={styles.editorPreview}>
+                <ThemeThumbnailPreview theme={editTheme} mode={editSurface} />
+              </div>
+
+              <div style={styles.surfaceTabs} role="tablist" aria-label="Output to edit">
+                {THUMB_MODES.map((option) => {
+                  const selected = editSurface === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setEditSurface(option.id)}
+                      style={{
+                        ...styles.surfaceTab,
+                        background: selected ? option.tint : 'transparent',
+                        color: selected ? option.color : 'var(--text-dim)',
+                        fontWeight: selected ? fontWeight.semibold : fontWeight.medium,
+                      }}
+                    >
+                      {option.id === 'full' ? 'Full screen' : 'Lower third'}
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={styles.surfaceHint}>
+                {editSurface === 'full'
+                  ? 'Editing the full-stage look — colour, still or clip behind the verse.'
+                  : 'Editing the banner only. An image here fills the lower third, not the whole screen.'}
+              </p>
+
+              <div style={styles.editorBody}>
+                <ThemeEditorForm
+                  key={editSurface}
+                  surface={editSurface}
+                  values={editSurface === 'full' ? editTheme.fullScreen : editTheme.lowerThird}
+                  onChange={(updates) => applyThemeEdit(
+                    editSurface === 'full'
+                      ? { ...editTheme, fullScreen: { ...editTheme.fullScreen, ...updates } }
+                      : { ...editTheme, lowerThird: { ...editTheme.lowerThird, ...updates } },
+                  )}
+                />
               </div>
             </div>
         </Block>
@@ -717,9 +738,16 @@ const TRANSPARENCY_CHECKS = {
 };
 
 function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode }) {
+  const assetBaseUrl = useAssetBaseUrl();
   const fs = theme.fullScreen;
   const lt = theme.lowerThird;
 
+  const mediaSrc = fs.backgroundMediaUrl
+    ? assetUrl(fs.backgroundMediaUrl, assetBaseUrl)
+    : '';
+  const ltMediaSrc = lt.backgroundMediaUrl
+    ? assetUrl(lt.backgroundMediaUrl, assetBaseUrl)
+    : '';
   const fsBg = fs.background || fs.backgroundColor || '#0c0e14';
   const ltBg = lt.background || lt.backgroundColor || 'linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(5, 7, 13, 0.95))';
   const ltRadius = lt.borderRadius ? Math.min(6, Math.max(2, lt.borderRadius / 4)) : 4;
@@ -758,6 +786,22 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
         boxSizing: 'border-box',
       }}
     >
+      {showFull && mediaSrc && fs.backgroundMediaType === 'image' && (
+        <img
+          src={mediaSrc}
+          alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fs.backgroundFit || 'cover', pointerEvents: 'none' }}
+        />
+      )}
+      {showFull && mediaSrc && fs.backgroundMediaType === 'video' && (
+        <video
+          src={mediaSrc}
+          muted
+          playsInline
+          preload="metadata"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fs.backgroundFit || 'cover', pointerEvents: 'none' }}
+        />
+      )}
       {/* Full Screen Content Preview */}
       {showFull && (
       <div
@@ -768,6 +812,8 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
           justifyContent: 'center',
           flex: 1,
           width: '100%',
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         <div
@@ -811,6 +857,11 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
           width: ltWidth,
           margin: '0 auto',
           background: ltBg,
+          backgroundImage: ltMediaSrc && lt.backgroundMediaType === 'image'
+            ? `url("${ltMediaSrc.replace(/"/g, '%22')}")`
+            : undefined,
+          backgroundSize: lt.backgroundFit || 'cover',
+          backgroundPosition: 'center',
           borderRadius: ltRadius,
           padding: '4px 8px',
           boxSizing: 'border-box',
@@ -818,8 +869,19 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
           flexDirection: 'column',
           alignItems: ltTextAlign === 'right' ? 'flex-end' : ltTextAlign === 'center' ? 'center' : 'flex-start',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
+        {ltMediaSrc && lt.backgroundMediaType === 'video' && (
+          <video
+            src={ltMediaSrc}
+            muted
+            playsInline
+            preload="metadata"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: lt.backgroundFit || 'cover', pointerEvents: 'none' }}
+          />
+        )}
         <div
           style={{
             fontFamily: lt.fontFamily || fs.fontFamily,
@@ -833,6 +895,8 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
             maxWidth: '100%',
             textAlign: ltTextAlign,
             textShadow: ltShadowCss,
+            position: 'relative',
+            zIndex: 1,
           }}
         >
           In the beginning God created the heaven
@@ -847,545 +911,14 @@ function ThemeThumbnailPreview({ theme, mode }: { theme: Theme; mode: ThumbMode 
             marginTop: 2,
             textAlign: ltTextAlign,
             textShadow: ltShadowCss,
+            position: 'relative',
+            zIndex: 1,
           }}
         >
           Genesis 1:1 (KJV)
         </div>
       </div>
       )}
-    </div>
-  );
-}
-
-/* `allowMedia` is the full-screen column only. A lower third is a band drawn
-   over whatever is already on the projector; giving it its own clip would put
-   a second video behind the band and on top of the one already playing. */
-function ThemeFormSection({ values, onChange, allowMedia = false }: { values: any; onChange: (updates: any) => void; allowMedia?: boolean }) {
-  const safeInt = (val: string, fallback = 0) => {
-    if (val === '' || val === undefined || val === null) return 0;
-    const parsed = parseInt(val, 10);
-    return isNaN(parsed) ? 0 : parsed;
-  };
-
-  const bgInfo = parseBackgroundInfo(values.background, values.backgroundColor);
-  /* Media, when set, is the type regardless of what `backgroundType` says —
-     the resolver reads it first, so the editor has to agree or the dropdown
-     would show "Gradient" over a clip that is actually playing. */
-  const currentBgType = values.backgroundMediaUrl && values.backgroundMediaType
-    ? values.backgroundMediaType
-    : values.backgroundType || bgInfo.type;
-
-  // Preserve gradient properties across background type switches so switching back to Gradient restores previous colors
-  const lastGradStart = values.gradientStart || (bgInfo.type === 'gradient' ? bgInfo.start : undefined) || values.savedGradientStart || '#0f172a';
-  const lastGradEnd = values.gradientEnd || (bgInfo.type === 'gradient' ? bgInfo.end : undefined) || values.savedGradientEnd || '#312e81';
-  const lastGradDir = values.gradientDirection || (bgInfo.type === 'gradient' ? bgInfo.dir : undefined) || values.savedGradientDir || '135deg';
-
-  const currentStart = lastGradStart;
-  const currentEnd = lastGradEnd;
-  const currentDir = lastGradDir;
-  const currentSolid = values.backgroundColor && values.backgroundColor !== 'transparent'
-    ? values.backgroundColor
-    : values.savedSolidColor || (bgInfo.type === 'solid' ? bgInfo.color : undefined) || '#0c0e14';
-  const currentOpacity = typeof values.backgroundOpacity === 'number' ? values.backgroundOpacity : 0.95;
-
-  /* Leaving media behind has to erase it, not just stop pointing at it: the
-     resolver checks backgroundMediaUrl before any colour, so a stale url would
-     keep the old clip on screen under a solid the operator just picked. */
-  const CLEAR_MEDIA = { backgroundMediaUrl: '', backgroundMediaType: undefined };
-
-  const handleBgTypeChange = (newType: string) => {
-    if (newType === 'image' || newType === 'video') {
-      /* No file yet — the grid below asks. Type is staged so the grid knows
-         which half of the library to show. */
-      onChange({
-        backgroundMediaType: newType,
-        backgroundMediaUrl: values.backgroundMediaUrl || '',
-        savedGradientStart: currentStart,
-        savedGradientEnd: currentEnd,
-        savedGradientDir: currentDir,
-        savedSolidColor: currentSolid,
-      });
-    } else if (newType === 'transparent') {
-      onChange({
-        ...CLEAR_MEDIA,
-        backgroundType: 'transparent',
-        background: 'transparent',
-        backgroundColor: 'transparent',
-        savedGradientStart: currentStart,
-        savedGradientEnd: currentEnd,
-        savedGradientDir: currentDir,
-        savedSolidColor: currentSolid,
-      });
-    } else if (newType === 'solid') {
-      const solidColor = currentSolid && currentSolid !== 'transparent' ? currentSolid : currentStart;
-      onChange({
-        ...CLEAR_MEDIA,
-        backgroundType: 'solid',
-        background: solidColor,
-        backgroundColor: solidColor,
-        gradientStart: currentStart,
-        gradientEnd: currentEnd,
-        gradientDirection: currentDir,
-        savedGradientStart: currentStart,
-        savedGradientEnd: currentEnd,
-        savedGradientDir: currentDir,
-        savedSolidColor: solidColor,
-      });
-    } else if (newType === 'gradient') {
-      const start = currentStart;
-      const end = currentEnd;
-      const dir = currentDir;
-      const gradCss = gradientCss(start, end, dir);
-      onChange({
-        ...CLEAR_MEDIA,
-        backgroundType: 'gradient',
-        background: gradCss,
-        backgroundColor: start,
-        gradientStart: start,
-        gradientEnd: end,
-        gradientDirection: dir,
-        savedGradientStart: start,
-        savedGradientEnd: end,
-        savedGradientDir: dir,
-        savedSolidColor: currentSolid,
-      });
-    }
-  };
-
-  const handleGradientChange = (updates: { start?: string; end?: string; dir?: string }) => {
-    const s = updates.start ?? currentStart;
-    const e = updates.end ?? currentEnd;
-    const d = updates.dir ?? currentDir;
-    const gradCss = gradientCss(s, e, d);
-    onChange({
-      backgroundType: 'gradient',
-      background: gradCss,
-      backgroundColor: s,
-      gradientStart: s,
-      gradientEnd: e,
-      gradientDirection: d,
-      savedGradientStart: s,
-      savedGradientEnd: e,
-      savedGradientDir: d,
-    });
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div>
-        <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Family</label>
-        <select
-          className="input"
-          value={values.fontFamily || ''}
-          onChange={(e) => onChange({ fontFamily: e.target.value })}
-        >
-          <option value="-apple-system, SF Pro Display, sans-serif">SF Pro Display</option>
-          <option value="Inter, sans-serif">Inter</option>
-          <option value="Georgia, serif">Georgia</option>
-          <option value="'Playfair Display', serif">Playfair Display</option>
-          <option value="'Montserrat', sans-serif">Montserrat</option>
-        </select>
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Size</label>
-          <input
-            className="input"
-            type="number"
-            value={values.fontSize === 0 ? '' : (values.fontSize ?? '')}
-            onChange={(e) => onChange({ fontSize: safeInt(e.target.value, 32) })}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Weight</label>
-          <select
-            className="input"
-            value={values.fontWeight || 400}
-            onChange={(e) => onChange({ fontWeight: safeInt(e.target.value, 400) })}
-          >
-            <option value="300">Light (300)</option>
-            <option value="400">Regular (400)</option>
-            <option value="500">Medium (500)</option>
-            <option value="600">Semi-Bold (600)</option>
-            <option value="700">Bold (700)</option>
-            <option value="800">Extra Bold (800)</option>
-          </select>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Font Color</label>
-          <input
-            className="input"
-            type="color"
-            value={values.fontColor || '#ffffff'}
-            onChange={(e) => onChange({ fontColor: e.target.value })}
-            style={{ height: 34, padding: 2 }}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Animation</label>
-          <select
-            className="input"
-            value={values.animation || 'fadeIn'}
-            onChange={(e) => onChange({ animation: e.target.value })}
-          >
-            <option value="fadeIn">Fade In</option>
-            <option value="slideInLeft">Slide Left</option>
-            <option value="slideInRight">Slide Right</option>
-            <option value="slideInUp">Slide Up</option>
-            <option value="slideInDown">Slide Down</option>
-            <option value="zoomIn">Zoom In</option>
-            <option value="scaleIn">Scale In</option>
-            <option value="flipIn">Flip In</option>
-            {/* Bounce In and Elastic In are retired. Both overshot their
-                resting position, which is the one thing broadcast motion does
-                not do — a lower third that springs reads as amateur on air.
-                A theme saved with either still opens and still plays; it just
-                plays on the house curve, and the option says so rather than
-                disappearing and silently resetting the operator's choice. */}
-            {(values.animation === 'bounceIn' || values.animation === 'elasticIn') && (
-              <option value={values.animation}>
-                {values.animation === 'bounceIn' ? 'Bounce In' : 'Elastic In'} (retired)
-              </option>
-            )}
-          </select>
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Ref Font Size</label>
-          <input
-            className="input"
-            type="number"
-            value={values.referenceFontSize === 0 ? '' : (values.referenceFontSize ?? '')}
-            onChange={(e) => onChange({ referenceFontSize: safeInt(e.target.value, 26) })}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Text Alignment</label>
-          <select
-            className="input"
-            value={values.textAlign || 'center'}
-            onChange={(e) => onChange({ textAlign: e.target.value })}
-          >
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Reference Color & Sync to Verse Option */}
-      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', marginTop: 2 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Reference Color</label>
-          <input
-            className="input"
-            type="color"
-            disabled={Boolean(values.syncRefColor)}
-            value={values.syncRefColor ? (values.fontColor || '#ffffff') : (values.referenceColor || values.savedRefColor || values.accentColor || '#C9A96E')}
-            onChange={(e) => onChange({ referenceColor: e.target.value, savedRefColor: e.target.value, syncRefColor: false })}
-            style={{ height: 34, padding: 2, opacity: values.syncRefColor ? 0.4 : 1, cursor: values.syncRefColor ? 'not-allowed' : 'pointer' }}
-          />
-        </div>
-        <div style={{ flex: 1, paddingBottom: 6 }}>
-          <AppleToggle
-            label="Sync to Verse"
-            checked={Boolean(values.syncRefColor)}
-            onChange={(checked) => {
-              const rememberedRefColor = values.referenceColor && values.referenceColor !== values.fontColor
-                ? values.referenceColor
-                : (values.savedRefColor || values.accentColor || '#FFCF66');
-              onChange({
-                syncRefColor: checked,
-                savedRefColor: rememberedRefColor,
-                referenceColor: checked ? (values.fontColor || '#ffffff') : rememberedRefColor,
-              });
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Text Shadow Controls Block */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)', marginTop: 2 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: values.textShadowEnabled ? 6 : 0 }}>
-          <span style={{ ...type.label, color: 'var(--text-dim)', fontWeight: 600 }}>Text Shadow</span>
-          <AppleToggle
-            label="Enable Shadow"
-            checked={Boolean(values.textShadowEnabled)}
-            onChange={(checked) => onChange({ textShadowEnabled: checked })}
-          />
-        </div>
-
-        {values.textShadowEnabled && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Shadow Level</label>
-                <select
-                  className="input"
-                  value={values.textShadowLevel || 'medium'}
-                  onChange={(e) => {
-                    const lvl = e.target.value;
-                    const blur = lvl === 'heavy' ? 16 : lvl === 'subtle' ? 4 : 8;
-                    onChange({ textShadowLevel: lvl, textShadowBlur: blur });
-                  }}
-                >
-                  <option value="subtle">Subtle (Soft Drop)</option>
-                  <option value="medium">Medium (Broadcast Sharp)</option>
-                  <option value="heavy">Heavy (Deep Glow)</option>
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Shadow Color</label>
-                <input
-                  className="input"
-                  type="color"
-                  value={values.textShadowColor || '#000000'}
-                  onChange={(e) => onChange({ textShadowColor: e.target.value })}
-                  style={{ height: 34, padding: 2 }}
-                />
-              </div>
-            </div>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                <label style={{ ...type.label, color: 'var(--text-dim)' }}>Blur Radius</label>
-                <span style={{ ...type.caption, color: 'var(--text-dim)' }}>{values.textShadowBlur ?? 8}px</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="30"
-                value={values.textShadowBlur ?? 8}
-                onChange={(e) => onChange({ textShadowBlur: safeInt(e.target.value, 8) })}
-                style={{ width: '100%' }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Background Style Editor */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', padding: 10, borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
-        <div style={{ ...type.label, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span>Background Style</span>
-          <span className="badge" style={{ fontSize: 10 }}>{currentBgType.toUpperCase()}</span>
-        </div>
-
-        {/* Live Swatch Preview */}
-        <div
-          style={{
-            height: 36,
-            borderRadius: 6,
-            marginBottom: 10,
-            border: '1px solid rgba(255,255,255,0.1)',
-            background: values.background || values.backgroundColor || '#0c0e14',
-            opacity: currentOpacity,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontSize: 11,
-            fontWeight: 600,
-            textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-          }}
-        >
-          {currentBgType === 'image' ? 'Image Background'
-            : currentBgType === 'video' ? 'Video Background'
-            : currentBgType === 'gradient' ? 'Gradient Preview'
-            : currentBgType === 'transparent' ? 'Transparent'
-            : 'Solid Preview'}
-        </div>
-
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Background Type</label>
-            <select
-              className="input"
-              value={currentBgType}
-              onChange={(e) => handleBgTypeChange(e.target.value)}
-            >
-              <option value="solid">Solid Color</option>
-              <option value="gradient">Gradient</option>
-              {allowMedia && <option value="image">Image</option>}
-              {allowMedia && <option value="video">Video</option>}
-              <option value="transparent">Transparent</option>
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Opacity ({Math.round(currentOpacity * 100)}%)</label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={currentOpacity}
-              onChange={(e) => onChange({ backgroundOpacity: parseFloat(e.target.value) })}
-              style={{ width: '100%', marginTop: 8 }}
-            />
-          </div>
-        </div>
-
-        {allowMedia && (currentBgType === 'image' || currentBgType === 'video') && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <MediaGrid
-              kind={currentBgType}
-              selectedUrl={values.backgroundMediaUrl || ''}
-              onSelect={(item) => onChange({
-                backgroundMediaUrl: item.url,
-                backgroundMediaType: item.type,
-                backgroundFit: values.backgroundFit || 'cover',
-              })}
-            />
-            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Fit</label>
-                <select
-                  className="input"
-                  value={values.backgroundFit || 'cover'}
-                  onChange={(e) => onChange({ backgroundFit: e.target.value })}
-                >
-                  <option value="cover">Cover</option>
-                  <option value="contain">Contain</option>
-                  <option value="fill">Stretch</option>
-                </select>
-              </div>
-              {currentBgType === 'video' && (
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, ...type.caption, color: 'var(--text-secondary)', paddingBottom: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={values.backgroundLoop !== false}
-                    onChange={(e) => onChange({ backgroundLoop: e.target.checked })}
-                  />
-                  Loop
-                </label>
-              )}
-            </div>
-          </div>
-        )}
-
-        {currentBgType === 'solid' && (
-          <div>
-            <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Solid Fill Color</label>
-            <input
-              className="input"
-              type="color"
-              value={currentSolid.startsWith('#') ? currentSolid : '#0c0e14'}
-              onChange={(e) => onChange({ backgroundColor: e.target.value, background: e.target.value })}
-              style={{ height: 34, padding: 2, width: '100%' }}
-            />
-          </div>
-        )}
-
-        {currentBgType === 'gradient' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {/* Gradient Presets */}
-            <div>
-              <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>Gradient Presets</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-                {[
-                  { name: 'Sapphire', start: '#0f172a', end: '#312e81', dir: '135deg' },
-                  { name: 'Purple', start: '#1a0033', end: '#7b1fa2', dir: '135deg' },
-                  { name: 'Emerald', start: '#001a0a', end: '#178e4c', dir: '135deg' },
-                  { name: 'Crimson', start: '#1b0000', end: '#e65100', dir: '135deg' },
-                  { name: 'Gold', start: '#1a140a', end: '#c9a96e', dir: '135deg' },
-                  { name: 'Midnight', start: '#070913', end: '#0f172a', dir: '180deg' },
-                ].map((p) => (
-                  <button
-                    key={p.name}
-                    type="button"
-                    className="btn btn-sm btn-secondary"
-                    style={{ fontSize: 10, padding: '3px 6px', background: `linear-gradient(${p.dir}, ${p.start}, ${p.end})`, color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
-                    onClick={() => handleGradientChange({ start: p.start, end: p.end, dir: p.dir })}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 6 }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Start Color</label>
-                <input
-                  className="input"
-                  type="color"
-                  value={currentStart.startsWith('#') ? currentStart : '#0f172a'}
-                  onChange={(e) => handleGradientChange({ start: e.target.value })}
-                  style={{ height: 32, padding: 2 }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>End Color</label>
-                <input
-                  className="input"
-                  type="color"
-                  value={currentEnd.startsWith('#') ? currentEnd : '#312e81'}
-                  onChange={(e) => handleGradientChange({ end: e.target.value })}
-                  style={{ height: 32, padding: 2 }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Direction</label>
-                <select
-                  className="input"
-                  value={currentDir}
-                  onChange={(e) => handleGradientChange({ dir: e.target.value })}
-                >
-                  <option value="135deg">Diagonal (135°)</option>
-                  <option value="180deg">Top to Bottom (180°)</option>
-                  <option value="90deg">Left to Right (90°)</option>
-                  <option value="45deg">Reverse Diag (45°)</option>
-                  <option value="radial">Radial Circle</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', gap: 6 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Radius</label>
-          <input
-            className="input"
-            type="number"
-            value={values.borderRadius === 0 ? '' : (values.borderRadius ?? '')}
-            onChange={(e) => onChange({ borderRadius: safeInt(e.target.value, 0) })}
-          />
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Width %</label>
-          <input
-            className="input"
-            type="number"
-            max="100"
-            value={values.width === 0 ? '' : (values.width ?? '')}
-            onChange={(e) => onChange({ width: safeInt(e.target.value, 75) })}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Position X (px)</label>
-          <input
-            className="input"
-            type="number"
-            value={values.offsetX === 0 ? '' : (values.offsetX ?? '')}
-            onChange={(e) => onChange({ offsetX: safeInt(e.target.value, 0) })}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Position Y (px)</label>
-          <input
-            className="input"
-            type="number"
-            value={values.offsetY === 0 ? '' : (values.offsetY ?? '')}
-            onChange={(e) => onChange({ offsetY: safeInt(e.target.value, 0) })}
-          />
-        </div>
-      </div>
     </div>
   );
 }
@@ -1414,7 +947,14 @@ const styles: Record<string, React.CSSProperties> = {
   editorCard: {
     display: 'flex',
     flexDirection: 'column',
+    flex: 1,
     minHeight: 0,
+  },
+  editorPreview: {
+    flexShrink: 0,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   editorHeader: {
     flexShrink: 0,
@@ -1436,14 +976,36 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-dim)',
   },
   editorBody: {
+    flex: 1,
     minHeight: 0,
     overflowY: 'auto',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: 16,
+    display: 'flex',
+    flexDirection: 'column',
     paddingRight: 4,
+    paddingBottom: 16,
   },
-  editorColumn: {
-    minWidth: 0,
+  surfaceTabs: {
+    display: 'flex',
+    gap: 4,
+    padding: 3,
+    marginTop: 4,
+    borderRadius: 8,
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.06)',
+  },
+  surfaceTab: {
+    flex: 1,
+    border: 'none',
+    borderRadius: 6,
+    padding: '8px 10px',
+    fontSize: 12,
+    cursor: 'pointer',
+    letterSpacing: '0.02em',
+  },
+  surfaceHint: {
+    ...type.caption,
+    color: 'var(--text-dim)',
+    margin: '8px 0 12px',
+    lineHeight: 1.4,
   },
 };

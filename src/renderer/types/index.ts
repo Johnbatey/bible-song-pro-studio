@@ -273,6 +273,11 @@ export interface LowerThirdTheme {
   scale?: number;
   anchor?: 'top' | 'bottom';
   referenceFontSize?: number;
+  /** Server-relative, e.g. `/media/<id>` — fills the banner only, not the page. */
+  backgroundMediaUrl?: string;
+  backgroundMediaType?: 'image' | 'video';
+  backgroundFit?: 'cover' | 'contain' | 'fill';
+  backgroundLoop?: boolean;
 }
 
 export interface FullScreenTheme {
@@ -827,6 +832,10 @@ declare global {
         load: () => Promise<{ ok: boolean; state: string | null; error?: string }>;
         save: (value: string) => Promise<{ ok: boolean }>;
         clear: () => Promise<{ ok: boolean }>;
+        broadcast?: (snapshot: unknown) => void;
+        requestSync?: () => void;
+        onRemote?: (cb: (snapshot: any) => void) => () => void;
+        onSyncRequest?: (cb: () => void) => () => void;
       };
       settings: {
         get: () => Promise<{ ok: boolean; settings: AppSettings }>;
@@ -854,6 +863,7 @@ declare global {
         list: () => Promise<{ ok: boolean; items: MediaItem[] }>;
         pick: () => Promise<MediaImportResult>;
         import: (paths: string[]) => Promise<MediaImportResult>;
+        importOptimized: (filePath: string) => Promise<{ ok: boolean; item?: MediaItem; error?: string }>;
         remove: (id: string) => Promise<{ ok: boolean; error?: string }>;
         rename: (id: string, name: string) => Promise<{ ok: boolean; item?: MediaItem }>;
         relink: (id: string, path: string) => Promise<{ ok: boolean; item?: MediaItem; error?: string }>;
@@ -888,6 +898,10 @@ declare global {
          * an unsubscribe function.
          */
         onResetLayout: (cb: () => void) => () => void;
+        popOut: (id: string) => Promise<{ ok: boolean; error?: string }>;
+        focusPopout: (id: string) => Promise<{ ok: boolean }>;
+        listPopouts: () => Promise<string[]>;
+        onPopoutsChanged: (cb: (ids: string[]) => void) => () => void;
       };
       /** Named dock arrangements. See WorkspaceBridge. */
       workspace?: {

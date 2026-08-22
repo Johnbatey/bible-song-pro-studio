@@ -1,9 +1,12 @@
-import type { Alert, Scene, FullScreenTheme, Theme, VideoTransport, AppSettings } from '../../types';
+import type { Alert, Scene, FullScreenTheme, LowerThirdTheme, Theme, VideoTransport, AppSettings } from '../../types';
 import { memo, useEffect, useRef } from 'react';
 import type React from 'react';
 import { SlideStage } from './SlideStage';
 import { attachAudioOutputSink } from '../../utils/audio-output';
+import { assetUrl } from '../../utils/asset-url';
 import './ProgramSurface.css';
+
+export { assetUrl };
 
 export interface ProgramSurfaceState {
   scene?: Scene | null;
@@ -66,24 +69,6 @@ const defaultTheme: Pick<ProgramSurfaceState, 'fontFamily' | 'fontSize' | 'fontW
   referenceColor: '#e8541a',
   referenceFontSize: 0,
 };
-
-/**
- * Resolves a scene's stored media path against the origin serving it.
- *
- * Scenes hold server-relative paths on purpose — an absolute URL would pin a
- * saved service to whatever port the display server happened to hold that day
- * — so every surface that loads one has to supply the origin. Exported because
- * the stage now loads the same media into its own zones and must resolve it the
- * identical way; two spellings of this would be two ways to get a broken image.
- */
-export function assetUrl(value: string | undefined, assetBaseUrl = '') {
-  if (!value) return '';
-  if (/^(https?:|file:|data:|blob:)/i.test(value)) return value;
-  const base = assetBaseUrl || '';
-  if (!base) return value;
-  if (value.startsWith('/')) return `${base}${value}`;
-  return `${base}/${value}`;
-}
 
 function displayFontSize(state: ProgramSurfaceState, preview: boolean) {
   if (state.fontSize && state.fontSize > 0) return `${state.fontSize}px`;
@@ -176,6 +161,46 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
   }
 
   return style;
+}
+
+function lowerThirdBandStyle(lt: LowerThirdTheme | undefined, assetBaseUrl?: string): React.CSSProperties {
+  const mediaUrl = lt?.backgroundMediaUrl ? assetUrl(lt.backgroundMediaUrl, assetBaseUrl) : '';
+  const hasImage = Boolean(mediaUrl && lt?.backgroundMediaType === 'image');
+  const hasVideo = Boolean(mediaUrl && lt?.backgroundMediaType === 'video');
+  const fit = lt?.backgroundFit === 'fill' ? '100% 100%' : (lt?.backgroundFit || 'cover');
+
+  if (hasImage) {
+    return {
+      backgroundColor: '#000',
+      backgroundImage: `url("${mediaUrl.replace(/"/g, '%22')}")`,
+      backgroundSize: fit,
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+    };
+  }
+
+  if (hasVideo) {
+    return { backgroundColor: '#000', backgroundImage: 'none' };
+  }
+
+  return { background: lt?.background || undefined };
+}
+
+function lowerThirdBandMedia(lt: LowerThirdTheme | undefined, assetBaseUrl?: string) {
+  const mediaUrl = lt?.backgroundMediaUrl ? assetUrl(lt.backgroundMediaUrl, assetBaseUrl) : '';
+  if (!mediaUrl || lt?.backgroundMediaType !== 'video') return null;
+  const fit = lt.backgroundFit === 'contain' ? 'contain' : lt.backgroundFit === 'fill' ? 'fill' : 'cover';
+  return (
+    <video
+      className="program-lt-media"
+      src={mediaUrl}
+      autoPlay
+      muted
+      loop={lt.backgroundLoop !== false}
+      playsInline
+      style={{ objectFit: fit }}
+    />
+  );
 }
 
 function fullscreenJustify(value: FullScreenTheme['verticalAlign'] | undefined) {
@@ -416,7 +441,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
         <div
           className="program-lower-third"
           style={{
-            background: state.theme?.lowerThird?.background || undefined,
+            ...lowerThirdBandStyle(state.theme?.lowerThird, assetBaseUrl),
             borderRadius: state.theme?.lowerThird?.borderRadius,
             width: ltWidth ? `${ltWidth}%` : undefined,
             left: ltWidth ? '50%' : undefined,
@@ -425,6 +450,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
             textAlign: isCompare ? dualTextAlign : textAlign,
           }}
         >
+          {lowerThirdBandMedia(state.theme?.lowerThird, assetBaseUrl)}
           {isCompare ? (
             <div
               className="program-compare-lt"

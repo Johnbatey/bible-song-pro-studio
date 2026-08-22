@@ -206,7 +206,7 @@ export function SettingsPanel() {
               {displayNotice && (
                 <div style={{ ...type.caption, color: 'var(--text-dim)', margin: '6px 0' }}>{displayNotice}</div>
               )}
-              <input className="input" value={displayUrl || display.outputStatus.browserUrl || 'http://localhost:8942/display.html'} readOnly onClick={(e) => (e.target as HTMLInputElement).select()} />
+              <input className="input" value={displayUrl || display.outputStatus.browserUrl || 'http://127.0.0.1:8942/display.html'} readOnly onClick={(e) => (e.target as HTMLInputElement).select()} />
               <div style={styles.statusLine}>Internal output: {display.outputStatus.url || 'Electron IPC display'} · Open: {String(display.outputStatus.isOpen)} · Browser clients: {display.outputStatus.clients}</div>
               <div style={styles.row}>
                 <button
