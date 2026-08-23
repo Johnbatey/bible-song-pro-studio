@@ -141,9 +141,13 @@ export function ThemeEditorForm({
   };
 
   const bgInfo = parseBackgroundInfo(values.background, values.backgroundColor);
-  const currentBgType = values.backgroundMediaUrl && values.backgroundMediaType
-    ? values.backgroundMediaType
-    : values.backgroundType || bgInfo.type;
+  /* Media type wins even before a file is chosen — otherwise picking Image
+     from the dropdown leaves backgroundType on gradient/solid, the select
+     snaps back, and the import grid never appears. */
+  const currentBgType =
+    values.backgroundMediaType === 'image' || values.backgroundMediaType === 'video'
+      ? values.backgroundMediaType
+      : (values.backgroundType || bgInfo.type);
 
   const lastGradStart = values.gradientStart || (bgInfo.type === 'gradient' ? bgInfo.start : undefined) || values.savedGradientStart || '#0f172a';
   const lastGradEnd = values.gradientEnd || (bgInfo.type === 'gradient' ? bgInfo.end : undefined) || values.savedGradientEnd || '#312e81';
@@ -162,6 +166,7 @@ export function ThemeEditorForm({
   const handleBgTypeChange = (newType: string) => {
     if (newType === 'image' || newType === 'video') {
       onChange({
+        backgroundType: newType,
         backgroundMediaType: newType,
         backgroundMediaUrl: values.backgroundMediaUrl || '',
         savedGradientStart: currentStart,
@@ -510,6 +515,11 @@ export function ThemeEditorForm({
 
         {(currentBgType === 'image' || currentBgType === 'video') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <p style={{ ...type.caption, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+              {surface === 'lt'
+                ? '1) Import or pick a file below. 2) Click its thumbnail so the banner preview shows it. The rest of the screen stays transparent.'
+                : '1) Import or pick a file below. 2) Click its thumbnail so the 16:9 preview shows it. 3) Make sure this design is the active theme (click its card in Presets).'}
+            </p>
             <MediaGrid
               kind={currentBgType}
               selectedUrl={values.backgroundMediaUrl || ''}

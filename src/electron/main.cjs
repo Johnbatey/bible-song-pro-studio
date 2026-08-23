@@ -596,7 +596,13 @@ function startHttpServer() {
     const pn = url.pathname;
 
     // Static files
-    if (pn === '/display.html' || pn === '/') { serveHtmlFile('display.html')(req, res); return; }
+    // ProgramSurface browser output (slides + verses). Legacy flat display.html
+    // stays available at /legacy-display.html for debugging.
+    if (pn === '/display.html' || pn === '/' || pn === '/browser-display.html') {
+      serveHtmlFile('browser-display.html')(req, res);
+      return;
+    }
+    if (pn === '/legacy-display.html') { serveHtmlFile('display.html')(req, res); return; }
     if (pn === '/remote.html') { serveHtmlFile('remote.html')(req, res); return; }
     if (pn.startsWith('/fonts/')) { serveStatic('fonts')(req, res, url); return; }
     if (pn.startsWith('/themes/')) { serveStatic('themes')(req, res, url); return; }
