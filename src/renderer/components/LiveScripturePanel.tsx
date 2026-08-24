@@ -557,6 +557,12 @@ export function LiveScripturePanel() {
     }
   }
 
+  function extractVerses(res: unknown): Array<{ book: string; chapter: number; verse: number; text: string; version?: string; reference?: string }> {
+    if (Array.isArray(res)) return res;
+    if (res && typeof res === 'object' && Array.isArray((res as any).verses)) return (res as any).verses;
+    return [];
+  }
+
   async function handleVersionChange(targetVersionId: string) {
     if (!targetVersionId) return;
     setVersion(targetVersionId);
@@ -572,8 +578,8 @@ export function LiveScripturePanel() {
         chapter: currentHit.chapter,
       }).catch(() => null);
 
-      const verses = (chapterRes as any)?.verses || [];
-      const matchedVerse = verses.find((v: any) => v.verse === currentHit.verse);
+      const verses = extractVerses(chapterRes);
+      const matchedVerse = verses.find((v) => Number(v.verse) === Number(currentHit.verse));
       const newText = matchedVerse?.text || currentHit.text;
 
       const updatedHit: BibleSearchResult = {
@@ -595,7 +601,7 @@ export function LiveScripturePanel() {
         const updatedSuggestions = await Promise.all(
           prevSuggestions.map(async (sug) => {
             if (sug.book === currentHit.book && sug.chapter === currentHit.chapter) {
-              const v = verses.find((x: any) => x.verse === sug.verse);
+              const v = verses.find((x) => Number(x.verse) === Number(sug.verse));
               return { ...sug, text: v?.text || sug.text, version: targetVersionId };
             }
             const chRes = await window.BSP?.bible?.getChapter({
@@ -603,7 +609,7 @@ export function LiveScripturePanel() {
               book: sug.book,
               chapter: sug.chapter,
             }).catch(() => null);
-            const v = ((chRes as any)?.verses || []).find((x: any) => x.verse === sug.verse);
+            const v = extractVerses(chRes).find((x) => Number(x.verse) === Number(sug.verse));
             return { ...sug, text: v?.text || sug.text, version: targetVersionId };
           })
         );
@@ -641,7 +647,7 @@ export function LiveScripturePanel() {
         chapter,
       }).catch(() => null);
 
-      const verses = (currentChapterRes as any)?.verses || [];
+      const verses = extractVerses(currentChapterRes);
       const maxVerse = verses.length || verse;
 
       if (command === 'first') {
@@ -658,7 +664,8 @@ export function LiveScripturePanel() {
             book,
             chapter: chapter + 1,
           }).catch(() => null);
-          if (nextChapterRes && (nextChapterRes as any)?.verses?.length > 0) {
+          const nextVerses = extractVerses(nextChapterRes);
+          if (nextVerses.length > 0) {
             targetChapter = chapter + 1;
             targetVerse = 1;
           } else {
@@ -682,7 +689,7 @@ export function LiveScripturePanel() {
               book,
               chapter: chapter - 1,
             }).catch(() => null);
-            const prevVerses = (prevChapterRes as any)?.verses || [];
+            const prevVerses = extractVerses(prevChapterRes);
             targetChapter = chapter - 1;
             targetVerse = prevVerses.length || 1;
           } else {
@@ -700,7 +707,7 @@ export function LiveScripturePanel() {
                 book: targetBook,
                 chapter: targetChapter,
               }).catch(() => null);
-              const targetVerses = (targetChapterRes as any)?.verses || [];
+              const targetVerses = extractVerses(targetChapterRes);
               targetVerse = targetVerses.length || 1;
             }
           }
@@ -716,8 +723,8 @@ export function LiveScripturePanel() {
             chapter: targetChapter,
           }).catch(() => null);
 
-      const targetVerses = (targetChapterRes as any)?.verses || [];
-      const matchedVerse = targetVerses.find((v: any) => v.verse === targetVerse);
+      const targetVerses = extractVerses(targetChapterRes);
+      const matchedVerse = targetVerses.find((v) => Number(v.verse) === Number(targetVerse));
       const verseText = matchedVerse?.text || '';
 
       const newHit: BibleSearchResult = {
