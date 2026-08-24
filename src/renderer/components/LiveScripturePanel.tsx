@@ -240,24 +240,43 @@ export function LiveScripturePanel() {
     const sequence = ++detectSequenceRef.current;
     const detectionStartedAt = performance.now();
     const prefsBeforeDetection = useAppStore.getState().liveScripture;
+
+    // 1. Spoken verse navigation commands ("next verse", "previous verse", "first verse", "last verse")
+    const navCmd = isFinal ? detectNavigationCommand(cleaned) : null;
+    if (navCmd) {
+      lastDetectionTextRef.current = transcriptKey;
+      await handleNavigationCommand(navCmd);
+      reportInfo(
+        navCmd === 'next' ? 'Navigated to next verse.' :
+        navCmd === 'prev' ? 'Navigated to previous verse.' :
+        navCmd === 'first' ? 'Navigated to first verse of chapter.' : 'Navigated to last verse of chapter.'
+      );
+      return;
+    }
+
     const versionRequest = isFinal ? detectVersionRequest(cleaned, versions) : null;
     let detectionVersion = version;
     if (versionRequest) {
       if (prefsBeforeDetection.autoVersionSwitch) {
         detectionVersion = versionRequest.versionId;
-        if (detectionVersion !== version) setVersion(detectionVersion);
-        setLive({ requestedVersion: null });
+        await handleVersionChange(detectionVersion);
         reportInfo(`Bible version switched to ${versionRequest.label}.`);
       } else {
         setLive({ requestedVersion: versionRequest.versionId });
-        reportInfo(`${versionRequest.label} was requested. Enable Auto version switch or select it manually.`);
+        reportInfo(`${versionRequest.label} was requested. Enable Auto version switch or click Switch Version.`);
       }
     }
+
+    const allowedModes: Array<'direct' | 'contextual' | 'verbatim' | 'semantic'> = ['direct', 'contextual', 'verbatim'];
+    if (prefsBeforeDetection.allowParaphrase !== false) {
+      allowedModes.push('semantic');
+    }
+
     const result = await window.BSP?.verse?.detect({
       text: cleaned,
       options: {
         versionId: detectionVersion,
-        modes: ['direct', 'contextual', 'verbatim', 'semantic'],
+        modes: allowedModes,
         limit: 6,
         minConfidence: isFinal ? 0.35 : 0.45,
         isFinal,
@@ -337,15 +356,16 @@ export function LiveScripturePanel() {
         }
       }
     } else {
-      // No immediate candidate found in this small chunk/breath pause.
-      // Hold previously retained high-confidence match for 3500ms so results do NOT flicker or disappear!
+      // No immediate candidate found in this small chunk/breath pause or after a version command.
+      // Hold previously retained match for 3500ms (or refresh timestamp on version request) so results do NOT flicker or disappear!
       if (
         candidateStabilityRef.current.retainedHit &&
-        now - candidateStabilityRef.current.retainedAt < 3500
+        (now - candidateStabilityRef.current.retainedAt < 3500 || Boolean(versionRequest))
       ) {
         topHit = candidateStabilityRef.current.retainedHit;
         effectiveSuggestions = candidateStabilityRef.current.retainedSuggestions;
         effectiveDetections = candidateStabilityRef.current.retainedDetections;
+        candidateStabilityRef.current.retainedAt = now;
       }
     }
 
@@ -537,13 +557,206 @@ export function LiveScripturePanel() {
     }
   }
 
+  async function handleVersionChange(targetVersionId: string) {
+    if (!targetVersionId) return;
+    setVersion(targetVersionId);
+    setLive({ requestedVersion: null });
+
+    const currentHit = live.bestHit || candidateStabilityRef.current.retainedHit;
+    if (!currentHit) return;
+
+    try {
+      const chapterRes = await window.BSP?.bible?.getChapter({
+        versionId: targetVersionId,
+        book: currentHit.book,
+        chapter: currentHit.chapter,
+      }).catch(() => null);
+
+      const verses = (chapterRes as any)?.verses || [];
+      const matchedVerse = verses.find((v: any) => v.verse === currentHit.verse);
+      const newText = matchedVerse?.text || currentHit.text;
+
+      const updatedHit: BibleSearchResult = {
+        ...currentHit,
+        text: newText,
+        version: targetVersionId,
+      };
+
+      setLive({ bestHit: updatedHit });
+      candidateStabilityRef.current = {
+        ...candidateStabilityRef.current,
+        ref: updatedHit.reference,
+        retainedHit: updatedHit,
+        retainedAt: Date.now(),
+      };
+
+      const prevSuggestions = live.suggestions || [];
+      if (prevSuggestions.length) {
+        const updatedSuggestions = await Promise.all(
+          prevSuggestions.map(async (sug) => {
+            if (sug.book === currentHit.book && sug.chapter === currentHit.chapter) {
+              const v = verses.find((x: any) => x.verse === sug.verse);
+              return { ...sug, text: v?.text || sug.text, version: targetVersionId };
+            }
+            const chRes = await window.BSP?.bible?.getChapter({
+              versionId: targetVersionId,
+              book: sug.book,
+              chapter: sug.chapter,
+            }).catch(() => null);
+            const v = ((chRes as any)?.verses || []).find((x: any) => x.verse === sug.verse);
+            return { ...sug, text: v?.text || sug.text, version: targetVersionId };
+          })
+        );
+        setLive({ suggestions: updatedSuggestions });
+        candidateStabilityRef.current.retainedSuggestions = updatedSuggestions;
+      }
+
+      // If active scene on program/audience display is a bible verse, re-project it with the updated version text
+      const activeScene = useAppStore.getState().display.currentScene;
+      if (activeScene && activeScene.type === 'bible') {
+        sendHit(updatedHit, { goLive: true, confidence: 1.0, sourceMode: 'version-switch' });
+      }
+    } catch (err) {
+      console.error('Failed to update verse for version switch:', err);
+    }
+  }
+
+  async function handleNavigationCommand(command: 'next' | 'prev' | 'first' | 'last') {
+    const currentHit = live.bestHit || candidateStabilityRef.current.retainedHit;
+    if (!currentHit || !currentHit.book || !currentHit.chapter || !currentHit.verse) return;
+
+    const currentVersion = version || currentHit.version || 'KJV';
+    const book = currentHit.book;
+    const chapter = Number(currentHit.chapter);
+    const verse = Number(currentHit.verse);
+
+    let targetBook = book;
+    let targetChapter = chapter;
+    let targetVerse = verse;
+
+    try {
+      const currentChapterRes = await window.BSP?.bible?.getChapter({
+        versionId: currentVersion,
+        book,
+        chapter,
+      }).catch(() => null);
+
+      const verses = (currentChapterRes as any)?.verses || [];
+      const maxVerse = verses.length || verse;
+
+      if (command === 'first') {
+        targetVerse = 1;
+      } else if (command === 'last') {
+        targetVerse = maxVerse;
+      } else if (command === 'next') {
+        if (verse < maxVerse) {
+          targetVerse = verse + 1;
+        } else {
+          // Advance to chapter + 1
+          const nextChapterRes = await window.BSP?.bible?.getChapter({
+            versionId: currentVersion,
+            book,
+            chapter: chapter + 1,
+          }).catch(() => null);
+          if (nextChapterRes && (nextChapterRes as any)?.verses?.length > 0) {
+            targetChapter = chapter + 1;
+            targetVerse = 1;
+          } else {
+            // Advance to next canonical book
+            const bookIdx = ALL_CANON_BOOKS.findIndex((b) => b.toLowerCase() === book.toLowerCase());
+            if (bookIdx !== -1 && bookIdx < ALL_CANON_BOOKS.length - 1) {
+              targetBook = ALL_CANON_BOOKS[bookIdx + 1];
+              targetChapter = 1;
+              targetVerse = 1;
+            }
+          }
+        }
+      } else if (command === 'prev') {
+        if (verse > 1) {
+          targetVerse = verse - 1;
+        } else {
+          // Go to chapter - 1
+          if (chapter > 1) {
+            const prevChapterRes = await window.BSP?.bible?.getChapter({
+              versionId: currentVersion,
+              book,
+              chapter: chapter - 1,
+            }).catch(() => null);
+            const prevVerses = (prevChapterRes as any)?.verses || [];
+            targetChapter = chapter - 1;
+            targetVerse = prevVerses.length || 1;
+          } else {
+            // Go to previous canonical book
+            const bookIdx = ALL_CANON_BOOKS.findIndex((b) => b.toLowerCase() === book.toLowerCase());
+            if (bookIdx > 0) {
+              targetBook = ALL_CANON_BOOKS[bookIdx - 1];
+              const booksList = await window.BSP?.bible?.getBooks(currentVersion).catch(() => []);
+              const targetBookMeta = (booksList as any[])?.find(
+                (b: any) => b.name?.toLowerCase() === targetBook.toLowerCase()
+              );
+              targetChapter = targetBookMeta?.chapters || 1;
+              const targetChapterRes = await window.BSP?.bible?.getChapter({
+                versionId: currentVersion,
+                book: targetBook,
+                chapter: targetChapter,
+              }).catch(() => null);
+              const targetVerses = (targetChapterRes as any)?.verses || [];
+              targetVerse = targetVerses.length || 1;
+            }
+          }
+        }
+      }
+
+      // Fetch text for target (targetBook, targetChapter, targetVerse)
+      const targetChapterRes = (targetBook === book && targetChapter === chapter)
+        ? currentChapterRes
+        : await window.BSP?.bible?.getChapter({
+            versionId: currentVersion,
+            book: targetBook,
+            chapter: targetChapter,
+          }).catch(() => null);
+
+      const targetVerses = (targetChapterRes as any)?.verses || [];
+      const matchedVerse = targetVerses.find((v: any) => v.verse === targetVerse);
+      const verseText = matchedVerse?.text || '';
+
+      const newHit: BibleSearchResult = {
+        reference: `${targetBook} ${targetChapter}:${targetVerse}`,
+        text: verseText,
+        book: targetBook,
+        chapter: targetChapter,
+        verse: targetVerse,
+        version: currentVersion,
+      };
+
+      setLive({ bestHit: newHit, suggestions: [newHit] });
+      candidateStabilityRef.current = {
+        ref: newHit.reference,
+        count: 1,
+        firstSeen: Date.now(),
+        retainedHit: newHit,
+        retainedSuggestions: [newHit],
+        retainedDetections: [],
+        retainedAt: Date.now(),
+      };
+
+      // If active scene is bible or direct auto-project is enabled, project immediately
+      const activeScene = useAppStore.getState().display.currentScene;
+      const prefs = useAppStore.getState().liveScripture;
+      if (prefs.autoProject || (activeScene && activeScene.type === 'bible')) {
+        sendHit(newHit, { goLive: true, confidence: 1.0, sourceMode: 'spoken-navigation' });
+      }
+    } catch (err) {
+      console.error('Failed to navigate verse:', err);
+    }
+  }
+
   function setAutoVersionSwitch(enabled: boolean) {
     setLive({ autoVersionSwitch: enabled });
     if (!enabled || !live.requestedVersion) return;
     const requested = versions.find((entry) => entry.id === live.requestedVersion);
     if (!requested) return;
-    setVersion(requested.id);
-    setLive({ requestedVersion: null });
+    handleVersionChange(requested.id);
     reportInfo(`Bible version switched to ${requested.abbreviation}.`);
   }
 
@@ -721,6 +934,58 @@ export function LiveScripturePanel() {
           Deepgram needs an API key — add one under <strong>Settings → Transcription</strong>, or switch to Local.
         </div>
       )}
+      {live.requestedVersion && !live.autoVersionSwitch && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '8px 14px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--accent-primary)',
+            borderRadius: 6,
+            margin: '6px 12px',
+            fontSize: 12,
+            color: 'var(--text-primary)',
+          }}
+        >
+          <span>
+            <strong>{versions.find((v) => v.id === live.requestedVersion)?.abbreviation || live.requestedVersion}</strong> translation requested.
+          </span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => handleVersionChange(live.requestedVersion!)}
+              style={{
+                padding: '4px 10px',
+                background: 'var(--accent-primary)',
+                border: 'none',
+                borderRadius: 4,
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              Switch Version
+            </button>
+            <button
+              onClick={() => setLive({ requestedVersion: null })}
+              style={{
+                padding: '4px 8px',
+                background: 'transparent',
+                border: '1px solid var(--border-primary)',
+                borderRadius: 4,
+                color: 'var(--text-dim)',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       {notice.text && (
         <div style={notice.tone === 'fault' ? styles.noticeFault : styles.notice}>{notice.text}</div>
       )}
@@ -890,8 +1155,7 @@ export function LiveScripturePanel() {
                 <CustomDropdown
                   value={version}
                   onChange={(val) => {
-                    setVersion(val);
-                    setLive({ requestedVersion: val });
+                    handleVersionChange(val);
                   }}
                   options={(versions.length ? versions : [{ id: 'KJV', abbreviation: 'KJV', name: 'King James Version' }]).map((v) => ({
                     value: v.id,
@@ -931,7 +1195,7 @@ export function LiveScripturePanel() {
               </div>
 
               {/* Row 6: Auto-version switch */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border-primary)', gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Auto-version switch</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
@@ -941,6 +1205,23 @@ export function LiveScripturePanel() {
                 <AppleToggle
                   checked={live.autoVersionSwitch}
                   onChange={(val) => setAutoVersionSwitch(val)}
+                />
+              </div>
+
+              {/* Row 7: Paraphrase & Semantic Matching */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', gap: 16 }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Paraphrase & Semantic Matching</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
+                    Detect topical and semantic paraphrases when scriptures are not quoted verbatim
+                  </div>
+                </div>
+                <AppleToggle
+                  checked={live.allowParaphrase !== false}
+                  onChange={(val) => {
+                    setLive({ allowParaphrase: val });
+                    reportInfo(val ? 'Paraphrase detection enabled.' : 'Paraphrase detection disabled (verbatim & citations only).');
+                  }}
                 />
               </div>
             </div>
@@ -1177,19 +1458,82 @@ function classifyProjectionMode(mode: string): 'direct' | 'quoted' | 'semantic' 
   return 'none';
 }
 
+const ALL_CANON_BOOKS = [
+  'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy', 'Joshua', 'Judges', 'Ruth',
+  '1 Samuel', '2 Samuel', '1 Kings', '2 Kings', '1 Chronicles', '2 Chronicles', 'Ezra',
+  'Nehemiah', 'Esther', 'Job', 'Psalms', 'Proverbs', 'Ecclesiastes', 'Song of Solomon',
+  'Isaiah', 'Jeremiah', 'Lamentations', 'Ezekiel', 'Daniel', 'Hosea', 'Joel', 'Amos',
+  'Obadiah', 'Jonah', 'Micah', 'Nahum', 'Habakkuk', 'Zephaniah', 'Haggai', 'Zechariah',
+  'Malachi', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', '1 Corinthians',
+  '2 Corinthians', 'Galatians', 'Ephesians', 'Philippians', 'Colossians', '1 Thessalonians',
+  '2 Thessalonians', '1 Timothy', '2 Timothy', 'Titus', 'Philemon', 'Hebrews', 'James',
+  '1 Peter', '2 Peter', '1 John', '2 John', '3 John', 'Jude', 'Revelation',
+];
+
+function detectNavigationCommand(transcript: string): 'next' | 'prev' | 'first' | 'last' | null {
+  const normalized = transcript.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!normalized) return null;
+
+  // First verse command
+  if (
+    /\b(first verse|read the first verse|go to first verse|from the beginning|start from verse one|verse one of this chapter)\b/.test(normalized) ||
+    normalized === 'first verse' ||
+    normalized === 'verse one'
+  ) {
+    return 'first';
+  }
+
+  // Last verse command
+  if (
+    /\b(last verse|read the last verse|go to the last verse|to the end of the chapter|final verse|read to the end)\b/.test(normalized) ||
+    normalized === 'last verse'
+  ) {
+    return 'last';
+  }
+
+  // Next verse command
+  if (
+    /\b(next verse|go to next verse|move to next verse|read next verse|the next verse|next one)\b/.test(normalized) ||
+    normalized === 'next verse' ||
+    normalized === 'next'
+  ) {
+    return 'next';
+  }
+
+  // Previous verse command
+  if (
+    /\b(previous verse|prev verse|go back a verse|prior verse|the previous verse|back to previous verse)\b/.test(normalized) ||
+    normalized === 'previous verse' ||
+    normalized === 'prev verse'
+  ) {
+    return 'prev';
+  }
+
+  return null;
+}
+
 function detectVersionRequest(
   transcript: string,
   availableVersions: Array<{ id: string; abbreviation: string; name: string }>,
 ) {
   const normalized = transcript.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  const hasIntent = /\b(switch|change|set|use|show|give|read from|turn to)\b/.test(normalized);
-  const hasContext = /\b(version|translation|bible)\b/.test(normalized);
+  const hasIntent = /\b(switch|change|set|use|show|give|give me|give us|let s have|lets have|can i have|can we have|read from|read in|read|turn to|open in|open to|put up|display|bring up)\b/.test(normalized);
+  const hasContext = /\b(version|translation|bible|trans)\b/.test(normalized);
   if (!hasIntent && !hasContext) return null;
+
   const builtInAliases: Record<string, string[]> = {
-    KJV: ['kjv', 'king james', 'king james version'],
+    KJV: ['kjv', 'king james', 'king james version', 'king james bible'],
     NKJV: ['nkjv', 'new king james', 'new king james version'],
     NASB: ['nasb', 'new american standard', 'new american standard bible'],
-    NLT: ['nlt', 'new living translation'],
+    NLT: ['nlt', 'new living translation', 'new living'],
+    NIV: ['niv', 'new international version', 'new international'],
+    ESV: ['esv', 'english standard version', 'english standard'],
+    ASV: ['asv', 'american standard version', 'american standard'],
+    Darby: ['dby', 'darby', 'darby translation'],
+    YLT: ['ylt', 'youngs literal', 'young s literal translation'],
+    LSG: ['lsg', 'louis segond', 'segond'],
+    OST: ['ost', 'ostervald'],
+    RV1909: ['rvr', 'reina valera', 'rv1909', 'valera'],
   };
   const candidates = availableVersions.flatMap((entry) => {
     const aliases = new Set([
@@ -1200,6 +1544,7 @@ function detectVersionRequest(
     ]);
     return [...aliases].map((alias) => ({ entry, alias }));
   }).sort((a, b) => b.alias.length - a.alias.length);
+
   const match = candidates.find(({ alias }) => new RegExp(`(^|\\s)${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(normalized));
   return match ? { versionId: match.entry.id, label: match.entry.abbreviation } : null;
 }

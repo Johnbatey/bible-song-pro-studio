@@ -506,6 +506,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     autoProject: true,
     autoVersionSwitch: true,
     autoProjectQuoted: false,
+    allowParaphrase: true,
     requestedVersion: null,
     meter: {
       level: 0,

@@ -641,6 +641,7 @@ export interface LiveScriptureState {
   autoProject: boolean;
   autoVersionSwitch: boolean;
   autoProjectQuoted: boolean;
+  allowParaphrase?: boolean;
   requestedVersion: string | null;
   meter: AudioMeterState;
   mlxStatus?: any;
