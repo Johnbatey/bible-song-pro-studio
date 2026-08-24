@@ -9,6 +9,7 @@ import type { ParsedShape } from '../../slide-engine/parser/slide-parser';
 import type { PresentationSlide, SlideElement } from '../../types';
 import { parseBackgroundInfo, gradientCss } from '../../utils/background';
 import { fetchInstalledSystemFonts, type FontOptionItem } from '../../utils/system-fonts';
+import { importSlideImage } from '../../utils/import-slide-image';
 
 export interface PptxInspector {
   selected: ParsedShape[];
@@ -891,17 +892,15 @@ export function SlideEditorRightSidebar({
     onSelectElement(duplicate.id, false);
   }
 
-  const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBgImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const val = evt.target?.result as string;
-      if (val) {
-        onUpdateSlide({ background: { type: 'image', value: val } });
-      }
-    };
-    reader.readAsDataURL(file);
+    const imported = await importSlideImage(file);
+    if ('error' in imported) {
+      window.alert(imported.error);
+      return;
+    }
+    onUpdateSlide({ background: { type: 'image', value: imported.url } });
   };
 
   return (

@@ -31,8 +31,12 @@ export function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
     if (!panel) return;
 
     if (api.location.type === 'grid') {
-      // Offset from the top-left so a popped-out dock doesn't land exactly on
-      // the one it came from and look like nothing happened.
+      if (window.BSP?.dock?.popOut) {
+        void window.BSP.dock.popOut(api.id).then((result) => {
+          if (result?.ok) api.close();
+        });
+        return;
+      }
       containerApi.addFloatingGroup(panel, {
         x: 80,
         y: 80,
@@ -61,7 +65,7 @@ export function DockTab({ api, containerApi }: IDockviewPanelHeaderProps) {
         className="dock-tab__action"
         onClick={toggleFloat}
         onMouseDown={(e) => e.stopPropagation()}
-        title={isFloating ? 'Dock this window back into the layout' : 'Pop this window out to float'}
+        title={isFloating ? 'Dock this window back into the layout' : 'Open this panel in its own window'}
         aria-label={isFloating ? 'Dock window' : 'Pop out window'}
       >
         {isFloating ? (

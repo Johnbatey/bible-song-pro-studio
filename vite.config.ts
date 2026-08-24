@@ -63,11 +63,13 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
         splash: path.resolve(__dirname, 'splash.html'),
         audienceDisplay: path.resolve(__dirname, 'audience-display.html'),
+        browserDisplay: path.resolve(__dirname, 'browser-display.html'),
         stageDisplay: path.resolve(__dirname, 'stage-display.html'),
         stageDesigner: path.resolve(__dirname, 'stage-designer.html'),
         audienceDisplayFixture: path.resolve(__dirname, 'audience-display-fixture.html'),
         programSurfaceHarness: path.resolve(__dirname, 'program-surface-harness.html'),
         programSurfaceSingle: path.resolve(__dirname, 'program-surface-single.html'),
+        dockPopout: path.resolve(__dirname, 'dock-popout.html'),
       },
       output: {
         manualChunks(id) {

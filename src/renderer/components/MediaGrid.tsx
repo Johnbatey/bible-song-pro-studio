@@ -5,8 +5,9 @@
    dropdown of file names, because an operator recognises the mountain loop on
    sight and has no idea which of them is `sunrise-final-v2.mp4`.
    ========================================================================= */
+import { useState, type DragEvent } from 'react';
 import type { MediaItem } from '../types';
-import { useMediaLibrary } from '../hooks/useMediaLibrary';
+import { useMediaLibrary, refreshMediaLibrary } from '../hooks/useMediaLibrary';
 import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { type } from '../styles/type';
 
@@ -21,17 +22,98 @@ export function MediaGrid({ kind, selectedUrl, onSelect }: MediaGridProps) {
   const { items } = useMediaLibrary();
   const baseUrl = useAssetBaseUrl();
   const matching = items.filter((item) => item.type === kind);
+  const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState('');
+
+  const applyImported = (imported: MediaItem[]) => {
+    const match = imported.find((item) => item.type === kind);
+    if (match) onSelect(match);
+  };
+
+  const handleImport = async () => {
+    if (!window.BSP?.media?.pick) return;
+    setBusy(true);
+    setHint('');
+    try {
+      const result = await window.BSP.media.pick();
+      if (result?.canceled) return;
+      await refreshMediaLibrary();
+      if (result?.items?.length) applyImported(result.items);
+      else if (result?.errors?.[0]) setHint(result.errors[0]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDrop = async (event: DragEvent) => {
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer.files || []);
+    if (files.length === 0 || !window.BSP?.media) return;
+    const paths = files.map((file) => window.BSP.media.pathForFile(file) || '').filter(Boolean);
+    if (paths.length === 0) {
+      setHint('Could not read those files — use Import instead.');
+      return;
+    }
+    setBusy(true);
+    setHint('');
+    try {
+      const result = await window.BSP.media.import(paths);
+      await refreshMediaLibrary();
+      if (result?.items?.length) applyImported(result.items);
+      else if (result?.errors?.[0]) setHint(result.errors[0]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const importRow = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <button
+        type="button"
+        className="btn btn-sm btn-secondary"
+        disabled={busy}
+        onClick={handleImport}
+      >
+        {busy ? 'Importing…' : kind === 'video' ? 'Import video…' : 'Import image…'}
+      </button>
+      <span style={{ ...type.caption, color: 'var(--text-dim)' }}>
+        or drop a file here
+      </span>
+    </div>
+  );
 
   if (matching.length === 0) {
     return (
-      <div style={{ ...type.caption, color: 'var(--text-dim)', padding: '10px 2px' }}>
-        No {kind === 'video' ? 'videos' : 'images'} in the library yet. Import them in the
-        Media panel and they will appear here.
+      <div
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={handleDrop}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          padding: '12px 10px',
+          border: '1px dashed var(--border-primary)',
+          borderRadius: 6,
+          background: 'rgba(255,255,255,0.02)',
+        }}
+      >
+        <div style={{ ...type.caption, color: 'var(--text-secondary)' }}>
+          No {kind === 'video' ? 'videos' : 'images'} in the library yet.
+        </div>
+        {importRow}
+        {hint && <div style={{ ...type.caption, color: 'var(--warning, #f59e0b)' }}>{hint}</div>}
       </div>
     );
   }
 
   return (
+    <div
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+      style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+    >
+    {importRow}
+    {hint && <div style={{ ...type.caption, color: 'var(--warning, #f59e0b)' }}>{hint}</div>}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, maxHeight: 190, overflowY: 'auto' }}>
       {matching.map((item) => {
         const selected = item.url === selectedUrl;
@@ -94,6 +176,7 @@ export function MediaGrid({ kind, selectedUrl, onSelect }: MediaGridProps) {
           </button>
         );
       })}
+    </div>
     </div>
   );
 }

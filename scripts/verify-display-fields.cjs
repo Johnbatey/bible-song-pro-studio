@@ -160,6 +160,22 @@ check(
   { bgVideo: '', bgCustomImage: '', bgFill: '' },
 );
 
+/** A still on the LT band must stay on the band — never become the page fill. */
+function themeWithLt(lowerThird) {
+  const theme = createDefaultTheme();
+  return { ...theme, lowerThird: { ...theme.lowerThird, ...lowerThird } };
+}
+
+check(
+  'lower third band image does not become the page ground',
+  ground(backgroundFieldsFor(
+    scene(),
+    themeWithLt({ backgroundMediaUrl: '/media/lt-band.png', backgroundMediaType: 'image' }),
+    'lowerThird',
+  )),
+  { bgVideo: '', bgCustomImage: '', bgFill: '' },
+);
+
 /* --- What a song scene carries. --- */
 console.log('\nSong scenes:');
 

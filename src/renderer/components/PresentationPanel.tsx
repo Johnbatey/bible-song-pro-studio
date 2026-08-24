@@ -438,6 +438,13 @@ export function PresentationPanel() {
       background: bg,
     };
 
+    /* A designed slide only paints in fullscreen. Leaving lower-third on would
+       show `content.text` (often just the slide title) on the projector while
+       Program looked fine — the LIVE lamp lied. */
+    if (useAppStore.getState().display.outputMode === 'lowerThird') {
+      useAppStore.getState().setOutputMode('fullscreen');
+    }
+
     if (direct || !isStudio) {
       cutToScene(scene);
     } else {

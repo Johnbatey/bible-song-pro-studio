@@ -75,6 +75,7 @@ const { createDeepgramService } = require('./deepgram-service.cjs');
 const { createObsService } = require('./obs-service.cjs');
 const { listenWithFallback } = require('./listen-with-fallback.cjs');
 const lexiconService = require('./lexicon-service.cjs');
+const { stripHugeDataUrls } = require('./strip-data-urls.cjs');
 
 const isDev = !app.isPackaged && !fs.existsSync(path.join(__dirname, '../../dist/index.html'));
 let mainWindow = null;
@@ -82,6 +83,7 @@ let displayWindow = null;
 /* Stage windows are a set, not a single handle: the operator can put a
    confidence monitor on more than one screen, and each needs both feeds. */
 const stageWindows = new Set();
+const dockPopoutWindows = new Map();
 /* Designer windows are their own set rather than members of stageWindows. Both
    receive the stage feed, but only a stage window is a stage: a designer must
    never be counted as a screen the service is going out on, and closing every
@@ -403,7 +405,7 @@ function broadcastDisplayState() {
 }
 
 function setDisplayState(next) {
-  displayState = { ...displayState, ...(next || {}), updatedAt: Date.now() };
+  displayState = stripHugeDataUrls({ ...displayState, ...(next || {}), updatedAt: Date.now() });
   broadcastDisplayState();
   return displayState;
 }
@@ -474,7 +476,11 @@ function serveHtmlFile(filename) {
     if (isDev) { res.writeHead(302, { Location: `http://localhost:5173/${filename}` }); res.end(); return; }
     const fp = path.join(__dirname, '../../dist', filename);
     if (!fs.existsSync(fp)) { res.writeHead(404); res.end('Not Found'); return; }
-    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Access-Control-Allow-Origin': '*',
+    });
     res.end(fs.readFileSync(fp, 'utf8'));
   };
 }
@@ -590,7 +596,13 @@ function startHttpServer() {
     const pn = url.pathname;
 
     // Static files
-    if (pn === '/display.html' || pn === '/') { serveHtmlFile('display.html')(req, res); return; }
+    // ProgramSurface browser output (slides + verses). Legacy flat display.html
+    // stays available at /legacy-display.html for debugging.
+    if (pn === '/display.html' || pn === '/' || pn === '/browser-display.html') {
+      serveHtmlFile('browser-display.html')(req, res);
+      return;
+    }
+    if (pn === '/legacy-display.html') { serveHtmlFile('display.html')(req, res); return; }
     if (pn === '/remote.html') { serveHtmlFile('remote.html')(req, res); return; }
     if (pn.startsWith('/fonts/')) { serveStatic('fonts')(req, res, url); return; }
     if (pn.startsWith('/themes/')) { serveStatic('themes')(req, res, url); return; }
@@ -616,7 +628,11 @@ function startHttpServer() {
           const query = {};
           params.forEach((v, k) => query[k] = v);
           const result = handler({ body: parsed, query });
-          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Access-Control-Allow-Origin': '*',
+          });
           res.end(JSON.stringify(result));
         } catch (e) {
           res.writeHead(400); res.end(JSON.stringify({ ok: false, error: e.message }));
@@ -645,7 +661,7 @@ function startHttpServer() {
     },
   });
 
-  wss = new WebSocketServer({ server });
+  wss = new WebSocketServer({ server, perMessageDeflate: false });
   wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ type: 'display:update', state: displayState }));
     // Relay must re-send as text: forwarding the raw Buffer produces a binary frame,
@@ -994,6 +1010,64 @@ function broadcastStageLayouts() {
   }
 }
 
+function broadcastDockPopouts() {
+  const ids = Array.from(dockPopoutWindows.keys());
+  buildAppMenu([...menuOpenIds, ...ids]);
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('dock:popouts', ids);
+  }
+}
+
+function createDockPopoutWindow(dockId) {
+  const id = String(dockId || '');
+  const def = DOCK_DEFS.find((entry) => entry && entry.id === id);
+  if (!def) return { ok: false, error: 'Unknown dock' };
+
+  const existing = dockPopoutWindows.get(id);
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore();
+    existing.focus();
+    return { ok: true };
+  }
+
+  const win = new BrowserWindow({
+    width: 760,
+    height: 680,
+    minWidth: 360,
+    minHeight: 280,
+    resizable: true,
+    maximizable: true,
+    fullscreenable: true,
+    thickFrame: true,
+    backgroundColor: '#0C0B0B',
+    title: def.label,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      backgroundThrottling: false,
+    },
+  });
+  const query = `dock=${encodeURIComponent(id)}`;
+  win.loadURL(isDev
+    ? `http://localhost:5173/dock-popout.html?${query}`
+    : `file://${path.join(__dirname, '../../dist/dock-popout.html')}?${query}`);
+  win.setMenuBarVisibility(false);
+  dockPopoutWindows.set(id, win);
+  win.on('closed', () => {
+    dockPopoutWindows.delete(id);
+    broadcastDockPopouts();
+  });
+  win.webContents.once('did-finish-load', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('store:syncRequest');
+    }
+    broadcastDockPopouts();
+  });
+  return { ok: true };
+}
+
 function createSlideEditorWindow() {
   const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0b0d12', title: 'BSP Slide Editor', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
   win.loadURL(isDev ? 'http://localhost:5173/slide-editor/index.html' : `file://${path.join(__dirname, '../../dist/slide-editor/index.html')}`);
@@ -1078,7 +1152,30 @@ app.whenReady().then(async () => {
   // the native menu checkmarks stay in sync without polling.
   ipcMain.on('dock:syncMenu', (_, openIds) => {
     menuOpenIds = Array.isArray(openIds) ? openIds : [];
-    buildAppMenu(menuOpenIds);
+    buildAppMenu([...menuOpenIds, ...dockPopoutWindows.keys()]);
+  });
+  ipcMain.handle('dock:popOut', (_, p) => createDockPopoutWindow(p?.id));
+  ipcMain.handle('dock:focusPopout', (_, p) => {
+    const win = dockPopoutWindows.get(String(p?.id || ''));
+    if (!win || win.isDestroyed()) return { ok: false };
+    if (win.isMinimized()) win.restore();
+    win.focus();
+    return { ok: true };
+  });
+  ipcMain.handle('dock:listPopouts', () => Array.from(dockPopoutWindows.keys()));
+  ipcMain.on('store:broadcast', (event, snapshot) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed() && win.webContents.id !== event.sender.id) {
+        win.webContents.send('store:remote', snapshot);
+      }
+    }
+  });
+  ipcMain.on('store:requestSync', (event) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed() && win.webContents.id !== event.sender.id) {
+        win.webContents.send('store:syncRequest');
+      }
+    }
   });
 
   /* And the saved arrangements, whenever one is added, renamed, deleted or
@@ -1156,8 +1253,8 @@ app.whenReady().then(async () => {
     // Null rather than a plausible-looking URL when nothing is listening —
     // the projector is unaffected by this, but the remote genuinely is not
     // reachable and an address that refuses the connection is worse than none.
-    browserUrl: httpServerError ? null : `http://localhost:${displayPort}/display.html`,
-    remoteUrl: httpServerError ? null : `http://localhost:${displayPort}/remote.html`,
+    browserUrl: httpServerError ? null : `http://127.0.0.1:${displayPort}/display.html`,
+    remoteUrl: httpServerError ? null : `http://127.0.0.1:${displayPort}/remote.html`,
     port: httpServerError ? null : displayPort,
     serverError: httpServerError,
     clients: wss ? wss.clients.size : 0,
@@ -1238,7 +1335,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('get:platform', () => process.platform);
   ipcMain.handle('get:userDataPath', () => app.getPath('userData'));
   ipcMain.handle('get:version', () => app.getVersion());
-  ipcMain.handle('get:displayUrl', () => `http://localhost:${displayPort}/display.html`);
+  ipcMain.handle('get:displayUrl', () => `http://127.0.0.1:${displayPort}/display.html`);
 
   /* Opening a link hands control to the operator's browser, so the renderer
      does not get to choose freely: https only, and only hosts we ship links
@@ -1429,6 +1526,7 @@ app.whenReady().then(async () => {
   // Media library IPC
   ipcMain.handle('media:list', () => mediaService?.list() || { ok: false, items: [] });
   ipcMain.handle('media:import', (_, p) => mediaService?.importPaths(p?.paths) || { ok: false, items: [], errors: ['Media service unavailable'] });
+  ipcMain.handle('media:importOptimized', (_, p) => mediaService?.importOptimizedImage(p?.path) || { ok: false, error: 'Media service unavailable' });
   ipcMain.handle('media:remove', (_, p) => mediaService?.remove(p?.id) || { ok: false });
   ipcMain.handle('media:relink', (_, p) => mediaService?.relink(p?.id, p?.path) || { ok: false, error: 'Media service unavailable' });
   /* Relink opens on the file's last known folder, because the usual cause is a

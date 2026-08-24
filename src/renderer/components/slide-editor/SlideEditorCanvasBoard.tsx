@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import type { PresentationSlide, SlideElement } from '../../types';
+import { useAssetBaseUrl } from '../../hooks/useAssetBaseUrl';
 import { slideElementsFor, hexToRgba } from '../NativeSlideBoard';
+import { assetUrl } from '../../utils/asset-url';
 import type { ActiveTool } from './SlideEditorQuickToolbar';
 
 function computeTextShadow(el: SlideElement): string | undefined {
@@ -91,6 +93,8 @@ export function SlideEditorCanvasBoard({
   const BOARD_HEIGHT = 720;
 
   const elements: SlideElement[] = slideElementsFor(slide);
+  const assetBaseUrl = useAssetBaseUrl();
+  const mediaSrc = (value?: string) => assetUrl(value, assetBaseUrl);
   const bgValue = slide.background?.value || '#18181b';
   const bgType = slide.background?.type || 'color';
 
@@ -692,7 +696,7 @@ export function SlideEditorCanvasBoard({
         {/* Background Image */}
         {bgType === 'image' && bgValue && (
           <img
-            src={bgValue}
+            src={mediaSrc(bgValue)}
             alt=""
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
           />
@@ -866,7 +870,7 @@ export function SlideEditorCanvasBoard({
               {/* Image Element */}
               {el.type === 'image' && (
                 <img
-                  src={el.content}
+                  src={mediaSrc(el.content)}
                   alt=""
                   draggable={false}
                   style={{

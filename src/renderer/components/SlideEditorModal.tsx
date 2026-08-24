@@ -36,6 +36,7 @@ import { groupShapes, layerUnits, moveLayerUnit, selectionHasGroup, ungroupShape
 import type { SelectionState } from '../slide-engine/edit/geometry';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
 import { getCustomTemplates } from '../services/customTemplateStore';
+import { importSlideImage } from '../utils/import-slide-image';
 
 export function SlideEditorModal() {
   const isSlideEditorOpen = useAppStore((s) => s.isSlideEditorOpen);
@@ -605,26 +606,29 @@ export function SlideEditorModal() {
       };
       reader.readAsText(file);
     } else if (file.type.startsWith('image/')) {
-      reader.onload = (e) => {
-        const imageUrl = e.target?.result as string;
-        const newSlide: PresentationSlide = {
-          id: `img-slide-${Date.now()}`,
-          title: file.name.replace(/\.[^/.]+$/, ''),
-          body: '',
-          label: `Slide ${slides.length + 1}`,
-          notes: '',
-          transition: 'fade',
-          durationMs: 3000,
-          hidden: false,
-          buildCount: 1,
-          buildStep: 1,
-          background: { type: 'image', value: imageUrl },
-          aspectRatio: '16:9',
-        };
-        updateDeckState((prev) => ({ ...prev, slides: [...slides, newSlide] }));
-        setActiveSlideIndex(slides.length);
+      setImportStatus(`Optimising ${file.name}…`);
+      const imported = await importSlideImage(file);
+      if ('error' in imported) {
+        setImportStatus(imported.error);
+        return;
+      }
+      const newSlide: PresentationSlide = {
+        id: `img-slide-${Date.now()}`,
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        body: '',
+        label: `Slide ${slides.length + 1}`,
+        notes: '',
+        transition: 'fade',
+        durationMs: 3000,
+        hidden: false,
+        buildCount: 1,
+        buildStep: 1,
+        background: { type: 'image', value: imported.url },
+        aspectRatio: '16:9',
       };
-      reader.readAsDataURL(file);
+      updateDeckState((prev) => ({ ...prev, slides: [...slides, newSlide] }));
+      setActiveSlideIndex(slides.length);
+      setImportStatus(null);
     } else if (ext === 'pptx') {
       /* The real engine, the same one the Slides page uses. This branch used
          to discard the file's bytes and fabricate a blue-gradient slide named
@@ -728,27 +732,28 @@ export function SlideEditorModal() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      input.onchange = (e: any) => {
+      input.onchange = async (e: any) => {
         const file = e.target?.files?.[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            const imgUrl = evt.target?.result as string;
-            const newElement: SlideElement = {
-              id: `image-${Date.now()}`,
-              type: 'image',
-              content: imgUrl,
-              x: 20,
-              y: 15,
-              width: 60,
-              height: 70,
-              zIndex: (activeSlideElements.length) + 1,
-            };
-            handleUpdateSlideElements([...activeSlideElements, newElement]);
-            handleSelectElement(newElement.id);
-          };
-          reader.readAsDataURL(file);
+        if (!file) return;
+        setImportStatus(`Optimising ${file.name}…`);
+        const imported = await importSlideImage(file);
+        if ('error' in imported) {
+          setImportStatus(imported.error);
+          return;
         }
+        const newElement: SlideElement = {
+          id: `image-${Date.now()}`,
+          type: 'image',
+          content: imported.url,
+          x: 20,
+          y: 15,
+          width: 60,
+          height: 70,
+          zIndex: (activeSlideElements.length) + 1,
+        };
+        handleUpdateSlideElements([...activeSlideElements, newElement]);
+        handleSelectElement(newElement.id);
+        setImportStatus(null);
       };
       input.click();
       setActiveTool('select');

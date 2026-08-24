@@ -87,5 +87,27 @@ assert.equal(svc.resolve('../../../../etc/passwd'), null, 'traversal must not re
 assert.equal(svc.resolve('/etc/passwd'), null, 'absolute paths must not resolve');
 console.log('9 ✓ path traversal and absolute paths refused');
 
+// 10. Optimized slide import writes an owned copy and leaves the original.
+const PNG_1X1 = Buffer.from(
+  '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082',
+  'hex',
+);
+const photo = path.join(vault, 'photo.png');
+fs.writeFileSync(photo, PNG_1X1);
+const optimized = svc.importOptimizedImage(photo);
+assert.equal(optimized.ok, true, `optimized import should succeed: ${optimized.error}`);
+assert.ok(optimized.item.file, 'optimized entry must own a copy');
+assert.equal(typeof optimized.item.sourcePath, 'undefined', 'optimized entry must not play from the original');
+assert.equal(fs.existsSync(photo), true, 'the original file must be left in place');
+const copyPath = svc.resolve(optimized.item.id);
+assert.ok(copyPath && copyPath.startsWith(mediaDir), 'resolve must serve the owned copy');
+assert.notEqual(copyPath, photo, 'the owned copy is not the original');
+assert.equal(svc.importOptimizedImage('/no/such/photo.jpg').ok, false, 'missing file must fail');
+assert.equal(svc.importOptimizedImage(dest).ok, false, 'a video must be refused');
+assert.equal(svc.remove(optimized.item.id).ok, true);
+assert.equal(fs.existsSync(copyPath), false, 'removing an optimized entry deletes the owned copy');
+assert.equal(fs.existsSync(photo), true, 'removing an optimized entry must not delete the original');
+console.log('10 ✓ optimized slide import writes a copy, original survives, remove cleans the copy');
+
 fs.rmSync(tmp, { recursive: true, force: true });
-console.log('\nAll 9 media-service checks passed.');
+console.log('\nAll 10 media-service checks passed.');

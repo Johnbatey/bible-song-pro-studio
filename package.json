@@ -6,6 +6,10 @@
   "author": "Johnson Olakotan",
   "license": "GPL-3.0-or-later",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.10.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/Johnbatey/bible-song-pro-studio.git"
@@ -58,9 +62,19 @@
     "verify:song-arrange": "node scripts/verify-song-arrange.cjs",
     "verify:song-arrange-ui": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-song-arrange-ui.cjs"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller",
+      "esbuild",
+      "koffi",
+      "sharp"
+    ]
+  },
   "build": {
     "appId": "com.biblesongpro.studio",
     "productName": "Bible Song Pro Studio",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "buildResources": "assets",
       "output": "release"
@@ -82,11 +96,25 @@
       "category": "public.app-category.productivity",
       "icon": "assets/icons/bible-song-pro-icon.icns",
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
+      "identity": null,
       "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": false,
       "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist",
       "extraResources": [
         {
           "from": "assets/bin/ndi/darwin",

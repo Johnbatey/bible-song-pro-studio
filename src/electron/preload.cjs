@@ -124,6 +124,18 @@ contextBridge.exposeInMainWorld('BSP', {
     load: () => ipcRenderer.invoke('store:load'),
     save: (value) => ipcRenderer.invoke('store:save', { value }),
     clear: () => ipcRenderer.invoke('store:clear'),
+    broadcast: (snapshot) => ipcRenderer.send('store:broadcast', snapshot),
+    requestSync: () => ipcRenderer.send('store:requestSync'),
+    onRemote: (cb) => {
+      const handler = (_, snapshot) => cb(snapshot);
+      ipcRenderer.on('store:remote', handler);
+      return () => ipcRenderer.removeListener('store:remote', handler);
+    },
+    onSyncRequest: (cb) => {
+      const handler = () => cb();
+      ipcRenderer.on('store:syncRequest', handler);
+      return () => ipcRenderer.removeListener('store:syncRequest', handler);
+    },
   },
 
   settings: {
@@ -168,6 +180,7 @@ contextBridge.exposeInMainWorld('BSP', {
     list: () => ipcRenderer.invoke('media:list'),
     pick: () => ipcRenderer.invoke('media:pick'),
     import: (paths) => ipcRenderer.invoke('media:import', { paths }),
+    importOptimized: (filePath) => ipcRenderer.invoke('media:importOptimized', { path: filePath }),
     remove: (id) => ipcRenderer.invoke('media:remove', { id }),
     rename: (id, name) => ipcRenderer.invoke('media:rename', { id, name }),
     /* Relink points an entry at the file's new home. `relink` takes a known
@@ -220,6 +233,14 @@ contextBridge.exposeInMainWorld('BSP', {
       const handler = () => cb();
       ipcRenderer.on('dock:resetLayout', handler);
       return () => ipcRenderer.removeListener('dock:resetLayout', handler);
+    },
+    popOut: (id) => ipcRenderer.invoke('dock:popOut', { id }),
+    focusPopout: (id) => ipcRenderer.invoke('dock:focusPopout', { id }),
+    listPopouts: () => ipcRenderer.invoke('dock:listPopouts'),
+    onPopoutsChanged: (cb) => {
+      const handler = (_, ids) => cb(ids);
+      ipcRenderer.on('dock:popouts', handler);
+      return () => ipcRenderer.removeListener('dock:popouts', handler);
     },
   },
 
