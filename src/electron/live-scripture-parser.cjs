@@ -222,11 +222,25 @@ function parseNumber(tokens) {
   const digitParts = parts.map((token) => /^\d$/.test(token) ? token : (NUMBER_WORDS[token] <= 9 ? String(NUMBER_WORDS[token]) : null));
   if (digitParts.every(Boolean) && digitParts.length <= 3) return Number(digitParts.join(''));
   let current = 0;
+  let prevValue = null;
   for (const token of parts) {
-    if (/^\d+$/.test(token)) { current += Number(token); continue; }
+    if (/^\d+$/.test(token)) {
+      const num = Number(token);
+      if (prevValue !== null && prevValue < 10 && num >= 20 && num < 100) return null;
+      current += num;
+      prevValue = num;
+      continue;
+    }
     if (!(token in NUMBER_WORDS)) return null;
     const value = NUMBER_WORDS[token];
-    current = value === 100 ? Math.max(1, current) * 100 : current + value;
+    if (value === 100) {
+      current = Math.max(1, current) * 100;
+      prevValue = 100;
+    } else {
+      if (prevValue !== null && prevValue < 10 && value >= 20 && value < 100) return null;
+      current += value;
+      prevValue = value;
+    }
   }
   return current || null;
 }
