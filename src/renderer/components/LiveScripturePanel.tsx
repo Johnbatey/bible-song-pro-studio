@@ -14,9 +14,10 @@ import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { detectSongs, type SongDetection } from '../utils/song-detection';
 
 /** Short enough to feel live, while still giving Whisper enough speech context. */
-const LOCAL_CHUNK_SECONDS = 3;
-const DETECT_DEBOUNCE_MS = 90;
-const DETECT_WINDOW_WORDS = 48;
+const LOCAL_CHUNK_SECONDS = 1.5;
+const DETECT_DEBOUNCE_MS = 60;
+/** Focused active utterance window for high-precision live matching without historical sermon pollution. */
+const DETECT_WINDOW_WORDS = 18;
 /** Roughly an hour of speech; the panel only ever shows the tail anyway. */
 const TRANSCRIPT_MAX_CHARS = 20000;
 
@@ -39,7 +40,7 @@ export function LiveScripturePanel() {
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [version, setVersion] = useState('KJV');
   const [versions, setVersions] = useState<Array<{ id: string; abbreviation: string; name: string }>>([]);
-  const [engine, setEngine] = useState<'local' | 'deepgram'>('local');
+  const [engine, setEngine] = useState<'local' | 'deepgram'>('deepgram');
   const [sttStatus, setSttStatus] = useState<SttStatus | null>(null);
   const [keyConfigured, setKeyConfigured] = useState(false);
   // A notice reports either a fault or a plain fact, and it is coloured as
@@ -66,6 +67,23 @@ export function LiveScripturePanel() {
   };
 
   const captureRef = useRef<AudioCaptureHandle | null>(null);
+  const candidateStabilityRef = useRef<{
+    ref: string;
+    count: number;
+    firstSeen: number;
+    retainedHit: BibleSearchResult | null;
+    retainedSuggestions: BibleSearchResult[];
+    retainedDetections: VerseDetection[];
+    retainedAt: number;
+  }>({
+    ref: '',
+    count: 0,
+    firstSeen: 0,
+    retainedHit: null,
+    retainedSuggestions: [],
+    retainedDetections: [],
+    retainedAt: 0,
+  });
   const localBufferRef = useRef<Float32Array[]>([]);
   const localSamplesRef = useRef(0);
   const localBusyRef = useRef(false);
@@ -83,12 +101,39 @@ export function LiveScripturePanel() {
   useEffect(() => {
     refreshInputs();
     window.BSP?.bible?.getVersions().then(setVersions).catch(() => {});
-    window.BSP?.settings?.get().then((res) => {
-      if (!res?.ok) return;
-      setKeyConfigured(Boolean(res.settings.deepgramApiKeySet));
-      if (res.settings.sttEngine) setEngine(res.settings.sttEngine);
-      if (res.settings.sermonLanguage) sermonLanguageRef.current = res.settings.sermonLanguage;
-    }).catch(() => {});
+
+    const applySettings = (settingsData: any) => {
+      if (!settingsData) return;
+      const isKeySet = Boolean(settingsData.deepgramApiKeySet);
+      setKeyConfigured(isKeySet);
+      if (settingsData.sttEngine) {
+        setEngine(settingsData.sttEngine === 'deepgram' ? 'deepgram' : 'local');
+      } else {
+        setEngine(isKeySet ? 'deepgram' : 'local');
+      }
+      if (settingsData.sermonLanguage) sermonLanguageRef.current = settingsData.sermonLanguage;
+      if (isKeySet || settingsData.sttEngine === 'local') {
+        setNotice((prev) => (prev.text.includes('API key') || prev.text.includes('Deepgram') ? { text: '', tone: 'info' } : prev));
+      }
+    };
+
+    const refreshSettings = () => {
+      window.BSP?.settings?.get().then((res) => {
+        if (res?.ok && res.settings) applySettings(res.settings);
+      }).catch(() => {});
+    };
+    refreshSettings();
+
+    const offSettings = window.BSP?.settings?.onUpdated?.((updated) => {
+      applySettings(updated);
+    });
+
+    const onSettingsCustomEvent = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) applySettings(detail);
+      else refreshSettings();
+    };
+
     window.BSP?.stt?.status().then(setSttStatus).catch(() => {});
 
     const off = window.BSP?.stt?.onEvent((event) => {
@@ -115,11 +160,16 @@ export function LiveScripturePanel() {
     };
     window.addEventListener('bsp:live-transcription-start', startFromTranscriptPanel);
     window.addEventListener('bsp:live-transcription-stop', stopFromTranscriptPanel);
+    window.addEventListener('bsp:settings-updated', onSettingsCustomEvent);
+    window.addEventListener('focus', refreshSettings);
 
     return () => {
       off?.();
+      offSettings?.();
       window.removeEventListener('bsp:live-transcription-start', startFromTranscriptPanel);
       window.removeEventListener('bsp:live-transcription-stop', stopFromTranscriptPanel);
+      window.removeEventListener('bsp:settings-updated', onSettingsCustomEvent);
+      window.removeEventListener('focus', refreshSettings);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -164,14 +214,21 @@ export function LiveScripturePanel() {
       text: finalTranscriptRef.current,
       interimText: interimTranscriptRef.current,
     });
-    scheduleDetection(combined, isFinal);
+    // Feed the active recent utterance rather than accumulated history
+    const activeUtterance = isFinal
+      ? text
+      : `${finalTranscriptRef.current.split(/\s+/).slice(-6).join(' ')} ${interimTranscriptRef.current}`.trim();
+    scheduleDetection(activeUtterance, isFinal);
   }
 
-  function scheduleDetection(text: string, isFinal: boolean) {
+  function scheduleDetection(activeText: string, isFinal: boolean) {
     if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
-    const words = text.trim().split(/\s+/).filter(Boolean);
+    const cleaned = activeText.trim();
+    if (!cleaned) return;
+    const words = cleaned.split(/\s+/).filter(Boolean);
     const rollingText = words.slice(-DETECT_WINDOW_WORDS).join(' ');
-    if (!rollingText || (!isFinal && rollingText.split(/\s+/).length < 3)) return;
+    if (!rollingText || (!isFinal && rollingText.split(/\s+/).length < 2)) return;
+    // Direct references in interim streams are evaluated with minimal delay (60ms)
     detectTimerRef.current = setTimeout(() => detectFromText(rollingText, isFinal), isFinal ? 0 : DETECT_DEBOUNCE_MS);
   }
 
@@ -198,50 +255,131 @@ export function LiveScripturePanel() {
     }
     const result = await window.BSP?.verse?.detect({
       text: cleaned,
-      options: { versionId: detectionVersion, modes: ['direct', 'contextual', 'verbatim', 'semantic'], limit: 6, minConfidence: isFinal ? 0.3 : 0.4, isFinal },
+      options: {
+        versionId: detectionVersion,
+        modes: ['direct', 'contextual', 'verbatim', 'semantic'],
+        limit: 6,
+        minConfidence: isFinal ? 0.35 : 0.45,
+        isFinal,
+      },
     }).catch(() => null);
     if (sequence !== detectSequenceRef.current) return;
     const detections = result?.detections || [];
-    const fallbackSuggestions = detections.length
-      ? []
-      : await window.BSP?.bible?.search({ versionId: detectionVersion, query: cleaned, limit: 6 }).catch(() => []) as BibleSearchResult[];
-    if (sequence !== detectSequenceRef.current) return;
-    const parserSuggestions = detections.map((d) => ({
-      reference: d.displayRef, text: d.text, book: d.book, chapter: d.chapter,
-      verse: d.verseStart, version: detectionVersion,
-    } as BibleSearchResult));
-    const suggestions = parserSuggestions.length ? parserSuggestions : fallbackSuggestions;
-    const bestHit = suggestions[0] || null;
+    const suggestions: BibleSearchResult[] = detections.map((d) => ({
+      reference: d.displayRef,
+      text: d.text,
+      book: d.book,
+      chapter: d.chapter,
+      verse: d.verseStart,
+      version: detectionVersion,
+    }));
+    
+    let effectiveDetections = detections;
+    let effectiveSuggestions = suggestions;
+    let topHit = effectiveSuggestions[0] || null;
+    const topDetection = effectiveDetections[0] || null;
+    const now = Date.now();
+
+    if (topHit && topDetection) {
+      const modeClass = classifyProjectionMode(topDetection.mode);
+      const isStrongDirect = modeClass === 'direct' && topDetection.confidence >= 0.85;
+
+      if (isStrongDirect) {
+        // Direct spoken citations lock in immediately and reset decay
+        candidateStabilityRef.current = {
+          ref: topHit.reference,
+          count: 1,
+          firstSeen: now,
+          retainedHit: topHit,
+          retainedSuggestions: effectiveSuggestions,
+          retainedDetections: effectiveDetections,
+          retainedAt: now,
+        };
+      } else if (modeClass === 'semantic') {
+        const refKey = topHit.reference;
+        if (candidateStabilityRef.current.ref === refKey) {
+          candidateStabilityRef.current.count += 1;
+        } else {
+          // If a new loose semantic candidate arrives with low-to-moderate confidence,
+          // don't immediately thrash the previously retained stable hit if it's fresh (within 3500ms)
+          if (
+            topDetection.confidence < 0.72 &&
+            candidateStabilityRef.current.retainedHit &&
+            now - candidateStabilityRef.current.retainedAt < 3500
+          ) {
+            topHit = candidateStabilityRef.current.retainedHit;
+            effectiveSuggestions = candidateStabilityRef.current.retainedSuggestions;
+            effectiveDetections = candidateStabilityRef.current.retainedDetections;
+          } else {
+            candidateStabilityRef.current = {
+              ref: refKey,
+              count: 1,
+              firstSeen: now,
+              retainedHit: topHit,
+              retainedSuggestions: effectiveSuggestions,
+              retainedDetections: effectiveDetections,
+              retainedAt: now,
+            };
+          }
+        }
+      } else {
+        // Verbatim or contextual
+        if (topDetection.confidence >= 0.65) {
+          candidateStabilityRef.current = {
+            ref: topHit.reference,
+            count: 1,
+            firstSeen: now,
+            retainedHit: topHit,
+            retainedSuggestions: effectiveSuggestions,
+            retainedDetections: effectiveDetections,
+            retainedAt: now,
+          };
+        }
+      }
+    } else {
+      // No immediate candidate found in this small chunk/breath pause.
+      // Hold previously retained high-confidence match for 3500ms so results do NOT flicker or disappear!
+      if (
+        candidateStabilityRef.current.retainedHit &&
+        now - candidateStabilityRef.current.retainedAt < 3500
+      ) {
+        topHit = candidateStabilityRef.current.retainedHit;
+        effectiveSuggestions = candidateStabilityRef.current.retainedSuggestions;
+        effectiveDetections = candidateStabilityRef.current.retainedDetections;
+      }
+    }
+
     lastDetectionTextRef.current = transcriptKey;
-    setRankedDetections(detections);
+    setRankedDetections(effectiveDetections);
     setDetectionIsFinal(isFinal);
     setDetectionLatencyMs(Math.max(0, Math.round(performance.now() - detectionStartedAt)));
-    setLive({ bestHit, suggestions });
-    setTranscription({ isActive: true, confidence: detections[0]?.confidence ?? (bestHit ? 0.65 : 0.45) });
+    setLive({ bestHit: topHit, suggestions: effectiveSuggestions });
+    setTranscription({ isActive: true, confidence: effectiveDetections[0]?.confidence ?? (topHit ? 0.65 : 0.45) });
 
     // Live Word Study / Lexicon term detection
     window.BSP?.lexicon?.detect(cleaned).then((match) => {
       if (match) setActiveWordStudy(match);
     }).catch(() => {});
-    // Keep Program accuracy tied to Deepgram's final transcript. Fast endpointing
-    // makes this final arrive promptly without projecting a revisable hypothesis.
-    if (isFinal && bestHit && detections[0]) {
-      const mode = String(detections[0]?.mode || '');
+
+    // Auto-projection guard:
+    // Direct spoken citations trigger instantly; verbatim quotes trigger on confidence;
+    // Semantic paraphrases are NEVER auto-projected to live screens without explicit operator click.
+    if (topHit && effectiveDetections[0]) {
+      const mode = String(effectiveDetections[0]?.mode || '');
       const prefs = useAppStore.getState().liveScripture;
       const matchClass = classifyProjectionMode(mode);
-      const shouldProject = matchClass === 'quoted'
-        ? prefs.autoProjectQuoted
-        : matchClass === 'direct' && prefs.autoProject;
-      const key = `${detectionVersion}|${bestHit.reference}`;
-      const now = Date.now();
-      if (shouldProject && (lastProjectedRef.current.key !== key || now - lastProjectedRef.current.at > 4000)) {
+      const shouldProject = (matchClass === 'direct' && prefs.autoProject && effectiveDetections[0].confidence >= 0.90) ||
+                            (matchClass === 'quoted' && prefs.autoProjectQuoted && isFinal && effectiveDetections[0].confidence >= 0.85);
+
+      const key = `${detectionVersion}|${topHit.reference}`;
+      if (shouldProject && (lastProjectedRef.current.key !== key || now - lastProjectedRef.current.at > 3500)) {
         lastProjectedRef.current = { key, at: now };
-        sendHit(bestHit, { goLive: true, confidence: detections[0].confidence, sourceMode: mode });
+        sendHit(topHit, { goLive: true, confidence: effectiveDetections[0].confidence, sourceMode: mode });
       }
     }
   }
 
-  /** Local engine: batch ~5s of audio, then run one Whisper pass over it. */
+  /** Local engine: batch ~1.5s of audio, then run one Whisper/Moonshine pass over it. */
   async function flushLocalBuffer() {
     if (localBusyRef.current || localBufferRef.current.length === 0) return;
     localBusyRef.current = true;
@@ -255,11 +393,6 @@ export function LiveScripturePanel() {
     chunks.forEach((chunk) => { merged.set(chunk, offset); offset += chunk.length; });
 
     try {
-      // Sent as a typed array — structured clone handles it, and Array.from() on
-      // ~80k samples per pass is pure overhead.
-      /* The operator's sermon language, not a hardcoded 'en'. An English-only
-         model ignores it — generationOptions only passes it on for a
-         multilingual checkpoint — so sending it is safe whatever is loaded. */
       const result = await window.BSP?.ai?.transcribe({
         audioData: merged,
         language: sermonLanguageRef.current,
@@ -282,10 +415,6 @@ export function LiveScripturePanel() {
   }
 
   async function startLive() {
-    /* Re-read the sermon language here rather than only on mount. Settings has
-       no change broadcast, and this panel can sit open across a whole morning
-       — an operator who switched to French between services would otherwise
-       still be transcribing the last one's language. */
     window.BSP?.settings?.get().then((res) => {
       if (res?.ok && res.settings.sermonLanguage) {
         sermonLanguageRef.current = res.settings.sermonLanguage;
@@ -296,13 +425,22 @@ export function LiveScripturePanel() {
     interimTranscriptRef.current = '';
     lastDetectionTextRef.current = '';
     detectSequenceRef.current += 1;
+    candidateStabilityRef.current = {
+      ref: '',
+      count: 0,
+      firstSeen: 0,
+      retainedHit: null,
+      retainedSuggestions: [],
+      retainedDetections: [],
+      retainedAt: 0,
+    };
     if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
     detectTimerRef.current = null;
 
     if (engine === 'deepgram') {
       const started = await window.BSP?.stt?.start({});
       if (!started?.ok) {
-        reportFault(started?.error || 'Could not start Deepgram');
+        reportFault(started?.error || 'Could not connect to Deepgram — check your API key in Settings.');
         setSttStatus(started?.status || null);
         return;
       }
@@ -330,9 +468,8 @@ export function LiveScripturePanel() {
         },
         onError: (err) => reportFault(err.message),
       });
-      setLive({ isActive: true, provider: engine === 'deepgram' ? 'deepgram' : 'local' });
-      const providerType = engine === 'deepgram' ? 'deepgram' : 'local';
-      const provider = useAppStore.getState().aiProviders.find((entry) => entry.type === providerType) || null;
+      setLive({ isActive: true, provider: engine });
+      const provider = useAppStore.getState().aiProviders.find((entry) => entry.type === (engine === 'deepgram' ? 'deepgram' : 'local')) || null;
       setTranscription({ isActive: true, provider });
     } catch (err) {
       reportFault(err instanceof Error ? err.message : 'Could not open the microphone');
@@ -342,9 +479,11 @@ export function LiveScripturePanel() {
 
   function stopLive() {
     teardownCapture();
-    window.BSP?.stt?.stop()
-      .then(() => window.BSP?.stt?.status().then(setSttStatus))
-      .catch(() => {});
+    if (engine === 'deepgram') {
+      window.BSP?.stt?.stop()
+        .then(() => window.BSP?.stt?.status().then(setSttStatus))
+        .catch(() => {});
+    }
     setLive({ isActive: false });
     setTranscription({ isActive: false });
   }
@@ -732,13 +871,10 @@ export function LiveScripturePanel() {
                     }
                   }}
                   options={[
-                    /* Not "Whisper" any more — Moonshine is the default and
-                       Whisper is one of three choices. Which one is running is
-                       named in Settings; this row is about local vs cloud. */
-                    { value: 'local', label: 'Local (On-device AI)', sublabel: 'Runs offline on this computer' },
-                    { value: 'deepgram', label: 'Deepgram (Cloud API)', sublabel: 'Fast cloud engine' },
+                    { value: 'deepgram', label: 'Deepgram (Cloud Nova-2)', sublabel: 'Sub-250ms streaming (recommended)' },
+                    { value: 'local', label: 'Local On-Device (ONNX)', sublabel: 'Runs 100% offline on this computer' },
                   ]}
-                  buttonStyle={{ width: 220, justifyContent: 'space-between' }}
+                  buttonStyle={{ width: 240, justifyContent: 'space-between' }}
                   title="Select AI Speech Model"
                 />
               </div>
@@ -1027,9 +1163,8 @@ function formatMatchModeAbbrev(mode: string) {
   return abbrevs[mode] || 'MATCH';
 }
 
-function classifyProjectionMode(mode: string): 'direct' | 'quoted' | 'none' {
+function classifyProjectionMode(mode: string): 'direct' | 'quoted' | 'semantic' | 'none' {
   const normalized = String(mode || '').toLowerCase();
-  if (normalized.includes('quoted') || normalized === 'verbatim' || normalized === 'semantic') return 'quoted';
   if (
     normalized === 'direct' ||
     normalized === 'direct-reference' ||
@@ -1037,6 +1172,8 @@ function classifyProjectionMode(mode: string): 'direct' | 'quoted' | 'none' {
     normalized === 'phonetic-reference' ||
     normalized === 'context-verse-reference'
   ) return 'direct';
+  if (normalized.includes('quoted') || normalized === 'verbatim') return 'quoted';
+  if (normalized === 'semantic' || normalized.includes('paraphrase')) return 'semantic';
   return 'none';
 }
 

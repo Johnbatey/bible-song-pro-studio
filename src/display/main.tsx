@@ -48,8 +48,20 @@ function DisplayHost() {
     };
   }, []);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'F11' || ((e.key === 'f' || e.key === 'F') && (e.metaKey || e.ctrlKey))) {
+        e.preventDefault();
+        window.BSP?.display?.toggleFullScreen?.();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div
+      onDoubleClick={() => window.BSP?.display?.toggleFullScreen?.()}
       style={{
         position: 'absolute',
         left: '50%',

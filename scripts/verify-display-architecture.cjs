@@ -10,7 +10,7 @@ const preload = read('src/electron/preload.cjs');
 const audienceHtml = read('audience-display.html');
 const audienceEntry = read('src/display/main.tsx');
 const legacyDisplay = read('display.html');
-const createDisplayWindowBody = main.match(/function createDisplayWindow\(bounds\) \{[\s\S]*?\n\}/)?.[0] || '';
+const createDisplayWindowBody = main.match(/function createDisplayWindow\([^)]*\) \{[\s\S]*?\n\}/)?.[0] || '';
 
 assert.match(main, /loadURL\(isDev \? 'http:\/\/localhost:5173\/audience-display\.html'/, 'createDisplayWindow must load the bundled audience display in development');
 assert.match(main, /dist\/audience-display\.html/, 'createDisplayWindow must load dist/audience-display.html in production');

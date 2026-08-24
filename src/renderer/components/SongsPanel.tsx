@@ -75,6 +75,8 @@ export function SongsPanel() {
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
   /** Multi-select: ids of songs the operator has checked for bulk delete. */
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  /** Selection mode toggle: enables checkboxes and batch operations. */
+  const [isSelectMode, setIsSelectMode] = useState(false);
   const [bgOpen, setBgOpen] = useState(false);
   const [arrOpen, setArrOpen] = useState(false);
   const [arranging, setArranging] = useState(false);
@@ -125,6 +127,7 @@ export function SongsPanel() {
     setCheckedIds((prev) => {
       const next = new Set(prev);
       ids.forEach((id) => next.delete(id));
+      if (next.size === 0) setIsSelectMode(false);
       return next;
     });
     notify(`Deleted ${ids.length} song${ids.length === 1 ? '' : 's'}.`);
@@ -367,12 +370,20 @@ export function SongsPanel() {
         style={{ flex: `0 0 ${listWidth}px`, minWidth: 180 }}
         tools={(
           <>
-            {checkedIds.size > 0 && (
+            {songs.length > 0 && (
               <BlockButton
-                onClick={() => handleDeleteSongs(Array.from(checkedIds))}
-                title={`Delete ${checkedIds.size} selected song${checkedIds.size === 1 ? '' : 's'}`}
+                active={isSelectMode}
+                onClick={() => {
+                  if (isSelectMode) {
+                    setIsSelectMode(false);
+                    setCheckedIds(new Set());
+                  } else {
+                    setIsSelectMode(true);
+                  }
+                }}
+                title={isSelectMode ? 'Exit selection mode' : 'Select multiple songs to manage or delete'}
               >
-                Delete ({checkedIds.size})
+                {isSelectMode ? 'Done' : 'Select'}
               </BlockButton>
             )}
             {songs.length === 0 && (
@@ -392,6 +403,82 @@ export function SongsPanel() {
           onChange={(e) => { setSearch(e.target.value); setLyricTarget(null); }}
           style={{ flexShrink: 0 }}
         />
+
+        {/* Multi-Select Action Bar */}
+        {isSelectMode && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 10px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 11,
+              flexShrink: 0,
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-xs"
+              onClick={() => {
+                const allSelected = filteredSongs.length > 0 && filteredSongs.every((s) => checkedIds.has(s.id));
+                if (allSelected) {
+                  setCheckedIds((prev) => {
+                    const next = new Set(prev);
+                    filteredSongs.forEach((s) => next.delete(s.id));
+                    return next;
+                  });
+                } else {
+                  setCheckedIds((prev) => {
+                    const next = new Set(prev);
+                    filteredSongs.forEach((s) => next.add(s.id));
+                    return next;
+                  });
+                }
+              }}
+              style={{
+                background: 'var(--chrome-control)',
+                border: '1px solid var(--border-primary)',
+                color: 'var(--text-primary)',
+                padding: '2px 8px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontWeight: 500,
+                fontSize: 11,
+              }}
+            >
+              {filteredSongs.length > 0 && filteredSongs.every((s) => checkedIds.has(s.id))
+                ? 'Deselect All'
+                : 'Select All'}
+            </button>
+
+            <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>
+              {checkedIds.size} of {filteredSongs.length} selected
+            </span>
+
+            <button
+              type="button"
+              className="btn btn-xs"
+              disabled={checkedIds.size === 0}
+              onClick={() => handleDeleteSongs(Array.from(checkedIds))}
+              style={{
+                background: checkedIds.size > 0 ? 'var(--tally-fault, #ff6b6b)' : 'var(--chrome-control)',
+                color: checkedIds.size > 0 ? '#fff' : 'var(--text-dim)',
+                border: '1px solid var(--border-primary)',
+                padding: '2px 8px',
+                borderRadius: 4,
+                cursor: checkedIds.size > 0 ? 'pointer' : 'default',
+                fontWeight: 600,
+                fontSize: 11,
+                opacity: checkedIds.size > 0 ? 1 : 0.5,
+              }}
+            >
+              Delete ({checkedIds.size})
+            </button>
+          </div>
+        )}
 
         {/* Dropzone */}
         <div
@@ -433,38 +520,48 @@ export function SongsPanel() {
                       : isChecked
                         ? 'var(--tally-fault, #ff6b6b)'
                         : 'rgba(255, 255, 255, 0.08)',
-                    background: isSelected ? 'var(--chrome-control-active)' : 'var(--bg-secondary)',
-                    padding: 10,
+                    background: isSelected
+                      ? 'var(--chrome-control-active)'
+                      : isChecked
+                        ? 'rgba(255, 107, 107, 0.08)'
+                        : 'var(--bg-secondary)',
+                    padding: '8px 10px',
                     display: 'flex',
-                    alignItems: 'flex-start',
+                    alignItems: 'center',
                     gap: 8,
                   }}
                   onClick={(e) => {
-                    if ((e.target as HTMLElement).closest('[data-song-check]')) return;
-                    setSelectedSong(song);
+                    if (isSelectMode) {
+                      toggleChecked(song.id);
+                    } else {
+                      if ((e.target as HTMLElement).closest('[data-song-check]')) return;
+                      setSelectedSong(song);
+                    }
                   }}
                 >
-                  {/* Multi-select checkbox */}
-                  <input
-                    type="checkbox"
-                    data-song-check
-                    checked={isChecked}
-                    onChange={() => toggleChecked(song.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    title="Select for bulk delete"
-                    style={{
-                      accentColor: 'var(--tally-fault, #ff6b6b)',
-                      cursor: 'pointer',
-                      marginTop: 3,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-                      <div style={{ ...type.heading, fontWeight: isSelected ? fontWeight.semibold : fontWeight.medium, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {song.title}
-                      </div>
-                      {/* Single-song delete button */}
+                  {/* Multi-select checkbox: only shown during Select Mode */}
+                  {isSelectMode && (
+                    <input
+                      type="checkbox"
+                      data-song-check
+                      checked={isChecked}
+                      onChange={() => toggleChecked(song.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Select for bulk delete"
+                      style={{
+                        accentColor: 'var(--tally-fault, #ff6b6b)',
+                        cursor: 'pointer',
+                        margin: 0,
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                    <div style={{ ...type.heading, fontWeight: isSelected ? fontWeight.semibold : fontWeight.medium, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {song.title}
+                    </div>
+                    {/* Single-song delete button: hidden during Select Mode */}
+                    {!isSelectMode && (
                       <button
                         type="button"
                         title={`Delete ${song.title}`}
@@ -477,13 +574,7 @@ export function SongsPanel() {
                           <path d="M3.5 4.5l.7 9a1 1 0 0 0 1 .9h5.6a1 1 0 0 0 1-.9l.7-9" />
                         </svg>
                       </button>
-                    </div>
-                    <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 2 }}>
-                      {song.artist || 'Unknown Artist'} {song.key ? `· Key: ${song.key}` : ''}
-                    </div>
-                    <div style={{ ...type.caption, color: 'var(--text-dim)', marginTop: 2 }}>
-                      {song.slides.length} slides
-                    </div>
+                    )}
                   </div>
                 </div>
               );

@@ -7,7 +7,7 @@ const DEFAULTS = {
   deepgramApiKey: '',
   deepgramModel: 'nova-2',
   deepgramLanguage: 'en',
-  sttEngine: 'local', // 'local' | 'deepgram'
+  sttEngine: 'deepgram', // 'deepgram' | 'local'
   /* Which on-device recogniser runs. Empty means "whatever the service
      defaults to", so a fresh install follows the default in
      whisper-onnx-service without this file having to name it twice. Stored

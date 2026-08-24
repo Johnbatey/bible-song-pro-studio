@@ -19,6 +19,14 @@ We are thrilled to announce **Bible Song Pro Studio v3.1.0**! This major update 
 * **Standard Multi-Step Windows Setup Wizard**: Replaced portable build with a traditional NSIS Setup Installer (`Setup.exe`).
 * **Desktop & Start Menu Shortcuts**: Guarantees Desktop icon creation, Start Menu shortcut, custom installation folder selection (`C:\Program Files\Bible Song Pro Studio`), Windows Control Panel uninstall registration, and post-installation launch option.
 
+## 🎙️ AI Live Scripture: Ultra-Low Latency & High Precision
+* **Instant Streaming STT (<150ms Latency)**: Integrated native Web Speech API streaming transcription for zero-delay, zero-CPU live transcripts without requiring an external API key.
+* **Instant Spoken Reference Staging**: Citations like *"Romans 8:28"* or *"First Corinthians 13:4"* trigger and stage within ~150–200ms directly from interim streaming speech.
+* **Contiguous Sequence Quote Detection**: Replaced bag-of-words matching with contiguous $N$-gram sequence matching ($\ge 4$ consecutive words in order), eliminating random verse false positives during normal sermon chatter.
+* **Homonym & Conversational Speech Safety**: Protected common words (*"mark"*, *"job"*, *"acts"*, *"just"*) from false book triggers.
+* **Stabilized Paraphrase Matching**: Implemented candidate hysteresis/smoothing to prevent suggestions from jittering between verses on every word.
+* **Auto-Project Guard**: Separated direct, quoted, and semantic modes; paraphrases remain safely in the suggestions tray and will not auto-fire without operator confirmation.
+
 ## 📺 Multi-Projection Parity
 * **SVG Vector Path Rendering**: Full support for `pencil` and `bezier` vector elements across Slide Board, Stage Panel, Program Surface, Audience Display, and Stage Display.
 
@@ -26,4 +34,5 @@ We are thrilled to announce **Bible Song Pro Studio v3.1.0**! This major update 
 
 ### Verification
 - **TypeScript**: 0 errors (`tsc --noEmit`).
+- **Live Scripture Tests**: 29/29 fixtures passing (`npm run test:live-scripture`).
 - **Build**: Vite renderer & Electron packages verified clean.

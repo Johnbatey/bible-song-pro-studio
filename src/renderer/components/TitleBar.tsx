@@ -207,11 +207,15 @@ export function TitleBar() {
                 return (
                   <button
                     key={dock.id}
+                    className="titlebar-pill-btn"
+                    data-active={isOpen ? 'true' : undefined}
                     style={{
                       ...styles.pillBtn,
                       background: isOpen ? 'var(--chrome-control-active)' : 'transparent',
+                      borderColor: isOpen ? 'var(--border-secondary, rgba(255, 255, 255, 0.1))' : 'transparent',
                       color: isOpen ? 'var(--text-primary)' : 'var(--text-secondary)',
                       fontWeight: isOpen ? fontWeight.semibold : fontWeight.medium,
+                      boxShadow: isOpen ? '0 1px 2px rgba(0, 0, 0, 0.25)' : 'none',
                     }}
                     onClick={() => toggleDock(dock.id)}
                     title={`${section.label} · ${isOpen ? `Close the ${dock.title} dock` : `Open the ${dock.title} dock`}`}
@@ -250,6 +254,7 @@ export function TitleBar() {
         {/* Live / Standby / Blackout Dynamic Status Pill */}
         <button
           type="button"
+          className="titlebar-live-btn"
           style={{
             ...styles.liveBadge,
             cursor: 'pointer',
@@ -268,7 +273,7 @@ export function TitleBar() {
               : currentScene
               ? 'var(--bsp-signal)'
               : 'var(--text-secondary)',
-            transition: 'all 0.2s ease',
+            transition: 'all 0.15s ease',
           }}
           onClick={() => {
             if (isBlackout) {
@@ -301,9 +306,11 @@ export function TitleBar() {
 
         {/* Blackout Toggle Button */}
         <button
+          className="titlebar-black-btn"
           style={{
             ...styles.blackBtn,
             background: isBlackout ? 'var(--tally-fault)' : 'var(--chrome-control)',
+            borderColor: isBlackout ? 'var(--tally-fault)' : 'var(--border-primary)',
             color: isBlackout ? '#ffffff' : 'var(--text-secondary)',
           }}
           onClick={toggleBlackout}
@@ -319,8 +326,11 @@ export function TitleBar() {
         <div style={styles.toolbarGroup}>
           {/* Audience Display Button */}
           <button
+            className="titlebar-icon-btn"
             style={{
               ...styles.toolbarBtn,
+              background: isExternalDisplayActive ? 'rgba(99, 102, 241, 0.18)' : styles.toolbarBtn.background,
+              borderColor: isExternalDisplayActive ? 'var(--accent)' : 'var(--border-primary)',
               color: isExternalDisplayActive ? 'var(--accent)' : 'var(--text-secondary)',
             }}
             onClick={async () => {
@@ -332,80 +342,82 @@ export function TitleBar() {
                 setExternalDisplay(true);
               }
             }}
-            title="Toggle Audience Display Window (Projector/Screen)"
+            title={isExternalDisplayActive ? 'Audience Display Active (Projector/Screen) — Click to Close' : 'Open Audience Display Window (Projector/Screen)'}
+            aria-label="Audience Display"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="3" width="20" height="14" rx="2" />
               <line x1="8" y1="21" x2="16" y2="21" />
               <line x1="12" y1="17" x2="12" y2="21" />
             </svg>
-            Audience
+            {isExternalDisplayActive && (
+              <span style={{ position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: '50%', background: 'var(--tally-preview)', boxShadow: '0 0 6px var(--tally-preview)' }} />
+            )}
           </button>
 
           {/* NDI Quick Toggle Button */}
           <button
+            className="titlebar-icon-btn"
             style={{
               ...styles.toolbarBtn,
               background: ndiStatus?.running ? 'rgba(59, 130, 246, 0.18)' : styles.toolbarBtn.background,
-              borderColor: ndiStatus?.running ? 'var(--tally-link)' : 'transparent',
+              borderColor: ndiStatus?.running ? 'var(--tally-link)' : 'var(--border-primary)',
               color: ndiStatus?.running ? 'var(--tally-link)' : 'var(--text-secondary)',
-              fontWeight: ndiStatus?.running ? 700 : 500,
             }}
             onClick={toggleNdi}
             title={ndiStatus?.running ? `NDI Streaming Active (${ndiStatus.connections} receiver connected) - Click to Stop` : 'Start NDI Stream for OBS / vMix'}
+            aria-label="NDI Stream"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" />
-              <path d="M8 21h8" />
-              <path d="M12 17v4" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 16.1A5 5 0 0 1 5.9 20" />
+              <path d="M2 12.05A9 9 0 0 1 9.95 20" />
+              <path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+              <line x1="2" y1="20" x2="2.01" y2="20" strokeWidth="2.5" />
             </svg>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              NDI
-              {ndiStatus?.running && (
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--tally-preview)', boxShadow: '0 0 6px var(--tally-preview)' }} />
-              )}
-            </span>
+            {ndiStatus?.running && (
+              <span style={{ position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: '50%', background: 'var(--tally-preview)', boxShadow: '0 0 6px var(--tally-preview)' }} />
+            )}
           </button>
 
           {/* Alerts Button */}
           <button
+            className="titlebar-icon-btn"
             style={{
               ...styles.toolbarBtn,
               background: activeAlert ? 'rgba(255, 85, 0, 0.2)' : styles.toolbarBtn.background,
-              borderColor: activeAlert ? '#FF5500' : 'transparent',
+              borderColor: activeAlert ? '#FF5500' : 'var(--border-primary)',
               color: activeAlert ? '#FF5500' : 'var(--text-secondary)',
-              fontWeight: activeAlert ? 700 : 500,
             }}
             onClick={() => setShowAlertModal((v) => !v)}
             title={activeAlert ? `Alert ON AIR: "${activeAlert.text}" — Click to manage` : 'Broadcast On-Screen Alert to Display Screens'}
+            aria-label="Alerts"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              Alerts
-              {activeAlert && (
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FF5500', boxShadow: '0 0 6px #FF5500' }} />
-              )}
-            </span>
+            {activeAlert && (
+              <span style={{ position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: '50%', background: '#FF5500', boxShadow: '0 0 6px #FF5500' }} />
+            )}
           </button>
 
           {/* Settings Button */}
           <button
+            className="titlebar-icon-btn"
             style={styles.toolbarBtn}
             onClick={() => useAppStore.getState().openSettings('output')}
             title="Open Application Settings"
+            aria-label="Settings"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
-            Settings
           </button>
 
           {/* UI Theme Switcher Button (Brand Identity Light / Dark Mode) */}
           <button
+            className="titlebar-icon-btn"
             style={{
               ...styles.toolbarBtn,
               color: uiThemeMode === 'light' ? 'var(--accent)' : 'var(--text-secondary)',
@@ -415,7 +427,7 @@ export function TitleBar() {
             aria-label="Toggle UI Theme"
           >
             {uiThemeMode === 'dark' ? (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="5" />
                 <line x1="12" y1="1" x2="12" y2="3" />
                 <line x1="12" y1="21" x2="12" y2="23" />
@@ -427,11 +439,10 @@ export function TitleBar() {
                 <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
               </svg>
             ) : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             )}
-            {uiThemeMode === 'dark' ? 'Light' : 'Dark'}
           </button>
         </div>
 
@@ -822,39 +833,44 @@ const styles: Record<string, React.CSSProperties> = {
   pillContainer: {
     display: 'flex',
     alignItems: 'center',
+    height: 32,
     background: 'var(--chrome-control)',
-    borderRadius: 6,
-    padding: 3,
+    borderRadius: 7,
+    padding: 2,
     gap: 2,
-    border: '1px solid var(--chrome-control)',
+    border: '1px solid var(--border-primary)',
+    boxSizing: 'border-box',
   },
   pillGroup: {
     display: 'flex',
     alignItems: 'center',
     gap: 2,
+    height: '100%',
   },
-  /* A hairline, not a rule: enough to read as a break between groups from a
-     metre away, not enough to look like a control. */
+  /* A hairline break between groups */
   pillDivider: {
     width: 1,
     height: 16,
-    margin: '0 6px',
-    /* Not --border-primary: that rule is #262628, which is a hairline against
-       the app's ground but all but invisible on the raised fill this pill
-       strip sits on. Mute, held back, is the same idea at a contrast the
-       operator can actually see from where they sit. */
-    background: 'var(--bsp-mute)',
-    opacity: 0.5,
+    margin: '0 4px',
+    background: 'var(--block-line)',
+    opacity: 0.8,
     flexShrink: 0,
   },
   pillBtn: {
-    padding: '5px 14px',
-    border: 'none',
-    borderRadius: 6,
-    fontSize: 13,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 26,
+    padding: '0 11px',
+    border: '1px solid transparent',
+    borderRadius: 5,
+    fontSize: 12,
+    letterSpacing: '-0.01em',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     fontFamily: 'var(--font-ui)',
+    boxSizing: 'border-box',
+    userSelect: 'none',
   },
   controlsRight: {
     display: 'flex',
@@ -866,23 +882,29 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
   },
   takeBtn: {
-    height: 28,
-    padding: '0 10px',
+    height: 32,
+    padding: '0 12px',
     fontSize: 12,
     fontWeight: 600,
+    borderRadius: 7,
+    boxSizing: 'border-box',
   },
   liveBadge: {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
+    height: 32,
+    padding: '0 11px',
     fontSize: 11,
     fontWeight: 700,
     color: 'var(--text-primary)',
-    padding: '4px 10px',
-    borderRadius: 6,
+    borderRadius: 7,
     background: 'var(--chrome-control)',
     border: '1px solid var(--border-primary)',
-    letterSpacing: '0.04em',
+    letterSpacing: '0.06em',
+    boxSizing: 'border-box',
+    fontFamily: 'var(--font-ui)',
   },
   liveDot: {
     width: 7,
@@ -890,16 +912,23 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
     background: 'var(--tally-preview)',
     boxShadow: '0 0 8px rgba(34, 197, 94, 0.8)',
+    flexShrink: 0,
   },
   blackBtn: {
-    padding: '4px 10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 32,
+    padding: '0 12px',
     border: '1px solid var(--border-primary)',
-    borderRadius: 6,
+    borderRadius: 7,
     fontSize: 11,
     fontWeight: 700,
     cursor: 'pointer',
-    letterSpacing: '0.04em',
+    letterSpacing: '0.06em',
     transition: 'all 0.15s ease',
+    boxSizing: 'border-box',
+    fontFamily: 'var(--font-ui)',
   },
   toolbarGroup: {
     display: 'flex',
@@ -908,29 +937,26 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toolbarBtn: {
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 60,
-    height: 42,
-    gap: 3,
+    width: 32,
+    height: 32,
     padding: 0,
     border: '1px solid var(--border-primary)',
     background: 'var(--chrome-control)',
-    borderRadius: 8,
+    borderRadius: 7,
     cursor: 'pointer',
-    fontSize: 10,
-    fontWeight: 500,
-    letterSpacing: '-0.01em',
-    color: 'var(--text-primary)',
+    color: 'var(--text-secondary)',
     transition: 'all 0.15s ease',
-    fontFamily: 'var(--font-ui)',
     flexShrink: 0,
     boxSizing: 'border-box',
+    position: 'relative',
   },
   divider: {
     width: 1,
-    height: 22,
+    height: 20,
     background: 'var(--block-line)',
+    margin: '0 2px',
+    flexShrink: 0,
   },
 };

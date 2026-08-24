@@ -13,6 +13,10 @@ const HARD_STOPWORDS = new Set([
   'the', 'and', 'that', 'unto', 'for', 'they', 'shall', 'with', 'you', 'not', 'but', 'his',
   'her', 'him', 'them', 'their', 'was', 'were', 'are', 'is', 'be', 'have', 'hath', 'had',
   'this', 'which', 'from', 'all', 'thou', 'thee', 'thy', 'ye', 'it', 'of', 'in', 'to', 'a',
+  'an', 'by', 'as', 'at', 'or', 'so', 'we', 'us', 'our', 'my', 'me', 'mine', 'your', 'yours',
+  'when', 'where', 'who', 'whom', 'whose', 'what', 'why', 'how', 'then', 'there', 'here',
+  'now', 'just', 'also', 'will', 'would', 'could', 'should', 'can', 'may', 'must', 'said',
+  'say', 'saying', 'went', 'came', 'come', 'into', 'upon', 'out', 'up', 'down', 'about',
 ]);
 
 /**

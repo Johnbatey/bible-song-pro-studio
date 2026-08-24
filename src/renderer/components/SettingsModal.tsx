@@ -413,12 +413,18 @@ export function SettingsModal() {
 
   async function saveSettings(patch: Partial<AppSettingsPatch>) {
     const res = await window.BSP?.settings?.set(patch).catch(() => null);
-    if (res?.ok) setSettings(res.settings);
+    if (res?.ok && res.settings) {
+      setSettings(res.settings);
+      window.dispatchEvent(new CustomEvent('bsp:settings-updated', { detail: res.settings }));
+    }
   }
 
   async function clearDeepgramKey() {
     const res = await window.BSP?.settings?.clearSecret('deepgramApiKey').catch(() => null);
-    if (res?.ok && res.settings) setSettings(res.settings);
+    if (res?.ok && res.settings) {
+      setSettings(res.settings);
+      window.dispatchEvent(new CustomEvent('bsp:settings-updated', { detail: res.settings }));
+    }
   }
 
   function patchFullScreen(patch: Partial<NonNullable<typeof activeTheme>['fullScreen']>) {
@@ -744,7 +750,7 @@ export function SettingsModal() {
                 <div style={modalStyles.formRow}>
                   <div>
                     <div style={modalStyles.rowTitle}>Transcription mode</div>
-                    <div style={modalStyles.rowSub}>Run transcription locally or via Cloud AI API</div>
+                    <div style={modalStyles.rowSub}>Run transcription via Cloud Deepgram Nova-2 API or locally offline</div>
                   </div>
                   <div style={modalStyles.pillGroup}>
                     <button
@@ -1060,7 +1066,7 @@ export function SettingsModal() {
                         </option>
                       ))}
                     </select>
-                    <button style={modalStyles.actionBtn} onClick={() => window.BSP?.openStageDisplay?.()}>
+                    <button style={modalStyles.actionBtn} onClick={() => window.BSP?.openStageDisplay?.(selectedStageDisplayId)}>
                       Open Stage Display
                     </button>
                   </div>

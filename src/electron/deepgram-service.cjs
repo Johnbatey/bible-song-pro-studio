@@ -132,6 +132,8 @@ function createDeepgramService({ emit }) {
     reconnectTimer = setTimeout(() => { openConnection(); }, delay);
   }
 
+  let pendingAudioQueue = [];
+
   function openConnection() {
     if (!apiKey) {
       lastError = 'Deepgram API key is not set (Settings → Transcription).';
@@ -148,24 +150,35 @@ function createDeepgramService({ emit }) {
 
       const client = createClient(apiKey);
       connection = client.listen.live({
-        model,
-        language,
+        model: model || 'nova-2',
+        language: language || 'en',
         encoding: 'linear16',
         sample_rate: SAMPLE_RATE,
         channels: 1,
         punctuate: true,
         smart_format: true,
         interim_results: true,
-        // Ask Deepgram to close a speech segment quickly. Projection still waits for
-        // `is_final`, but no longer pays the previous 300 ms endpointing delay.
-        endpointing: 50,
+        endpointing: 250,
         vad_events: true,
         utterance_end_ms: 1000,
+        keywords: [
+          'Genesis:2.5', 'Exodus:2.5', 'Leviticus:2.5', 'Numbers:2.5', 'Deuteronomy:2.5',
+          'Joshua:2.5', 'Judges:2.5', 'Ruth:2.5', 'Samuel:2.5', 'Kings:2.5',
+          'Chronicles:2.5', 'Ezra:2.5', 'Nehemiah:2.5', 'Esther:2.5', 'Job:2.5',
+          'Psalms:2.5', 'Proverbs:2.5', 'Ecclesiastes:2.5', 'Song of Solomon:2.5',
+          'Isaiah:2.5', 'Jeremiah:2.5', 'Lamentations:2.5', 'Ezekiel:2.5', 'Daniel:2.5',
+          'Hosea:2.5', 'Joel:2.5', 'Amos:2.5', 'Obadiah:2.5', 'Jonah:2.5',
+          'Micah:2.5', 'Nahum:2.5', 'Habakkuk:2.5', 'Zephaniah:2.5', 'Haggai:2.5',
+          'Zechariah:2.5', 'Malachi:2.5', 'Matthew:2.5', 'Mark:2.5', 'Luke:2.5',
+          'John:2.5', 'Acts:2.5', 'Romans:2.5', 'Corinthians:2.5', 'Galatians:2.5',
+          'Ephesians:2.5', 'Philippians:2.5', 'Colossians:2.5', 'Thessalonians:2.5',
+          'Timothy:2.5', 'Titus:2.5', 'Philemon:2.5', 'Hebrews:2.5', 'James:2.5',
+          'Peter:2.5', 'Jude:2.5', 'Revelation:2.5', 'Chapter:2.0', 'Verse:2.0',
+          'Scripture:2.0', 'Bible:2.0', 'Hallelujah:1.8', 'Amen:1.8',
+        ],
       });
 
       connection.on(LiveTranscriptionEvents.Open, () => {
-        // Deliberately not marking the generation settled: a later drop on this same
-        // connection must still be able to trigger a reconnect.
         if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
         everConnected = true;
         reconnectAttempts = 0;
@@ -175,6 +188,19 @@ function createDeepgramService({ emit }) {
         bytesSinceLastResult = 0;
         setState('live');
         startStallWatch();
+
+        // Flush any audio chunks captured while establishing the connection
+        if (pendingAudioQueue.length > 0) {
+          const queue = pendingAudioQueue;
+          pendingAudioQueue = [];
+          for (const buf of queue) {
+            try {
+              connection.send(buf);
+              bytesSent += buf.length;
+              bytesSinceLastResult += buf.length;
+            } catch (_) {}
+          }
+        }
       });
 
       connection.on(LiveTranscriptionEvents.Transcript, (data) => {
@@ -204,12 +230,12 @@ function createDeepgramService({ emit }) {
       connection.on(LiveTranscriptionEvents.Error, (err) => {
         lastError = err?.message || String(err);
         emit?.({ type: 'error', error: lastError });
-        // A rejected handshake often raises Error with no Close behind it
         if (running && !closingIntentionally) failAttempt(lastError);
       });
 
       connection.on(LiveTranscriptionEvents.Close, (event) => {
         connection = null;
+        pendingAudioQueue = [];
         if (closingIntentionally || !running) { setState('idle'); return; }
         failAttempt(`socket closed${event?.code ? ' code=' + event.code : ''}`);
       });
@@ -242,15 +268,24 @@ function createDeepgramService({ emit }) {
     bytesSent = 0;
     bytesSinceLastResult = 0;
     lastError = '';
+    pendingAudioQueue = [];
     openConnection();
     return { ok: true, status: status() };
   }
 
   /** `chunk` is 16 kHz mono signed 16-bit PCM. */
   function sendAudio(chunk) {
-    if (!running || !connection || state !== 'live') return false;
+    if (!running) return false;
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    if (state === 'connecting') {
+      // Buffer up to 4 seconds of audio while handshake completes
+      if (pendingAudioQueue.length < 60) {
+        pendingAudioQueue.push(buffer);
+      }
+      return true;
+    }
+    if (!connection || state !== 'live') return false;
     try {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       connection.send(buffer);
       bytesSent += buffer.length;
       bytesSinceLastResult += buffer.length;
@@ -265,6 +300,7 @@ function createDeepgramService({ emit }) {
   function stop(opts = {}) {
     closingIntentionally = true;
     running = false;
+    pendingAudioQueue = [];
     clearTimers();
     if (connection) {
       try { connection.requestClose(); } catch { /* already gone */ }

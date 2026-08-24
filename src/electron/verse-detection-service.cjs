@@ -143,33 +143,47 @@ function createVerseDetectionService() {
       });
     }
 
-    // Mode 4: Semantic — BM25 over the verse index, for paraphrases and loose quotes.
-    // Previously a full 30k-verse rescan per call with no IDF, which was both slow
-    // (~180ms) and wrong (common-word overlap ranked genealogies above the quoted verse).
-    if (modes.includes('semantic') && detections.length < limit) {
-      const results = verseIndex.search(text, { versionId, limit: Math.max(5, limit) });
-      results
-        .filter((hit) => hit.score >= 0.12)
-        .slice(0, Math.min(5, limit - detections.length))
-        .forEach((hit) => {
-          const key = `sem|${hit.book}|${hit.chapter}|${hit.verse}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          detections.push({
-            mode: 'semantic',
-            book: hit.book,
-            chapter: hit.chapter,
-            verseStart: hit.verse,
-            verseEnd: hit.verse,
-            displayRef: hit.reference,
-            text: hit.text,
-            verses: [{ verse: hit.verse, text: hit.text }],
-            // Held below the verbatim/direct band: a strong lexical match is still a
-            // weaker signal than an explicit reference or an exact quote.
-            confidence: Math.min(0.85, 0.3 + hit.score * 0.6),
-            semanticScore: hit.score,
+    // Mode 4: Semantic — BM25 over the verse index, for genuine paraphrases.
+    // Strictly gated to prevent conversational fluff or numbers from hallucinating random verses.
+    if (modes.includes('semantic') && detections.length < limit && detections.length === 0) {
+      const cleaned = liveParser.cleanSermonUtterance ? liveParser.cleanSermonUtterance(text) : text;
+      const searchTarget = cleaned.length >= 8 ? cleaned : text;
+      // Strip number words and citation markers from semantic tokens so citation fragments never trigger random OT verses
+      const rawTokens = verseIndex.tokenize(searchTarget);
+      const numberAndCitationWords = new Set([
+        'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+        'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen',
+        'nineteen', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety', 'hundred',
+        'chapter', 'chapters', 'verse', 'verses', 'book', 'read', 'open', 'turn', 'bible', 'scripture',
+        'tight', 'tightest', 'title', 'leave', 'ronald'
+      ]);
+      const contentTokens = rawTokens.filter((t) => !numberAndCitationWords.has(t));
+
+      // Require at least 3 distinct non-number content tokens for semantic search
+      if (contentTokens.length >= 3) {
+        const results = verseIndex.search(contentTokens.join(' '), { versionId, limit: Math.max(5, limit) });
+        const minSemanticScore = options.isFinal === false ? 0.55 : 0.48;
+        results
+          .filter((hit) => hit.score >= minSemanticScore)
+          .slice(0, Math.min(4, limit - detections.length))
+          .forEach((hit) => {
+            const key = `sem|${hit.book}|${hit.chapter}|${hit.verse}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            detections.push({
+              mode: 'semantic',
+              book: hit.book,
+              chapter: hit.chapter,
+              verseStart: hit.verse,
+              verseEnd: hit.verse,
+              displayRef: hit.reference,
+              text: hit.text,
+              verses: [{ verse: hit.verse, text: hit.text }],
+              confidence: Math.min(0.80, 0.45 + hit.score * 0.35),
+              semanticScore: hit.score,
+            });
           });
-        });
+      }
     }
 
     // Sort by confidence descending, limit

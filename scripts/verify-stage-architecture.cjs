@@ -58,7 +58,7 @@ assert.match(preload, /stage:\s*\{[\s\S]*?ipcRenderer\.on\('stage:message'/, 'pr
 assert.match(preload, /getState:\s*\(\)\s*=>\s*ipcRenderer\.invoke\('stage:getState'\)/, 'preload must expose stage.getState so a window opened mid-service can catch up');
 
 // ── The window itself ──
-const stageWindowBody = main.match(/function createStageDisplayWindow\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+const stageWindowBody = main.match(/function createStageDisplayWindow\([^)]*\) \{[\s\S]*?\n\}/)?.[0] || '';
 assert.ok(stageWindowBody, 'createStageDisplayWindow must exist in main.cjs');
 assert.match(stageWindowBody, /webSecurity:\s*true/, 'the stage window must run with webSecurity on — it was only ever off to allow the cross-origin iframe');
 assert.match(stageWindowBody, /stage-display\.html/, 'createStageDisplayWindow must load the bundled stage entry');

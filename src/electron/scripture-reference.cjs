@@ -86,6 +86,77 @@ ALL_BOOKS.forEach((book) => {
   book.abbrev.forEach((a) => BOOK_LOOKUP.set(a.toLowerCase().replace(/\./g, ''), book.name));
 });
 
+const EXTRA_BOOK_ALIASES = {
+  Genesis: ['genese', 'jenesis', 'oriki', 'genisis'],
+  Exodus: ['exodo', 'exode', 'eksodu', 'ekisodu'],
+  Leviticus: ['levitico', 'levitique', 'lefiti', 'lefitiku', 'leave it to us', 'leviticas', 'levitic'],
+  Numbers: ['number', 'nums', 'numeros', 'nombres', 'numeri', 'nomba'],
+  Deuteronomy: ['deuteronomio', 'deuteronome', 'detronome', 'ditaronomy', 'ditronomy', 'diuteronomi', 'deuteronomi', 'dutronomy', 'due to ronald me', 'due teronomy'],
+  Joshua: ['josue', 'joshua', 'josua'],
+  Judges: ['jueces', 'juges', 'george', 'georges', 'george s', 'adajo', 'onidajo'],
+  Ruth: ['rut', 'routes', 'roots', 'root', 'ruutu'],
+  Psalms: ['salmo', 'salmos', 'psaume', 'psaumes', 'salm', 'salms', 'sams', 'sam', 'saamu', 'saam', 'psam', 'psams', 'sama', 'sums', 'some'],
+  Proverbs: ['proverbios', 'proverbes', 'owe', 'proverb'],
+  Ecclesiastes: ['eclesiastes', 'ecclesiaste', 'ecclesia sees', 'ectilestiasthesis', 'ecclessiastes', 'ecclisiastes', 'oniwaasu', 'oniwasu', 'ecclesiast', 'a classy astiz'],
+  'Song of Solomon': ['song of songs', 'songs', 'cantares', 'cantar de los cantares', 'cantique des cantiques', 'cantique', 'orin solomoni', 'orin solomon', 'canticles'],
+  Isaiah: ['isaias', 'esaie', 'isaiah', 'woli isaiah', 'isaya'],
+  Jeremiah: ['jeremias', 'jeremie', 'jerry maya', 'jerry mayaw', 'jerry mayer', 'jeremiya', 'jeremaya'],
+  Lamentations: ['lamentaciones', 'lamentation', 'orin aron', 'ekun jeremiah'],
+  Ezekiel: ['ezequiel', 'ezechiel', 'esekieli', 'ezekieli'],
+  Daniel: ['danieli', 'daniyel'],
+  Hosea: ['oseas', 'osee', 'hoseya', 'hoshea'],
+  Joel: ['joeli'],
+  Amos: ['amosi'],
+  Obadiah: ['abdias', 'obadiya'],
+  Jonah: ['jonas', 'jona'],
+  Micah: ['miqueas', 'michee', 'mika'],
+  Nahum: ['nahumu'],
+  Habakkuk: ['habacuc', 'abaco', 'abacu', 'abacuk', 'ababkuk', 'abraco', 'abracu', 'abracul', 'abacouk', 'abacog', 'abacogue', 'abacuum', 'habakuku', 'abakuk', 'how back hook', 'have a cook'],
+  Zephaniah: ['sofonias', 'sophonie', 'ziphaniah', 'zi fania', 'ziffanai', 'sefania', 'zefaniya'],
+  Haggai: ['hagai', 'haggaye', 'agee', 'hageo', 'haggai'],
+  Zechariah: ['zacarías', 'zacarias', 'zacharie', 'zekariya', 'sechariah'],
+  Malachi: ['malachie', 'malaquias', 'malaki', 'malakai'],
+  Matthew: ['mateo', 'matthieu', 'mathieu', 'mathew', 'matiu', 'matyu', 'mathews'],
+  Mark: ['marcos', 'marc', 'marke', 'maku'],
+  Luke: ['lucas', 'luc', 'lukee', 'luku'],
+  John: ['juan', 'jean', 'jhon', 'johanu'],
+  Acts: ['hechos', 'actes', 'acts of apostles', 'ise awon aposteli', 'aposteli'],
+  Romans: ['romanos', 'romains', 'romance', 'arokolu', 'ara romu', 'romu'],
+  '1 Corinthians': ['corinthians', '1 corintios', 'primer corintios', '1 corinthiens', 'premier corinthiens', 'corinthians 1', '1st corinthians', 'first corinthians', '1st cor', 'first cor', 'ara korinti kinni', 'korinti kinni', 'korinti kini'],
+  '2 Corinthians': ['2 corintios', 'segundo corintios', '2 corinthiens', 'deuxieme corinthiens', 'corinthians 2', '2nd corinthians', 'second corinthians', '2nd cor', 'second cor', 'ara korinti keji', 'korinti keji'],
+  Galatians: ['galates', 'galatas', 'ara galatia', 'galatia', 'collations', 'collatians', 'glacians'],
+  Ephesians: ['ephesiens', 'efesios', 'ara efesu', 'efesu', 'effusions', 'fusions'],
+  Philippians: ['philippiens', 'filipenses', 'ara filipi', 'filipi', 'philipians', 'flipians', 'philipia', 'flip ya'],
+  Colossians: ['colossiens', 'colosenses', 'ara kolose', 'kolose', 'collisions', 'collosians'],
+  '1 Thessalonians': ['thesalonians', 'thessalonia', 'tesalonia', 'thessaloniciens 1', 'tesalonicenses 1', '1st thessalonians', 'first thessalonians', '1st thess', 'first thess', 'ara tesalonika kinni', 'tesalonika kinni'],
+  '2 Thessalonians': ['2 thessalonians', 'thessaloniciens 2', 'tesalonicenses 2', '2nd thessalonians', 'second thessalonians', '2nd thess', 'second thess', 'ara tesalonika keji', 'tesalonika keji'],
+  '1 Timothy': ['timoti', 'timoteo 1', '1er timothee', '1st timothy', 'first timothy', '1st tim', 'first tim', 'timoti kinni', 'timoti kini'],
+  '2 Timothy': ['timoteo 2', '2e timothee', '2nd timothy', 'second timothy', '2nd tim', 'second tim', 'timoti keji'],
+  Titus: ['titus', 'tight us', 'tightest', 'tytus', 'tightos', 'title', 'titers', 'titous', 'tight as', 'tite', 'tito', 'titu', 'tightis', 'tightist'],
+  Philemon: ['philemon', 'filemon', 'fill him on', 'file a month', 'philimon', 'fylemon', 'file him on', 'filimoni', 'fill a mon'],
+  Hebrews: ['hebreux', 'hebreos', 'awon heberu', 'heberu'],
+  James: ['jacques', 'santiago', 'jakobu', 'jakob'],
+  '1 Peter': ['1 pedro', 'primer pedro', '1 pierre', 'premier pierre', 'peter 1', '1st peter', 'first peter', '1st pet', 'first pet', 'peteru kinni', 'peteru kini'],
+  '2 Peter': ['2 pedro', 'segundo pedro', '2 pierre', 'deuxieme pierre', 'peter 2', '2nd peter', 'second peter', '2nd pet', 'second pet', 'peteru keji'],
+  '1 John': ['1 juan', 'primer juan', '1 jean', 'premier jean', 'john 1', '1st john', 'first john', '1st jn', 'first jn', 'johanu kinni', 'johanu kini'],
+  '2 John': ['2 juan', 'segundo juan', '2 jean', 'deuxieme jean', 'john 2', '2nd john', 'second john', '2nd jn', 'second jn', 'johanu keji'],
+  '3 John': ['3 juan', 'tercer juan', '3 jean', 'troisieme jean', 'john 3', '3rd john', 'third john', '3rd jn', 'third jn', 'johanu keta'],
+  Jude: ['judas', 'juda'],
+  Revelation: ['revelations', 'apocalipsis', 'apocalypse', 'ifihan', 'revelation of john'],
+  '1 Samuel': ['primer samuel', 'premier samuel', 'samuel 1', '1st samuel', 'first samuel', '1st sam', 'first sam', 'samuel kinni', 'samuel kini', 'sameli kinni', 'sameli kini'],
+  '2 Samuel': ['segundo samuel', 'deuxieme samuel', 'samuel 2', '2nd samuel', 'second samuel', '2nd sam', 'second sam', 'samuel keji', 'sameli keji'],
+  '1 Kings': ['1 reyes', 'primer reyes', '1 rois', 'premier rois', 'kings 1', '1st kings', 'first kings', '1st kgs', 'first kgs', 'awon oba kinni', 'oba kinni', 'oba kini'],
+  '2 Kings': ['2 reyes', 'segundo reyes', '2 rois', 'deuxieme rois', 'kings 2', '2nd kings', 'second kings', '2nd kgs', 'second kgs', 'awon oba keji', 'oba keji'],
+  '1 Chronicles': ['1 cronicas', 'primer cronicas', '1 chroniques', 'premier chroniques', 'chronicles 1', '1st chronicles', 'first chronicles', '1st chron', 'first chron', 'kronika kinni', 'kronika kini'],
+  '2 Chronicles': ['2 cronicas', 'segundo cronicas', '2 chroniques', 'deuxieme chroniques', 'chronicles 2', '2nd chronicles', 'second chronicles', '2nd chron', 'second chron', 'kronika keji'],
+};
+
+for (const [bookName, aliases] of Object.entries(EXTRA_BOOK_ALIASES)) {
+  for (const alias of aliases) {
+    BOOK_LOOKUP.set(alias.toLowerCase(), bookName);
+  }
+}
+
 // Chapter counts for validation
 const CHAPTER_COUNTS = {};
 ALL_BOOKS.forEach((book) => { CHAPTER_COUNTS[book.name] = book.chapters; });
@@ -111,12 +182,24 @@ const SPOKEN_REF_PATTERN = new RegExp(
   'gi'
 );
 
-const SPOKEN_ORDINALS = { first: '1', '1st': '1', second: '2', '2nd': '2', third: '3', '3rd': '3' };
+const SPOKEN_ORDINALS = {
+  first: '1', '1st': '1', second: '2', '2nd': '2', third: '3', '3rd': '3',
+  premier: '1', primer: '1', primero: '1', deuxieme: '2', segundo: '2',
+  troisieme: '3', tercero: '3', kinni: '1', kini: '1', keji: '2', keta: '3',
+};
 const SPOKEN_NUMBERS = {
   zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
   ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
   seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
-  sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+  sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100,
+  wan: 1, won: 1, on: 1, tu: 2, too: 2, to: 2, tree: 3, free: 3, for: 4, fore: 4, foor: 4,
+  fife: 5, fight: 5, sex: 6, sicks: 6, seek: 6, siven: 7, ate: 8, eights: 8, eighth: 8,
+  nein: 9, tin: 10, tarty: 30, thurty: 30, foty: 40, fity: 50,
+  uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+  un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10,
+  okan: 1, kan: 1, kini: 1, kinni: 1, meji: 2, keji: 2, meta: 3, keta: 3, merin: 4, kerin: 4,
+  marun: 5, karun: 5, mefa: 6, kefa: 6, meje: 7, keje: 7, mejo: 8, kejo: 8, mesan: 9, kesan: 9,
+  mewa: 10, kewa: 10, ogun: 20, ogbon: 30, ogoji: 40, aadota: 50,
 };
 
 /** Convert speech-to-text number words near reference markers into digits. */
@@ -139,6 +222,34 @@ function normalizeSpokenBook(candidate) {
   if (SPOKEN_ORDINALS[lead]) return [SPOKEN_ORDINALS[lead], ...parts.slice(1)].join(' ');
   return candidate;
 }
+
+/**
+ * Finds the maximum length of contiguous matching words between query words and verse words.
+ */
+function maxContiguousWordMatch(queryWords, verseWords) {
+  if (!queryWords.length || !verseWords.length) return { maxMatch: 0, matchRatio: 0 };
+  const qClean = queryWords.map((w) => w.toLowerCase());
+  const vClean = verseWords.map((w) => w.toLowerCase());
+  let maxMatch = 0;
+
+  for (let i = 0; i < qClean.length; i++) {
+    for (let j = 0; j < vClean.length; j++) {
+      let len = 0;
+      while (i + len < qClean.length && j + len < vClean.length && qClean[i + len] === vClean[j + len]) {
+        len++;
+      }
+      if (len > maxMatch) {
+        maxMatch = len;
+      }
+    }
+  }
+
+  const matchRatio = maxMatch / Math.max(1, vClean.length);
+  return { maxMatch, matchRatio };
+}
+
+// Homonym books that frequently appear in ordinary English speech
+const HOMONYM_BOOKS = new Set(['Mark', 'Job', 'Acts', 'Numbers', 'Revelation', 'Ruth', 'James', 'Judges']);
 
 function extractReferences(text) {
   text = normalizeSpokenReferenceNumbers(text);
@@ -178,7 +289,7 @@ function extractReferences(text) {
       displayRef: fullRef,
       matchStart: match.index,
       matchEnd: match.index + match[0].length,
-      confidence: verseStart ? 0.96 : 0.86,
+      confidence: verseStart ? 0.98 : 0.90,
     });
   }
 
@@ -189,8 +300,6 @@ function extractReferences(text) {
     const verseStart = match[3] ? parseInt(match[3], 10) : null;
     const verseEnd = match[4] ? parseInt(match[4], 10) : null;
 
-    // Try to find a valid book name within the candidate
-    // If "As John" doesn't work, try "John" (last word), then "of John", etc.
     let book = null;
     let displayBook = bookCandidate;
     const words = bookCandidate.split(/\s+/);
@@ -205,10 +314,18 @@ function extractReferences(text) {
     if (!book) continue;
     const maxCh = CHAPTER_COUNTS[book];
     if (chapter < 1 || chapter > maxCh) continue;
+
+    // Guard against homonyms like "job 5", "acts 3" in ordinary text unless a verse is given
+    // or it's preceded by biblical context markers
+    if (HOMONYM_BOOKS.has(book) && !verseStart) {
+      const preceding = text.slice(Math.max(0, match.index - 30), match.index).toLowerCase();
+      const hasBibleMarker = /\b(book|chapter|read|reading|scripture|verse|bible|in|from|unto)\b/.test(preceding);
+      if (!hasBibleMarker) continue;
+    }
+
     const key = `${book}|${chapter}|${verseStart || ''}|${verseEnd || ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    // Reconstruct the full match using the proper book portion
     const bookIdx = match[0].indexOf(displayBook);
     const fullRef = displayBook + ' ' + match[2] + (verseStart ? ':' + verseStart + (verseEnd && verseEnd !== verseStart ? '-' + verseEnd : '') : '');
     results.push({
@@ -234,7 +351,6 @@ const CONTEXTUAL_PATTERNS = [
 
 function extractContextualHints(text) {
   const hints = [];
-  const lower = text.toLowerCase();
   CONTEXTUAL_PATTERNS.forEach((pattern) => {
     pattern.lastIndex = 0;
     let m;
@@ -246,17 +362,10 @@ function extractContextualHints(text) {
       }
     }
   });
-  // Also detect chapter mentions without explicit reference
-  const chMatch = lower.match(/chapter\s+(\d+)/g);
-  if (chMatch) {
-    // These are weaker hints without a book
-  }
   return hints;
 }
 
-// Verbatim matching — find exact verse text in sermon text
-// Flattened/cleaned verse lists, cached per version. This used to be rebuilt on every
-// call — 30k regex replacements per keystroke of live transcript.
+// Flattened/cleaned verse lists, cached per version
 const verbatimCorpusCache = new Map();
 
 function getVerbatimCorpus(bibleData, versionId) {
@@ -268,10 +377,10 @@ function getVerbatimCorpus(bibleData, versionId) {
     for (const [ch, vMap] of Object.entries(chapters)) {
       for (const [vs, vt] of Object.entries(vMap)) {
         const cleaned = vt.replace(/[^\w\s']/g, '').toLowerCase();
-        const vWords = cleaned.split(/\s+/);
+        const vWords = cleaned.split(/\s+/).filter(Boolean);
         if (vWords.length < 4) continue;
         verses.push({
-          book, chapter: parseInt(ch), verse: parseInt(vs),
+          book, chapter: parseInt(ch, 10), verse: parseInt(vs, 10),
           text: cleaned, original: vt,
           words: vWords, wordSet: new Set(vWords),
         });
@@ -283,46 +392,44 @@ function getVerbatimCorpus(bibleData, versionId) {
 }
 
 /**
- * `candidates` (from the BM25 index) narrows scoring to a handful of plausible verses.
- * Any verse sharing 60%+ of its words with the text is certain to rank near the top
- * lexically, so this is the same answer for a fraction of the work.
+ * Strict contiguous quote detection:
+ * Requires at least 4 contiguous words in sequence (or 3 contiguous words for short verses covering >= 60% of verse).
+ * Eliminates bag-of-words random matches completely.
  */
 function findVerbatimQuotes(text, bibleData, versionId, candidates) {
   const results = [];
   const words = text.replace(/[^\w\s']/g, '').split(/\s+/).filter(Boolean);
   if (words.length < 3) return results;
 
-  // An empty array means "the index found nothing plausible" — which is an answer, not
-  // a reason to fall back to scanning all 30k verses. Only an absent argument does that.
   const corpus = Array.isArray(candidates)
     ? candidates
     : getVerbatimCorpus(bibleData, versionId);
 
   for (const v of corpus) {
-    const vWords = v.words || v.text.split(/\s+/);
+    const vWords = v.words || v.text.split(/\s+/).filter(Boolean);
     if (vWords.length < 4) continue;
-    // Check if the sermon text contains a substantial portion of this verse
-    let matches = 0;
-    const vWordSet = v.wordSet || new Set(vWords);
-    for (const w of words) {
-      if (vWordSet.has(w.toLowerCase())) matches++;
-    }
-    const ratio = matches / vWords.length;
-    if (ratio > 0.6 && matches >= 5) {
+
+    const { maxMatch, matchRatio } = maxContiguousWordMatch(words, vWords);
+
+    // Contiguous sequence requirement:
+    // Minimum 4 continuous words, or 3 if it covers >= 60% of the entire verse
+    if (maxMatch >= 4 || (maxMatch >= 3 && matchRatio >= 0.60)) {
+      const confidence = Math.min(0.98, 0.70 + (maxMatch >= 6 ? 0.20 : maxMatch * 0.04) + matchRatio * 0.10);
       results.push({
         book: v.book,
         chapter: v.chapter,
         verse: v.verse,
         text: v.original,
         reference: `${v.book} ${v.chapter}:${v.verse}`,
-        confidence: Math.min(0.95, 0.5 + ratio * 0.5),
+        confidence,
         matchType: 'verbatim',
-        wordOverlap: ratio,
-        matchedWords: matches,
+        wordOverlap: matchRatio,
+        matchedWords: maxMatch,
         totalVerseWords: vWords.length,
       });
     }
   }
+
   // Deduplicate — keep highest confidence per verse
   const best = {};
   results.forEach((r) => {
@@ -338,4 +445,5 @@ module.exports = {
   extractReferences,
   extractContextualHints,
   findVerbatimQuotes,
+  maxContiguousWordMatch,
 };

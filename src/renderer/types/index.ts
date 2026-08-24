@@ -426,7 +426,7 @@ export interface AppSettings {
   obsPasswordSet?: boolean;
   deepgramModel: string;
   deepgramLanguage: string;
-  sttEngine: 'local' | 'deepgram';
+  sttEngine: 'deepgram' | 'local';
   /** Which on-device recogniser runs. Empty means the service's own default. */
   sttLocalModel: string;
   /** The preacher's language. Only a multilingual model can honour it. */
@@ -450,7 +450,7 @@ export interface AppSettingsPatch {
   deepgramApiKey: string;
   deepgramModel: string;
   deepgramLanguage: string;
-  sttEngine: 'local' | 'deepgram';
+  sttEngine: 'deepgram' | 'local';
   sttLocalModel: string;
   sermonLanguage: SermonLanguage;
   obsUrl: string;
@@ -633,7 +633,7 @@ export interface AudioMeterState {
 export interface LiveScriptureState {
   isActive: boolean;
   detectionMode: 'bible' | 'song';
-  provider: 'deepgram' | 'local' | 'mlx-whisper';
+  provider: 'webspeech' | 'deepgram' | 'local' | 'mlx-whisper';
   selectedInputId: string;
   transcript: string;
   bestHit: BibleSearchResult | null;
@@ -649,7 +649,7 @@ export interface LiveScriptureState {
 export interface AIProvider {
   id: string;
   name: string;
-  type: 'deepgram' | 'speechmatics' | 'local';
+  type: 'webspeech' | 'deepgram' | 'speechmatics' | 'local';
   enabled: boolean;
   apiKey?: string;
 }
@@ -745,6 +745,7 @@ declare global {
       display: {
         open: (target?: { displayId?: string } | string | number) => Promise<{ ok: boolean; displayId?: string; label?: string; error?: string }>;
         close: () => Promise<{ ok: boolean }>;
+        toggleFullScreen: () => Promise<boolean>;
         getDisplays: () => Promise<DisplayTarget[]>;
         getActive: () => Promise<{ ok: boolean; displayId: string | null; isOpen: boolean }>;
         onListChanged: (cb: (displays: DisplayTarget[]) => void) => () => void;
@@ -832,6 +833,7 @@ declare global {
         get: () => Promise<{ ok: boolean; settings: AppSettings }>;
         set: (patch: Partial<AppSettingsPatch>) => Promise<{ ok: boolean; settings: AppSettings }>;
         clearSecret: (key: string) => Promise<{ ok: boolean; settings?: AppSettings }>;
+        onUpdated?: (cb: (settings: AppSettings) => void) => () => void;
       };
       stt: {
         start: (payload?: { model?: string; language?: string }) => Promise<{ ok: boolean; error?: string; status: SttStatus }>;
@@ -863,7 +865,7 @@ declare global {
         pathForFile: (file: File) => string;
       };
       openSlideEditor: () => Promise<boolean>;
-      openStageDisplay: () => Promise<boolean>;
+      openStageDisplay: (target?: { displayId?: string } | string | number) => Promise<boolean>;
       closeStageDisplay: () => Promise<{ ok: boolean; open: boolean }>;
       isStageDisplayOpen: () => Promise<boolean>;
       onStageDisplayState: (cb: (open: boolean) => void) => () => void;

@@ -51,4 +51,22 @@ const quote = service.detect('For God so loved the world that he gave his only b
 }).detections[0];
 assert.equal(quote?.displayRef, 'John 3:16');
 
-console.log(`live scripture parser passed (${fixtures.length + 3} fixtures)`);
+const quote2 = service.detect('The Lord is my shepherd I shall not want', {
+  versionId: 'KJV', modes: ['verbatim'], limit: 3, minConfidence: 0.3, isFinal: true,
+}).detections[0];
+assert.equal(quote2?.displayRef, 'Psalms 23:1');
+
+// False positive prevention tests:
+// 1. General sermon speech should NOT produce detections
+const sermonSpeech = service.detect('We welcome everyone to church this morning, let us pray and thank God for this beautiful day', {
+  versionId: 'KJV', modes: ['direct', 'contextual', 'verbatim', 'semantic'], limit: 3, minConfidence: 0.45, isFinal: true,
+});
+assert.equal(sermonSpeech.detections.length, 0, 'General sermon speech should not produce false positive detections');
+
+// 2. Homonym words (mark, job, acts) in normal speech should not trigger books
+const homonymSpeech = service.detect('It is just a mark of true leadership to do a good job', {
+  versionId: 'KJV', modes: ['direct', 'contextual'], limit: 3, minConfidence: 0.45, isFinal: true,
+});
+assert.equal(homonymSpeech.detections.length, 0, 'Homonym English words should not trigger false book references');
+
+console.log(`live scripture parser passed (${fixtures.length + 6} fixtures)`);

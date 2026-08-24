@@ -91,12 +91,18 @@ export function SettingsPanel() {
 
   async function saveSettings(patch: Partial<AppSettingsPatch>) {
     const res = await window.BSP?.settings?.set(patch).catch(() => null);
-    if (res?.ok) setSettings(res.settings);
+    if (res?.ok && res.settings) {
+      setSettings(res.settings);
+      window.dispatchEvent(new CustomEvent('bsp:settings-updated', { detail: res.settings }));
+    }
   }
 
   async function clearDeepgramKey() {
     const res = await window.BSP?.settings?.clearSecret('deepgramApiKey').catch(() => null);
-    if (res?.ok && res.settings) setSettings(res.settings);
+    if (res?.ok && res.settings) {
+      setSettings(res.settings);
+      window.dispatchEvent(new CustomEvent('bsp:settings-updated', { detail: res.settings }));
+    }
   }
 
   async function refreshStatus() {
@@ -321,12 +327,12 @@ export function SettingsPanel() {
                   <span style={{ ...type.secondary, color: 'var(--text-secondary)' }}>Engine</span>
                   <select
                     className="input"
-                    style={{ width: 180 }}
-                    value={settings?.sttEngine || 'local'}
+                    style={{ width: 190 }}
+                    value={settings?.sttEngine || 'deepgram'}
                     onChange={(e) => saveSettings({ sttEngine: e.target.value as 'local' | 'deepgram' })}
                   >
-                    <option value="local">Local Whisper (offline)</option>
                     <option value="deepgram">Deepgram (cloud, streaming)</option>
+                    <option value="local">Local On-Device (offline)</option>
                   </select>
                 </div>
 

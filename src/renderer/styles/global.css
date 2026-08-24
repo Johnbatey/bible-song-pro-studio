@@ -786,16 +786,17 @@ select option:hover, select option:focus, select option:checked {
    scrolls to follow. (It used to be pinned to the bottom with margin-top:auto,
    which left a short transcript floating in the middle of an empty panel.) */
 .transcript-panel__flow {
-  color: var(--text-primary);
-  font-size: 14px;
-  line-height: var(--lh-relaxed);
-  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: var(--fw-regular);
   text-align: left;
   overflow-wrap: anywhere;
 }
 
 .transcript-panel__interim {
   color: var(--text-dim);
+  font-style: italic;
 }
 
 /* Three rings breathing in sequence at the point of writing — enough to show
@@ -1501,3 +1502,50 @@ body.light-theme .zoombar-fit[data-active] {
   color: var(--text-primary) !important;
   box-shadow: none !important;
 }
+
+/* Quick toolbar icon buttons in TitleBar */
+.titlebar-icon-btn,
+.titlebar-black-btn,
+.titlebar-live-btn {
+  user-select: none;
+}
+
+.titlebar-icon-btn:hover,
+.titlebar-black-btn:hover:not([aria-pressed="true"]) {
+  background: var(--chrome-control-hover, rgba(255, 255, 255, 0.08)) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-secondary, rgba(255, 255, 255, 0.16)) !important;
+}
+
+.titlebar-icon-btn:active,
+.titlebar-black-btn:active,
+.titlebar-live-btn:active {
+  transform: scale(0.96);
+}
+
+[data-ui-theme="light"] .titlebar-icon-btn:hover,
+[data-ui-theme="light"] .titlebar-black-btn:hover:not([aria-pressed="true"]),
+body.light-theme .titlebar-icon-btn:hover,
+body.light-theme .titlebar-black-btn:hover:not([aria-pressed="true"]) {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-secondary, rgba(0, 0, 0, 0.15)) !important;
+}
+
+/* Dock Navigation Pill Tabs */
+.titlebar-pill-btn:hover:not([data-active="true"]) {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--text-primary) !important;
+}
+
+.titlebar-pill-btn:active {
+  transform: scale(0.97);
+}
+
+[data-ui-theme="light"] .titlebar-pill-btn:hover:not([data-active="true"]),
+body.light-theme .titlebar-pill-btn:hover:not([data-active="true"]) {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: var(--text-primary) !important;
+}
+
+

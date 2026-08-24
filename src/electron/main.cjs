@@ -767,29 +767,64 @@ function resizableOutputBounds(bounds) {
   };
 }
 
-function createDisplayWindow(bounds, options = {}) {
-  if (displayWindow && !displayWindow.isDestroyed()) {
-    if (options.show !== undefined) {
-      if (options.show) displayWindow.show();
-      else displayWindow.hide();
-    }
-    return displayWindow;
+function createDisplayWindow(targetOrBounds, options = {}) {
+  const primary = screen.getPrimaryDisplay();
+  let targetDisplay = null;
+  let explicitBounds = null;
+
+  if (targetOrBounds && typeof targetOrBounds.id !== 'undefined') {
+    targetDisplay = targetOrBounds;
+  } else if (targetOrBounds && typeof targetOrBounds.width === 'number') {
+    explicitBounds = targetOrBounds;
+    const allDisplays = screen.getAllDisplays();
+    targetDisplay = allDisplays.find((d) =>
+      d.bounds.x === explicitBounds.x && d.bounds.y === explicitBounds.y &&
+      d.bounds.width === explicitBounds.width && d.bounds.height === explicitBounds.height
+    ) || primary;
+  } else {
+    targetDisplay = chooseDisplay('auto') || primary;
   }
-  const d = resizableOutputBounds(bounds || screen.getPrimaryDisplay().workArea || screen.getPrimaryDisplay().bounds);
+
+  const isExternal = Boolean(targetDisplay && (targetDisplay.id !== primary.id || !targetDisplay.internal));
+  const isFullScreen = options.fullscreen !== undefined ? options.fullscreen : isExternal;
+
+  if (displayWindow && !displayWindow.isDestroyed()) {
+    const isCurrentlyFrameless = Boolean(displayWindow.__isFrameless);
+    if (isCurrentlyFrameless !== isFullScreen) {
+      displayWindow.close();
+      displayWindow = null;
+    } else {
+      if (isFullScreen) {
+        displayWindow.setBounds(targetDisplay.bounds);
+      } else {
+        displayWindow.setBounds(explicitBounds || resizableOutputBounds(targetDisplay.bounds));
+      }
+      if (options.show !== undefined) {
+        if (options.show) displayWindow.show();
+        else displayWindow.hide();
+      }
+      return displayWindow;
+    }
+  }
+
+  const bounds = isFullScreen
+    ? targetDisplay.bounds
+    : (explicitBounds || resizableOutputBounds(targetDisplay.bounds || screen.getPrimaryDisplay().workArea || screen.getPrimaryDisplay().bounds));
   const showWindow = options.show !== false;
+
   displayWindow = new BrowserWindow({
-    x: d.x,
-    y: d.y,
-    width: d.width,
-    height: d.height,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
     minWidth: 640,
     minHeight: 360,
-    frame: true,
+    frame: !isFullScreen,
     autoHideMenuBar: true,
-    resizable: true,
+    resizable: !isFullScreen,
     maximizable: true,
     fullscreenable: true,
-    thickFrame: true,
+    thickFrame: !isFullScreen,
     transparent: true,
     backgroundColor: '#00000000',
     show: showWindow,
@@ -800,9 +835,15 @@ function createDisplayWindow(bounds, options = {}) {
       backgroundThrottling: false,
     },
   });
-  displayWindow.setResizable(true);
-  displayWindow.setMinimumSize(640, 360);
-  displayWindow.setAspectRatio(16 / 9);
+
+  displayWindow.__isFrameless = isFullScreen;
+
+  if (!isFullScreen) {
+    displayWindow.setResizable(true);
+    displayWindow.setMinimumSize(640, 360);
+    displayWindow.setAspectRatio(16 / 9);
+  }
+
   displayWindow.loadURL(isDev ? 'http://localhost:5173/audience-display.html' : `file://${path.join(__dirname, '../../dist/audience-display.html')}`);
   displayWindow.setMenuBarVisibility(false);
   displayWindow.webContents.once('did-finish-load', () => {
@@ -815,30 +856,46 @@ function createDisplayWindow(bounds, options = {}) {
   return displayWindow;
 }
 
-function createStageDisplayWindow() {
-  /* webSecurity is on, unlike the page this replaced. It was off only so a
-     file:// stage page could embed http://localhost:8942/display.html in an
-     iframe for its program pane; the pane is a React component now, so there
-     is nothing cross-origin left to allow. */
-  /* The stage is a screen someone is standing in front of for the whole
-     service, and it is almost never the focused window. It plays the scene's
-     video in its own zones now, so it needs the same exemption the projector
-     has. */
-  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#000000', title: 'BSP Stage Display', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false } });
+function createStageDisplayWindow(targetDisplay, options = {}) {
+  const primary = screen.getPrimaryDisplay();
+  const target = targetDisplay || chooseDisplay('auto') || primary;
+  const isExternal = Boolean(target && (target.id !== primary.id || !target.internal));
+  const isFullScreen = options.fullscreen !== undefined ? options.fullscreen : isExternal;
+  const bounds = isFullScreen ? target.bounds : resizableOutputBounds(target.bounds || screen.getPrimaryDisplay().workArea || screen.getPrimaryDisplay().bounds);
+
+  const win = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    minWidth: 640,
+    minHeight: 480,
+    frame: !isFullScreen,
+    autoHideMenuBar: true,
+    resizable: !isFullScreen,
+    maximizable: true,
+    fullscreenable: true,
+    thickFrame: !isFullScreen,
+    backgroundColor: '#000000',
+    title: 'BSP Stage Display',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      backgroundThrottling: false,
+    },
+  });
   win.loadURL(isDev ? 'http://localhost:5173/stage-display.html' : `file://${path.join(__dirname, '../../dist/stage-display.html')}`);
+  win.setMenuBarVisibility(false);
 
   stageWindows.add(win);
   broadcastStageWindows();
   win.on('closed', () => {
     stageWindows.delete(win);
-    /* Closing the stage from its own red button has to reach the panel's lamp
-       exactly as the panel's own toggle does — an indicator that only tracks
-       one of the two ways a window can go away is an indicator that lies. */
     broadcastStageWindows();
   });
 
-  // Catch the window up on both feeds the moment it can receive them, so one
-  // opened mid-service shows the service rather than an idle screen.
   win.webContents.once('did-finish-load', () => {
     win.webContents.send('display:message', { type: 'display:update', state: displayState });
     if (Object.keys(stageState).length > 0) win.webContents.send('stage:message', stageState);
@@ -1065,13 +1122,16 @@ app.whenReady().then(async () => {
     const target = chooseDisplay(displayId);
     if (!target) return { ok: false, error: 'No displays available' };
     activeDisplayId = String(target.id);
-    if (displayWindow && !displayWindow.isDestroyed()) {
-      displayWindow.setBounds(resizableOutputBounds(target.bounds));
-      displayWindow.show();
-    } else {
-      createDisplayWindow(target.bounds, { show: true });
-    }
+    createDisplayWindow(target, { show: true });
     return { ok: true, displayId: activeDisplayId, label: getDisplayPayload().find((d) => d.id === activeDisplayId)?.label || '' };
+  });
+  ipcMain.handle('display:toggleFullScreen', () => {
+    if (displayWindow && !displayWindow.isDestroyed()) {
+      const isFull = displayWindow.isFullScreen();
+      displayWindow.setFullScreen(!isFull);
+      return !isFull;
+    }
+    return false;
   });
   ipcMain.handle('display:close', () => {
     activeDisplayId = null;
@@ -1106,7 +1166,12 @@ app.whenReady().then(async () => {
   ipcMain.on('display:message', (_, msg) => { if (msg && msg.type === 'display:update') setDisplayState(msg.state || msg); });
 
   ipcMain.handle('slide-editor:open', () => { createSlideEditorWindow(); return true; });
-  ipcMain.handle('stage-display:open', () => { createStageDisplayWindow(); return true; });
+  ipcMain.handle('stage-display:open', (_, arg) => {
+    const displayId = (arg && typeof arg === 'object') ? arg.displayId : arg;
+    const target = chooseDisplay(displayId);
+    createStageDisplayWindow(target);
+    return true;
+  });
   /* Closing every stage screen, not just one: the panel's control is a single
      lamp for "the stage is up", so the off state it promises has to be the
      whole of it. `close`, not `destroy` — the window's own teardown runs. */
@@ -1304,6 +1369,15 @@ app.whenReady().then(async () => {
   });
 
   // Settings IPC — secrets are write-only from the renderer's point of view
+  function broadcastSettings(settings) {
+    if (!settings) return;
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (!win.isDestroyed()) {
+        try { win.webContents.send('settings:updated', settings); } catch (_) {}
+      }
+    });
+  }
+
   ipcMain.handle('settings:get', () => settingsService?.getPublic() || { ok: false, settings: {} });
   ipcMain.handle('settings:set', (_, patch) => {
     const result = settingsService?.set(patch) || { ok: false, settings: {} };
@@ -1313,9 +1387,18 @@ app.whenReady().then(async () => {
       model: settingsService?.get('deepgramModel'),
       language: settingsService?.get('deepgramLanguage'),
     });
+    if (result.ok && result.settings) {
+      broadcastSettings(result.settings);
+    }
     return result;
   });
-  ipcMain.handle('settings:clearSecret', (_, p) => settingsService?.clearSecret(p?.key) || { ok: false });
+  ipcMain.handle('settings:clearSecret', (_, p) => {
+    const result = settingsService?.clearSecret(p?.key) || { ok: false };
+    if (result.ok && result.settings) {
+      broadcastSettings(result.settings);
+    }
+    return result;
+  });
 
   // Streaming speech-to-text IPC
   ipcMain.handle('stt:start', (_, p) => deepgramService?.start({

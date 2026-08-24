@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('BSP', {
       return () => ipcRenderer.removeListener('display:listChanged', handler);
     },
     close: () => ipcRenderer.invoke('display:close'),
+    toggleFullScreen: () => ipcRenderer.invoke('display:toggleFullScreen'),
     getDisplays: () => ipcRenderer.invoke('display:getDisplays'),
     sendState: (state) => ipcRenderer.invoke('display:sendState', state),
     getState: () => ipcRenderer.invoke('display:getState'),
@@ -129,6 +130,11 @@ contextBridge.exposeInMainWorld('BSP', {
     get: () => ipcRenderer.invoke('settings:get'),
     set: (patch) => ipcRenderer.invoke('settings:set', patch),
     clearSecret: (key) => ipcRenderer.invoke('settings:clearSecret', { key }),
+    onUpdated: (cb) => {
+      const handler = (_, settings) => cb(settings);
+      ipcRenderer.on('settings:updated', handler);
+      return () => ipcRenderer.removeListener('settings:updated', handler);
+    },
   },
 
   stt: {
@@ -234,7 +240,7 @@ contextBridge.exposeInMainWorld('BSP', {
   },
 
   openSlideEditor: () => ipcRenderer.invoke('slide-editor:open'),
-  openStageDisplay: () => ipcRenderer.invoke('stage-display:open'),
+  openStageDisplay: (target) => ipcRenderer.invoke('stage-display:open', target),
   closeStageDisplay: () => ipcRenderer.invoke('stage-display:close'),
   openStageDesigner: () => ipcRenderer.invoke('stage-designer:open'),
 

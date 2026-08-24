@@ -67,11 +67,28 @@ export function toPcm16Buffer(frames: Float32Array): ArrayBuffer {
 export async function startAudioCapture(options: AudioCaptureOptions): Promise<AudioCaptureHandle> {
   const constraints: MediaStreamConstraints = {
     audio: options.deviceId
-      ? { deviceId: { exact: options.deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      : { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      ? {
+          deviceId: { exact: options.deviceId },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 1,
+        }
+      : {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 1,
+        },
   };
 
-  const stream = await navigator.mediaDevices.getUserMedia(constraints);
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch {
+    // Fallback to basic audio constraints if exact constraints fail
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  }
   const context = new AudioContext({ sampleRate: STT_SAMPLE_RATE });
 
   // Some browsers ignore the requested rate; warn rather than silently sending

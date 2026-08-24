@@ -481,13 +481,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         },
       ],
     })),
-  removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
+      removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
   clearQueue: () => set({ queue: [] }),
 
   aiProviders: [
-    { id: 'deepgram', name: 'Deepgram', type: 'deepgram', enabled: false },
-    { id: 'speechmatics', name: 'Speechmatics', type: 'speechmatics', enabled: false },
-    { id: 'local', name: 'Local AI (MLX Whisper)', type: 'local', enabled: true },
+    { id: 'deepgram', name: 'Deepgram Nova-2', type: 'deepgram', enabled: true },
+    { id: 'local', name: 'Local AI (On-Device)', type: 'local', enabled: true },
   ],
   transcription: {
     isActive: false,
@@ -499,7 +498,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   liveScripture: {
     isActive: false,
     detectionMode: 'bible',
-    provider: 'local',
+    provider: 'deepgram',
     selectedInputId: '',
     transcript: '',
     bestHit: null,

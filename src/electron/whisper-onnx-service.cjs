@@ -127,6 +127,7 @@ function generationOptions(model, payload = {}) {
     return_timestamps: 'chunk',
     chunk_length_s: payload.chunkLength || 30,
     stride_length_s: payload.strideLength || 4,
+    initial_prompt: payload.initialPrompt || 'Bible scripture reading: Genesis, Exodus, Leviticus, Numbers, Deuteronomy, Matthew, Mark, Luke, John, Romans, Psalms, Chapter, Verse.',
   };
   /* Only a multilingual checkpoint has a language to be told and a task to
      choose between. See the note on whisper-tiny-en above. */
