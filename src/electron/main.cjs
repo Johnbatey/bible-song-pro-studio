@@ -24,9 +24,6 @@ app.commandLine.appendSwitch('log-level', '3');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
@@ -674,7 +671,19 @@ function startHttpServer() {
 }
 
 function createSplashWindow() {
-  const s = new BrowserWindow({ width: 1000, height: 620, frame: false, transparent: true, resizable: false, alwaysOnTop: true, backgroundColor: '#0C0B0B', webPreferences: { nodeIntegration: false, contextIsolation: true } });
+  const isMac = process.platform === 'darwin';
+  const s = new BrowserWindow({
+    width: 1000,
+    height: 620,
+    frame: false,
+    transparent: isMac,
+    resizable: false,
+    alwaysOnTop: true,
+    backgroundColor: '#0C0B0B',
+    center: true,
+    show: true,
+    webPreferences: { nodeIntegration: false, contextIsolation: true }
+  });
   /* The splash has no preload and no node access, so the version is passed in
      the URL. It is read from the running build, never hardcoded in the page. */
   const v = `?v=${encodeURIComponent(app.getVersion())}`;
@@ -1795,8 +1804,8 @@ app.whenReady().then(async () => {
      rather than after it, so the floor costs nothing the boot was not
      already spending — and the operator gets a screen that settles and can
      be read instead of one that is pulled the moment the window is ready. */
-  const SPLASH_FLOOR_MS = 6000;
-  const SPLASH_CEILING_MS = 15000;
+  const SPLASH_FLOOR_MS = 3000;
+  const SPLASH_CEILING_MS = 7000;
   const splashUpAt = Date.now();
 
   let splash = createSplashWindow();
@@ -1806,22 +1815,36 @@ app.whenReady().then(async () => {
   const handOver = () => {
     if (handedOver) return;
     handedOver = true;
-    if (splash && !splash.isDestroyed()) splash.close();
-    splash = null;
+
+    // 1. Show and focus main application window first
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.maximize();
       mainWindow.show();
+      mainWindow.maximize();
       mainWindow.focus();
     }
+
+    // 2. Safely remove splash window without blocking focus
+    if (splash && !splash.isDestroyed()) {
+      try {
+        splash.setAlwaysOnTop(false);
+        splash.destroy();
+      } catch (_) {}
+    }
+    splash = null;
   };
   const handOverAfterFloor = () => {
     setTimeout(handOver, Math.max(0, SPLASH_FLOOR_MS - (Date.now() - splashUpAt)));
   };
 
+  mainWindow.once('ready-to-show', handOverAfterFloor);
   mainWindow.webContents.on('did-finish-load', handOverAfterFloor);
   mainWindow.webContents.on('did-fail-load', (e, c, d) => {
     console.error('Load fail:', c, d);
-    handOverAfterFloor();
+    handOver();
+  });
+  mainWindow.webContents.on('render-process-gone', (e, details) => {
+    console.error('Renderer process gone:', details);
+    handOver();
   });
   /* A hung load must never leave the operator staring at a splash. */
   setTimeout(handOver, SPLASH_CEILING_MS);
