@@ -49,18 +49,20 @@ let transformers = null;
  */
 const MODELS = [
   {
-    key: 'moonshine-tiny',
-    id: 'onnx-community/moonshine-tiny-ONNX',
-    label: 'Moonshine Tiny',
-    note: 'The default. Built for live speech — fastest to respond, smallest download.',
+    key: 'moonshine-base',
+    id: 'onnx-community/moonshine-base-ONNX',
+    label: 'Moonshine Base',
+    approxSize: '145 MB',
+    note: 'The recommended default. Built for live speech with superior accuracy on names and citations.',
     family: 'moonshine',
     dtype: 'q8',
   },
   {
-    key: 'moonshine-base',
-    id: 'onnx-community/moonshine-base-ONNX',
-    label: 'Moonshine Base',
-    note: 'More accurate than Tiny, and still built for live speech.',
+    key: 'moonshine-tiny',
+    id: 'onnx-community/moonshine-tiny-ONNX',
+    label: 'Moonshine Tiny',
+    approxSize: '75 MB',
+    note: 'Built for live speech — ultra fast response time with a lightweight footprint.',
     family: 'moonshine',
     dtype: 'q8',
   },
@@ -68,27 +70,17 @@ const MODELS = [
     key: 'whisper-tiny-en',
     id: 'Xenova/whisper-tiny.en',
     label: 'Whisper Tiny (English)',
+    approxSize: '75 MB',
     note: 'English only. Well proven, but tuned for 30-second windows.',
     family: 'whisper',
-    /* An English-only checkpoint. v3 refuses `language` and `task` on these —
-       "Cannot specify `task` or `language` for an English-only model" — where
-       v2 quietly ignored them. Passing them anyway sent every transcription
-       down the bare retry, which also dropped the chunking and the timestamps.
-       There is nothing to select on a model that speaks one language. */
     multilingual: false,
     dtype: 'q8',
   },
-  /* The multilingual pair. Everything above speaks English and only English —
-     Moonshine ships English-only weights, and `.en` is what the Whisper Tiny
-     above is. A church running a French or Spanish service had no model here
-     that could hear it, which is why the sermon-language setting only means
-     something once one of these is chosen.
-     Both are the 51865-token multilingual checkpoints; `language` and `task`
-     are passed to them, which is what `multilingual: true` gates below. */
   {
     key: 'whisper-tiny-multi',
     id: 'Xenova/whisper-tiny',
     label: 'Whisper Tiny (multilingual)',
+    approxSize: '75 MB',
     note: 'Understands French, Spanish and 90+ more. Slower than Moonshine.',
     family: 'whisper',
     multilingual: true,
@@ -98,7 +90,8 @@ const MODELS = [
     key: 'whisper-base-multi',
     id: 'Xenova/whisper-base',
     label: 'Whisper Base (multilingual)',
-    note: 'The most accurate here, and the largest. Best for non-English sermons.',
+    approxSize: '145 MB',
+    note: 'The most accurate multilingual model. Best for non-English sermons.',
     family: 'whisper',
     multilingual: true,
     dtype: 'q8',
@@ -111,15 +104,10 @@ const SUPPORTED_LANGUAGES = ['en', 'fr', 'es'];
 /* By key, not by position. The list is ordered for the operator reading the
    dropdown, and a reorder must not quietly change which recogniser a fresh
    install runs. */
-const DEFAULT_MODEL = MODELS.find((m) => m.key === 'moonshine-tiny') || MODELS[0];
+const DEFAULT_MODEL = MODELS.find((m) => m.key === 'moonshine-base') || MODELS[0];
 
 /**
  * Whisper's long-form arguments, which Moonshine does not take.
- *
- * At module scope and taking its model explicitly so a check can call it — the
- * sermon language reaches the recogniser through here and nowhere else, and a
- * silent no-op in this function is exactly what the old language mockup was.
- * See scripts/verify-local-models.cjs.
  */
 function generationOptions(model, payload = {}) {
   if (model.family !== 'whisper') return {};
@@ -127,7 +115,7 @@ function generationOptions(model, payload = {}) {
     return_timestamps: 'chunk',
     chunk_length_s: payload.chunkLength || 30,
     stride_length_s: payload.strideLength || 4,
-    initial_prompt: payload.initialPrompt || 'Bible scripture reading: Genesis, Exodus, Leviticus, Numbers, Deuteronomy, Matthew, Mark, Luke, John, Romans, Psalms, Chapter, Verse.',
+    initial_prompt: payload.initialPrompt || 'Bible scripture reading and preaching: Genesis, Exodus, Leviticus, Numbers, Deuteronomy, Joshua, Judges, Ruth, Samuel, Kings, Chronicles, Ezra, Nehemiah, Esther, Job, Psalms, Proverbs, Ecclesiastes, Song of Solomon, Isaiah, Jeremiah, Lamentations, Ezekiel, Daniel, Hosea, Joel, Amos, Obadiah, Jonah, Micah, Nahum, Habakkuk, Zephaniah, Haggai, Zechariah, Malachi, Matthew, Mark, Luke, John, Acts, Romans, Corinthians, Galatians, Ephesians, Philippians, Colossians, Thessalonians, Timothy, Titus, Philemon, Hebrews, James, Peter, Jude, Revelation, Chapter, Verse.',
   };
   /* Only a multilingual checkpoint has a language to be told and a task to
      choose between. See the note on whisper-tiny-en above. */
@@ -195,6 +183,7 @@ function createOnnxWhisperService({ app }) {
         id: m.id,
         label: m.label,
         note: m.note,
+        approxSize: m.approxSize,
         family: m.family,
         multilingual: Boolean(m.multilingual),
         downloaded: isCached(m),

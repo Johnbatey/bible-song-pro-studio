@@ -940,6 +940,7 @@ export interface LocalModelChoice {
   id: string;
   label: string;
   note: string;
+  approxSize?: string;
   family: 'whisper' | 'moonshine';
   /** Understands more than English, so the sermon language means something. */
   multilingual: boolean;
@@ -953,6 +954,7 @@ export interface LocalModelStatus {
   modelId: string;
   modelKey: string;
   modelLabel: string;
+  approxSize?: string;
   family: 'whisper' | 'moonshine';
   available: boolean;
   ready: boolean;

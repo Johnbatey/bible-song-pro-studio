@@ -799,7 +799,7 @@ export function SettingsModal() {
                       >
                         {localModels.map((model) => (
                           <option key={model.key} value={model.key}>
-                            {model.label}
+                            {model.label} {model.approxSize ? `(~${model.approxSize})` : ''}
                             {model.downloaded ? ' — on this computer' : ''}
                           </option>
                         ))}
@@ -814,13 +814,13 @@ export function SettingsModal() {
                       >
                         {localBusy
                           ? aiStatus?.warmupState === 'downloading'
-                            ? `Downloading… ${aiStatus?.downloadProgress ?? 0}%`
+                            ? `Downloading… ${aiStatus?.downloadProgress ?? 0}% ${localModel?.approxSize ? `(~${localModel.approxSize})` : ''}`
                             : 'Preparing…'
                           : aiStatus?.ready
                           ? 'Ready'
                           : localModel?.downloaded
                           ? 'Load model'
-                          : 'Download model'}
+                          : `Download model ${localModel?.approxSize ? `(~${localModel.approxSize})` : ''}`}
                       </button>
                       <span
                         style={{
@@ -832,7 +832,7 @@ export function SettingsModal() {
                           ? aiStatus?.lastError || 'The model could not be loaded.'
                           : aiStatus?.ready
                           ? 'Loaded and ready to transcribe.'
-                          : 'The first download needs the internet. After that it runs offline.'}
+                          : `Download size: ${localModel?.approxSize || '~145 MB'}. Downloaded once, then runs offline.`}
                       </span>
                     </div>
                   </div>

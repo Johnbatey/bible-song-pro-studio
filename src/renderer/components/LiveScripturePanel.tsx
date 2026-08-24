@@ -13,8 +13,8 @@ import { SongDeck } from './song/SongDeck';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { detectSongs, type SongDetection } from '../utils/song-detection';
 
-/** Short enough to feel live, while still giving Whisper enough speech context. */
-const LOCAL_CHUNK_SECONDS = 1.5;
+/** Short enough to feel live, while still giving Whisper/Moonshine full speech and reference context. */
+const LOCAL_CHUNK_SECONDS = 2.0;
 const DETECT_DEBOUNCE_MS = 60;
 /** Focused active utterance window for high-precision live matching without historical sermon pollution. */
 const DETECT_WINDOW_WORDS = 18;
@@ -214,9 +214,9 @@ export function LiveScripturePanel() {
       text: finalTranscriptRef.current,
       interimText: interimTranscriptRef.current,
     });
-    // Feed the active recent utterance rather than accumulated history
+    // Feed the active recent utterance with rolling window across chunk boundaries
     const activeUtterance = isFinal
-      ? text
+      ? `${finalTranscriptRef.current.split(/\s+/).slice(-14).join(' ')} ${text}`.trim()
       : `${finalTranscriptRef.current.split(/\s+/).slice(-6).join(' ')} ${interimTranscriptRef.current}`.trim();
     scheduleDetection(activeUtterance, isFinal);
   }

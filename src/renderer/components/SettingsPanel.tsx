@@ -395,14 +395,18 @@ export function SettingsPanel() {
                     {aiStatus?.engines?.onnx?.warmupState || 'idle'}
                   </span>
                   <button className="btn btn-sm btn-primary" disabled={localModelAction === 'downloading'} onClick={downloadLocalModel}>
-                    {localModelAction === 'downloading' ? 'Downloading…' : aiStatus?.engines?.onnx?.ready ? 'Downloaded' : 'Download model'}
+                    {localModelAction === 'downloading'
+                      ? 'Downloading…'
+                      : aiStatus?.engines?.onnx?.ready
+                      ? 'Downloaded'
+                      : `Download model ${aiStatus?.engines?.onnx?.approxSize ? `(~${aiStatus.engines.onnx.approxSize})` : '(~145 MB)'}`}
                   </button>
                   <button className="btn btn-sm" onClick={async () => setAiStatus(await window.BSP?.ai?.dispose({ engine: 'onnx' }).catch((e) => ({ ok: false, error: String(e) })))}>Dispose</button>
                 </div>
                 <div style={{ ...type.caption, color: localModelAction === 'error' ? 'var(--tally-fault)' : 'var(--text-dim)', marginBottom: 8 }}>
                   {localModelAction === 'error'
                     ? 'Model download failed. Check your connection and try again.'
-                    : 'Required for offline Live Scripture. It is downloaded once and cached on this computer.'}
+                    : `Required for offline Live Scripture. Download size: ${aiStatus?.engines?.onnx?.approxSize || '~145 MB'}. Downloaded once and cached.`}
                 </div>
 
                 {aiStatus?.platform?.isAppleSilicon && (

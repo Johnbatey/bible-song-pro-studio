@@ -88,8 +88,8 @@ async function main() {
   const duplicates = keys.filter((k, i) => keys.indexOf(k) !== i);
   if (duplicates.length) failures.push(`duplicate model keys: ${[...new Set(duplicates)].join(', ')}`);
 
-  const defaultModel = LOCAL_MODELS.find((m) => m.key === 'moonshine-tiny');
-  if (!defaultModel) failures.push('moonshine-tiny is gone — the default points at nothing');
+  const defaultModel = LOCAL_MODELS.find((m) => m.key === 'moonshine-base');
+  if (!defaultModel) failures.push('moonshine-base is gone — the default points at nothing');
 
   /* At least one model that can actually hear a language other than English,
      or the sermon-language setting is decoration. */
