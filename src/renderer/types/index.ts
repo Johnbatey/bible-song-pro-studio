@@ -361,24 +361,20 @@ export interface Song {
       it follows the theme, which is what Scripture does and what a song
       imported from OpenLyrics or ChordPro will always do. */
   background?: Background;
-  /** Play order, as slide ids; an id may repeat (V1 C V2 C B C).
-   *
-   *  Ids rather than labels because labels are operator-editable and not
-   *  unique — two slides can both read "Chorus", and renaming one would
-   *  silently re-point the order at the other.
-   *
-   *  Absent or empty means "play the slides in list order", which is what
-   *  every song written before this field existed does — so nothing needs
-   *  migrating and the persist version must not be bumped for it. Ids that no
-   *  longer name a slide are dropped when the order is expanded, so deleting a
-   *  slide can never leave a song unprojectable. */
+  /** Play order, as slide ids; an id may repeat (V1 C V2 C B C). */
   arrangement?: string[];
+  /** Secondary translation metadata */
+  translationLang?: string;
+  translationTitle?: string;
+  isBilingual?: boolean;
+  lockTranslation?: boolean;
 }
 
 export interface SongSlide {
   id: string;
   label: string;
   text: string;
+  translation?: string;
 }
 
 /** Shape returned by song-import-service.cjs (OpenLyrics / ChordPro / plain text). */

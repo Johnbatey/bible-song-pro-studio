@@ -1324,6 +1324,9 @@ export function LiveScripturePanel() {
             song={pickedSong}
             title="Lyrics"
             targetText={activeSongMatch?.excerpt}
+            onUpdateSong={(patch) => {
+              if (pickedSong) useAppStore.getState().updateSong(pickedSong.id, patch);
+            }}
             emptyLabel="Pick a song from the candidate index to project its lyrics."
           />
         </div>

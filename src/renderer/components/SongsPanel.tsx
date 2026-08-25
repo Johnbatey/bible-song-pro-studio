@@ -799,6 +799,7 @@ export function SongsPanel() {
       <SongDeck
         song={selectedSong}
         targetText={lyricTarget || undefined}
+        onUpdateSong={patchSelectedSong}
         emptyLabel="Select a song from the left list to view its lyrics."
       />
     </div>
