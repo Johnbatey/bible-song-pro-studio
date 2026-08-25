@@ -35,3 +35,4 @@ npm-debug.log*
 .env.local
 /settings.json
 .opencode
+dist._packaged_bak

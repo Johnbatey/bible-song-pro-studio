@@ -24,11 +24,22 @@ const path = require('path');
 const FOURCC_BGRA = 0x41524742;
 const FRAME_FORMAT_PROGRESSIVE = 1;
 
+/* Cached so TitleBar / Settings status polls (every ~2s) do not re-walk the
+   filesystem. A missed install after the first lookup is rare; restarting the
+   app picks it up. `null` means "looked, not found" — distinct from unset. */
+let cachedLibPath = undefined;
+
 /**
  * Universal dynamic NDI library locator across Windows, macOS, and Linux.
  * Adapts to NDI 5, NDI 6, NDI 7+, custom SDK directories, and system paths.
+ *
+ * Important on Windows: never readdir system roots like System32. An earlier
+ * version walked every System32 subdirectory on each `ndi:status` poll, which
+ * pegged the Electron main process at ~100% CPU and froze the UI cursor.
  */
 function findLib() {
+  if (cachedLibPath !== undefined) return cachedLibPath;
+
   const isWin = process.platform === 'win32';
   const isMac = process.platform === 'darwin';
   const isLinux = process.platform === 'linux';
@@ -67,8 +78,29 @@ function findLib() {
     return null;
   }
 
-  // 1. Dynamic Environment Variables (e.g. NDI_RUNTIME_DIR_V6, NDI_RUNTIME_DIR_V5, NDILIB_REDIST_DIR, NDI_SDK_DIR)
-  // Sort descending so newer NDI versions (V7, V6) take precedence over older (V5, V4)
+  /** Only NDI install roots are safe to readdir — never System32 / usr/lib. */
+  function walkShallow(dir) {
+    if (!dir) return null;
+    const direct = checkDir(dir);
+    if (direct) return direct;
+    try {
+      if (!fs.existsSync(dir)) return null;
+      const subfolders = fs.readdirSync(dir);
+      subfolders.sort((a, b) => b.localeCompare(a));
+      for (const sub of subfolders) {
+        const found = checkDir(path.join(dir, sub));
+        if (found) return found;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function finish(found) {
+    cachedLibPath = found || null;
+    return cachedLibPath;
+  }
+
+  // 1. Dynamic Environment Variables (e.g. NDI_RUNTIME_DIR_V6, NDILIB_REDIST_DIR)
   const envKeys = Object.keys(process.env)
     .filter((k) => /^NDI/i.test(k) || /NDILIB/i.test(k))
     .sort((a, b) => b.localeCompare(a));
@@ -77,59 +109,11 @@ function findLib() {
     const val = process.env[key];
     if (val) {
       const found = checkDir(val);
-      if (found) return found;
+      if (found) return finish(found);
     }
   }
 
-  // 2. Standard System Installation Candidates
-  const baseCandidates = isWin
-    ? [
-        process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'NDI'),
-        process.env['ProgramFiles(x86)'] && path.join(process.env['ProgramFiles(x86)'], 'NDI'),
-        process.env.ProgramW6432 && path.join(process.env.ProgramW6432, 'NDI'),
-        'C:\\Program Files\\NDI',
-        'C:\\Program Files (x86)\\NDI',
-        process.env.SystemRoot && path.join(process.env.SystemRoot, 'System32'),
-        'C:\\Windows\\System32',
-      ].filter(Boolean)
-    : isMac
-    ? [
-        '/Library/NDI SDK for Apple/lib/macOS',
-        '/Library/NDI Runtimes/macOS',
-        '/Library/NDI SDK for Apple',
-        '/opt/homebrew/lib',
-        '/usr/local/lib',
-        '/usr/lib',
-      ]
-    : [
-        '/usr/lib/x86_64-linux-gnu',
-        '/usr/lib64',
-        '/usr/lib',
-        '/usr/local/lib',
-        '/opt/ndi/lib/x86_64-linux-gnu',
-        '/opt/ndi/lib',
-        '/opt/ndi',
-      ];
-
-  for (const base of baseCandidates) {
-    const directFound = checkDir(base);
-    if (directFound) return directFound;
-
-    // On Windows, dynamically inspect subdirectories inside C:\Program Files\NDI (e.g. NDI 6 Runtime, NDI 5 Tools, NDI 6 SDK, etc.)
-    if (isWin && fs.existsSync(base)) {
-      try {
-        const subfolders = fs.readdirSync(base);
-        subfolders.sort((a, b) => b.localeCompare(a));
-        for (const sub of subfolders) {
-          const subPath = path.join(base, sub);
-          const found = checkDir(subPath);
-          if (found) return found;
-        }
-      } catch (_) {}
-    }
-  }
-
-  // 3. Bundled Application Fallback (Zero-configuration out-of-the-box support)
+  // 2. Bundled copy first — cheap, and the usual case for this app.
   let appPath = null;
   try {
     const { app } = require('electron');
@@ -139,11 +123,9 @@ function findLib() {
   } catch (_) {}
 
   const bundledCandidates = [
-    // Production extraResources path
     process.resourcesPath && path.join(process.resourcesPath, 'bin/ndi'),
     process.resourcesPath && path.join(process.resourcesPath, 'assets/bin/ndi', platformFolder),
     process.resourcesPath && path.join(process.resourcesPath, 'app.asar.unpacked/assets/bin/ndi', platformFolder),
-    // App path / Source tree development paths
     appPath && path.join(appPath, 'assets/bin/ndi', platformFolder),
     path.join(__dirname, '../../assets/bin/ndi', platformFolder),
     path.join(__dirname, '../assets/bin/ndi', platformFolder),
@@ -152,10 +134,60 @@ function findLib() {
 
   for (const bundledDir of bundledCandidates) {
     const bundledFound = checkDir(bundledDir);
-    if (bundledFound) return bundledFound;
+    if (bundledFound) return finish(bundledFound);
   }
 
-  return null;
+  // 3. System NDI installs (Program Files\NDI\* only — shallow walk).
+  if (isWin) {
+    const ndiRoots = [
+      process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'NDI'),
+      process.env['ProgramFiles(x86)'] && path.join(process.env['ProgramFiles(x86)'], 'NDI'),
+      process.env.ProgramW6432 && path.join(process.env.ProgramW6432, 'NDI'),
+      'C:\\Program Files\\NDI',
+      'C:\\Program Files (x86)\\NDI',
+    ].filter(Boolean);
+
+    for (const root of ndiRoots) {
+      const found = walkShallow(root);
+      if (found) return finish(found);
+    }
+
+    // Direct file probes only — never readdir these.
+    for (const leaf of [
+      process.env.SystemRoot && path.join(process.env.SystemRoot, 'System32'),
+      'C:\\Windows\\System32',
+    ].filter(Boolean)) {
+      const found = checkDir(leaf);
+      if (found) return finish(found);
+    }
+  } else if (isMac) {
+    for (const base of [
+      '/Library/NDI SDK for Apple/lib/macOS',
+      '/Library/NDI Runtimes/macOS',
+      '/Library/NDI SDK for Apple',
+      '/opt/homebrew/lib',
+      '/usr/local/lib',
+      '/usr/lib',
+    ]) {
+      const found = checkDir(base);
+      if (found) return finish(found);
+    }
+  } else if (isLinux) {
+    for (const base of [
+      '/usr/lib/x86_64-linux-gnu',
+      '/usr/lib64',
+      '/usr/lib',
+      '/usr/local/lib',
+      '/opt/ndi/lib/x86_64-linux-gnu',
+      '/opt/ndi/lib',
+      '/opt/ndi',
+    ]) {
+      const found = checkDir(base);
+      if (found) return finish(found);
+    }
+  }
+
+  return finish(null);
 }
 
 /**
