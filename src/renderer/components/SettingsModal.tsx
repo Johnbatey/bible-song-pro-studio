@@ -197,6 +197,7 @@ export function SettingsModal() {
   const setLive = useAppStore((s) => s.setLiveScripture);
   const showStandbyBrand = useAppStore((s) => s.showStandbyBrand);
   const setShowStandbyBrand = useAppStore((s) => s.setShowStandbyBrand);
+  const platform = useAppStore((s) => s.platform);
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(activeCategoryValue || 'scripture');
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -596,7 +597,15 @@ export function SettingsModal() {
                 <div style={modalStyles.formRow}>
                   <div>
                     <div style={modalStyles.rowTitle}>System Engine Specs</div>
-                    <div style={modalStyles.rowSub}>macOS Metal Hardware Acceleration • Port 8942</div>
+                    <div style={modalStyles.rowSub}>
+                      {platform === 'darwin'
+                        ? 'macOS Metal Hardware Acceleration • Port 8942'
+                        : platform === 'win32'
+                        ? 'Windows DirectX / Direct3D Hardware Acceleration • Port 8942'
+                        : platform === 'linux'
+                        ? 'Linux Vulkan / OpenGL Hardware Acceleration • Port 8942'
+                        : 'GPU Hardware Acceleration • Port 8942'}
+                    </div>
                   </div>
                   <span style={{ fontSize: 12, color: '#2ecc71', fontWeight: 600 }}>Active</span>
                 </div>
