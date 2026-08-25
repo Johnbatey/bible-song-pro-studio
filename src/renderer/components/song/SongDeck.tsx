@@ -224,8 +224,10 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
       <Block
         className="blk-fill"
         title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: fontWeight.bold }}>{title ?? (song ? song.title : 'Songs Workspace')}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'nowrap', minWidth: 0 }}>
+            <span style={{ fontWeight: fontWeight.bold, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {title ?? (song ? song.title : 'Songs Workspace')}
+            </span>
             {song && (
               <div style={deckStyles.tabSegmentContainer}>
                 <button
@@ -252,11 +254,8 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
             )}
           </div>
         }
-        subtitle={song
-          ? `${song.artist || 'Unknown Artist'}${song.key ? ` · Key: ${song.key}` : ''}${song.translationLang ? ` · ${song.translationLang.toUpperCase()}` : ''}`
-          : undefined}
         tools={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
             {/* Mode Switcher: Text vs Buttons */}
             <BlockSegment>
               <BlockButton

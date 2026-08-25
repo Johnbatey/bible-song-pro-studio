@@ -524,6 +524,13 @@ select option:hover, select option:focus, select option:checked {
   min-height: var(--block-chrome-h);
   padding: 0 var(--block-pad);
   border-bottom: 1px solid var(--block-line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.blk__chrome::-webkit-scrollbar {
+  display: none;
 }
 
 /* A chrome bar that is nothing but tools (no label) still keeps the rule. */
@@ -531,6 +538,12 @@ select option:hover, select option:focus, select option:checked {
   justify-content: flex-start;
   flex-wrap: nowrap;
   padding: 6px var(--block-pad);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.blk__chrome--tools::-webkit-scrollbar {
+  display: none;
 }
 
 .blk__title {
@@ -540,6 +553,7 @@ select option:hover, select option:focus, select option:checked {
   color: #ffffff;
   white-space: nowrap;
   letter-spacing: -0.01em;
+  flex-shrink: 0;
 }
 
 .blk__subtitle {
@@ -547,6 +561,7 @@ select option:hover, select option:focus, select option:checked {
   font-weight: var(--fw-regular);
   color: var(--text-dim);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .blk__titlegroup {
@@ -554,6 +569,7 @@ select option:hover, select option:focus, select option:checked {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .blk__tools {
@@ -561,6 +577,13 @@ select option:hover, select option:focus, select option:checked {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.blk__tools::-webkit-scrollbar {
+  display: none;
 }
 
 .blk__body {
