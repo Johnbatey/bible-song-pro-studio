@@ -27,6 +27,14 @@ app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
+// Prevent unexpected stream destruction or network errors from showing modal crash dialogs
+process.on('uncaughtException', (err) => {
+  console.error('[Main] Uncaught exception:', err?.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Main] Unhandled rejection:', reason);
+});
+
 /* ── Where the operator's data lives, and why renaming is expensive ─────────
  *
  * Everything an operator owns — settings and API keys, the app-state store
