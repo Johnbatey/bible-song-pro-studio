@@ -5,12 +5,15 @@
 - Graphic design keyboard shortcuts (V, T, P, B, R, O/C, L, H, Esc, Cmd/Ctrl+A, Cmd/Ctrl+D)
 - Individual Bézier node selection, repositioning, and deletion
 - Spoken verse navigation (next/previous verse, jump to verse, chapter traversal)
+- Multi-accent phonetic speech dictionary and sound-alike book name mappings
+- Biblical lemmatization (KJV archaic terms mapped to modern root words)
 - Flexible spoken translation requests and real-time paraphrase toggle
 - Multi-tab Song workspace (Primary and Translation projection across Text & Button modes)
 - Detachable dock pop-out windows for multi-monitor workspaces
 - Full Pro Slides OBS / browser output parity at /display.html
 
 🔧 Tweaks:
+- Cleaned up top header bar buttons with crisp, high-resolution SVG icons
 - True 1:1 shape geometry for circles, triangles, and stars on 16:9 canvas
 - Clean AI speech model dropdown with glowing download status indicators
 - Bidirectional mode synchronization between Local and Cloud models
