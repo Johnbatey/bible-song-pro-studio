@@ -21,7 +21,7 @@
 🐞 Bugfixes:
 - Fixed NDI 6 native runtime missing on Windows and Linux by bundling cross-platform libraries
 - Fixed external audience and stage displays not rendering borderless fullscreen
-- Fixed display switching back to fullscreen when Pro Slides presentation is active
+- Fixed presentation slides showing as partial text in lower-third mode by auto-switching display to full screen when slides are active
 - Fixed Bézier nodes snapping back to initial position after dragging
 - Fixed closed path fill color not applying immediately upon loop completion
 - Fixed delete key removing entire element instead of selected vector node
