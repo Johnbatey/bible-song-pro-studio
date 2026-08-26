@@ -6,6 +6,10 @@ export interface DropdownOption<T extends string = string> {
   label: React.ReactNode;
   sublabel?: string;
   icon?: React.ReactNode;
+  group?: string;
+  badge?: string;
+  badgeColor?: string;
+  statusDot?: 'green' | 'red' | 'amber' | 'blue';
 }
 
 interface CustomDropdownProps<T extends string = string> {
@@ -42,7 +46,7 @@ export function CustomDropdown<T extends string = string>({
   const measure = useCallback(() => {
     const button = containerRef.current?.getBoundingClientRect();
     if (!button) return;
-    const estimatedHeight = Math.min(240, options.length * 38 + 8);
+    const estimatedHeight = Math.min(340, options.length * 48 + 40);
     const flip = button.bottom + estimatedHeight + 8 > window.innerHeight;
     setMenuRect({
       top: flip ? button.top - 4 : button.bottom + 4,
@@ -102,9 +106,23 @@ export function CustomDropdown<T extends string = string>({
         onClick={() => setIsOpen(!isOpen)}
         title={title}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
-          {selectedOption?.label || value}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', flex: 1, minWidth: 0 }}>
+          {selectedOption?.statusDot && (
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: selectedOption.statusDot === 'green' ? '#22c55e' : selectedOption.statusDot === 'amber' ? '#f59e0b' : '#ef4444',
+                boxShadow: selectedOption.statusDot === 'green' ? '0 0 6px rgba(34, 197, 94, 0.7)' : selectedOption.statusDot === 'amber' ? '0 0 6px rgba(245, 158, 11, 0.7)' : '0 0 6px rgba(239, 68, 68, 0.7)',
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
+            {selectedOption?.label || value}
+          </span>
+        </div>
         <svg
           width="12"
           height="12"
@@ -132,8 +150,8 @@ export function CustomDropdown<T extends string = string>({
             left: menuRect.left,
             transform: menuRect.flip ? 'translateY(-100%)' : undefined,
             zIndex: zIndex,
-            minWidth: Math.max(menuRect.width, 220),
-            maxWidth: 360,
+            minWidth: Math.max(menuRect.width, 240),
+            maxWidth: 380,
             background: 'var(--bg-secondary, #161414)',
             border: '1px solid var(--border-primary, #262628)',
             borderRadius: 6,
@@ -142,66 +160,122 @@ export function CustomDropdown<T extends string = string>({
             display: 'flex',
             flexDirection: 'column',
             gap: 2,
-            maxHeight: 260,
+            maxHeight: 340,
             overflowY: 'auto',
           }}
         >
-          {options.map((opt) => {
+          {options.map((opt, idx) => {
+            const prevGroup = idx > 0 ? options[idx - 1].group : undefined;
+            const isNewGroup = opt.group && opt.group !== prevGroup;
             const isSelected = opt.value === value;
+
             return (
-              <button
-                key={opt.value}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  padding: '8px 12px',
-                  background: isSelected ? 'var(--accent-dim, rgba(255, 85, 0, 0.15))' : 'transparent',
-                  border: 'none',
-                  borderRadius: 6,
-                  color: isSelected ? 'var(--accent, #FF5500)' : 'var(--text-primary)',
-                  fontSize: 13,
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.15s ease',
-                  fontFamily: 'var(--font-ui)',
-                }}
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.background = 'var(--bg-hover, rgba(255, 255, 255, 0.08))';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.background = 'transparent';
-                  }
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-                  {opt.icon && (
-                    <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? 'var(--accent)' : 'var(--text-secondary)', flexShrink: 0 }}>
-                      {opt.icon}
-                    </span>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
-                    {opt.sublabel && (
-                      <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 400 }}>{opt.sublabel}</span>
-                    )}
+              <div key={opt.value} style={{ display: 'contents' }}>
+                {isNewGroup && (
+                  <div
+                    style={{
+                      padding: idx === 0 ? '4px 10px 4px 10px' : '8px 10px 4px 10px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      color: 'var(--text-dim, #888)',
+                      borderTop: idx > 0 ? '1px solid var(--border-primary, #262628)' : 'none',
+                      marginTop: idx > 0 ? 4 : 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <span>{opt.group}</span>
                   </div>
-                </div>
-                {isSelected && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent, #FF5500)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
                 )}
-              </button>
+                <button
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    padding: '8px 12px',
+                    background: isSelected ? 'var(--accent-dim, rgba(255, 85, 0, 0.15))' : 'transparent',
+                    border: 'none',
+                    borderRadius: 6,
+                    color: isSelected ? 'var(--accent, #FF5500)' : 'var(--text-primary)',
+                    fontSize: 13,
+                    fontWeight: isSelected ? 700 : 500,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease',
+                    fontFamily: 'var(--font-ui)',
+                  }}
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.background = 'var(--bg-hover, rgba(255, 255, 255, 0.08))';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.background = 'transparent';
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                    {opt.icon && (
+                      <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? 'var(--accent)' : 'var(--text-secondary)', flexShrink: 0 }}>
+                        {opt.icon}
+                      </span>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
+                        {opt.statusDot && (
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: '50%',
+                              background: opt.statusDot === 'green' ? '#22c55e' : opt.statusDot === 'amber' ? '#f59e0b' : '#ef4444',
+                              boxShadow: opt.statusDot === 'green' ? '0 0 6px rgba(34, 197, 94, 0.7)' : opt.statusDot === 'amber' ? '0 0 6px rgba(245, 158, 11, 0.7)' : '0 0 6px rgba(239, 68, 68, 0.7)',
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        {opt.badge && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              padding: '1px 5px',
+                              borderRadius: 4,
+                              background: opt.badgeColor ? `${opt.badgeColor}22` : 'rgba(255, 255, 255, 0.1)',
+                              color: opt.badgeColor || 'var(--text-dim)',
+                              border: `1px solid ${opt.badgeColor ? `${opt.badgeColor}44` : 'rgba(255, 255, 255, 0.15)'}`,
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {opt.badge}
+                          </span>
+                        )}
+                      </div>
+                      {opt.sublabel && (
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {opt.sublabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent, #FF5500)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             );
           })}
         </div>,
@@ -210,3 +284,4 @@ export function CustomDropdown<T extends string = string>({
     </div>
   );
 }
+

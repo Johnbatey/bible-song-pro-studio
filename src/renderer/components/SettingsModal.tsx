@@ -250,8 +250,20 @@ export function SettingsModal() {
 
   const selectLocalModel = useCallback(async (key: string) => {
     await window.BSP?.ai?.setLocalModel?.(key).catch(() => null);
+    await saveSettings({ sttLocalModel: key });
     await refreshAiStatus();
   }, [refreshAiStatus]);
+
+  const handleSelectSttEngine = async (nextEngine: 'deepgram' | 'local') => {
+    await saveSettings({ sttEngine: nextEngine });
+    await window.BSP?.ai?.setEngine?.(nextEngine).catch(() => {});
+    setLive({ provider: nextEngine });
+    if (nextEngine === 'local') {
+      const localModelKey = settings?.sttLocalModel || aiStatus?.modelKey || 'moonshine-base';
+      await window.BSP?.ai?.setLocalModel?.(localModelKey).catch(() => {});
+      await refreshAiStatus();
+    }
+  };
 
   /* Warmup is the download: transformers.js fetches the weights the first time
      the pipeline is built and reads them off disk every time after. Polling
@@ -339,8 +351,21 @@ export function SettingsModal() {
   useEffect(() => {
     refreshDisplays();
     window.BSP?.settings?.get().then((res) => { if (res?.ok) setSettings(res.settings); }).catch(() => {});
-    
-  }, []);
+    const off = window.BSP?.settings?.onUpdated?.((updated) => {
+      setSettings(updated);
+      refreshAiStatus();
+    });
+    return () => {
+      off?.();
+    };
+  }, [refreshAiStatus]);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      refreshAiStatus();
+      window.BSP?.settings?.get().then((res) => { if (res?.ok) setSettings(res.settings); }).catch(() => {});
+    }
+  }, [isSettingsOpen, refreshAiStatus]);
 
   /* Microphones, from the only place that knows about them.
    *
@@ -614,7 +639,7 @@ export function SettingsModal() {
                   <div>
                     <div style={modalStyles.rowTitle}>Software Updates</div>
                     <div style={modalStyles.rowSub}>
-                      App Version {appVersion || '3.1.0'} {updateStatusText ? `• ${updateStatusText}` : ''}
+                      App Version {appVersion || '3.2.0'} {updateStatusText ? `• ${updateStatusText}` : ''}
                     </div>
                   </div>
                   <button
@@ -768,7 +793,7 @@ export function SettingsModal() {
                         background: (settings?.sttEngine || 'deepgram') === 'deepgram' ? '#FF5500' : 'transparent',
                         color: (settings?.sttEngine || 'deepgram') === 'deepgram' ? '#ffffff' : 'var(--text-secondary)',
                       }}
-                      onClick={() => saveSettings({ sttEngine: 'deepgram' })}
+                      onClick={() => handleSelectSttEngine('deepgram')}
                     >
                       Cloud (Deepgram)
                     </button>
@@ -778,7 +803,7 @@ export function SettingsModal() {
                         background: settings?.sttEngine === 'local' ? '#FF5500' : 'transparent',
                         color: settings?.sttEngine === 'local' ? '#ffffff' : 'var(--text-secondary)',
                       }}
-                      onClick={() => saveSettings({ sttEngine: 'local' })}
+                      onClick={() => handleSelectSttEngine('local')}
                     >
                       On-device
                     </button>
@@ -1183,14 +1208,7 @@ export function SettingsModal() {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                    <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText(`OBS NDI Source: ${ndiName}`)}>
-                      Copy OBS Setup Info
-                    </button>
-                    <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText(`vMix NDI Input: ${ndiName}`)}>
-                      Copy vMix Setup Info
-                    </button>
-                  </div>
+
                 </div>
               </div>
             )}
@@ -1903,83 +1921,77 @@ const modalStyles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   selectInput: {
-    background: 'var(--settings-card)',
-    border: '1px solid var(--settings-line)',
+    background: "var(--settings-card)",
+    border: "1px solid var(--settings-line)",
     borderRadius: 6,
-    color: 'var(--text-primary)',
+    color: "var(--text-primary)",
     fontSize: 13,
-    padding: '6px 12px',
-    outline: 'none',
-    cursor: 'pointer',
+    padding: "6px 12px",
+    outline: "none",
+    cursor: "pointer",
   },
   toggleInput: {
     width: 38,
     height: 20,
-    accentColor: '#FF5500',
-    cursor: 'pointer',
+    accentColor: "#FF5500",
+    cursor: "pointer",
   },
   rangeInput: {
-    width: '100%',
-    accentColor: '#FF5500',
-    cursor: 'pointer',
+    width: "100%",
+    accentColor: "#FF5500",
+    cursor: "pointer",
     marginTop: 6,
   },
   actionBtn: {
-    padding: '6px 14px',
-    background: 'var(--settings-card)',
-    border: '1px solid var(--settings-line)',
+    padding: "6px 14px",
+    background: "var(--settings-card)",
+    border: "1px solid var(--settings-line)",
     borderRadius: 6,
-    color: 'var(--text-primary)',
+    color: "var(--text-primary)",
     fontSize: 12,
     fontWeight: 600,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  },
-  shortcutRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '10px 0',
-    borderBottom: '1px solid var(--settings-line)',
-  },
-  keyBadge: {
-    padding: '3px 8px',
-    background: 'var(--settings-card)',
-    border: '1px solid var(--settings-line)',
-    borderRadius: 4,
-    color: 'var(--text-primary)',
-    fontSize: 11,
-    fontWeight: 600,
-  },
-  textInput: {
-    width: '100%',
-    padding: '8px 12px',
-    background: 'var(--settings-card)',
-    border: '1px solid var(--settings-line)',
-    borderRadius: 6,
-    color: 'var(--text-primary)',
-    fontSize: 13,
-    outline: 'none',
-  },
-  textareaInput: {
-    width: '100%',
-    padding: '10px 12px',
-    background: 'var(--settings-card)',
-    border: '1px solid var(--settings-line)',
-    borderRadius: 6,
-    color: 'var(--text-primary)',
-    fontSize: 13,
-    outline: 'none',
-    resize: 'vertical',
-    fontFamily: 'var(--font-ui)',
-  },
-  chipBadge: {
-    padding: '4px 10px',
-    background: 'var(--settings-card)',
-    border: '1px solid var(--settings-line)',
-    borderRadius: 999,
-    color: 'var(--text-secondary)',
-    fontSize: 11,
-    cursor: 'pointer',
+    cursor: "pointer",
+    whiteSpace: "nowrap",
   },
 };
+
+function SettingsCopyButton({ textToCopy, label, style }: { textToCopy: string; label: string; style?: React.CSSProperties }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard?.writeText(textToCopy);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      style={{
+        ...style,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        color: copied ? "var(--tally-preview)" : undefined,
+        borderColor: copied ? "var(--tally-preview)" : undefined,
+        transition: "all 0.15s ease",
+      }}
+    >
+      {copied ? (
+        <>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "checkmarkPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)" }}>
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span style={{ color: "var(--tally-preview)" }}>Copied!</span>
+        </>
+      ) : (
+        <>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          <span>{label}</span>
+        </>
+      )}
+    </button>
+  );
+}

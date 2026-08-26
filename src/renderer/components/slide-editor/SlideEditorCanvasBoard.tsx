@@ -82,17 +82,27 @@ export function SlideEditorCanvasBoard({
     initialY: number;
     initialW: number;
     initialH: number;
+    multiDrag?: {
+      id: string;
+      initialX: number;
+      initialY: number;
+      width: number;
+      height: number;
+    }[];
   } | null>(null);
 
   const [drawingPencilId, setDrawingPencilId] = useState<string | null>(null);
   const [selectedBezierNodeIdx, setSelectedBezierNodeIdx] = useState<number | null>(null);
   const [selectedBezierHandleType, setSelectedBezierHandleType] = useState<'anchor' | 'h1' | 'h2' | null>(null);
+  const [bezierHoverPos, setBezierHoverPos] = useState<{ x: number; y: number } | null>(null);
   const [spaceHeld, setSpaceHeld] = useState(false);
 
   const BOARD_WIDTH = 1280;
   const BOARD_HEIGHT = 720;
 
   const elements: SlideElement[] = slideElementsFor(slide);
+  const elementsRef = useRef(elements);
+  elementsRef.current = elements;
   const assetBaseUrl = useAssetBaseUrl();
   const mediaSrc = (value?: string) => assetUrl(value, assetBaseUrl);
   const bgValue = slide.background?.value || '#18181b';
@@ -113,30 +123,27 @@ export function SlideEditorCanvasBoard({
 
   useEffect(() => {
     fitToViewport();
-    window.addEventListener('resize', fitToViewport);
-    return () => window.removeEventListener('resize', fitToViewport);
   }, [fitToViewport]);
 
-  /* Keyboard Spacebar for panning */
+  /* Keyboard shortcut: Space key for hand/pan tool toggle */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
-        e.preventDefault();
+      if ((e.target as HTMLElement | null)?.closest('input,textarea,[contenteditable="true"]')) return;
+      if (e.code === 'Space' && !e.repeat) {
         setSpaceHeld(true);
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') setSpaceHeld(false);
+      if (e.code === 'Space') {
+        setSpaceHeld(false);
+        setIsPanning(false);
+      }
     };
-    const onBlur = () => setSpaceHeld(false);
-
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
     };
   }, []);
 
@@ -221,28 +228,91 @@ export function SlideEditorCanvasBoard({
         }
 
         setSnapGuides(guides);
-        onUpdateElement(dragState.elementId, {
-          x: Math.max(0, Math.min(100 - dragState.initialW, Math.round(newX * 10) / 10)),
-          y: Math.max(0, Math.min(100 - dragState.initialH, Math.round(newY * 10) / 10)),
-        });
+
+        if (dragState.multiDrag && dragState.multiDrag.length > 1) {
+          dragState.multiDrag.forEach((item) => {
+            const itemNewX = item.initialX + dxPercent;
+            const itemNewY = item.initialY + dyPercent;
+            onUpdateElement(item.id, {
+              x: Math.max(-50, Math.min(150, Math.round(itemNewX * 10) / 10)),
+              y: Math.max(-50, Math.min(150, Math.round(itemNewY * 10) / 10)),
+            });
+          });
+        } else {
+          onUpdateElement(dragState.elementId, {
+            x: Math.max(0, Math.min(100 - dragState.initialW, Math.round(newX * 10) / 10)),
+            y: Math.max(0, Math.min(100 - dragState.initialH, Math.round(newY * 10) / 10)),
+          });
+        }
       } else {
         const handle = dragState.handle;
-        let nx = dragState.initialX;
-        let ny = dragState.initialY;
-        let nw = dragState.initialW;
-        let nh = dragState.initialH;
+        const dragEl = elementsRef.current.find((item) => item.id === dragState.elementId);
+        const isCircle = dragEl?.content === 'circle';
+        const isAlt = e.altKey;
+        const isShift = e.shiftKey || isCircle;
 
-        if (handle.includes('r')) nw = Math.min(Math.max(dragState.initialW + dxPercent, 2), 100 - dragState.initialX);
-        if (handle.includes('l')) {
-          const newX = Math.min(Math.max(dragState.initialX + dxPercent, 0), dragState.initialX + dragState.initialW - 2);
-          nx = newX;
-          nw = dragState.initialW - (newX - dragState.initialX);
-        }
-        if (handle.includes('b')) nh = Math.min(Math.max(dragState.initialH + dyPercent, 2), 100 - dragState.initialY);
-        if (handle.includes('t')) {
-          const newY = Math.min(Math.max(dragState.initialY + dyPercent, 0), dragState.initialY + dragState.initialH - 2);
-          ny = newY;
-          nh = dragState.initialH - (newY - dragState.initialY);
+        const initX = dragState.initialX;
+        const initY = dragState.initialY;
+        const initW = dragState.initialW;
+        const initH = dragState.initialH;
+        const centerX = initX + initW / 2;
+        const centerY = initY + initH / 2;
+
+        let nw = initW;
+        let nh = initH;
+        let nx = initX;
+        let ny = initY;
+
+        if (isAlt) {
+          // Alt/Option key: Center-origin symmetric scaling
+          let effDx = 0;
+          let effDy = 0;
+          if (handle.includes('r')) effDx = dxPercent;
+          else if (handle.includes('l')) effDx = -dxPercent;
+          if (handle.includes('b')) effDy = dyPercent;
+          else if (handle.includes('t')) effDy = -dyPercent;
+
+          nw = Math.max(2, initW + 2 * effDx);
+          nh = Math.max(2, initH + 2 * effDy);
+
+          if (isShift && ['br', 'bl', 'tr', 'tl'].includes(handle)) {
+            const initPxW = (initW / 100) * BOARD_WIDTH;
+            const initPxH = (initH / 100) * BOARD_HEIGHT;
+            const ratio = isCircle ? 1.0 : (initPxW > 0 ? initPxH / initPxW : 1.0);
+            const pxW = (nw / 100) * BOARD_WIDTH;
+            const pxH = pxW * ratio;
+            nh = (pxH / BOARD_HEIGHT) * 100;
+          }
+
+          nx = centerX - nw / 2;
+          ny = centerY - nh / 2;
+        } else {
+          // Standard corner/edge scaling
+          if (handle.includes('r')) nw = Math.min(Math.max(initW + dxPercent, 2), 100 - initX);
+          if (handle.includes('l')) {
+            const newX = Math.min(Math.max(initX + dxPercent, 0), initX + initW - 2);
+            nx = newX;
+            nw = initW - (newX - initX);
+          }
+          if (handle.includes('b')) nh = Math.min(Math.max(initH + dyPercent, 2), 100 - initY);
+          if (handle.includes('t')) {
+            const newY = Math.min(Math.max(initY + dyPercent, 0), initY + initH - 2);
+            ny = newY;
+            nh = initH - (newY - initY);
+          }
+
+          if (isShift && ['br', 'bl', 'tr', 'tl'].includes(handle)) {
+            const initPxW = (initW / 100) * BOARD_WIDTH;
+            const initPxH = (initH / 100) * BOARD_HEIGHT;
+            const ratio = isCircle ? 1.0 : (initPxW > 0 ? initPxH / initPxW : 1.0);
+            const pxW = (nw / 100) * BOARD_WIDTH;
+            const pxH = pxW * ratio;
+            const newHPercent = (pxH / BOARD_HEIGHT) * 100;
+            if (handle.includes('t')) {
+              ny = initY + (initH - newHPercent);
+            }
+            nh = newHPercent;
+          }
         }
 
         onUpdateElement(dragState.elementId, {
@@ -279,7 +349,7 @@ export function SlideEditorCanvasBoard({
   };
 
   /* Optimize Bezier element bounding box */
-  const optimizeBezierBounds = (bezierEl: SlideElement) => {
+  const optimizeBezierBounds = (bezierEl: SlideElement, extraPatch?: Partial<SlideElement>) => {
     const pts = (bezierEl.points || []) as any[];
     if (pts.length < 2) return;
 
@@ -338,6 +408,17 @@ export function SlideEditorCanvasBoard({
         height: nh,
         vbW: width,
         vbH: height,
+        closed: bezierEl.closed,
+        isLoopFilled: bezierEl.isLoopFilled,
+        backgroundColor: bezierEl.backgroundColor,
+        fillColor: bezierEl.fillColor,
+        strokeColor: bezierEl.strokeColor,
+        borderColor: bezierEl.borderColor,
+        strokeWidth: bezierEl.strokeWidth,
+        borderWidth: bezierEl.borderWidth,
+        fillOpacity: bezierEl.fillOpacity,
+        strokeOpacity: bezierEl.strokeOpacity,
+        ...extraPatch,
       });
     }
   };
@@ -348,24 +429,57 @@ export function SlideEditorCanvasBoard({
       if (selectedBezierNodeIdx === null || !selectedElementId) return;
       if (e.key === 'Backspace' || e.key === 'Delete') {
         const target = elements.find((el) => el.id === selectedElementId && el.type === 'bezier');
-        if (!target || !target.points) return;
+        if (!target || !target.points || selectedBezierNodeIdx >= target.points.length) return;
         e.preventDefault();
         e.stopPropagation();
         const newPts = [...(target.points as any[])];
         newPts.splice(selectedBezierNodeIdx, 1);
         if (newPts.length < 2) {
-          onUpdateElement(target.id, { points: newPts });
+          onUpdateElement(target.id, { points: newPts, closed: false, isLoopFilled: false });
           setSelectedBezierNodeIdx(null);
         } else {
-          onUpdateElement(target.id, { points: newPts });
-          setSelectedBezierNodeIdx(Math.max(0, selectedBezierNodeIdx - 1));
-          optimizeBezierBounds({ ...target, points: newPts });
+          const isStillClosed = Boolean(target.closed && newPts.length >= 3);
+          const nextIdx = Math.max(0, Math.min(newPts.length - 1, selectedBezierNodeIdx));
+          setSelectedBezierNodeIdx(nextIdx);
+          optimizeBezierBounds({
+            ...target,
+            points: newPts,
+            closed: isStillClosed,
+            isLoopFilled: isStillClosed,
+          });
         }
       }
     }
     window.addEventListener('keydown', handleNodeDeleteKeys, { capture: true });
     return () => window.removeEventListener('keydown', handleNodeDeleteKeys, { capture: true });
-  }, [selectedBezierNodeIdx, selectedElementId, elements, onUpdateElement]);
+  }, [selectedBezierNodeIdx, selectedElementId, elements, onUpdateElement, activeTool]);
+
+  /* Finalize open bezier element when switching tools or pressing Enter/Escape */
+  useEffect(() => {
+    function handleFinishBezierKeys(e: KeyboardEvent) {
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        const target = elements.find((el) => el.id === selectedElementId && el.type === 'bezier' && !el.closed);
+        if (target && (target.points?.length || 0) >= 2) {
+          optimizeBezierBounds(target);
+          setSelectedBezierNodeIdx(null);
+          setSelectedBezierHandleType(null);
+        }
+      }
+    }
+    window.addEventListener('keydown', handleFinishBezierKeys);
+    return () => window.removeEventListener('keydown', handleFinishBezierKeys);
+  }, [elements, selectedElementId]);
+
+  const prevToolRef = useRef(activeTool);
+  useEffect(() => {
+    if (prevToolRef.current === 'bezier' && activeTool !== 'bezier') {
+      const target = elements.find((el) => el.id === selectedElementId && el.type === 'bezier' && !el.closed);
+      if (target && (target.points?.length || 0) >= 2) {
+        optimizeBezierBounds(target);
+      }
+    }
+    prevToolRef.current = activeTool;
+  }, [activeTool, elements, selectedElementId]);
 
   /* Pointer events on viewport for canvas panning & vector drawing */
   const onViewportPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -401,24 +515,41 @@ export function SlideEditorCanvasBoard({
         target = {
           id: newId,
           type: 'bezier',
-          x: 0, y: 0, width: 100, height: 100, content: 'bezier',
+          x: 0, y: 0, width: 100, height: 100,
+          vbW: BOARD_WIDTH, vbH: BOARD_HEIGHT,
+          content: 'bezier',
           points: [], closed: false, strokeColor: '#FF5500', strokeWidth: strokeWidth || 4,
           zIndex: (elements.length || 0) + 1,
         };
         isNew = true;
       }
 
-      const localX = pt.x - ((target.x / 100) * BOARD_WIDTH);
-      const localY = pt.y - ((target.y / 100) * BOARD_HEIGHT);
+      const targetAbsX = (target.x / 100) * BOARD_WIDTH;
+      const targetAbsY = (target.y / 100) * BOARD_HEIGHT;
+      const localX = pt.x - targetAbsX;
+      const localY = pt.y - targetAbsY;
       const pts = (target.points || []) as any[];
 
+      // If clicking near first node with >= 2 points, close the loop!
       if (pts.length >= 2) {
         const first = pts[0];
         const dx = localX - first.x;
         const dy = localY - first.y;
-        if (Math.sqrt(dx * dx + dy * dy) <= 18) {
-          onUpdateElement(target.id, { closed: true });
-          optimizeBezierBounds({ ...target, closed: true });
+        if (Math.sqrt(dx * dx + dy * dy) <= 24) {
+          const nextFill = (target.backgroundColor && target.backgroundColor !== 'transparent')
+            ? target.backgroundColor
+            : (target.fillColor && target.fillColor !== 'transparent')
+            ? target.fillColor
+            : '#FF5500';
+          optimizeBezierBounds({
+            ...target,
+            closed: true,
+            isLoopFilled: true,
+            backgroundColor: nextFill,
+            fillColor: nextFill,
+          });
+          setSelectedBezierNodeIdx(null);
+          setSelectedBezierHandleType(null);
           return;
         }
       }
@@ -440,8 +571,8 @@ export function SlideEditorCanvasBoard({
       const targetId = target.id;
       function onDragNewHandle(moveEv: PointerEvent) {
         const movePt = getCanvasPoint(moveEv);
-        const dragLocalX = movePt.x - ((target!.x / 100) * BOARD_WIDTH);
-        const dragLocalY = movePt.y - ((target!.y / 100) * BOARD_HEIGHT);
+        const dragLocalX = movePt.x - targetAbsX;
+        const dragLocalY = movePt.y - targetAbsY;
 
         const currPts = [...newPts];
         const currNode = { ...currPts[newIdx] };
@@ -457,8 +588,6 @@ export function SlideEditorCanvasBoard({
       function onUpNewHandle() {
         window.removeEventListener('pointermove', onDragNewHandle);
         window.removeEventListener('pointerup', onUpNewHandle);
-        const curEl = elements.find((el) => el.id === targetId);
-        if (curEl) optimizeBezierBounds(curEl);
       }
 
       window.addEventListener('pointermove', onDragNewHandle);
@@ -486,6 +615,13 @@ export function SlideEditorCanvasBoard({
       setIsInteracting(true);
       setPan({ x: d.ox + e.clientX - d.startX, y: d.oy + e.clientY - d.startY });
       return;
+    }
+
+    if (activeTool === 'bezier') {
+      const pt = getCanvasPoint(e);
+      setBezierHoverPos(pt);
+    } else if (bezierHoverPos) {
+      setBezierHoverPos(null);
     }
 
     if (drawingPencilId) {
@@ -724,6 +860,7 @@ export function SlideEditorCanvasBoard({
 
         {/* Elements Rendering */}
         {elements.map((el) => {
+          if (el.hidden) return null;
           const isSelected = activeSelection.includes(el.id);
           const isEditing = el.id === editingTextId;
           const isLocked = Boolean(el.locked);
@@ -737,14 +874,14 @@ export function SlideEditorCanvasBoard({
             <div
               key={el.id}
               onClick={(e) => {
+                if (activeTool === 'bezier') return;
                 e.stopPropagation();
-                onSelectElement(el.id, e.shiftKey || e.metaKey || e.ctrlKey);
               }}
               onDoubleClick={(e) => {
-                if (isLocked) return;
+                if (isLocked || activeTool === 'bezier') return;
                 e.stopPropagation();
                 onSelectElement(el.id, false);
-                if (el.type === 'text') setEditingTextId(el.id);
+                if (el.type === "text") setEditingTextId(el.id);
               }}
               onPointerDown={(e) => {
                 if (isEditing || isLocked || activeTool === 'pencil' || activeTool === 'bezier') return;
@@ -793,6 +930,22 @@ export function SlideEditorCanvasBoard({
                   onSelectElement(el.id, isShift);
                 }
 
+                const currentSelectedIds = selectedElementIds || (selectedElementId ? [selectedElementId] : []);
+                const effectiveSelected = (currentSelectedIds.includes(el.id))
+                  ? currentSelectedIds
+                  : isShift ? [...currentSelectedIds, el.id] : [el.id];
+
+                const multiDrag = effectiveSelected.map((id) => {
+                  const targetEl = elementsRef.current.find((item) => item.id === id);
+                  return {
+                    id,
+                    initialX: targetEl ? targetEl.x : 0,
+                    initialY: targetEl ? targetEl.y : 0,
+                    width: targetEl ? targetEl.width : 0,
+                    height: targetEl ? targetEl.height : 0,
+                  };
+                });
+
                 setDragState({
                   elementId: el.id,
                   handle: null,
@@ -802,6 +955,7 @@ export function SlideEditorCanvasBoard({
                   initialY: elY,
                   initialW: elW,
                   initialH: elH,
+                  multiDrag,
                 });
               }}
               style={{
@@ -916,7 +1070,12 @@ export function SlideEditorCanvasBoard({
                   }
                 }
 
-                const fillOn = !!(el.isLoopFilled && (el.fillColor || el.backgroundColor) && (el.fillColor || el.backgroundColor) !== 'none');
+                const fillOn = Boolean(
+                  (el.isLoopFilled || el.closed || el.type === 'bezier') &&
+                  (el.fillColor || el.backgroundColor) &&
+                  (el.fillColor || el.backgroundColor) !== 'none' &&
+                  (el.fillColor || el.backgroundColor) !== 'transparent'
+                );
                 const fillColor = fillOn ? (el.fillColor || el.backgroundColor || '#FF5500') : 'none';
                 const strokeColor = el.strokeColor || el.borderColor || '#FF5500';
                 const strokeWidth = el.strokeWidth ?? el.borderWidth ?? 4;
@@ -957,7 +1116,7 @@ export function SlideEditorCanvasBoard({
                     const localH = (el.height / 100) * BOARD_HEIGHT;
 
                     const canClosePath = nodeIdx === 0 && el.points!.length >= 2 && !el.closed;
-                    const isAnchorSelected = selectedBezierNodeIdx === nodeIdx && selectedBezierHandleType === 'anchor';
+                    const isAnchorSelected = selectedBezierNodeIdx === nodeIdx;
 
                     const axPct = (node.x / localW) * 100;
                     const ayPct = (node.y / localH) * 100;
@@ -973,18 +1132,40 @@ export function SlideEditorCanvasBoard({
                     const handleDrag = (type: 'anchor' | 'h1' | 'h2', evt: React.PointerEvent) => {
                       evt.stopPropagation();
                       evt.preventDefault();
+
+                      if (type === 'anchor' && canClosePath) {
+                        const nextFill = (el.backgroundColor && el.backgroundColor !== 'transparent')
+                          ? el.backgroundColor
+                          : (el.fillColor && el.fillColor !== 'transparent')
+                          ? el.fillColor
+                          : '#FF5500';
+                        optimizeBezierBounds({
+                          ...el,
+                          closed: true,
+                          isLoopFilled: true,
+                          backgroundColor: nextFill,
+                          fillColor: nextFill,
+                        });
+                        setSelectedBezierNodeIdx(null);
+                        setSelectedBezierHandleType(null);
+                        return;
+                      }
+
                       setSelectedBezierNodeIdx(nodeIdx);
                       setSelectedBezierHandleType(type);
 
-                      const elId = el.id;
+                      const initialEl = elementsRef.current.find((item) => item.id === el.id) || el;
+                      const initialPts = JSON.parse(JSON.stringify(initialEl.points || []));
+                      let latestPts = initialPts;
+                      const parentAbsX = (initialEl.x / 100) * BOARD_WIDTH;
+                      const parentAbsY = (initialEl.y / 100) * BOARD_HEIGHT;
+
                       function onNodeMove(moveEv: PointerEvent) {
                         const movePt = getCanvasPoint(moveEv);
-                        const localMoveX = movePt.x - ((el.x / 100) * BOARD_WIDTH);
-                        const localMoveY = movePt.y - ((el.y / 100) * BOARD_HEIGHT);
+                        const localMoveX = movePt.x - parentAbsX;
+                        const localMoveY = movePt.y - parentAbsY;
 
-                        const currentEl = elements.find((item) => item.id === elId);
-                        if (!currentEl || !currentEl.points) return;
-                        const ptsCopy = [...(currentEl.points as any[])];
+                        const ptsCopy = JSON.parse(JSON.stringify(initialPts));
                         const currNode = { ...ptsCopy[nodeIdx] };
 
                         if (type === 'anchor') {
@@ -1013,14 +1194,17 @@ export function SlideEditorCanvasBoard({
                         }
 
                         ptsCopy[nodeIdx] = currNode;
-                        onUpdateElement(elId, { points: ptsCopy });
+                        latestPts = ptsCopy;
+                        onUpdateElement(el.id, { points: ptsCopy });
                       }
 
                       function onNodeUp() {
                         window.removeEventListener('pointermove', onNodeMove);
                         window.removeEventListener('pointerup', onNodeUp);
-                        const curEl = elements.find((el) => el.id === elId);
-                        if (curEl) optimizeBezierBounds(curEl);
+                        const upEl = elementsRef.current.find((item) => item.id === el.id) || initialEl;
+                        if (upEl && (upEl.closed || activeTool !== 'bezier')) {
+                          optimizeBezierBounds({ ...upEl, points: latestPts });
+                        }
                       }
 
                       window.addEventListener('pointermove', onNodeMove);
@@ -1037,17 +1221,21 @@ export function SlideEditorCanvasBoard({
                             left: `${axPct}%`,
                             top: `${ayPct}%`,
                             transform: 'translate(-50%, -50%)',
-                            width: 10,
-                            height: 10,
+                            width: canClosePath ? 14 : isAnchorSelected ? 12 : 9,
+                            height: canClosePath ? 14 : isAnchorSelected ? 12 : 9,
                             background: canClosePath ? '#22c55e' : isAnchorSelected ? '#3b82f6' : '#ffffff',
-                            border: '2px solid #FF5500',
+                            border: canClosePath ? '2.5px solid #ffffff' : isAnchorSelected ? '2px solid #ffffff' : '1.5px solid #FF5500',
                             borderRadius: canClosePath ? '50%' : 2,
                             cursor: 'pointer',
                             pointerEvents: 'auto',
-                            zIndex: 25,
-                            boxShadow: '0 0 6px rgba(0,0,0,0.6)',
+                            zIndex: isAnchorSelected ? 30 : 25,
+                            boxShadow: canClosePath
+                              ? '0 0 10px rgba(34, 197, 94, 0.9)'
+                              : isAnchorSelected
+                              ? '0 0 8px rgba(59, 130, 246, 0.9)'
+                              : '0 0 4px rgba(0,0,0,0.6)',
                           }}
-                          title={canClosePath ? 'First Anchor: Click to Close Bezier Curve Loop' : `Anchor ${nodeIdx + 1}`}
+                          title={canClosePath ? 'Click to Close Bezier Curve Loop' : `Anchor ${nodeIdx + 1}${isAnchorSelected ? ' (Selected — press Delete to remove)' : ''}`}
                         />
 
                         {/* Tangent Line & Handle Dot H1 */}
@@ -1241,7 +1429,61 @@ export function SlideEditorCanvasBoard({
             </div>
           );
         })}
+
+        {/* Illustrator-style live rubberband guide when drawing with Bezier Pen tool */}
+        {activeTool === 'bezier' && bezierHoverPos && (() => {
+          const activeEl = elements.find((item) => item.id === selectedElementId && item.type === 'bezier' && !item.closed);
+          if (!activeEl || !activeEl.points || activeEl.points.length === 0) return null;
+          const pts = activeEl.points as any[];
+          const last = pts[pts.length - 1];
+          const first = pts[0];
+          const absLastX = last.x + ((activeEl.x / 100) * BOARD_WIDTH);
+          const absLastY = last.y + ((activeEl.y / 100) * BOARD_HEIGHT);
+          const absFirstX = first.x + ((activeEl.x / 100) * BOARD_WIDTH);
+          const absFirstY = first.y + ((activeEl.y / 100) * BOARD_HEIGHT);
+
+          const dxFirst = bezierHoverPos.x - absFirstX;
+          const dyFirst = bezierHoverPos.y - absFirstY;
+          const isNearFirst = pts.length >= 2 && Math.sqrt(dxFirst * dxFirst + dyFirst * dyFirst) <= 24;
+
+          return (
+            <svg
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                zIndex: 35,
+                overflow: 'visible',
+              }}
+              viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`}
+            >
+              <line
+                x1={absLastX}
+                y1={absLastY}
+                x2={isNearFirst ? absFirstX : bezierHoverPos.x}
+                y2={isNearFirst ? absFirstY : bezierHoverPos.y}
+                stroke={isNearFirst ? '#22c55e' : '#FF5500'}
+                strokeWidth={2}
+                strokeDasharray="4,4"
+                strokeOpacity={0.85}
+              />
+              {isNearFirst && (
+                <circle
+                  cx={absFirstX}
+                  cy={absFirstY}
+                  r={12}
+                  fill="rgba(34, 197, 94, 0.25)"
+                  stroke="#22c55e"
+                  strokeWidth={2.5}
+                />
+              )}
+            </svg>
+          );
+        })()}
       </div>
     </section>
   );
 }
+

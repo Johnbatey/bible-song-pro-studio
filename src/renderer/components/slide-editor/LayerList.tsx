@@ -4,7 +4,7 @@
    One presentation for both deck kinds. The PowerPoint side feeds it layer
    units from the parsed shapes; the native side feeds it the slide's elements
    sorted by z-index. Either way a row is one thing the operator can select,
-   drag to restack, lock, or remove.
+   drag to restack, lock, hide, or remove.
 
    Rows are given topmost-first, the way every layer panel reads, and the drop
    index is in that same space — the callers own the translation back to paint
@@ -20,6 +20,7 @@ export interface LayerRow {
   kind: string;
   selected: boolean;
   locked?: boolean;
+  hidden?: boolean;
 }
 
 export interface LayerListProps {
@@ -31,6 +32,7 @@ export interface LayerListProps {
   onDuplicateLayer?: (from: number, to: number) => void;
   onDelete?: (id: string) => void;
   onToggleLock?: (id: string) => void;
+  onToggleVisible?: (id: string) => void;
   emptyHint: string;
 }
 
@@ -45,6 +47,46 @@ const GLYPH: Record<string, string> = {
   pencil: '✎',
   bezier: '∿',
 };
+
+export function EyeIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+export function EyeOffIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
 
 export function LockedIcon({ size = 12 }: { size?: number }) {
   return (
@@ -86,7 +128,16 @@ export function UnlockedIcon({ size = 12 }: { size?: number }) {
   );
 }
 
-export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelete, onToggleLock, emptyHint }: LayerListProps) {
+export function LayerList({
+  rows,
+  onSelect,
+  onReorder,
+  onDuplicateLayer,
+  onDelete,
+  onToggleLock,
+  onToggleVisible,
+  emptyHint,
+}: LayerListProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
@@ -134,7 +185,10 @@ export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelet
               }
               endDrag();
             }}
-            onMouseDown={(e) => onSelect(row.id, e.shiftKey || e.metaKey)}
+            onMouseDown={(e) => {
+              if (e.button !== 0) return;
+              onSelect(row.id, e.shiftKey || e.metaKey || e.ctrlKey);
+            }}
             style={{
               ...styles.row,
               background: row.selected ? 'rgba(244,98,31,0.18)' : 'transparent',
@@ -145,13 +199,52 @@ export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelet
                 : 'rgba(255,255,255,0.07)',
               opacity: dragging ? 0.4 : 1,
             }}
-            title={row.label + (row.locked ? ' (Locked)' : '')}
+            title={row.label + (row.locked ? ' (Locked)' : '') + (row.hidden ? ' (Hidden)' : '')}
           >
-            <span style={styles.grip}>⠿</span>
-            <span style={styles.glyph}>{GLYPH[row.kind] || '◆'}</span>
-            <span style={styles.label}>{row.label}</span>
+            {/* 1. Visibility (Eye) Toggle Button on Far Left */}
+            <button
+              type="button"
+              className="layer-item-vis-btn"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onToggleVisible) onToggleVisible(row.id);
+              }}
+              style={{
+                flexShrink: 0,
+                width: 22,
+                height: 22,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                background: 'transparent',
+                border: 'none',
+                borderRadius: 4,
+                color: row.hidden ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.65)',
+                cursor: onToggleVisible ? 'pointer' : 'default',
+                transition: 'all 0.15s ease',
+              }}
+              title={row.hidden ? 'Show layer' : 'Hide layer'}
+            >
+              {row.hidden ? <EyeOffIcon size={13} /> : <EyeIcon size={13} />}
+            </button>
 
-            {/* Lock / Unlock Toggle Button */}
+            {/* 2. Type Glyph */}
+            <span style={styles.glyph}>{GLYPH[row.kind] || '◆'}</span>
+
+            {/* 3. Layer Name / Label */}
+            <span
+              style={{
+                ...styles.label,
+                opacity: row.hidden ? 0.45 : 1,
+                textDecoration: row.hidden ? 'line-through' : 'none',
+              }}
+            >
+              {row.label}
+            </span>
+
+            {/* 4. Lock / Unlock Toggle Button */}
             {onToggleLock && (
               <button
                 type="button"
@@ -181,7 +274,7 @@ export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelet
               </button>
             )}
 
-            {/* Remove Button */}
+            {/* 5. Remove Button */}
             {onDelete && (
               <button
                 type="button"
@@ -196,6 +289,11 @@ export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelet
                 ✕
               </button>
             )}
+
+            {/* 6. Drag Grip Handle on Far Right */}
+            <span style={styles.grip} title="Drag to restack layer">
+              ⠿
+            </span>
           </div>
         );
       })}
@@ -216,7 +314,13 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'grab',
     userSelect: 'none',
   },
-  grip: { fontSize: 11, color: 'rgba(255,255,255,0.3)', cursor: 'grab' },
+  grip: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.3)',
+    cursor: 'grab',
+    flexShrink: 0,
+    padding: '0 2px',
+  },
   glyph: {
     width: 15,
     flexShrink: 0,

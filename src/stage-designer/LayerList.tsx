@@ -150,14 +150,19 @@ export function LayerList({ zones, selection, hiddenTypes, onSelect, onToggle, o
               data-drop-before={drag?.over === displayIndex || undefined}
               data-drop-after={(drag && drag.over === ordered.length && displayIndex === ordered.length - 1) || undefined}
             >
-              <span
-                className="dz-layer-grip"
-                title="Drag to reorder — the top of this list is the front of the stage"
-                onPointerDown={(event) => onPointerDown(event, arrayIndex)}
+              {/* 1. Visibility (Eye) Toggle Button on Far Left */}
+              <button
+                type="button"
+                className="dz-layer-vis-btn"
+                title={zone.visible === false ? 'Show on the stage' : 'Hide from the stage'}
+                aria-label={zone.visible === false ? 'Show on the stage' : 'Hide from the stage'}
+                data-active={zone.visible === false || undefined}
+                onClick={() => onToggle(zone.id, 'visible')}
               >
-                <GripDots />
-              </span>
+                {zone.visible === false ? <EyeOff /> : <Eye />}
+              </button>
 
+              {/* 2. Zone Name & Icon */}
               <button
                 type="button"
                 className="dz-layer-name"
@@ -167,28 +172,31 @@ export function LayerList({ zones, selection, hiddenTypes, onSelect, onToggle, o
                 {Icon && <span className="dz-layer-icon"><Icon /></span>}
                 <span className="dz-layer-text">
                   <span className="dz-layer-title">{title}</span>
-                  {/* Only when it adds something. A row reading "Timer / Timer"
-                      spends a line saying nothing. */}
                   {notes.length > 0 && <span className="dz-layer-type">{notes.join(' · ')}</span>}
                 </span>
               </button>
 
+              {/* 3. Actions (Lock/Unlock) */}
               <div className="dz-layer-actions">
-                <button
-                  type="button"
-                  title={zone.visible === false ? 'Show on the stage' : 'Hide from the stage'}
-                  aria-label={zone.visible === false ? 'Show on the stage' : 'Hide from the stage'}
-                  data-active={zone.visible === false || undefined}
-                  onClick={() => onToggle(zone.id, 'visible')}
-                >{zone.visible === false ? <EyeOff /> : <Eye />}</button>
                 <button
                   type="button"
                   title={zone.locked ? 'Unlock' : 'Lock — stops the canvas selecting it'}
                   aria-label={zone.locked ? 'Unlock' : 'Lock'}
                   data-active={zone.locked || undefined}
                   onClick={() => onToggle(zone.id, 'locked')}
-                >{zone.locked ? <Locked /> : <Unlocked />}</button>
+                >
+                  {zone.locked ? <Locked /> : <Unlocked />}
+                </button>
               </div>
+
+              {/* 4. Drag Grip Handle on Far Right */}
+              <span
+                className="dz-layer-grip"
+                title="Drag to reorder — the top of this list is the front of the stage"
+                onPointerDown={(event) => onPointerDown(event, arrayIndex)}
+              >
+                <GripDots />
+              </span>
             </li>
           );
         })}
