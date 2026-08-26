@@ -445,7 +445,7 @@ export interface AppSettings {
 }
 
 /** 'auto' lets Whisper detect the language per utterance. */
-export type SermonLanguage = 'auto' | 'en' | 'fr' | 'es';
+export type SermonLanguage = 'auto' | 'en' | 'fr' | 'es' | 'pt';
 
 export interface AppSettingsPatch {
   deepgramApiKey: string;

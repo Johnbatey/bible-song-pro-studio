@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme } from 'dockview-react';
 import { useAppStore } from '../../stores/appStore';
-import { DOCK_COMPONENTS, DOCKS, type DockId } from './docks';
+import { DOCK_COMPONENTS, DOCKS, getDockTitle, type DockId } from './docks';
 import { getDockApi, setDockApi, toggleDock, openDock } from './dockController';
 import { DockTab } from './DockTab';
 import { DockEmptyState } from './DockEmptyState';
+import { useI18n } from '../../../i18n/useI18n';
 
 const LAYOUT_KEY = 'bsp_dockLayout';
 
@@ -183,6 +184,7 @@ export function DockHost() {
   const setOpenDockIds = useAppStore((s) => s.setOpenDockIds);
   const setPoppedOutDockIds = useAppStore((s) => s.setPoppedOutDockIds);
   const openDockIds = useAppStore((s) => s.openDockIds);
+  const { locale } = useI18n();
 
   const syncOpenDocks = useCallback((api: DockviewApi) => {
     const ids = api.panels.map((p) => p.id);
@@ -191,6 +193,16 @@ export function DockHost() {
     // web-browser dev fallback (no BSP bridge) is a silent no-op.
     window.BSP?.dock?.syncMenu(ids);
   }, [setOpenDockIds]);
+
+  /* Re-apply localized titles when the operator changes UI language. */
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    for (const panel of api.panels) {
+      const title = getDockTitle(panel.id);
+      if (panel.title !== title) panel.api.setTitle(title);
+    }
+  }, [locale, openDockIds]);
 
   const onReady = useCallback((event: DockviewReadyEvent) => {
     const api = event.api;
@@ -227,8 +239,8 @@ export function DockHost() {
      * The id is the identity and the title is derived from it, so this simply
      * restates the current one. The arrangement itself is untouched. */
     for (const panel of api.panels) {
-      const dock = DOCKS.find((d) => d.id === panel.id);
-      if (dock && panel.title !== dock.title) panel.api.setTitle(dock.title);
+      const title = getDockTitle(panel.id);
+      if (panel.title !== title) panel.api.setTitle(title);
     }
 
     syncOpenDocks(api);

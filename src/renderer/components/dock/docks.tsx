@@ -14,6 +14,7 @@ import { StagePanel } from '../StagePanel';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { openDock } from './dockController';
 import { DockedContext } from './DockedContext';
+import { t, dockMessageKey, type MessageKey } from '../../../i18n';
 
 /**
  * Every dockable window in the app, declared once. The title bar builds its
@@ -81,6 +82,18 @@ export const DOCKS = [
 ] as const satisfies readonly DockDef[];
 
 export type DockId = (typeof DOCKS)[number]['id'];
+
+/** Localized dock tab / panel title. Falls back to the English catalog title. */
+export function getDockTitle(id: string): string {
+  const key = dockMessageKey(id);
+  if (key) return t(key);
+  return DOCKS.find((d) => d.id === id)?.title || id;
+}
+
+/** Localized group label for nav section chrome. */
+export function getDockGroupLabel(groupId: DockGroup): string {
+  return t(`dock.group.${groupId}` as MessageKey);
+}
 
 /** Docks that get a tab in the title bar, in tab order. */
 export const NAV_DOCKS = DOCKS.filter((d) => d.nav);

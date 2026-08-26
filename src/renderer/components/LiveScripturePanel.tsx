@@ -12,6 +12,7 @@ import { PanelSplitter } from './PanelSplitter';
 import { SongDeck } from './song/SongDeck';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { detectSongs, type SongDetection } from '../utils/song-detection';
+import { useI18n } from '../../i18n/useI18n';
 
 /** Short enough to feel live, while still giving Whisper/Moonshine full speech and reference context. */
 const LOCAL_CHUNK_SECONDS = 2.0;
@@ -21,16 +22,17 @@ const DETECT_WINDOW_WORDS = 18;
 /** Roughly an hour of speech; the panel only ever shows the tail anyway. */
 const TRANSCRIPT_MAX_CHARS = 20000;
 
-const STATE_LABELS: Record<SttState, { text: string; color: string }> = {
-  idle: { text: 'Idle', color: 'var(--text-dim)' },
-  connecting: { text: 'Connecting…', color: 'var(--tally-hold)' },
-  live: { text: 'Live', color: 'var(--tally-preview)' },
-  reconnecting: { text: 'Reconnecting…', color: 'var(--tally-hold)' },
-  stalled: { text: 'Stalled', color: 'var(--tally-fault)' },
-  error: { text: 'Error', color: 'var(--tally-fault)' },
+const STATE_COLORS: Record<SttState, string> = {
+  idle: 'var(--text-dim)',
+  connecting: 'var(--tally-hold)',
+  live: 'var(--tally-preview)',
+  reconnecting: 'var(--tally-hold)',
+  stalled: 'var(--tally-fault)',
+  error: 'var(--tally-fault)',
 };
 
 export function LiveScripturePanel() {
+  const { t } = useI18n();
   const live = useAppStore((s) => s.liveScripture);
   const setLive = useAppStore((s) => s.setLiveScripture);
   const setTranscription = useAppStore((s) => s.setTranscription);
@@ -790,7 +792,17 @@ export function LiveScripturePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSongMode, live.transcript, songs]);
 
-  const statusInfo = STATE_LABELS[sttStatus?.state || 'idle'];
+  const sttState = sttStatus?.state || 'idle';
+  const statusColor = STATE_COLORS[sttState];
+  const statusText = (() => {
+    if (engine !== 'deepgram') return live.isActive ? t('live.listening') : t('live.idle');
+    if (sttState === 'connecting') return t('live.connecting');
+    if (sttState === 'reconnecting') return t('live.reconnecting');
+    if (sttState === 'stalled') return t('live.stalled');
+    if (sttState === 'live') return t('panel.live');
+    if (sttState === 'error') return 'Error';
+    return t('live.idle');
+  })();
   const deepgramUnavailable = engine === 'deepgram' && !keyConfigured;
 
   /* Built once and rendered into whichever slot is active — the same element in
@@ -803,8 +815,8 @@ export function LiveScripturePanel() {
           options={[
             {
               value: 'bible',
-              label: 'Bible',
-              title: 'Detect scripture references in speech',
+              label: t('live.modeBible'),
+              title: t('live.modeBibleHint'),
               icon: (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -814,8 +826,8 @@ export function LiveScripturePanel() {
             },
             {
               value: 'song',
-              label: 'Song',
-              title: 'Detect song lyrics in speech',
+              label: t('live.modeSong'),
+              title: t('live.modeSongHint'),
               icon: (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18V5l12-2v13" />
@@ -846,7 +858,7 @@ export function LiveScripturePanel() {
               cursor: 'pointer',
               fontFamily: 'var(--font-ui)',
             }}
-            title="Stop Live Scripture"
+            title={t('live.stop')}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <rect x="5" y="5" width="14" height="14" rx="2" />
@@ -873,7 +885,7 @@ export function LiveScripturePanel() {
               opacity: deepgramUnavailable ? 0.5 : 1,
               fontFamily: 'var(--font-ui)',
             }}
-            title={deepgramUnavailable ? 'Add a Deepgram API key in Settings first' : 'Start Live Scripture'}
+            title={deepgramUnavailable ? 'Add a Deepgram API key in Settings first' : t('live.start')}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <polygon points="5 3 19 12 5 21 5 3" />
@@ -902,7 +914,7 @@ export function LiveScripturePanel() {
             transition: 'all 0.15s ease',
             flexShrink: 0,
           }}
-          title="Live Scripture Settings & Audio Inputs"
+          title={t('live.settings')}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
@@ -918,8 +930,8 @@ export function LiveScripturePanel() {
             <div style={{ ...styles.meterPeak, left: `${Math.round(live.meter.peak * 100)}%` }} />
           </div>
 
-          <span style={{ ...type.caption, color: statusInfo.color, fontWeight: fontWeight.semibold, whiteSpace: 'nowrap' }}>
-            ● {engine === 'deepgram' ? statusInfo.text : live.isActive ? 'Listening' : 'Idle'}
+          <span style={{ ...type.caption, color: statusColor, fontWeight: fontWeight.semibold, whiteSpace: 'nowrap' }}>
+            ● {statusText}
           </span>
 
           <MoveBarButton
@@ -1094,11 +1106,11 @@ export function LiveScripturePanel() {
                     }}
                     options={
                       devices.length === 0
-                        ? [{ value: '', label: 'No microphone available' }]
+                        ? [{ value: '', label: t('live.noMic') }]
                         : devices.map((d) => ({ value: d.deviceId, label: d.label }))
                     }
                     buttonStyle={{ width: 220, justifyContent: 'space-between' }}
-                    title="Select Microphone"
+                    title={t('live.selectMic')}
                   />
                   <button
                     onClick={refreshInputs}
@@ -1115,7 +1127,7 @@ export function LiveScripturePanel() {
                       flexShrink: 0,
                       transition: 'all 0.15s ease',
                     }}
-                    title="Refresh audio inputs"
+                    title={t('live.refreshInputs')}
                   >
                     Refresh
                   </button>
@@ -1264,7 +1276,7 @@ export function LiveScripturePanel() {
           {/* Left, where Bible shows Best Match: the ranked song candidates. */}
           <Block
             style={{ ...styles.primaryColumn, flex: `0 0 ${primaryWidth}px` }}
-            title="Candidate Index"
+            title={t('live.candidateIndex')}
             tools={<span style={styles.countBadge}>{songMatches.length} matches</span>}
           >
             {songMatches.length === 0 ? (
@@ -1322,7 +1334,7 @@ export function LiveScripturePanel() {
           {/* Right: the same deck the Songs panel uses, tools and all. */}
           <SongDeck
             song={pickedSong}
-            title="Lyrics"
+            title={t('live.lyrics')}
             targetText={activeSongMatch?.excerpt}
             onUpdateSong={(patch) => {
               if (pickedSong) useAppStore.getState().updateSong(pickedSong.id, patch);
@@ -1334,10 +1346,10 @@ export function LiveScripturePanel() {
         <div className="blk-row" style={styles.matchDashboard}>
           <Block
             style={{ ...styles.primaryColumn, flex: `0 0 ${primaryWidth}px` }}
-            title="Best Match"
+            title={t('live.bestMatch')}
             tools={(
               <span style={detectionIsFinal ? styles.finalBadge : styles.trackingBadge}>
-                {detectionIsFinal ? 'Final' : 'Tracking'}
+                {detectionIsFinal ? t('live.final') : t('live.tracking')}
               </span>
             )}
             bodyStyle={{ display: 'flex', flexDirection: 'column' }}
@@ -1373,7 +1385,7 @@ export function LiveScripturePanel() {
           />
 
           <Block
-            title="Candidate Index"
+            title={t('live.candidateIndex')}
             style={styles.indexColumn}
             tools={<span style={styles.countBadge}>{Math.max(0, live.suggestions.length - 1)} matches</span>}
             bodyStyle={{ display: 'flex', flexDirection: 'column' }}

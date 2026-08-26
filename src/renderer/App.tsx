@@ -19,10 +19,12 @@ export { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
 import { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
 import { ensureTheme } from './utils/defaultTheme';
 import { sanitizeForIpc } from './utils/sanitize-ipc';
+import { setUiLocale as applyI18nLocale } from '../i18n';
 
 export function App() {
   const platform = useAppStore((s) => s.platform);
   const uiThemeMode = useAppStore((s) => s.uiThemeMode);
+  const uiLocale = useAppStore((s) => s.uiLocale);
 
   useEffect(() => {
     const mode = uiThemeMode || 'dark';
@@ -35,6 +37,10 @@ export function App() {
       document.body.classList.remove('light-theme');
     }
   }, [uiThemeMode]);
+
+  useEffect(() => {
+    applyI18nLocale(uiLocale);
+  }, [uiLocale]);
 
   useEffect(() => {
     async function init() {

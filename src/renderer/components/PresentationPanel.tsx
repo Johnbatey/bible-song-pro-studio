@@ -14,6 +14,7 @@ import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { usePptxImport } from '../hooks/usePptxImport';
 import { Block, BlockButton } from './Block';
 import { TallyBadge } from './TallyBadge';
+import { useI18n } from '../../i18n/useI18n';
 
 /** Card-shaped view of a deck. */
 interface SlideItem {
@@ -179,6 +180,7 @@ function CardThumb({ deck, fallback, caption }: { deck?: PresentationDeck; fallb
 }
 
 export function PresentationPanel() {
+  const { t } = useI18n();
   const openSlideEditor = useAppStore((s) => s.openSlideEditor);
   const presentationDecks = useAppStore((s) => s.presentationDecks);
   const addPresentationDeck = useAppStore((s) => s.addPresentationDeck);
@@ -245,7 +247,7 @@ export function PresentationPanel() {
 
   const presentations: SlideItem[] = presentationDecks.map((deck, index) => ({
     id: deck.id,
-    title: deck.title || 'Untitled deck',
+    title: deck.title || t('pres.untitled'),
     pagesCount: deck.slides?.length ?? 0,
     bg: deck.slides?.[0]?.background?.type === 'color' || deck.slides?.[0]?.background?.type === 'gradient'
       ? String(deck.slides[0].background?.value || CARD_BACKGROUNDS[index % CARD_BACKGROUNDS.length])
@@ -254,14 +256,14 @@ export function PresentationPanel() {
   }));
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newProjectTitle, setNewProjectTitle] = useState('New Presentation Deck');
+  const [newProjectTitle, setNewProjectTitle] = useState('');
 
   const [renameDeckTarget, setRenameDeckTarget] = useState<{ id: string; title: string } | null>(null);
   const [renameTitleInput, setRenameTitleInput] = useState('');
 
   function handleCreateNew(val: string) {
     if (val === 'manual') {
-      setNewProjectTitle('New Presentation Deck');
+      setNewProjectTitle(t('pres.newDeck'));
       setIsCreateModalOpen(true);
     } else if (val === 'import') {
       clearStatus();
@@ -270,7 +272,7 @@ export function PresentationPanel() {
   }
 
   function handleConfirmCreateProject() {
-    const title = newProjectTitle.trim() || 'New Presentation Deck';
+    const title = newProjectTitle.trim() || t('pres.newDeck');
     const newDeck: PresentationDeck = {
       id: `deck-${Date.now()}`,
       title,
@@ -555,12 +557,12 @@ export function PresentationPanel() {
           { value: 'create', label: '+ Create new' },
           {
             value: 'manual',
-            label: 'Create manually',
+            label: t('pres.createManual'),
             icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
           },
           {
             value: 'import',
-            label: 'Import presentation',
+            label: t('pres.importPresentation'),
             icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
           },
           {
@@ -583,7 +585,7 @@ export function PresentationPanel() {
       <div style={styles.searchBox}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input
-          placeholder="Search for slide title or content"
+          placeholder={t('pres.searchProjects')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={styles.searchInput}
@@ -607,7 +609,7 @@ export function PresentationPanel() {
       <div style={styles.searchBox}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input
-          placeholder="Search slides in this project..."
+          placeholder={t('pres.searchSlides')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={styles.searchInput}
@@ -694,7 +696,7 @@ export function PresentationPanel() {
 
       {/* PAGE 1: PROJECTS GRID VIEW */}
       {!selectedDeck ? (
-        <Block className="blk-fill" title="Slides Projects" subtitle={`${presentations.length}`} bodyStyle={dynamicGridStyle}>
+        <Block className="blk-fill" title={t('pres.projects')} subtitle={`${presentations.length}`} bodyStyle={dynamicGridStyle}>
           {status && (
             <div
               style={{
@@ -769,8 +771,10 @@ export function PresentationPanel() {
         /* PAGE 2: PROJECT SLIDES VIEW */
         <Block
           className="blk-fill"
-          title={<>Project: <span style={{ color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Click to rename project" onClick={() => handleRenameDeck(selectedDeck.id)}>{selectedDeck.title} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span></>}
-          subtitle={`${page2SlidesList.length} ${page2SlidesList.length === 1 ? 'slide' : 'slides'}`}
+          title={<>Project: <span style={{ color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }} title={t('pres.renameProject')} onClick={() => handleRenameDeck(selectedDeck.id)}>{selectedDeck.title} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span></>}
+          subtitle={page2SlidesList.length === 1
+            ? t('pres.slide', { count: page2SlidesList.length })
+            : t('pres.slides', { count: page2SlidesList.length })}
           tools={(
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <BlockButton onClick={() => setSelectedDeckId(null)}>← Projects</BlockButton>
@@ -778,8 +782,8 @@ export function PresentationPanel() {
                 icon
                 onClick={() => stepSlide(-1)}
                 disabled={filteredPage2Slides.length === 0}
-                title="Previous slide"
-                aria-label="Previous slide"
+                title={t('pres.prevSlide')}
+                aria-label={t('pres.prevSlide')}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6" />
@@ -789,8 +793,8 @@ export function PresentationPanel() {
                 icon
                 onClick={() => stepSlide(1)}
                 disabled={filteredPage2Slides.length === 0}
-                title="Next slide"
-                aria-label="Next slide"
+                title={t('pres.nextSlide')}
+                aria-label={t('pres.nextSlide')}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6" />
@@ -896,7 +900,7 @@ export function PresentationPanel() {
                         handleProjectSlide(slide, index, true);
                       }}
                     >
-                      {live ? 'Live' : 'Go Live'}
+                      {live ? t('panel.live') : t('panel.goLive')}
                     </button>
                   </div>
                 </div>

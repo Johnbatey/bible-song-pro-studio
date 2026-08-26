@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type } from '../styles/type';
+import { useI18n } from '../../i18n/useI18n';
 
 export function StatusBar() {
+  const { t } = useI18n();
   const platform = useAppStore((s) => s.platform);
   const mode = useAppStore((s) => s.display.mode);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
@@ -32,7 +34,7 @@ export function StatusBar() {
               background: 'var(--tally-hold)',
             }}
           />
-          {mode === 'basic' ? 'Basic — goes live instantly' : 'Studio — preview then take'}
+          {mode === 'basic' ? t('status.mode.basic') : t('status.mode.studio')}
         </span>
         <span style={styles.separator} />
         <span style={styles.item}>
@@ -42,7 +44,7 @@ export function StatusBar() {
               background: isExternalDisplayActive ? 'var(--tally-program)' : 'var(--tally-hold)',
             }}
           />
-          {isExternalDisplayActive ? 'Ext Display' : 'No Ext Display'}
+          {isExternalDisplayActive ? t('status.output.on') : t('status.output.off')}
         </span>
         <span style={styles.separator} />
         <span style={styles.item}>
@@ -52,7 +54,9 @@ export function StatusBar() {
               background: ndiStatus?.running ? 'var(--tally-link)' : 'var(--tally-hold)',
             }}
           />
-          {ndiStatus?.running ? `NDI Stream (${ndiStatus.connections})` : 'NDI Off'}
+          {ndiStatus?.running
+            ? t('status.ndi.on', { count: ndiStatus.connections })
+            : t('status.ndi.off')}
         </span>
         <span style={styles.separator} />
         <span style={styles.item}>
@@ -60,17 +64,17 @@ export function StatusBar() {
             <circle cx="12" cy="12" r="10" />
             <path d="M12 6v6l4 2" />
           </svg>
-          {transcription.isActive ? 'Transcribing' : 'Transcription Off'}
+          {transcription.isActive ? t('status.transcribing') : t('status.transcriptionOff')}
         </span>
         <span style={styles.separator} />
         <span style={styles.item}>
-          {scenes.length} Scenes
+          {t('status.scenes', { count: scenes.length })}
         </span>
         {currentScene && (
           <>
             <span style={styles.separator} />
             <span style={styles.item}>
-              Live: {currentScene.name}
+              {t('status.live', { name: currentScene.name })}
             </span>
           </>
         )}
@@ -80,12 +84,7 @@ export function StatusBar() {
           {platform === 'darwin' ? 'macOS' : platform === 'win32' ? 'Windows' : platform}
         </span>
         <span style={styles.separator} />
-        {/* The wordmark is monochrome. Signal is reserved for program state —
-            on a bar that reports live status it must not be decorative. */}
         <span style={styles.item}>
-          {/* styles.item is a flex container, so the wordmark needs its own
-              inline box — a bare <sup> becomes a flex item and vertical-align
-              is ignored. */}
           <span>Bible Song Pro<sup style={styles.sup}>Studio</sup></span>
         </span>
       </div>
@@ -112,32 +111,38 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--bg-secondary)',
     borderTop: '1px solid var(--border-primary)',
     flexShrink: 0,
-    ...type.caption,
-    color: 'var(--text-dim)',
   },
   left: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 0,
+    minWidth: 0,
+    overflow: 'hidden',
   },
   right: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    flexShrink: 0,
   },
   item: {
-    display: 'flex',
+    ...type.caption,
+    display: 'inline-flex',
     alignItems: 'center',
-    gap: 4,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: '50%',
+    color: 'var(--text-dim)',
+    whiteSpace: 'nowrap',
   },
   separator: {
     width: 1,
     height: 12,
     background: 'var(--border-primary)',
+    margin: '0 10px',
+    flexShrink: 0,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 'var(--radius-dot)',
+    marginRight: 6,
+    flexShrink: 0,
   },
 };

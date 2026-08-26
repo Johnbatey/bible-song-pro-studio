@@ -7,6 +7,7 @@ import type {
 } from '../types';
 import { createDefaultTheme } from '../utils/defaultTheme';
 import { sanitizeForIpc } from '../utils/sanitize-ipc';
+import { setUiLocale as applyUiLocale, isUiLocale, detectUiLocale, type UiLocale } from '../../i18n';
 
 /**
  * Persisted slices live in a JSON file under the app's userData dir (via store:* IPC),
@@ -252,6 +253,10 @@ interface AppState {
   themeTransitionTarget: 'dark' | 'light';
   setUIThemeMode: (mode: 'dark' | 'light') => void;
   toggleUIThemeMode: () => void;
+
+  /** Operator console language (menus / chrome). Independent of sermonLanguage. */
+  uiLocale: UiLocale;
+  setUiLocale: (locale: UiLocale) => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -675,6 +680,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       get().setUIThemeMode(next);
     }, 260);
   },
+
+  uiLocale: typeof navigator !== 'undefined' ? detectUiLocale() : 'en',
+  setUiLocale: (uiLocale) => {
+    applyUiLocale(uiLocale);
+    set({ uiLocale });
+  },
 }), {
   name: 'bsp-app-state',
   version: 1,
@@ -706,7 +717,14 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       autoVersionSwitch: state.liveScripture.autoVersionSwitch,
       autoProjectQuoted: state.liveScripture.autoProjectQuoted,
     },
+    uiLocale: state.uiLocale,
   }),
+
+  onRehydrateStorage: () => (state) => {
+    if (state?.uiLocale && isUiLocale(state.uiLocale)) {
+      applyUiLocale(state.uiLocale);
+    }
+  },
 
   // Custom merge: the persisted shape is flattened (outputMode, liveScripturePrefs), so a
   // shallow spread would clobber `display` and `liveScripture` with partial objects.
@@ -736,6 +754,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
           : saved.operatingMode === 'studio' ? 'studio' : current.display.mode,
       },
       liveScripture: { ...current.liveScripture, ...(saved.liveScripturePrefs || {}) },
+      uiLocale: isUiLocale(saved.uiLocale) ? saved.uiLocale : current.uiLocale,
     };
   },
 }));
@@ -760,4 +779,5 @@ interface PersistedState {
     LiveScriptureState,
     'detectionMode' | 'provider' | 'selectedInputId' | 'autoProject' | 'autoVersionSwitch' | 'autoProjectQuoted'
   >;
+  uiLocale?: UiLocale;
 }

@@ -13,6 +13,7 @@ import { backgroundSwatchCss, describeBackground } from '../utils/background';
 import { isFocusedDock } from './dock/dockFocus';
 import { arrangeExistingSong, describeArrangement, shortLabel, type ArrangeProposal } from '../utils/song-arrange';
 import { ImportConflictModal, type ConflictResolution, type ImportConflict } from './ImportConflictModal';
+import { useI18n } from '../../i18n/useI18n';
 
 const DEMO_SONGS: Song[] = [
   {
@@ -56,6 +57,7 @@ interface PendingImport {
 }
 
 export function SongsPanel() {
+  const { t } = useI18n();
   const songs = useAppStore((s) => s.songs);
   const setSongs = useAppStore((s) => s.setSongs);
   const updateSong = useAppStore((s) => s.updateSong);
@@ -365,7 +367,7 @@ export function SongsPanel() {
 
       {/* Left block: search & song list */}
       <Block
-        title="Songs"
+        title={t('songs.title')}
         subtitle={`${songs.length}`}
         style={{ flex: `0 0 ${listWidth}px`, minWidth: 180 }}
         tools={(
@@ -381,16 +383,16 @@ export function SongsPanel() {
                     setIsSelectMode(true);
                   }
                 }}
-                title={isSelectMode ? 'Exit selection mode' : 'Select multiple songs to manage or delete'}
+                title={isSelectMode ? t('songs.exitSelect') : t('songs.selectHint')}
               >
-                {isSelectMode ? 'Done' : 'Select'}
+                {isSelectMode ? t('panel.done') : t('panel.select')}
               </BlockButton>
             )}
             {songs.length === 0 && (
-              <BlockButton onClick={handleAddDemoSongs}>Demo</BlockButton>
+              <BlockButton onClick={handleAddDemoSongs}>{t('panel.demo')}</BlockButton>
             )}
             <BlockButton onClick={handlePickImport} disabled={importing}>
-              {importing ? 'Importing…' : 'Import'}
+              {importing ? t('panel.importing') : t('panel.import')}
             </BlockButton>
           </>
         )}
@@ -398,7 +400,7 @@ export function SongsPanel() {
       >
         <input
           className="input"
-          placeholder="Search title, author, or a line of lyrics..."
+          placeholder={t('songs.searchPlaceholder')}
           value={search}
           onChange={(e) => { setSearch(e.target.value); setLyricTarget(null); }}
           style={{ flexShrink: 0 }}
@@ -582,7 +584,7 @@ export function SongsPanel() {
           {/* Lyric hits — clicking one opens the song at that section */}
           {lyricMatches.length > 0 && (
             <>
-              <div style={styles.matchHeading}>In lyrics</div>
+              <div style={styles.matchHeading}>{t('songs.inLyrics')}</div>
               {lyricMatches.map((match, i) => (
                 <div
                   key={`${match.song.id}-${match.label}-${i}`}
@@ -630,7 +632,7 @@ export function SongsPanel() {
               style={styles.bgHeader}
               title={bgOpen ? 'Hide background options' : 'Set what this song sits on'}
             >
-              <span>Background</span>
+              <span>{t('panel.background')}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span
                   aria-hidden
@@ -673,7 +675,7 @@ export function SongsPanel() {
               style={styles.bgHeader}
               title={arrOpen ? 'Hide play order' : 'Set the order sections are sung in'}
             >
-              <span>Arrangement</span>
+              <span>{t('songs.arrangement')}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ color: 'var(--text-dim)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
                   {describeArrangement(selectedSong)}
@@ -726,7 +728,7 @@ export function SongsPanel() {
                 </div>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-                  <span style={{ ...type.caption, color: 'var(--text-dim)' }}>Add</span>
+                  <span style={{ ...type.caption, color: 'var(--text-dim)' }}>{t('panel.add')}</span>
                   {selectedSong.slides.map((slide) => (
                     <BlockButton
                       key={slide.id}
@@ -758,8 +760,8 @@ export function SongsPanel() {
                       <div key={w} style={{ ...type.caption, color: 'var(--tally-fault)' }}>{w}</div>
                     ))}
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <BlockButton onClick={applyProposal}>Apply</BlockButton>
-                      <BlockButton onClick={() => setProposal(null)}>Cancel</BlockButton>
+                      <BlockButton onClick={applyProposal}>{t('panel.apply')}</BlockButton>
+                      <BlockButton onClick={() => setProposal(null)}>{t('panel.cancel')}</BlockButton>
                     </div>
                   </div>
                 ) : (
@@ -792,7 +794,7 @@ export function SongsPanel() {
         onChange={setListWidthPersisted}
         min={180}
         max={560}
-        title="Drag to resize the song list"
+        title={t('songs.resizeList')}
       />
 
       {/* Right block: the shared lyric deck, also used by Live song mode */}

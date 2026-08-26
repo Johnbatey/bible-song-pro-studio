@@ -2,9 +2,12 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type, fontSize, fontWeight } from '../styles/type';
 import { NAV_DOCK_SECTIONS } from './dock/docks';
+import { getDockTitle, getDockGroupLabel } from './dock/docks';
 import { toggleDock } from './dock/dockController';
+import { useI18n } from '../../i18n/useI18n';
 
 export function TitleBar() {
+  const { t } = useI18n();
   const mode = useAppStore((s) => s.display.mode);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
@@ -64,7 +67,7 @@ export function TitleBar() {
       await window.BSP?.ndi?.stop?.();
       notify({
         id: `ndi-${Date.now()}`,
-        text: 'NDI Stream Stopped',
+        text: t('app.ndiStopped'),
         type: 'info',
         duration: 3,
         animation: 'slideDown',
@@ -74,7 +77,7 @@ export function TitleBar() {
       if (res?.ok) {
         notify({
           id: `ndi-${Date.now()}`,
-          text: 'NDI Stream Live (OBS / vMix)',
+          text: t('app.ndiLive'),
           type: 'info',
           duration: 4,
           animation: 'slideDown',
@@ -82,7 +85,7 @@ export function TitleBar() {
       } else if (res?.error) {
         notify({
           id: `ndi-${Date.now()}`,
-          text: `NDI Error: ${res.error}`,
+          text: t('app.ndiError', { error: res.error }),
           type: 'warning',
           duration: 5,
           animation: 'slideDown',
@@ -101,7 +104,7 @@ export function TitleBar() {
        the one thing blackout exists to prevent. */
     notify({
       id: `blackout-${Date.now()}`,
-      text: next ? 'Blackout active — audience screens are black' : 'Blackout cleared',
+      text: next ? t('app.blackoutActive') : t('app.blackoutCleared'),
       type: next ? 'warning' : 'info',
       duration: 3,
       animation: 'slideDown',
@@ -206,6 +209,8 @@ export function TitleBar() {
               {section.docks.map((dock) => {
                 const isPopped = poppedOutDockIds.includes(dock.id);
                 const isOpen = isPopped || openDockIds.includes(dock.id);
+                const title = getDockTitle(dock.id);
+                const groupLabel = getDockGroupLabel(section.id);
                 return (
                   <button
                     key={dock.id}
@@ -226,9 +231,9 @@ export function TitleBar() {
                       }
                       toggleDock(dock.id);
                     }}
-                    title={`${section.label} · ${isPopped ? `${dock.title} is in its own window` : isOpen ? `Close the ${dock.title} dock` : `Open the ${dock.title} dock`}`}
+                    title={`${groupLabel} · ${title}`}
                   >
-                    {dock.title}
+                    {title}
                   </button>
                 );
               })}
@@ -414,8 +419,8 @@ export function TitleBar() {
             className="titlebar-icon-btn"
             style={styles.toolbarBtn}
             onClick={() => useAppStore.getState().openSettings('output')}
-            title="Open Application Settings"
-            aria-label="Settings"
+            title={t('app.openSettings')}
+            aria-label={t('common.settings')}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />

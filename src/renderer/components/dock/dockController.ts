@@ -1,5 +1,5 @@
 import type { DockviewApi } from 'dockview-react';
-import { DOCKS, type DockId } from './docks';
+import { DOCKS, getDockTitle, type DockId } from './docks';
 
 /**
  * dockview's API is imperative and lives inside DockHost, but the title bar
@@ -27,7 +27,7 @@ export function openDock(id: DockId) {
   }
   const dock = DOCKS.find((d) => d.id === id);
   if (!dock) return;
-  api.addPanel({ id, component: id, title: dock.title });
+  api.addPanel({ id, component: id, title: getDockTitle(id) });
 }
 
 /**

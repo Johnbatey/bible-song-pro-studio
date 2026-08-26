@@ -9,6 +9,7 @@ import { SlidingSwitch } from './SlidingSwitch';
 import { isFocusedDock } from './dock/dockFocus';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { Block, BlockButton } from './Block';
+import { useI18n } from '../../i18n/useI18n';
 
 const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', 'Revelation'];
 
@@ -301,6 +302,7 @@ function AnnotatedVerseText({
 }
 
 export function BiblePanel() {
+  const { t } = useI18n();
   const projectScene = useAppStore((s) => s.projectScene);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
@@ -1097,7 +1099,7 @@ export function BiblePanel() {
             value={selectedVersion}
             options={versionOptions.map((v) => ({ value: v.id, label: v.abbreviation, sublabel: v.name }))}
             onChange={(val) => handleVersionChange(val)}
-            title="Select Translation"
+            title={t('bible.selectTranslation')}
             buttonStyle={{ height: 38 }}
           />
 
@@ -1108,8 +1110,8 @@ export function BiblePanel() {
             options={[
               {
                 value: 'single',
-                label: 'Single Version',
-                title: 'Show one translation',
+                label: t('bible.singleVersion'),
+                title: t('bible.singleVersionHint'),
                 icon: (
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -1119,8 +1121,8 @@ export function BiblePanel() {
               },
               {
                 value: 'dual',
-                label: 'Dual Version',
-                title: 'Show a parallel translation alongside',
+                label: t('bible.dualVersion'),
+                title: t('bible.dualVersionHint'),
                 icon: (
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
@@ -1209,7 +1211,7 @@ export function BiblePanel() {
             onChange={(e) => setQuery(e.target.value)}
             onBlur={() => setQuery((current) => normalizeReferenceQuery(current))}
             onKeyDown={handleSearchKeyDown}
-            placeholder="John 3:16 or keyword search..."
+            placeholder={t('bible.searchPlaceholder')}
           />
 
           {/* Previous and next chapter navigation */}
@@ -1222,7 +1224,7 @@ export function BiblePanel() {
               }}
               disabled={!visibleVerses.length}
               onClick={() => sendAdjacentVerse(-1)}
-              title="Previous verse / chapter"
+              title={t('bible.prevVerse')}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
@@ -1236,7 +1238,7 @@ export function BiblePanel() {
               }}
               disabled={!visibleVerses.length}
               onClick={() => sendAdjacentVerse(1)}
-              title="Next verse / chapter"
+              title={t('bible.nextVerse')}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 18 15 12 9 6" />
@@ -1264,8 +1266,8 @@ export function BiblePanel() {
         title={chapterLabel}
         tools={(
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <BlockButton onClick={() => { void handlePickImport(); }} disabled={importing} title="Import custom Bible translation (.json, .xml, .bible)">
-              {importing ? 'Importing…' : 'Import'}
+            <BlockButton onClick={() => { void handlePickImport(); }} disabled={importing} title={t('bible.importTitle')}>
+              {importing ? t('panel.importing') : t('panel.import')}
             </BlockButton>
             <span style={{ ...type.caption, color: 'var(--text-dim)', lineHeight: 1 }}>
               {currentVersion?.name || selectedVersion}
@@ -1307,7 +1309,7 @@ export function BiblePanel() {
               <WordStudyCard entry={lexiconResult} onClose={() => setLexiconResult(null)} />
             )}
             {results.length > 0 && (
-              <div style={styles.resultsHeading}>Search results</div>
+              <div style={styles.resultsHeading}>{t('bible.searchResults')}</div>
             )}
             {(results.length ? results : chapterVerses).map((verse, index) => {
               const isHighlighted = !results.length && highlightedVerse === verse.verse;
@@ -1484,7 +1486,7 @@ export function BiblePanel() {
                       justifyContent: 'center',
                       flexShrink: 0,
                     }}
-                    title="Add verse to Queue"
+                    title={t('bible.addToQueue')}
                   >
                     +
                   </button>

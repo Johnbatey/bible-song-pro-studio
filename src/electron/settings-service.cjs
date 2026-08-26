@@ -20,7 +20,7 @@ const DEFAULTS = {
      wants. Only a multilingual model can honour anything but English — the
      Language settings row says so rather than offering a choice that would go
      nowhere. */
-  sermonLanguage: 'auto', // 'auto' | 'en' | 'fr' | 'es'
+  sermonLanguage: 'auto', // 'auto' | 'en' | 'fr' | 'es' | 'pt'
   obsUrl: 'ws://127.0.0.1:4455',
   obsPassword: '',
   obsAutoConnect: false,

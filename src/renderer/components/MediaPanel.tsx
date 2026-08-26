@@ -8,6 +8,7 @@ import { Block, BlockButton } from './Block';
 import { MediaTransport } from './MediaTransport';
 import { TallyBadge } from './TallyBadge';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
+import { useI18n } from '../../i18n/useI18n';
 
 /* No Backgrounds block here. Solid and gradient grounds are the Themes
    panel's job; this panel is the media library, and it gets the whole pane. */
@@ -19,6 +20,7 @@ function formatSize(bytes: number) {
 }
 
 export function MediaPanel() {
+  const { t } = useI18n();
   const projectScene = useAppStore((s) => s.projectScene);
   const pushNotice = useAppStore((s) => s.notify);
   const currentScene = useAppStore((s) => s.display.currentScene);
@@ -251,7 +253,7 @@ export function MediaPanel() {
     <div className="blk blk--bar">
       <div style={styles.controlsRow}>
         <BlockButton onClick={handlePick} disabled={busy}>
-          {busy ? 'Importing\u2026' : 'Import Media'}
+          {busy ? t('panel.importing') : t('media.import')}
         </BlockButton>
         {transportTarget && <MediaTransport />}
         <span style={{ marginLeft: 'auto' }}>
@@ -272,8 +274,8 @@ export function MediaPanel() {
 
       <Block
         className="blk-fill"
-        title="Media"
-        subtitle={`${items.length} in library`}
+        title={t('media.title')}
+        subtitle={t('media.inLibrary', { count: items.length })}
       >
       <div
         onDragEnter={onDragEnter}
@@ -495,13 +497,13 @@ export function MediaPanel() {
                       style={{ ...type.caption, color: item.missing ? 'var(--tally-fault)' : 'var(--text-dim)', textTransform: 'uppercase' }}
                       title={item.sourcePath || ''}
                     >
-                      {item.missing ? 'File not found' : `${item.type} · ${formatSize(item.size)}`}
+                      {item.missing ? t('media.fileNotFound') : `${item.type} · ${formatSize(item.size)}`}
                     </div>
                   </div>
                   <button
                     className="btn btn-sm btn-ghost"
                     onClick={() => handleRemove(item)}
-                    title="Remove from library"
+                    title={t('media.remove')}
                     style={{ padding: '2px 6px', flexShrink: 0 }}
                   >
                     ✕
@@ -535,9 +537,9 @@ export function MediaPanel() {
             }}
           >
             {[
-              { label: menu.item.missing ? 'Relink…' : 'Relink to another file…', run: () => handleRelink(menu.item) },
-              { label: 'Show in Finder', run: () => handleReveal(menu.item), disabled: !menu.item.sourcePath },
-              { label: 'Remove from library', run: () => handleRemove(menu.item), fault: true },
+              { label: menu.item.missing ? t('media.relink') : t('media.relink'), run: () => handleRelink(menu.item) },
+              { label: t('media.showInFolder'), run: () => handleReveal(menu.item), disabled: !menu.item.sourcePath },
+              { label: t('media.remove'), run: () => handleRemove(menu.item), fault: true },
             ].map((entry) => (
               <button
                 key={entry.label}

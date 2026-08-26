@@ -5,6 +5,8 @@ import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, Lo
 import { SongPacks } from './settings/SongPacks';
 import { BackupSystem } from './settings/BackupSystem';
 import { createDefaultTheme } from '../utils/defaultTheme';
+import { useI18n } from '../../i18n/useI18n';
+import { UI_LOCALES, type UiLocale, type MessageKey } from '../../i18n';
 
 export type SettingsCategory =
   | 'system'
@@ -23,14 +25,14 @@ export type SettingsCategory =
 
 interface CategoryItem {
   id: SettingsCategory;
-  label: string;
+  labelKey: MessageKey;
   icon: React.ReactNode;
 }
 
-const categories: CategoryItem[] = [
+const categoryDefs: CategoryItem[] = [
   {
     id: 'system',
-    label: 'System',
+    labelKey: 'settings.cat.system',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2v20M2 12h20" />
@@ -39,7 +41,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'bible',
-    label: 'Bible Options',
+    labelKey: 'settings.cat.bible',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -49,7 +51,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'scripture',
-    label: 'Live Scripture AI',
+    labelKey: 'settings.cat.scripture',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" />
@@ -59,7 +61,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'songs',
-    label: 'Songs & CCLI',
+    labelKey: 'settings.cat.songs',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 18V5l12-2v13" />
@@ -70,7 +72,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'audio',
-    label: 'Audio Input (Microphone)',
+    labelKey: 'settings.cat.audio',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -82,7 +84,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'output',
-    label: 'Outputs (Displays & NDI)',
+    labelKey: 'settings.cat.output',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -93,7 +95,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'fullscreen',
-    label: 'Full Screen display',
+    labelKey: 'settings.cat.fullscreen',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
@@ -102,7 +104,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'lowerthird',
-    label: 'Lower Third display',
+    labelKey: 'settings.cat.lowerthird',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="14" width="18" height="7" rx="2" />
@@ -111,7 +113,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'language',
-    label: 'Language',
+    labelKey: 'settings.cat.language',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -122,7 +124,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'hotkeys',
-    label: 'Hotkeys',
+    labelKey: 'settings.cat.hotkeys',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="4" width="20" height="16" rx="2" />
@@ -136,7 +138,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'help',
-    label: 'Help',
+    labelKey: 'settings.cat.help',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -147,7 +149,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'feedback',
-    label: 'Send feedback',
+    labelKey: 'settings.cat.feedback',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -156,7 +158,7 @@ const categories: CategoryItem[] = [
   },
   {
     id: 'support',
-    label: 'Support the Creator',
+    labelKey: 'settings.cat.support',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
@@ -178,6 +180,8 @@ function openTutorials() {
 }
 
 export function SettingsModal() {
+  const { t, locale } = useI18n();
+  const setStoreUiLocale = useAppStore((s) => s.setUiLocale);
   /* Read from the running build. A hardcoded version goes stale silently and
      then misreports itself in every bug report. */
   const [appVersion, setAppVersion] = useState('');
@@ -524,7 +528,7 @@ export function SettingsModal() {
               Settings
             </div>
             <div style={modalStyles.menuList}>
-              {categories.map((item) => {
+              {categoryDefs.map((item) => {
                 const isActive = activeCategory === item.id;
                 return (
                   <button
@@ -543,7 +547,7 @@ export function SettingsModal() {
                     }}>
                       {item.icon}
                     </span>
-                    <span>{item.label}</span>
+                    <span>{t(item.labelKey)}</span>
                   </button>
                 );
               })}
@@ -579,7 +583,7 @@ export function SettingsModal() {
             onMouseDown={handleMouseDown}
           >
             <span style={modalStyles.contentTitle}>
-              {categories.find((c) => c.id === activeCategory)?.label || 'Settings'}
+              {t(categoryDefs.find((c) => c.id === activeCategory)?.labelKey || 'app.settingsTitle')}
             </span>
             <button
               style={modalStyles.closeBtn}
@@ -1363,20 +1367,40 @@ export function SettingsModal() {
               <div>
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Sermon language</div>
-                    <div style={modalStyles.rowSub}>
-                      Naming the language is steadier than letting it be detected each time.
-                    </div>
+                    <div style={modalStyles.rowTitle}>{t('settings.language.uiTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.language.uiHint')}</div>
+                  </div>
+                  <select
+                    style={modalStyles.selectInput}
+                    value={locale}
+                    onChange={(e) => setStoreUiLocale(e.target.value as UiLocale)}
+                  >
+                    {UI_LOCALES.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.nativeLabel} — {entry.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ ...modalStyles.rowSub, marginBottom: 20 }}>
+                  {t('settings.language.restartHint')}
+                </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>{t('settings.language.sermonTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.language.sermonHint')}</div>
                   </div>
                   <select
                     style={modalStyles.selectInput}
                     value={settings?.sermonLanguage || 'auto'}
                     onChange={(e) => saveSettings({ sermonLanguage: e.target.value as SermonLanguage })}
                   >
-                    <option value="auto">Auto (detect per utterance)</option>
+                    <option value="auto">{t('settings.language.auto')}</option>
                     <option value="en">English</option>
-                    <option value="fr">French — Français</option>
-                    <option value="es">Spanish — Español</option>
+                    <option value="fr">Français</option>
+                    <option value="es">Español</option>
+                    <option value="pt">Português</option>
                   </select>
                 </div>
 
