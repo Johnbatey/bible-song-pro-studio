@@ -1,6 +1,6 @@
 {
   "name": "bible-song-pro-studio",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Bible Song Pro - Professional Church Presentation & Streaming Software",
   "main": "src/electron/main.cjs",
   "author": "Johnson Olakotan",
@@ -183,18 +183,6 @@
   "dependencies": {
     "@deepgram/sdk": "^3.6.0",
     "@huggingface/transformers": "^3.8.1",
-    "@img/sharp-darwin-arm64": "0.34.5",
-    "@img/sharp-darwin-x64": "0.34.5",
-    "@img/sharp-libvips-darwin-arm64": "1.2.4",
-    "@img/sharp-libvips-darwin-x64": "1.2.4",
-    "@img/sharp-libvips-linux-x64": "1.2.4",
-    "@img/sharp-libvips-win32-x64": "1.2.4",
-    "@img/sharp-linux-x64": "0.34.5",
-    "@img/sharp-win32-x64": "0.34.5",
-    "@koromix/koffi-darwin-arm64": "3.1.2",
-    "@koromix/koffi-darwin-x64": "3.1.2",
-    "@koromix/koffi-linux-x64": "3.1.2",
-    "@koromix/koffi-win32-x64": "3.1.2",
     "animejs": "^3.2.2",
     "dockview": "^7.0.4",
     "dockview-react": "^7.0.4",
@@ -210,6 +198,20 @@
     "uuid": "^11.0.0",
     "ws": "^8.18.0",
     "zustand": "^5.0.0"
+  },
+  "optionalDependencies": {
+    "@img/sharp-darwin-arm64": "0.34.5",
+    "@img/sharp-darwin-x64": "0.34.5",
+    "@img/sharp-libvips-darwin-arm64": "1.2.4",
+    "@img/sharp-libvips-darwin-x64": "1.2.4",
+    "@img/sharp-libvips-linux-x64": "1.2.4",
+    "@img/sharp-libvips-win32-x64": "1.2.4",
+    "@img/sharp-linux-x64": "0.34.5",
+    "@img/sharp-win32-x64": "0.34.5",
+    "@koromix/koffi-darwin-arm64": "3.1.2",
+    "@koromix/koffi-darwin-x64": "3.1.2",
+    "@koromix/koffi-linux-x64": "3.1.2",
+    "@koromix/koffi-win32-x64": "3.1.2"
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",

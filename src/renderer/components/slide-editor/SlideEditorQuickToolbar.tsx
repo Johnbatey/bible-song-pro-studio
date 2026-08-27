@@ -17,7 +17,9 @@ export type ActiveTool =
   | 'image'
   | 'pencil'
   | 'bezier'
-  | 'eraser';
+  | 'eraser'
+  | 'pan'
+  | 'hand';
 
 export interface PptxToolbarActions {
   canGroup: boolean;

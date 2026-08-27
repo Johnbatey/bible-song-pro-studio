@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHandle } from '../services/audio-capture';
-import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection, WordStudyEntry } from '../types';
+import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection, WordStudyEntry, LocalModelStatus, LocalModelChoice } from '../types';
 import { WordStudyCard } from './WordStudyCard';
 import { type, fontWeight, numeric } from '../styles/type';
 import { Block } from './Block';
@@ -43,8 +43,18 @@ export function LiveScripturePanel() {
   const [version, setVersion] = useState('KJV');
   const [versions, setVersions] = useState<Array<{ id: string; abbreviation: string; name: string }>>([]);
   const [engine, setEngine] = useState<'local' | 'deepgram'>('deepgram');
+  const [aiStatus, setAiStatus] = useState<LocalModelStatus | null>(null);
   const [sttStatus, setSttStatus] = useState<SttStatus | null>(null);
   const [keyConfigured, setKeyConfigured] = useState(false);
+
+  const refreshAiStatus = useCallback(async () => {
+    const status = await window.BSP?.ai?.status?.().catch(() => null);
+    if (status?.engines?.onnx) setAiStatus(status.engines.onnx as LocalModelStatus);
+  }, []);
+
+  useEffect(() => {
+    refreshAiStatus();
+  }, [refreshAiStatus]);
   // A notice reports either a fault or a plain fact, and it is coloured as
   // whichever it is. There is no warning colour in this system and inventing
   // one would put a sixth hue next to a five-state tally.
@@ -771,6 +781,12 @@ export function LiveScripturePanel() {
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
 
+  useEffect(() => {
+    if (isConfigOpen) {
+      refreshAiStatus();
+    }
+  }, [isConfigOpen, refreshAiStatus]);
+
   const isSongMode = live.detectionMode === 'song';
   /* The operator's pick wins; otherwise follow the detector's leader so the
      deck tracks the singing without a click. */
@@ -1135,33 +1151,132 @@ export function LiveScripturePanel() {
               </div>
 
               {/* Row 2: AI Speech Model Engine */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border-primary)', gap: 16 }}>
-                <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>AI Speech Model Engine</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
-                    Engine used for live speech recognition
+              {(() => {
+                const localModels: LocalModelChoice[] = aiStatus?.models?.length
+                  ? aiStatus.models
+                  : [
+                      { key: 'moonshine-base', id: 'onnx-community/moonshine-base-ONNX', label: 'Moonshine Base', approxSize: '145 MB', note: 'Recommended default. Built for live speech.', family: 'moonshine', multilingual: false, downloaded: false },
+                      { key: 'moonshine-tiny', id: 'onnx-community/moonshine-tiny-ONNX', label: 'Moonshine Tiny', approxSize: '75 MB', note: 'Ultra fast response • Lightweight', family: 'moonshine', multilingual: false, downloaded: false },
+                      { key: 'whisper-tiny-en', id: 'Xenova/whisper-tiny.en', label: 'Whisper Tiny (English)', approxSize: '75 MB', note: 'English only', family: 'whisper', multilingual: false, downloaded: false },
+                      { key: 'whisper-tiny-multi', id: 'Xenova/whisper-tiny', label: 'Whisper Tiny (multilingual)', approxSize: '75 MB', note: '90+ languages supported', family: 'whisper', multilingual: true, downloaded: false },
+                      { key: 'whisper-base-multi', id: 'Xenova/whisper-base', label: 'Whisper Base (multilingual)', approxSize: '145 MB', note: 'Best for non-English sermons', family: 'whisper', multilingual: true, downloaded: false },
+                    ];
+
+                const activeLocalModelKey = aiStatus?.modelKey || 'moonshine-base';
+                const currentLocalModel = localModels.find((m) => m.key === activeLocalModelKey) || localModels[0];
+                const isLocalModelDownloaded = Boolean(currentLocalModel?.downloaded);
+
+                const currentDropdownValue = engine === 'deepgram' ? 'deepgram' : `local:${activeLocalModelKey}`;
+
+                const modelOptions: import('./CustomDropdown').DropdownOption<string>[] = [
+                  {
+                    value: 'deepgram',
+                    label: 'Deepgram (Cloud Nova-2)',
+                    sublabel: 'Sub-250ms streaming • Cloud API',
+                    group: 'Cloud Model',
+                    statusDot: keyConfigured ? 'green' : 'amber',
+                  },
+                  ...localModels.map((m) => ({
+                    value: `local:${m.key}`,
+                    label: m.label,
+                    sublabel: m.note || 'Runs locally on this computer',
+                    group: 'Local On-Device Models (ONNX)',
+                    statusDot: (m.downloaded ? 'green' : 'red') as 'green' | 'red',
+                  })),
+                ];
+
+                return (
+                  <div style={{ padding: '16px 0', borderBottom: '1px solid var(--border-primary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>AI Speech Model Engine</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2, lineHeight: 1.4 }}>
+                          {engine === 'deepgram'
+                            ? 'Cloud streaming via Deepgram Nova-2'
+                            : `Local on-device (${currentLocalModel?.label || 'Moonshine'}) • 100% offline`}
+                        </div>
+                      </div>
+                      <CustomDropdown
+                        value={currentDropdownValue}
+                        onChange={async (val) => {
+                          if (val === 'deepgram') {
+                            setEngine('deepgram');
+                            setLive({ provider: 'deepgram' });
+                            await window.BSP?.settings?.set({ sttEngine: 'deepgram' }).catch(() => {});
+                            await window.BSP?.ai?.setEngine?.('deepgram').catch(() => {});
+                          } else if (val.startsWith('local:')) {
+                            const modelKey = val.replace('local:', '');
+                            setEngine('local');
+                            setLive({ provider: 'local' });
+                            await window.BSP?.settings?.set({ sttEngine: 'local', sttLocalModel: modelKey }).catch(() => {});
+                            await window.BSP?.ai?.setEngine?.('local').catch(() => {});
+                            await window.BSP?.ai?.setLocalModel?.(modelKey).catch(() => {});
+                            await refreshAiStatus();
+                          }
+                          if (live.isActive) {
+                            stopLive();
+                            setTimeout(() => startLive(), 100);
+                          }
+                        }}
+                        options={modelOptions}
+                        buttonStyle={{ width: 260, justifyContent: 'space-between' }}
+                        title="Select AI Speech Model Engine"
+                      />
+                    </div>
+
+                    {/* Notice if local model needs download */}
+                    {engine === 'local' && !isLocalModelDownloaded && (
+                      <div
+                        style={{
+                          marginTop: 12,
+                          padding: '10px 14px',
+                          background: 'rgba(249, 115, 22, 0.12)',
+                          border: '1px solid rgba(249, 115, 22, 0.35)',
+                          borderRadius: 8,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                          </svg>
+                          <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                            <strong>{currentLocalModel?.label || 'Selected model'}</strong> is not yet downloaded on this computer.
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setIsConfigOpen(false);
+                            useAppStore.getState().openSettings('audio');
+                          }}
+                          style={{
+                            background: 'var(--accent, #FF5500)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: 6,
+                            padding: '6px 12px',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                            boxShadow: '0 2px 6px rgba(255, 85, 0, 0.3)',
+                            transition: 'all 0.15s ease',
+                          }}
+                          title="Open Settings → Audio Input to download this model"
+                        >
+                          Download in Settings →
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <CustomDropdown
-                  value={engine}
-                  onChange={(val) => {
-                    const next = val as 'local' | 'deepgram';
-                    setEngine(next);
-                    setLive({ provider: next });
-                    window.BSP?.settings?.set({ sttEngine: next }).catch(() => {});
-                    if (live.isActive) {
-                      stopLive();
-                      setTimeout(() => startLive(), 100);
-                    }
-                  }}
-                  options={[
-                    { value: 'deepgram', label: 'Deepgram (Cloud Nova-2)', sublabel: 'Sub-250ms streaming (recommended)' },
-                    { value: 'local', label: 'Local On-Device (ONNX)', sublabel: 'Runs 100% offline on this computer' },
-                  ]}
-                  buttonStyle={{ width: 240, justifyContent: 'space-between' }}
-                  title="Select AI Speech Model"
-                />
-              </div>
+                );
+              })()}
 
               {/* Row 3: Bible Version */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid var(--border-primary)', gap: 16 }}>

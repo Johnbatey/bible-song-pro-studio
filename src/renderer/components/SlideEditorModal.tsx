@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { SlideEditorHeader } from './slide-editor/SlideEditorHeader';
 import { SlideEditorLeftRail } from './slide-editor/SlideEditorLeftRail';
@@ -239,7 +239,117 @@ export function SlideEditorModal() {
   const activeSlideElements = slideElementsFor(activeSlide);
   const selectedElement = activeSlideElements.find((el) => el.id === selectedElementId) || null;
 
-  /* Keyboard shortcuts for slide editor (Cmd+D duplicate, Delete, Cmd+A select all, Arrow nudge) */
+  const historyRef = useRef<PresentationDeck[]>([]);
+  const historyPointerRef = useRef(-1);
+
+  useEffect(() => {
+    historyRef.current = history;
+    historyPointerRef.current = historyPointer;
+  }, [history, historyPointer]);
+
+  const handleUndo = useCallback(() => {
+    const p = historyPointerRef.current;
+    const h = historyRef.current;
+    if (p > 0) {
+      const prev = h[p - 1];
+      setHistoryPointer(p - 1);
+      setDeck(prev);
+    }
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    const p = historyPointerRef.current;
+    const h = historyRef.current;
+    if (p < h.length - 1 && p >= 0) {
+      const next = h[p + 1];
+      setHistoryPointer(p + 1);
+      setDeck(next);
+    }
+  }, []);
+
+  // Tool Selection Handlers
+  const handleSelectTool = useCallback((tool: ActiveTool | string) => {
+    setActiveTool(tool as ActiveTool);
+    if (tool === 'text') {
+      const newElement: SlideElement = {
+        id: `text-${Date.now()}`,
+        type: 'text',
+        x: 25,
+        y: 37,
+        width: 50,
+        height: 16.7,
+        content: 'New Text Box',
+        fontSize: 48,
+        fontFamily: 'Inter',
+        fontWeight: 600,
+        color: '#ffffff',
+        textAlign: 'center',
+        zIndex: (activeSlideElements.length) + 1,
+      };
+      handleUpdateSlideElements([...activeSlideElements, newElement]);
+      handleSelectElement(newElement.id);
+      setActiveTool('select');
+    } else if (tool === 'pencil' || tool === 'bezier') {
+      setActiveTool(tool);
+    } else if (['box', 'rectangle', 'rounded', 'circle', 'triangle', 'star', 'line'].includes(tool)) {
+      const isCircle = tool === 'circle';
+      const isRounded = tool === 'rounded';
+      const isLine = tool === 'line';
+      const isSquareLike = isCircle || tool === 'triangle' || tool === 'star';
+
+      const elemWidth = isLine ? 31.3 : isSquareLike ? 20.3 : 31.3;
+      const elemHeight = isLine ? 1 : isSquareLike ? 36.1 : 33.3;
+
+      const newElement: SlideElement = {
+        id: `shape-${Date.now()}`,
+        type: 'shape',
+        x: Math.round(((100 - elemWidth) / 2) * 10) / 10,
+        y: isLine ? 48 : Math.round(((100 - elemHeight) / 2) * 10) / 10,
+        width: elemWidth,
+        height: elemHeight,
+        content: tool,
+        backgroundColor: '#FF5500',
+        borderColor: '#FF5500',
+        borderWidth: isLine ? 0 : 3,
+        borderRadius: isCircle ? 300 : isRounded ? 12 : 0,
+        zIndex: (activeSlideElements.length) + 1,
+      };
+      handleUpdateSlideElements([...activeSlideElements, newElement]);
+      handleSelectElement(newElement.id);
+      setActiveTool('select');
+    } else if (tool === 'image') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e: any) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+        setImportStatus(`Optimising ${file.name}…`);
+        const imported = await importSlideImage(file);
+        if ('error' in imported) {
+          setImportStatus(imported.error);
+          return;
+        }
+        const newElement: SlideElement = {
+          id: `image-${Date.now()}`,
+          type: 'image',
+          content: imported.url,
+          x: 20,
+          y: 15,
+          width: 60,
+          height: 70,
+          zIndex: (activeSlideElements.length) + 1,
+        };
+        handleUpdateSlideElements([...activeSlideElements, newElement]);
+        handleSelectElement(newElement.id);
+        setImportStatus(null);
+      };
+      input.click();
+      setActiveTool('select');
+    }
+  }, [activeSlideElements, handleUpdateSlideElements, handleSelectElement]);
+
+  /* Keyboard shortcuts for slide editor (Undo/Redo, Cmd+D duplicate, Delete, Cmd+A select all, Arrow nudge, V/T/P/B/R/O/C/L/H tool selection) */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -247,14 +357,83 @@ export function SlideEditorModal() {
         return;
       }
 
-      // Escape (Reset active tool to Select & Move mode)
+      // Single Key Pro Design Tool Shortcuts (V, T, P, B, R, O, C, L, H)
+      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'v') {
+          e.preventDefault();
+          setActiveTool('select');
+          return;
+        }
+        if (key === 't') {
+          e.preventDefault();
+          handleSelectTool('text');
+          return;
+        }
+        if (key === 'p') {
+          e.preventDefault();
+          setActiveTool('bezier');
+          return;
+        }
+        if (key === 'b') {
+          e.preventDefault();
+          setActiveTool('pencil');
+          return;
+        }
+        if (key === 'r') {
+          e.preventDefault();
+          handleSelectTool('rectangle');
+          return;
+        }
+        if (key === 'o' || key === 'c') {
+          e.preventDefault();
+          handleSelectTool('circle');
+          return;
+        }
+        if (key === 'l') {
+          e.preventDefault();
+          handleSelectTool('line');
+          return;
+        }
+        if (key === 'h') {
+          e.preventDefault();
+          setActiveTool('pan');
+          return;
+        }
+      }
+
+      // Cmd+Z / Ctrl+Z (Undo) & Cmd+Shift+Z / Ctrl+Shift+Z / Ctrl+Y (Redo)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (isPptxDeck) pptxHistory.redo();
+          else handleRedo();
+        } else {
+          if (isPptxDeck) pptxHistory.undo();
+          else handleUndo();
+        }
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        if (isPptxDeck) pptxHistory.redo();
+        else handleRedo();
+        return;
+      }
+
+      // Escape (Deselect all elements & reset active tool to Select mode)
       if (e.key === 'Escape') {
         setActiveTool('select');
+        setSelectedElementIds([]);
         return;
       }
 
       // Delete / Backspace
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (e.defaultPrevented) return;
+        const targetTag = (e.target as HTMLElement)?.tagName;
+        if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
         if (isPptxDeck) {
           if (pptxSelection && pptxSelection.ids.length > 0) {
             e.preventDefault();
@@ -346,7 +525,7 @@ export function SlideEditorModal() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPptxDeck, pptxSelection, selectedElementIds, activeSlideElements, handlePptxDelete, handleDuplicateElements, handleUpdateSlideElements]);
+  }, [isPptxDeck, pptxSelection, selectedElementIds, activeSlideElements, handlePptxDelete, handleDuplicateElements, handleUpdateSlideElements, handleUndo, handleRedo, pptxHistory]);
 
   const handlePptxTextEdit = useCallback((shape: ParsedShape, value: string) => {
     setShapeText(shape, value);
@@ -654,24 +833,6 @@ export function SlideEditorModal() {
     }
   };
 
-  const handleUndo = () => {
-    if (historyPointer > 0) {
-      const prev = history[historyPointer - 1];
-      setHistoryPointer(historyPointer - 1);
-      setDeck(prev);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyPointer < history.length - 1) {
-      const next = history[historyPointer + 1];
-      setHistoryPointer(historyPointer + 1);
-      setDeck(next);
-    }
-  };
-
-
-
   const renderNativeThumb = useCallback((index: number, width = 180) => {
     const slide = slides[index];
     if (!slide) return null;
@@ -685,83 +846,6 @@ export function SlideEditorModal() {
   }, [slides]);
 
   if (!isSlideEditorOpen) return null;
-
-  // Tool Selection Handlers
-  const handleSelectTool = (tool: ActiveTool | string) => {
-    setActiveTool(tool as ActiveTool);
-    if (tool === 'text') {
-      const newElement: SlideElement = {
-        id: `text-${Date.now()}`,
-        type: 'text',
-        x: 25,
-        y: 37,
-        width: 50,
-        height: 16.7,
-        content: t('slideEditor.defaults.newTextBox'),
-        fontSize: 48,
-        fontFamily: 'Inter',
-        fontWeight: 600,
-        color: '#ffffff',
-        textAlign: 'center',
-        zIndex: (activeSlideElements.length) + 1,
-      };
-      handleUpdateSlideElements([...activeSlideElements, newElement]);
-      handleSelectElement(newElement.id);
-      setActiveTool('select');
-    } else if (tool === 'pencil' || tool === 'bezier') {
-      setActiveTool(tool);
-    } else if (['box', 'rectangle', 'rounded', 'circle', 'triangle', 'star', 'line'].includes(tool)) {
-      const isCircle = tool === 'circle';
-      const isRounded = tool === 'rounded';
-      const isLine = tool === 'line';
-      const newElement: SlideElement = {
-        id: `shape-${Date.now()}`,
-        type: 'shape',
-        x: 34.4,
-        y: isLine ? 48 : 33.3,
-        width: 31.3,
-        height: isLine ? 1 : 33.3,
-        content: tool,
-        backgroundColor: '#FF5500',
-        borderColor: '#FF5500',
-        borderWidth: isLine ? 0 : 3,
-        borderRadius: isCircle ? 300 : isRounded ? 12 : 0,
-        zIndex: (activeSlideElements.length) + 1,
-      };
-      handleUpdateSlideElements([...activeSlideElements, newElement]);
-      handleSelectElement(newElement.id);
-      setActiveTool('select');
-    } else if (tool === 'image') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async (e: any) => {
-        const file = e.target?.files?.[0];
-        if (!file) return;
-        setImportStatus(t('slideEditor.modal.importOptimising', { name: file.name }));
-        const imported = await importSlideImage(file);
-        if ('error' in imported) {
-          setImportStatus(imported.error);
-          return;
-        }
-        const newElement: SlideElement = {
-          id: `image-${Date.now()}`,
-          type: 'image',
-          content: imported.url,
-          x: 20,
-          y: 15,
-          width: 60,
-          height: 70,
-          zIndex: (activeSlideElements.length) + 1,
-        };
-        handleUpdateSlideElements([...activeSlideElements, newElement]);
-        handleSelectElement(newElement.id);
-        setImportStatus(null);
-      };
-      input.click();
-      setActiveTool('select');
-    }
-  };
 
   // Slide CRUD Actions
   function handleAddSlide() {
