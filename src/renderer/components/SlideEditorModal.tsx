@@ -37,8 +37,10 @@ import type { SelectionState } from '../slide-engine/edit/geometry';
 import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
 import { getCustomTemplates } from '../services/customTemplateStore';
 import { importSlideImage } from '../utils/import-slide-image';
+import { useI18n } from '../../i18n/useI18n';
 
 export function SlideEditorModal() {
+  const { t } = useI18n();
   const isSlideEditorOpen = useAppStore((s) => s.isSlideEditorOpen);
   const closeSlideEditor = useAppStore((s) => s.closeSlideEditor);
   const activePresentationId = useAppStore((s) => s.activePresentationId);
@@ -53,15 +55,15 @@ export function SlideEditorModal() {
     if (existing) return existing;
     return {
       id: activePresentationId || `deck-${Date.now()}`,
-      title: 'Untitled Presentation',
+      title: t('slideEditor.defaults.untitledPresentation'),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       aspectRatio: '16:9',
       slides: [
         {
           id: 'slide-1',
-          title: 'Welcome Presentation',
-          body: 'Double click text to edit content',
+          title: t('slideEditor.defaults.welcomePresentation'),
+          body: t('slideEditor.defaults.doubleClickEdit'),
           label: 'Slide 1',
           notes: '',
           transition: 'fade',
@@ -79,7 +81,7 @@ export function SlideEditorModal() {
               y: 20.4,
               width: 87.5,
               height: 18.5,
-              content: 'Welcome Presentation',
+              content: t('slideEditor.defaults.welcomePresentation'),
               fontSize: 64,
               fontFamily: 'Inter',
               fontWeight: 700,
@@ -94,7 +96,7 @@ export function SlideEditorModal() {
               y: 44.4,
               width: 83.3,
               height: 27.8,
-              content: 'Double click text to edit content',
+              content: t('slideEditor.defaults.doubleClickEdit'),
               fontSize: 36,
               fontFamily: 'Inter',
               fontWeight: 500,
@@ -215,12 +217,12 @@ export function SlideEditorModal() {
     });
     setPptxSelection(null);
   }, [pptxSlide, pptxShapes, pptxSelection, commitStyle]);
-  const slides = deck.slides.length > 0 ? deck.slides : [
+  const slides: PresentationSlide[] = deck.slides.length > 0 ? deck.slides : [
     {
       id: 'slide-default',
-      title: 'Untitled Slide',
-      body: 'Double click to edit',
-      label: 'Slide 1',
+      title: t('slideEditor.defaults.untitledSlide'),
+      body: t('slideEditor.defaults.doubleClickBody'),
+      label: t('slideEditor.defaults.slideN', { n: 1 }),
       notes: '',
       transition: 'fade' as const,
       durationMs: 3000,
@@ -229,6 +231,7 @@ export function SlideEditorModal() {
       buildStep: 1,
       background: { type: 'color' as const, value: '#18181b' },
       aspectRatio: '16:9' as const,
+      elements: [],
     },
   ];
 
@@ -477,7 +480,7 @@ export function SlideEditorModal() {
       setHistoryPointer(0);
     } else {
       const scene = scenes.find((sc) => sc.id === activePresentationId);
-      const title = scene?.name || 'Untitled Presentation';
+      const title = scene?.name || t('slideEditor.defaults.untitledPresentation');
       const slides = scene?.content?.slides || [];
       if (slides.length > 0) {
         const newDeck: PresentationDeck = {
@@ -488,9 +491,9 @@ export function SlideEditorModal() {
           aspectRatio: '16:9',
           slides: slides.map((s, idx) => ({
             id: s.id || `slide-${idx + 1}`,
-            title: s.title || `Slide ${idx + 1}`,
+            title: s.title || t('slideEditor.defaults.slideN', { n: idx + 1 }),
             body: s.text || '',
-            label: s.label || `Slide ${idx + 1}`,
+            label: s.label || t('slideEditor.defaults.slideN', { n: idx + 1 }),
             notes: s.notes || '',
             transition: 'fade',
             durationMs: 3000,
@@ -549,9 +552,9 @@ export function SlideEditorModal() {
           const body = lines.slice(1).join('\n').trim();
           return {
             id: `imported-${idx}-${Date.now()}`,
-            title: title || `Slide ${idx + 1}`,
+            title: title || t('slideEditor.defaults.slideN', { n: idx + 1 }),
             body: body || title,
-            label: `Slide ${idx + 1}`,
+            label: t('slideEditor.defaults.slideN', { n: idx + 1 }),
             notes: '',
             transition: 'fade',
             durationMs: 3000,
@@ -606,7 +609,7 @@ export function SlideEditorModal() {
       };
       reader.readAsText(file);
     } else if (file.type.startsWith('image/')) {
-      setImportStatus(`Optimising ${file.name}…`);
+      setImportStatus(t('slideEditor.modal.importOptimising', { name: file.name }));
       const imported = await importSlideImage(file);
       if ('error' in imported) {
         setImportStatus(imported.error);
@@ -616,7 +619,7 @@ export function SlideEditorModal() {
         id: `img-slide-${Date.now()}`,
         title: file.name.replace(/\.[^/.]+$/, ''),
         body: '',
-        label: `Slide ${slides.length + 1}`,
+        label: t('slideEditor.defaults.slideN', { n: slides.length + 1 }),
         notes: '',
         transition: 'fade',
         durationMs: 3000,
@@ -633,9 +636,9 @@ export function SlideEditorModal() {
       /* The real engine, the same one the Slides page uses. This branch used
          to discard the file's bytes and fabricate a blue-gradient slide named
          after it, which looked like an import and was not one. */
-      setImportStatus(`Reading ${file.name}…`);
+      setImportStatus(t('slideEditor.modal.importReading', { name: file.name }));
       const result = await buildDeckFromPptx(file, (done, total) => {
-        setImportStatus(`Parsing slide ${done} of ${total}…`);
+        setImportStatus(t('slideEditor.modal.importParsing', { done, total }));
       });
       if ('error' in result) {
         setImportStatus(result.error);
@@ -647,7 +650,7 @@ export function SlideEditorModal() {
       setImportStatus(null);
       openSlideEditor(result.deck.id);
     } else {
-      setImportStatus(`${ext ? ext.toUpperCase() : 'That file type'} import is not supported yet — PowerPoint (.pptx), JSON, TXT, MD and images are.`);
+      setImportStatus(t('slideEditor.errors.importNotSupported', { ext: ext ? ext.toUpperCase() : 'That file type' }));
     }
   };
 
@@ -694,7 +697,7 @@ export function SlideEditorModal() {
         y: 37,
         width: 50,
         height: 16.7,
-        content: 'New Text Box',
+        content: t('slideEditor.defaults.newTextBox'),
         fontSize: 48,
         fontFamily: 'Inter',
         fontWeight: 600,
@@ -735,7 +738,7 @@ export function SlideEditorModal() {
       input.onchange = async (e: any) => {
         const file = e.target?.files?.[0];
         if (!file) return;
-        setImportStatus(`Optimising ${file.name}…`);
+        setImportStatus(t('slideEditor.modal.importOptimising', { name: file.name }));
         const imported = await importSlideImage(file);
         if ('error' in imported) {
           setImportStatus(imported.error);
@@ -764,9 +767,9 @@ export function SlideEditorModal() {
   function handleAddSlide() {
     const newSlide: PresentationSlide = {
       id: `slide-${Date.now()}`,
-      title: 'New Slide',
-      body: 'Double click to edit body',
-      label: `Slide ${slides.length + 1}`,
+      title: t('slideEditor.defaults.newSlide'),
+      body: t('slideEditor.defaults.doubleClickBody'),
+      label: t('slideEditor.defaults.slideN', { n: slides.length + 1 }),
       notes: '',
       transition: 'fade',
       durationMs: 3000,
@@ -783,7 +786,7 @@ export function SlideEditorModal() {
           y: 20.4,
           width: 87.5,
           height: 18.5,
-          content: 'New Slide Title',
+          content: t('slideEditor.defaults.newSlideTitle'),
           fontSize: 64,
           fontFamily: 'Inter',
           fontWeight: 700,
@@ -804,7 +807,7 @@ export function SlideEditorModal() {
     const duplicated: PresentationSlide = {
       ...target,
       id: `slide-${Date.now()}`,
-      title: `${target.title} (Copy)`,
+      title: `${target.title}${t('slideEditor.defaults.copySuffix')}`,
       elements: target.elements?.map((el) => ({ ...el, id: `${el.id}-copy-${Date.now()}` })),
     };
     const nextSlides = [...slides];

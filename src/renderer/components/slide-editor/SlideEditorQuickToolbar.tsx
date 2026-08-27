@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { useI18n } from '../../../i18n/useI18n';
+import { IconMusic } from './SlideEditorIcons';
 import type { SlideElement, Song, BibleVerse } from '../../types';
 
 export type ActiveTool =
@@ -52,6 +54,7 @@ export function SlideEditorQuickToolbar({
   strokeWidth = 4,
   onChangeStrokeWidth,
 }: SlideEditorQuickToolbarProps) {
+  const { t } = useI18n();
   const songs = useAppStore((s) => s.songs);
   const [localStrokeWidth, setLocalStrokeWidth] = useState(strokeWidth);
   const currentStrokeWidth = onChangeStrokeWidth ? strokeWidth : localStrokeWidth;
@@ -287,10 +290,10 @@ export function SlideEditorQuickToolbar({
             paddingBottom: 6,
             width: '100%',
           }}
-          title="Drag to move toolbar"
+          title={t('slideEditor.toolbar.dragToMove')}
         >
           <div style={{ width: 28, height: 3, background: 'var(--border-primary)', borderRadius: 2, marginBottom: 4 }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.04em', textTransform: 'uppercase', background: 'var(--bg-secondary)', padding: '2px 10px', borderRadius: 12, border: '1px solid var(--border-primary)', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>Add content</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.04em', textTransform: 'uppercase', background: 'var(--bg-secondary)', padding: '2px 10px', borderRadius: 12, border: '1px solid var(--border-primary)', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>{t('slideEditor.toolbar.addContent')}</span>
         </div>
 
         {/* Floating Toolbar Buttons Row */}
@@ -303,12 +306,12 @@ export function SlideEditorQuickToolbar({
               setActiveDropdown(null);
             }}
             style={activeTool === 'select' ? PILL_BTN_ACTIVE : PILL_BTN}
-            title="Select & Move Tool (Esc)"
+            title={t('slideEditor.toolbar.selectTitle')}
           >
             <svg viewBox="0 0 24 24" style={ICON}>
               <path d="M3 3l7 18 3-7 7-3L3 3z" fill="currentColor" />
             </svg>
-            <span>Select</span>
+            <span>{t('slideEditor.toolbar.select')}</span>
           </button>
 
           {/* 1. Text Tool */}
@@ -319,12 +322,12 @@ export function SlideEditorQuickToolbar({
               setActiveDropdown(null);
             }}
             style={activeTool === 'text' ? PILL_BTN_ACTIVE : PILL_BTN}
-            title="Add Text Box"
+            title={t('slideEditor.toolbar.textTitle')}
           >
             <svg viewBox="0 0 24 24" style={ICON}>
               <path d="M4 7V4h16v3M9 20h6M12 4v16" />
             </svg>
-            <span>Text</span>
+            <span>{t('slideEditor.toolbar.text')}</span>
           </button>
 
           {/* 2. Bible Tool Button (Proper SVG Bible Icon) */}
@@ -333,14 +336,14 @@ export function SlideEditorQuickToolbar({
               type="button"
               onClick={() => setActiveDropdown(activeDropdown === 'scripture' ? null : 'scripture')}
               style={activeDropdown === 'scripture' ? PILL_BTN_ACTIVE : PILL_BTN}
-              title="Bible Tool"
+              title={t('slideEditor.toolbar.bibleTitle')}
             >
               <svg viewBox="0 0 24 24" style={ICON}>
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 <path d="M12 6v6M9 9h6" />
               </svg>
-              <span>Bible</span>
+              <span>{t('slideEditor.toolbar.bible')}</span>
             </button>
 
             {/* Scripture Popover */}
@@ -377,7 +380,7 @@ export function SlideEditorQuickToolbar({
                     type="text"
                     value={scriptureQuery}
                     onChange={(e) => searchScripture(e.target.value)}
-                    placeholder="Genesis 1:1, John 3:16..."
+                    placeholder={t('slideEditor.toolbar.scripturePlaceholder')}
                     style={{
                       flex: 1,
                       padding: '8px 12px',
@@ -394,15 +397,15 @@ export function SlideEditorQuickToolbar({
 
                 {/* Verses List Header */}
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.5)', marginTop: 10, letterSpacing: '0.05em' }}>
-                  {scriptureQuery.toUpperCase() || 'SEARCH RESULTS'}
+                  {scriptureQuery.toUpperCase() || t('slideEditor.toolbar.searchResults')}
                 </div>
 
                 {/* Verses Selection list */}
                 <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, paddingRight: 4 }}>
                   {scriptureLoading ? (
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>Searching Bible...</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>{t('slideEditor.toolbar.searchingBible')}</div>
                   ) : scriptureVerses.length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>No verses found</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>{t('slideEditor.toolbar.noVerses')}</div>
                   ) : (
                     scriptureVerses.map((v) => (
                       <button
@@ -442,11 +445,11 @@ export function SlideEditorQuickToolbar({
                 <div style={{ display: 'flex', gap: 12, marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 10 }}>
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input type="color" value={verseColor} onChange={(e) => setVerseColor(e.target.value)} style={COLOR_DOT} />
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>Verse Color</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{t('slideEditor.toolbar.verseColor')}</span>
                   </div>
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input type="color" value={refColor} onChange={(e) => setRefColor(e.target.value)} style={COLOR_DOT} />
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>Ref Color</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{t('slideEditor.toolbar.refColor')}</span>
                   </div>
                 </div>
               </div>
@@ -459,12 +462,12 @@ export function SlideEditorQuickToolbar({
               type="button"
               onClick={() => setActiveDropdown(activeDropdown === 'shapes' ? null : 'shapes')}
               style={isShapeActive || activeDropdown === 'shapes' ? PILL_BTN_ACTIVE : PILL_BTN}
-              title="Insert Shapes"
+              title={t('slideEditor.toolbar.shapeTitle')}
             >
               <svg viewBox="0 0 24 24" style={ICON}>
                 <rect x="3" y="3" width="18" height="18" rx="4" />
               </svg>
-              <span>Shape</span>
+              <span>{t('slideEditor.toolbar.shape')}</span>
               <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
             </button>
 
@@ -484,7 +487,7 @@ export function SlideEditorQuickToolbar({
                   <svg viewBox="0 0 24 24" style={ICON}>
                     <rect x="4" y="4" width="16" height="16" rx="0" />
                   </svg>
-                  <span>Rectangle</span>
+                  <span>{t('slideEditor.toolbar.rectangle')}</span>
                 </button>
 
                 {/* 2. Rounded */}
@@ -501,7 +504,7 @@ export function SlideEditorQuickToolbar({
                   <svg viewBox="0 0 24 24" style={ICON}>
                     <rect x="4" y="4" width="16" height="16" rx="5" />
                   </svg>
-                  <span>Rounded</span>
+                  <span>{t('slideEditor.toolbar.rounded')}</span>
                 </button>
 
                 {/* 3. Circle */}
@@ -518,7 +521,7 @@ export function SlideEditorQuickToolbar({
                   <svg viewBox="0 0 24 24" style={ICON}>
                     <circle cx="12" cy="12" r="8" />
                   </svg>
-                  <span>Circle</span>
+                  <span>{t('slideEditor.toolbar.circle')}</span>
                 </button>
 
                 {/* 4. Triangle */}
@@ -535,7 +538,7 @@ export function SlideEditorQuickToolbar({
                   <svg viewBox="0 0 24 24" style={ICON}>
                     <polygon points="12,4 4,20 20,20" />
                   </svg>
-                  <span>Triangle</span>
+                  <span>{t('slideEditor.toolbar.triangle')}</span>
                 </button>
 
                 {/* 5. Star */}
@@ -552,7 +555,7 @@ export function SlideEditorQuickToolbar({
                   <svg viewBox="0 0 24 24" style={ICON}>
                     <polygon points="12,2 15,9 22,9 16,14 18,21 12,17 6,21 8,14 2,9 9,9" />
                   </svg>
-                  <span>Star</span>
+                  <span>{t('slideEditor.toolbar.star')}</span>
                 </button>
 
                 {/* 6. Line */}
@@ -569,7 +572,7 @@ export function SlideEditorQuickToolbar({
                   <svg viewBox="0 0 24 24" style={ICON}>
                     <line x1="4" y1="12" x2="20" y2="12" strokeWidth="2.5" />
                   </svg>
-                  <span>Line</span>
+                  <span>{t('slideEditor.toolbar.line')}</span>
                 </button>
               </div>
             )}
@@ -583,14 +586,14 @@ export function SlideEditorQuickToolbar({
               setActiveDropdown(null);
             }}
             style={activeTool === 'image' ? PILL_BTN_ACTIVE : PILL_BTN}
-            title="Upload / Add Image Asset"
+            title={t('slideEditor.toolbar.imageTitle')}
           >
             <svg viewBox="0 0 24 24" style={ICON}>
               <rect x="3" y="3" width="18" height="18" rx="3.5" />
               <circle cx="9" cy="9" r="2" />
               <path d="M21 15l-3.086-3.086a2 2 0 00-2.828 0L6 21" />
             </svg>
-            <span>Image</span>
+            <span>{t('slideEditor.toolbar.image')}</span>
           </button>
 
           {/* 5. Draw Category Dropdown (Pencil Freehand & Pen Bezier Vector) */}
@@ -599,12 +602,12 @@ export function SlideEditorQuickToolbar({
               type="button"
               onClick={() => setActiveDropdown(activeDropdown === 'draw' ? null : 'draw')}
               style={activeTool === 'pencil' || activeTool === 'bezier' || activeDropdown === 'draw' ? PILL_BTN_ACTIVE : PILL_BTN}
-              title="Drawing Tools (Freehand Pencil & Bezier Pen)"
+              title={t('slideEditor.toolbar.drawTitle')}
             >
               <svg viewBox="0 0 24 24" style={ICON}>
                 <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
               </svg>
-              <span>Draw</span>
+              <span>{t('slideEditor.toolbar.draw')}</span>
               <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
             </button>
 
@@ -629,8 +632,8 @@ export function SlideEditorQuickToolbar({
                     <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                   </svg>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span style={{ fontWeight: 600 }}>Freehand Pencil</span>
-                    <span style={{ fontSize: 10, opacity: 0.6 }}>Draw lines & loops</span>
+                    <span style={{ fontWeight: 600 }}>{t('slideEditor.toolbar.freehandPencil')}</span>
+                    <span style={{ fontSize: 10, opacity: 0.6 }}>{t('slideEditor.toolbar.freehandPencilHint')}</span>
                   </div>
                 </button>
 
@@ -656,8 +659,8 @@ export function SlideEditorQuickToolbar({
                     <circle cx="11" cy="11" r="2" />
                   </svg>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span style={{ fontWeight: 600 }}>Bezier Pen</span>
-                    <span style={{ fontSize: 10, opacity: 0.6 }}>Node & curve tool</span>
+                    <span style={{ fontWeight: 600 }}>{t('slideEditor.toolbar.bezierPen')}</span>
+                    <span style={{ fontSize: 10, opacity: 0.6 }}>{t('slideEditor.toolbar.bezierPenHint')}</span>
                   </div>
                 </button>
 
@@ -665,7 +668,7 @@ export function SlideEditorQuickToolbar({
                 <div style={{ height: 1, background: 'var(--border-primary)', margin: '4px 0' }} />
                 <div style={{ padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pen Thickness</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('slideEditor.toolbar.penThickness')}</span>
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#FF5500' }}>{currentStrokeWidth}px</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -685,9 +688,9 @@ export function SlideEditorQuickToolbar({
                           fontWeight: 700,
                           cursor: 'pointer',
                         }}
-                        title={`${w}px Stroke`}
+                        title={t('slideEditor.toolbar.strokePx', { w })}
                       >
-                        {w === 2 ? 'Fine' : w === 4 ? 'Med' : w === 8 ? 'Bold' : 'Thick'}
+                        {w === 2 ? t('slideEditor.toolbar.penFine') : w === 4 ? t('slideEditor.toolbar.penMed') : w === 8 ? t('slideEditor.toolbar.penBold') : t('slideEditor.toolbar.penThick')}
                       </button>
                     ))}
                   </div>
@@ -698,7 +701,7 @@ export function SlideEditorQuickToolbar({
                     value={currentStrokeWidth}
                     onChange={(e) => setPenStrokeWidth(parseInt(e.target.value, 10))}
                     style={{ width: '100%', accentColor: '#FF5500', cursor: 'pointer', marginTop: 2 }}
-                    title="Adjust Pen Thickness (1px - 32px)"
+                    title={t('slideEditor.toolbar.penThicknessTitle')}
                   />
                 </div>
               </div>
@@ -714,12 +717,12 @@ export function SlideEditorQuickToolbar({
               setShowSectionDetail(false);
             }}
             style={activeDropdown === 'song' ? PILL_BTN_ACTIVE : PILL_BTN}
-            title="Song Tool"
+            title={t('slideEditor.toolbar.songTitle')}
           >
             <svg viewBox="0 0 24 24" style={ICON}>
               <path d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12 0a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span>Song</span>
+            <span>{t('slideEditor.toolbar.song')}</span>
             <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
           </button>
 
@@ -727,12 +730,12 @@ export function SlideEditorQuickToolbar({
             <div style={{ ...POPOVER_SHELL, width: 360 }}>
               {!showSectionDetail || !selectedSong ? (
                 <>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#ffffff' }}>🎵 Worship Song Library</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: 6 }}><IconMusic size={14} />{t('slideEditor.toolbar.songLibrary')}</div>
                   <input
                     type="text"
                     value={songQuery}
                     onChange={(e) => setSongQuery(e.target.value)}
-                    placeholder="Search songs in library..."
+                    placeholder={t('slideEditor.toolbar.songSearchPlaceholder')}
                     style={{
                       padding: '8px 12px',
                       background: '#1a1a1c',
@@ -746,7 +749,7 @@ export function SlideEditorQuickToolbar({
                   />
                   <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
                     {filteredSongs.length === 0 ? (
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>No songs found</div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: 12, textAlign: 'center' }}>{t('slideEditor.toolbar.noSongs')}</div>
                     ) : (
                       filteredSongs.slice(0, 10).map((s) => (
                         <div
@@ -789,7 +792,7 @@ export function SlideEditorQuickToolbar({
                               alignItems: 'center',
                               justifyContent: 'center',
                             }}
-                            title="Browse Sections & Lyrics"
+                            title={t('slideEditor.toolbar.browseSections')}
                           >
                             ›
                           </button>
@@ -807,16 +810,16 @@ export function SlideEditorQuickToolbar({
                       onClick={() => setShowSectionDetail(false)}
                       style={{ background: 'none', border: 'none', color: '#FF5500', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
                     >
-                      ‹ Back
+                      {t('slideEditor.toolbar.back')}
                     </button>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {selectedSong.title}
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginTop: 6 }}>Select Song Section to Insert:</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginTop: 6 }}>{t('slideEditor.toolbar.selectSection')}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                    {['Chorus', 'Verse 1', 'Verse 2', 'Bridge', 'Tag', 'All'].map((sec) => (
+                    {(['Chorus', 'Verse 1', 'Verse 2', 'Bridge', 'Tag', 'All'] as const).map((sec) => (
                       <button
                         key={sec}
                         type="button"
@@ -849,7 +852,7 @@ export function SlideEditorQuickToolbar({
           type="button"
           onClick={onToggleSmartSnap}
           style={smartSnap ? PILL_BTN_ACTIVE : PILL_BTN}
-          title="Toggle Smart Alignment Snapping"
+          title={t('slideEditor.toolbar.smartSnapTitle')}
         >
           <svg viewBox="0 0 24 24" style={ICON}>
             <circle cx="12" cy="12" r="9" />
@@ -864,7 +867,7 @@ export function SlideEditorQuickToolbar({
             onClick={pptx.onDelete}
             disabled={!pptx.hasSelection}
             style={pptx.hasSelection ? DANGER_BTN : DISABLED_BTN}
-            title="Delete Selected Layer"
+            title={t('slideEditor.toolbar.deleteLayerTitle')}
           >
             <svg viewBox="0 0 24 24" style={ICON}>
               <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />

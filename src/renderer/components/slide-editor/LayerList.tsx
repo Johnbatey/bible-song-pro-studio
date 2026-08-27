@@ -1,50 +1,25 @@
-/* =========================================================================
-   <LayerList> — the slide's stack, topmost first
-   -------------------------------------------------------------------------
-   One presentation for both deck kinds. The PowerPoint side feeds it layer
-   units from the parsed shapes; the native side feeds it the slide's elements
-   sorted by z-index. Either way a row is one thing the operator can select,
-   drag to restack, lock, or remove.
-
-   Rows are given topmost-first, the way every layer panel reads, and the drop
-   index is in that same space — the callers own the translation back to paint
-   order, which is where it belongs.
-   ========================================================================= */
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useI18n } from '../../../i18n/useI18n';
+import { IconGrip, IconX, LayerKindIcon } from './SlideEditorIcons';
 
 export interface LayerRow {
   id: string;
   label: string;
-  /** 'group', 'text', 'shape', 'image', … — drives the leading glyph. */
   kind: string;
   selected: boolean;
   locked?: boolean;
 }
 
 export interface LayerListProps {
-  /** Topmost first. */
   rows: LayerRow[];
   onSelect: (id: string, additive: boolean) => void;
-  /** Both indices are into `rows`; the dragged row lands at `to`. */
   onReorder: (from: number, to: number) => void;
   onDuplicateLayer?: (from: number, to: number) => void;
   onDelete?: (id: string) => void;
   onToggleLock?: (id: string) => void;
   emptyHint: string;
 }
-
-const GLYPH: Record<string, string> = {
-  group: '▣',
-  text: 'T',
-  shape: '◆',
-  image: '▤',
-  imagefill: '▤',
-  connector: '⟋',
-  table: '▦',
-  pencil: '✎',
-  bezier: '∿',
-};
 
 export function LockedIcon({ size = 12 }: { size?: number }) {
   return (
@@ -87,6 +62,7 @@ export function UnlockedIcon({ size = 12 }: { size?: number }) {
 }
 
 export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelete, onToggleLock, emptyHint }: LayerListProps) {
+  const { t } = useI18n();
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
@@ -145,13 +121,12 @@ export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelet
                 : 'rgba(255,255,255,0.07)',
               opacity: dragging ? 0.4 : 1,
             }}
-            title={row.label + (row.locked ? ' (Locked)' : '')}
+            title={row.label + (row.locked ? t('slideEditor.layer.lockedSuffix') : '')}
           >
-            <span style={styles.grip}>⠿</span>
-            <span style={styles.glyph}>{GLYPH[row.kind] || '◆'}</span>
+            <span style={styles.grip}><IconGrip /></span>
+            <span style={styles.glyph}><LayerKindIcon kind={row.kind} /></span>
             <span style={styles.label}>{row.label}</span>
 
-            {/* Lock / Unlock Toggle Button */}
             {onToggleLock && (
               <button
                 type="button"
@@ -175,13 +150,12 @@ export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelet
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                 }}
-                title={row.locked ? 'Unlock layer' : 'Lock layer — stops canvas selection/movement'}
+                title={row.locked ? t('slideEditor.layer.unlock') : t('slideEditor.layer.lock')}
               >
                 {row.locked ? <LockedIcon size={12} /> : <UnlockedIcon size={12} />}
               </button>
             )}
 
-            {/* Remove Button */}
             {onDelete && (
               <button
                 type="button"
@@ -191,9 +165,9 @@ export function LayerList({ rows, onSelect, onReorder, onDuplicateLayer, onDelet
                   onDelete(row.id);
                 }}
                 style={styles.remove}
-                title="Remove from slide"
+                title={t('slideEditor.layer.remove')}
               >
-                ✕
+                <IconX />
               </button>
             )}
           </div>
@@ -216,12 +190,13 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'grab',
     userSelect: 'none',
   },
-  grip: { fontSize: 11, color: 'rgba(255,255,255,0.3)', cursor: 'grab' },
+  grip: { display: 'flex', color: 'rgba(255,255,255,0.3)', cursor: 'grab' },
   glyph: {
     width: 15,
     flexShrink: 0,
-    textAlign: 'center',
-    fontSize: 11,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     color: 'rgba(255,255,255,0.55)',
   },
   label: {
@@ -238,12 +213,13 @@ const styles: Record<string, CSSProperties> = {
     width: 18,
     height: 18,
     padding: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     background: 'transparent',
     border: 'none',
     borderRadius: 3,
     color: 'rgba(255,255,255,0.4)',
-    fontSize: 11,
-    lineHeight: 1,
     cursor: 'pointer',
   },
 };

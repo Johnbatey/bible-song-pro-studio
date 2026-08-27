@@ -1,4 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useI18n } from '../../../i18n/useI18n';
+import {
+  IconSave, IconImport, IconRefresh, IconExport, IconTrash, IconPlus, IconCopy,
+  IconChevronUp, IconChevronDown, IconX, IconSparkles, IconPencil,
+} from './SlideEditorIcons';
 import { createPortal } from 'react-dom';
 import type { PresentationSlide } from '../../types';
 import { NativeSlideBoard, slideElementsFor } from '../NativeSlideBoard';
@@ -97,6 +102,7 @@ export function SlideEditorLeftRail({
   renderThumb,
   readOnlyDeck = false,
 }: SlideEditorLeftRailProps) {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'slides' | 'templates'>('slides');
   const [customTemplates, setCustomTemplates] = useState<CustomSlideTemplate[]>(getCustomTemplates());
 
@@ -128,20 +134,20 @@ export function SlideEditorLeftRail({
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
-  const prebuiltTemplates = [
-    { id: 'worship', name: 'Worship Song Classic', bg: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)' },
-    { id: 'sermon', name: 'Sermon Key Points', bg: 'linear-gradient(135deg, #18181b 0%, #09090b 100%)' },
-    { id: 'scripture', name: 'Scripture Verse Display', bg: 'linear-gradient(135deg, #0b132b 0%, #1c2541 100%)' },
-    { id: 'lower-third', name: 'Lower Third Overlay Bar', bg: 'rgba(0, 0, 0, 0.85)' },
-    { id: 'announcement', name: 'Event Announcement', bg: 'linear-gradient(135deg, #4c1d95 0%, #831843 100%)' },
-    { id: 'welcome', name: 'Welcome & Fellowship', bg: 'linear-gradient(135deg, #1c1917 0%, #292524 100%)' },
-    { id: 'offering', name: 'Offering & Tithing', bg: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)' },
-    { id: 'benediction', name: 'Benediction & Closing', bg: 'linear-gradient(135deg, #450a0a 0%, #1c0505 100%)' },
-  ];
+  const prebuiltTemplates = useMemo(() => [
+    { id: 'worship', name: t('slideEditor.rail.template.worship'), bg: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%)' },
+    { id: 'sermon', name: t('slideEditor.rail.template.sermon'), bg: 'linear-gradient(135deg, #18181b 0%, #09090b 100%)' },
+    { id: 'scripture', name: t('slideEditor.rail.template.scripture'), bg: 'linear-gradient(135deg, #0b132b 0%, #1c2541 100%)' },
+    { id: 'lower-third', name: t('slideEditor.rail.template.lowerThird'), bg: 'rgba(0, 0, 0, 0.85)' },
+    { id: 'announcement', name: t('slideEditor.rail.template.announcement'), bg: 'linear-gradient(135deg, #4c1d95 0%, #831843 100%)' },
+    { id: 'welcome', name: t('slideEditor.rail.template.welcome'), bg: 'linear-gradient(135deg, #1c1917 0%, #292524 100%)' },
+    { id: 'offering', name: t('slideEditor.rail.template.offering'), bg: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)' },
+    { id: 'benediction', name: t('slideEditor.rail.template.benediction'), bg: 'linear-gradient(135deg, #450a0a 0%, #1c0505 100%)' },
+  ], [t]);
 
   const handleOpenSaveModal = (slideIndex: number) => {
     const targetSlide = slides[slideIndex];
-    setTemplateNameInput(targetSlide?.title || `Custom Template ${customTemplates.length + 1}`);
+    setTemplateNameInput(targetSlide?.title || t('slideEditor.defaults.customTemplateN', { n: customTemplates.length + 1 }));
     setSaveModal({ slideIndex });
     setSlideContextMenu(null);
   };
@@ -150,7 +156,7 @@ export function SlideEditorLeftRail({
     if (!saveModal) return;
     const slide = slides[saveModal.slideIndex];
     if (slide) {
-      saveCustomTemplate(templateNameInput || 'Custom Template', slide);
+      saveCustomTemplate(templateNameInput || t('slideEditor.defaults.customTemplate'), slide);
     }
     setSaveModal(null);
     setTemplateNameInput('');
@@ -168,7 +174,7 @@ export function SlideEditorLeftRail({
       await importCustomTemplateFile(file);
       setActiveTab('templates');
     } catch (err: any) {
-      alert(`Failed to import template: ${err?.message || 'Invalid format'}`);
+      alert(t('slideEditor.errors.importTemplate', { error: err?.message || 'Invalid format' }));
     }
     if (e.target) e.target.value = '';
   };
@@ -285,7 +291,7 @@ export function SlideEditorLeftRail({
             }}
           >
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-              Slides Deck
+              {t('slideEditor.rail.slidesDeck')}
             </span>
             {!readOnlyDeck && (
               <button
@@ -303,7 +309,7 @@ export function SlideEditorLeftRail({
                   color: '#ffffff',
                   cursor: 'pointer',
                 }}
-                title="Add New Slide"
+                title={t('slideEditor.rail.addSlide')}
               >
                 <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2.5 }}>
                   <path d="M12 5v14M5 12h14" />
@@ -400,9 +406,9 @@ export function SlideEditorLeftRail({
                             handleOpenSaveModal(idx);
                           }}
                           style={{ background: 'none', border: 'none', color: 'var(--accent, #FF5500)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
-                          title="Save as Template"
+                          title={t('slideEditor.rail.saveAsTemplate')}
                         >
-                          💾
+                          <IconSave size={12} />
                         </button>
                         {!readOnlyDeck && idx > 0 && (
                           <button
@@ -412,9 +418,9 @@ export function SlideEditorLeftRail({
                               onMoveSlide(idx, idx - 1);
                             }}
                             style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10 }}
-                            title="Move Up"
+                            title={t('slideEditor.rail.moveUp')}
                           >
-                            ▲
+                            <IconChevronUp size={10} />
                           </button>
                         )}
                         {!readOnlyDeck && idx < slides.length - 1 && (
@@ -425,9 +431,9 @@ export function SlideEditorLeftRail({
                               onMoveSlide(idx, idx + 1);
                             }}
                             style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10 }}
-                            title="Move Down"
+                            title={t('slideEditor.rail.moveDown')}
                           >
-                            ▼
+                            <IconChevronDown size={10} />
                           </button>
                         )}
                         {!readOnlyDeck && (
@@ -438,9 +444,9 @@ export function SlideEditorLeftRail({
                               onDuplicateSlide(idx);
                             }}
                             style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10 }}
-                            title="Duplicate Slide"
+                            title={t('slideEditor.rail.duplicateSlide')}
                           >
-                            ❐
+                            <IconCopy size={12} />
                           </button>
                         )}
                         {slides.length > 1 && (
@@ -463,7 +469,7 @@ export function SlideEditorLeftRail({
                               alignItems: 'center',
                               justifyContent: 'center',
                             }}
-                            title="Delete Slide"
+                            title={t('slideEditor.rail.deleteSlide')}
                           >
                             <svg viewBox="0 0 24 24" style={{ width: 12, height: 12, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}>
                               <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
@@ -490,8 +496,8 @@ export function SlideEditorLeftRail({
               justifyContent: 'space-between',
             }}
           >
-            <span>Active Slide: <strong style={{ color: 'var(--text-primary)' }}>{activeSlideIndex + 1}</strong></span>
-            <span>Total: {slides.length}</span>
+            <span>{t('slideEditor.rail.activeSlide')} <strong style={{ color: 'var(--text-primary)' }}>{activeSlideIndex + 1}</strong></span>
+            <span>{t('slideEditor.rail.total')} {slides.length}</span>
           </div>
         </div>
       ) : (
@@ -525,9 +531,9 @@ export function SlideEditorLeftRail({
                 justifyContent: 'center',
                 gap: 4,
               }}
-              title="Save active slide as a custom template"
+              title={t('slideEditor.rail.saveActiveTitle')}
             >
-              ➕ Save Active Slide
+              <IconPlus size={12} /> {t('slideEditor.rail.saveActiveSlide')}
             </button>
             <button
               type="button"
@@ -546,9 +552,9 @@ export function SlideEditorLeftRail({
                 justifyContent: 'center',
                 gap: 4,
               }}
-              title="Import .bsptemplate or JSON template file"
+              title={t('slideEditor.rail.importTitle')}
             >
-              📥 Import
+              <IconImport size={12} /> {t('slideEditor.rail.import')}
             </button>
           </div>
 
@@ -558,7 +564,7 @@ export function SlideEditorLeftRail({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent, #FF5500)', textTransform: 'uppercase' }}>
-                    My Custom Templates ({customTemplates.length})
+                    {t('slideEditor.rail.myCustomTemplates', { count: customTemplates.length })}
                   </span>
                 </div>
 
@@ -608,7 +614,7 @@ export function SlideEditorLeftRail({
                           type="button"
                           onClick={() => onApplyTemplate(tpl.id)}
                           style={{ background: 'none', border: 'none', color: '#FF5500', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
-                          title="Apply Template to Current Slide"
+                          title={t('slideEditor.rail.applyTitle')}
                         >
                           Apply
                         </button>
@@ -616,28 +622,28 @@ export function SlideEditorLeftRail({
                           type="button"
                           onClick={() => {
                             updateCustomTemplateFromSlide(tpl.id, slides[activeSlideIndex]);
-                            alert(`Template "${tpl.name}" updated from Slide ${activeSlideIndex + 1}!`);
+                            alert(t('slideEditor.errors.templateUpdated', { name: tpl.name, slide: activeSlideIndex + 1 }));
                           }}
                           style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}
-                          title="Update Template layout from Active Slide"
+                          title={t('slideEditor.rail.updateFromSlideTitle')}
                         >
-                          🔄
+                          <IconRefresh size={12} />
                         </button>
                         <button
                           type="button"
                           onClick={() => exportCustomTemplate(tpl)}
                           style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}
-                          title="Export Template File (.bsptemplate)"
+                          title={t('slideEditor.rail.exportTemplateTitle')}
                         >
-                          📤
+                          <IconExport size={12} />
                         </button>
                         <button
                           type="button"
                           onClick={() => deleteCustomTemplate(tpl.id)}
                           style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: 11 }}
-                          title="Delete Custom Template"
+                          title={t('slideEditor.rail.deleteTemplate')}
                         >
-                          ✕
+                          <IconX size={11} />
                         </button>
                       </div>
                     </div>
@@ -649,7 +655,7 @@ export function SlideEditorLeftRail({
             {/* Prebuilt System Templates */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase' }}>
-                Prebuilt Templates
+                {t('slideEditor.rail.prebuiltTemplates')}
               </span>
 
               {prebuiltTemplates.map((tpl) => (
@@ -721,7 +727,7 @@ export function SlideEditorLeftRail({
             onClick={() => handleOpenSaveModal(slideContextMenu.slideIndex)}
             style={contextMenuItemStyle}
           >
-            💾 Save as Template...
+            <IconSave size={12} /> {t('slideEditor.menu.saveAsTemplate')}
           </button>
           <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '2px 0' }} />
           {!readOnlyDeck && (
@@ -733,7 +739,7 @@ export function SlideEditorLeftRail({
               }}
               style={contextMenuItemStyle}
             >
-              ❐ Duplicate Slide
+              <IconCopy size={12} /> {t('slideEditor.menu.duplicateSlide')}
             </button>
           )}
           {!readOnlyDeck && slideContextMenu.slideIndex > 0 && (
@@ -745,7 +751,7 @@ export function SlideEditorLeftRail({
               }}
               style={contextMenuItemStyle}
             >
-              ▲ Move Up
+              <IconChevronUp size={12} /> {t('slideEditor.menu.moveUp')}
             </button>
           )}
           {!readOnlyDeck && slideContextMenu.slideIndex < slides.length - 1 && (
@@ -757,7 +763,7 @@ export function SlideEditorLeftRail({
               }}
               style={contextMenuItemStyle}
             >
-              ▼ Move Down
+              <IconChevronDown size={12} /> {t('slideEditor.menu.moveDown')}
             </button>
           )}
           {slides.length > 1 && (
@@ -771,7 +777,7 @@ export function SlideEditorLeftRail({
                 }}
                 style={{ ...contextMenuItemStyle, color: '#f87171' }}
               >
-                🗑 Delete Slide
+                <IconTrash size={12} /> {t('slideEditor.menu.deleteSlide')}
               </button>
             </>
           )}
@@ -807,18 +813,18 @@ export function SlideEditorLeftRail({
             }}
             style={contextMenuItemStyle}
           >
-            ✨ Apply to Active Slide
+            <IconSparkles size={12} /> {t('slideEditor.menu.applyToActive')}
           </button>
           <button
             type="button"
             onClick={() => {
               updateCustomTemplateFromSlide(templateContextMenu.template.id, slides[activeSlideIndex]);
               setTemplateContextMenu(null);
-              alert(`Updated "${templateContextMenu.template.name}" from active slide!`);
+              alert(t('slideEditor.errors.templateUpdatedFromActive', { name: templateContextMenu.template.name }));
             }}
             style={contextMenuItemStyle}
           >
-            🔄 Update from Active Slide
+            <IconRefresh size={12} /> {t('slideEditor.menu.updateFromActive')}
           </button>
           <button
             type="button"
@@ -829,7 +835,7 @@ export function SlideEditorLeftRail({
             }}
             style={contextMenuItemStyle}
           >
-            ✏️ Rename Template...
+            <IconPencil size={12} /> {t('slideEditor.menu.renameTemplate')}
           </button>
           <button
             type="button"
@@ -839,7 +845,7 @@ export function SlideEditorLeftRail({
             }}
             style={contextMenuItemStyle}
           >
-            📤 Export Template (.bsptemplate)
+            <IconExport size={12} /> {t('slideEditor.menu.exportTemplate')}
           </button>
           <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '2px 0' }} />
           <button
@@ -850,7 +856,7 @@ export function SlideEditorLeftRail({
             }}
             style={{ ...contextMenuItemStyle, color: '#f87171' }}
           >
-            🗑 Delete Template
+            <IconTrash size={12} /> {t('slideEditor.menu.deleteTemplate')}
           </button>
         </div>,
         document.body
@@ -886,10 +892,10 @@ export function SlideEditorLeftRail({
             }}
           >
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#ffffff' }}>
-              Save Slide as Template
+              {t('slideEditor.modal.saveTemplateTitle')}
             </h3>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
-              Give your new custom template a descriptive name:
+              {t('slideEditor.modal.saveTemplateHint')}
             </p>
             <input
               type="text"
@@ -900,7 +906,7 @@ export function SlideEditorLeftRail({
                 if (e.key === 'Enter') handleSaveModalSubmit();
                 if (e.key === 'Escape') setSaveModal(null);
               }}
-              placeholder="e.g. Sunday Worship Lower Third"
+              placeholder={t('slideEditor.modal.templateNamePlaceholder')}
               style={{
                 width: '100%',
                 height: 36,
@@ -929,7 +935,7 @@ export function SlideEditorLeftRail({
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -945,7 +951,7 @@ export function SlideEditorLeftRail({
                   cursor: 'pointer',
                 }}
               >
-                Save Template
+                {t('slideEditor.modal.saveTemplate')}
               </button>
             </div>
           </div>
@@ -983,7 +989,7 @@ export function SlideEditorLeftRail({
             }}
           >
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#ffffff' }}>
-              Rename Custom Template
+              {t('slideEditor.modal.renameTemplateTitle')}
             </h3>
             <input
               type="text"
@@ -1038,7 +1044,7 @@ export function SlideEditorLeftRail({
                   cursor: 'pointer',
                 }}
               >
-                Save Name
+                {t('slideEditor.modal.saveName')}
               </button>
             </div>
           </div>
@@ -1050,6 +1056,9 @@ export function SlideEditorLeftRail({
 }
 
 const contextMenuItemStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
   padding: '8px 12px',
   background: 'transparent',
   border: 'none',

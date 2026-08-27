@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../../i18n/useI18n';
 
 interface SlideEditorHeaderProps {
   title: string;
@@ -20,11 +21,12 @@ export function SlideEditorHeader({
   canRedo,
   onUndo,
   onRedo,
-  onImportFile,
   onBackToDeck,
   onSaveToDeck,
   onSaveExport,
 }: SlideEditorHeaderProps) {
+  const { t } = useI18n();
+
   return (
     <header
       style={{
@@ -43,7 +45,6 @@ export function SlideEditorHeader({
         boxSizing: 'border-box',
       }}
     >
-      {/* Left: Wordmark & Undo/Redo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <h1
           style={{
@@ -55,7 +56,7 @@ export function SlideEditorHeader({
             fontFamily: 'var(--font-ui)',
           }}
         >
-          BSP Editor
+          {t('slideEditor.header.brand')}
         </h1>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -75,7 +76,7 @@ export function SlideEditorHeader({
               color: canUndo ? 'var(--text-primary)' : 'var(--text-dim)',
               cursor: canUndo ? 'pointer' : 'not-allowed',
             }}
-            title="Undo (⌘/Ctrl+Z)"
+            title={t('slideEditor.header.undoTitle')}
           >
             <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}>
               <path d="M9 14 4 9l5-5" />
@@ -99,7 +100,7 @@ export function SlideEditorHeader({
               color: canRedo ? 'var(--text-primary)' : 'var(--text-dim)',
               cursor: canRedo ? 'pointer' : 'not-allowed',
             }}
-            title="Redo (⌘/Ctrl+Shift+Z)"
+            title={t('slideEditor.header.redoTitle')}
           >
             <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}>
               <path d="m15 14 5-5-5-5" />
@@ -108,12 +109,11 @@ export function SlideEditorHeader({
           </button>
         </div>
 
-        {/* Deck Title Field */}
         <input
           type="text"
           value={title}
           onChange={(e) => onUpdateTitle(e.target.value)}
-          placeholder="Untitled Deck"
+          placeholder={t('slideEditor.header.untitledDeck')}
           style={{
             background: 'var(--chrome-control)',
             border: '1px solid var(--border-primary)',
@@ -128,9 +128,7 @@ export function SlideEditorHeader({
         />
       </div>
 
-      {/* Right: Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-
         <button
           type="button"
           onClick={onBackToDeck}
@@ -147,12 +145,12 @@ export function SlideEditorHeader({
             fontWeight: 600,
             cursor: 'pointer',
           }}
-          title="Return to the deck without saving"
+          title={t('slideEditor.header.backToDeckTitle')}
         >
           <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}>
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          Back to Deck
+          {t('slideEditor.header.backToDeck')}
         </button>
 
         <button
@@ -171,13 +169,13 @@ export function SlideEditorHeader({
             fontWeight: 600,
             cursor: 'pointer',
           }}
-          title="Save the deck and return to the library"
+          title={t('slideEditor.header.saveToDeckTitle')}
         >
           <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}>
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
             <path d="M17 21v-8H7v8M7 3v5h8" />
           </svg>
-          Save to Deck
+          {t('slideEditor.header.saveToDeck')}
         </button>
 
         <button
@@ -196,14 +194,14 @@ export function SlideEditorHeader({
             fontWeight: 700,
             cursor: 'pointer',
           }}
-          title="Save and export presentation file"
+          title={t('slideEditor.header.saveExportTitle')}
         >
           <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
-          Save / Export
+          {t('slideEditor.header.saveExport')}
         </button>
       </div>
     </header>

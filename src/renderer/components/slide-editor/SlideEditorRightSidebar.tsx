@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useI18n } from '../../../i18n/useI18n';
+import type { MessageKey } from '../../../i18n/types';
+import { IconFolder, IconCheck, IconSparkles } from './SlideEditorIcons';
 import { LayerList, type LayerRow } from './LayerList';
 import { ShapeInspector } from '../ShapeInspector';
 import { SlideTextPanel } from '../SlideTextPanel';
@@ -49,12 +52,12 @@ interface SlideEditorRightSidebarProps {
   pptx?: PptxInspector | null;
 }
 
-function nativeLayerRows(elements: SlideElement[], selectedIds: string[]): LayerRow[] {
+function nativeLayerRows(elements: SlideElement[], selectedIds: string[], t: (key: MessageKey) => string): LayerRow[] {
   return [...elements]
     .sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0))
     .map((el) => ({
       id: el.id,
-      label: el.type === 'pencil' ? 'Freehand Drawing' : el.type === 'bezier' ? 'Pen Curve' : (el.content || '').trim().slice(0, 34) || el.type,
+      label: el.type === 'pencil' ? t('slideEditor.layer.freehandDrawing') : el.type === 'bezier' ? t('slideEditor.layer.penCurve') : (el.content || '').trim().slice(0, 34) || el.type,
       kind: el.type === 'text' ? 'text' : el.type === 'image' ? 'image' : el.type === 'pencil' ? 'pencil' : el.type === 'bezier' ? 'bezier' : 'shape',
       selected: selectedIds.includes(el.id),
       locked: Boolean(el.locked),
@@ -79,16 +82,18 @@ const FONT_FAMILIES = [
   { value: 'Courier New', label: 'Courier New' },
 ];
 
-const FONT_WEIGHTS = [
-  { value: '100', label: 'Thin (100)' },
-  { value: '300', label: 'Light (300)' },
-  { value: '400', label: 'Regular (400)' },
-  { value: '500', label: 'Medium (500)' },
-  { value: '600', label: 'Semi Bold (600)' },
-  { value: '700', label: 'Bold (700)' },
-  { value: '800', label: 'Extra Bold (800)' },
-  { value: '900', label: 'Black (900)' },
-];
+function fontWeightOptions(t: (key: MessageKey) => string) {
+  return [
+    { value: '100', label: t('slideEditor.fontWeight.thin') },
+    { value: '300', label: t('slideEditor.fontWeight.light') },
+    { value: '400', label: t('slideEditor.fontWeight.regular') },
+    { value: '500', label: t('slideEditor.fontWeight.medium') },
+    { value: '600', label: t('slideEditor.fontWeight.semiBold') },
+    { value: '700', label: t('slideEditor.fontWeight.bold') },
+    { value: '800', label: t('slideEditor.fontWeight.extraBold') },
+    { value: '900', label: t('slideEditor.fontWeight.black') },
+  ];
+}
 
 /* The sizes the app's own templates and defaults actually use — 26, 32, 36,
    48, 54, 64 — were missing from this list, so opening a stock slide showed a
@@ -205,6 +210,7 @@ function ScrubbableInput({
   suffix,
   title,
 }: ScrubbableInputProps) {
+  const { t } = useI18n();
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
   const startValRef = useRef(0);
@@ -308,7 +314,7 @@ function ScrubbableInput({
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       style={{ ...styles.iconInputBox, cursor: 'ew-resize', ...style }}
-      title={title || "Swipe left/right with two fingers (or drag) to adjust value. Hold Shift for 10x speed."}
+      title={title || t('slideEditor.sidebar.scrubTitle')}
     >
       {badge && <span style={styles.iconInputBadge}>{badge}</span>}
       <input
@@ -331,7 +337,7 @@ interface GradientRampPickerProps {
   onChange: (nextGradientCss: string) => void;
 }
 
-function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
+function GradientRampPicker({ value, onChange, t }: GradientRampPickerProps & { t: (key: MessageKey, vars?: Record<string, string | number>) => string }) {
   const info = parseBackgroundInfo(value, undefined);
   const [activeStop, setActiveStop] = useState<'start' | 'end'>('start');
 
@@ -420,9 +426,9 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
       {/* Visual Gradient Ramp Track Bar with Movable Stop Pins */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={styles.propLabel}>Gradient Ramp</span>
+          <span style={styles.propLabel}>{t('slideEditor.sidebar.gradientRamp')}</span>
           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)' }}>
-            {isRadial ? 'Radial' : `${angleDeg}°`}
+            {isRadial ? t('slideEditor.sidebar.radial') : `${angleDeg}°`}
           </span>
         </div>
 
@@ -459,7 +465,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
               alignItems: 'center',
               zIndex: activeStop === 'start' ? 10 : 2,
             }}
-            title="Highlight Stop: Drag anywhere along the ramp bar"
+            title={t('slideEditor.sidebar.highlightStopTitle')}
           >
             {/* Arrow Pointer */}
             <div
@@ -500,7 +506,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
               alignItems: 'center',
               zIndex: activeStop === 'end' ? 10 : 2,
             }}
-            title="Shadow Stop: Drag anywhere along the ramp bar"
+            title={t('slideEditor.sidebar.shadowStopTitle')}
           >
             {/* Arrow Pointer */}
             <div
@@ -540,7 +546,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
             fontSize: 10,
           }}
         >
-          ● Highlight ({startPos}%)
+          {t('slideEditor.sidebar.highlight')} ({startPos}%)
         </button>
         <button
           type="button"
@@ -553,7 +559,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
             fontSize: 10,
           }}
         >
-          ● Shadow ({endPos}%)
+          {t('slideEditor.sidebar.shadow')} ({endPos}%)
         </button>
       </div>
 
@@ -561,7 +567,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10, background: 'var(--bg-primary)', borderRadius: 6, border: '1px solid var(--border-primary)' }}>
         {/* Color Swatch & Hex */}
         <div style={styles.propRowCol}>
-          <span style={styles.propLabel}>{activeStop === 'start' ? 'Highlight Color' : 'Shadow Color'}</span>
+          <span style={styles.propLabel}>{activeStop === 'start' ? t('slideEditor.sidebar.highlightColor') : t('slideEditor.sidebar.shadowColor')}</span>
           <div style={styles.colorPillRow}>
             <input
               type="color"
@@ -588,7 +594,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
         {/* Location Stop Slider */}
         <div style={styles.propRowCol}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={styles.propLabel}>Location</span>
+            <span style={styles.propLabel}>{t('slideEditor.sidebar.location')}</span>
             <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-primary)' }}>{activePos}%</span>
           </div>
           <ScrubbableInput
@@ -605,20 +611,20 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
       {/* Direction & Angle Selector */}
       <div style={styles.propRowCol}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={styles.propLabel}>Angle & Direction</span>
+          <span style={styles.propLabel}>{t('slideEditor.sidebar.angleDirection')}</span>
           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-primary)' }}>
-            {isRadial ? 'Radial' : `${angleDeg}°`}
+            {isRadial ? t('slideEditor.sidebar.radial') : `${angleDeg}°`}
           </span>
         </div>
 
         {/* Direction Presets */}
         <div style={styles.segmentGroup}>
           {[
-            { label: '↘ 135°', dir: '135deg' },
-            { label: '➔ 90°', dir: '90deg' },
-            { label: '⬇ 180°', dir: '180deg' },
-            { label: '⬆ 0°', dir: '0deg' },
-            { label: '⭕ Radial', dir: 'radial' },
+            { label: t('slideEditor.sidebar.dir135'), dir: '135deg' },
+            { label: t('slideEditor.sidebar.dir90'), dir: '90deg' },
+            { label: t('slideEditor.sidebar.dir180'), dir: '180deg' },
+            { label: t('slideEditor.sidebar.dir0'), dir: '0deg' },
+            { label: t('slideEditor.sidebar.dirRadial'), dir: 'radial' },
           ].map((preset) => {
             const on = direction === preset.dir;
             return (
@@ -659,7 +665,7 @@ function GradientRampPicker({ value, onChange }: GradientRampPickerProps) {
 
       {/* Quick Gradient Presets Grid */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 }}>
-        <span style={styles.propLabel}>Presets</span>
+        <span style={styles.propLabel}>{t('slideEditor.sidebar.presets')}</span>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
           {[
             'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)',
@@ -701,6 +707,7 @@ export function SlideEditorRightSidebar({
   onReorderElements,
   pptx = null,
 }: SlideEditorRightSidebarProps) {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'design' | 'layer' | 'ai'>('design');
   const bgFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -742,7 +749,7 @@ export function SlideEditorRightSidebar({
   const activeSelectionIds = selectedElementIds.length > 0
     ? selectedElementIds
     : (selectedElement ? [selectedElement.id] : []);
-  const nativeRows = nativeLayerRows(nativeElements, activeSelectionIds);
+  const nativeRows = nativeLayerRows(nativeElements, activeSelectionIds, t);
 
   /**
    * Which element the Typography controls act on.
@@ -799,9 +806,9 @@ export function SlideEditorRightSidebar({
           {f.label}
         </span>
       ),
-      sublabel: f.isSystemFont ? 'System Font' : 'App Font',
+      sublabel: f.isSystemFont ? t('slideEditor.sidebar.systemFont') : t('slideEditor.sidebar.appFont'),
     }));
-  }, [systemFontItems, currentFontFamily]);
+  }, [systemFontItems, currentFontFamily, t]);
 
   const currentFontWeight = pptx
     ? (firstPptxRun?.fontWeight ?? (firstPptxRun?.bold ? 700 : 600))
@@ -945,7 +952,7 @@ export function SlideEditorRightSidebar({
               textTransform: 'capitalize',
             }}
           >
-            {tab === 'ai' ? 'AI Studio' : tab}
+            {tab === 'design' ? t('slideEditor.sidebar.tabDesign') : tab === 'layer' ? t('slideEditor.sidebar.tabLayer') : t('slideEditor.sidebar.tabAi')}
           </button>
         ))}
       </div>
@@ -972,7 +979,7 @@ export function SlideEditorRightSidebar({
             {/* Aspect Ratio & Canvas Section */}
             <div style={styles.sectionCard}>
               <div style={styles.sectionHeader} onClick={() => toggleSection('canvas')}>
-                <span style={styles.sectionTitle}>Canvas & Aspect</span>
+                <span style={styles.sectionTitle}>{t('slideEditor.sidebar.canvasAspect')}</span>
                 <ChevronIcon open={Boolean(openSections.canvas)} />
               </div>
 
@@ -980,7 +987,7 @@ export function SlideEditorRightSidebar({
                 <div style={styles.sectionBody}>
                   {/* Aspect Ratio Pills */}
                   <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>Aspect Ratio</span>
+                    <span style={styles.propLabel}>{t('slideEditor.sidebar.aspectRatio')}</span>
                     <div style={styles.pillGroup}>
                       {(['16:9', '4:3', 'lower-third'] as const).map((ratio) => (
                         <button
@@ -1014,7 +1021,7 @@ export function SlideEditorRightSidebar({
 
                   {/* Canvas Background Header & Toggle */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                    <span style={styles.propLabel}>Canvas Background</span>
+                    <span style={styles.propLabel}>{t('slideEditor.sidebar.canvasBackground')}</span>
                     <button
                       type="button"
                       onClick={() =>
@@ -1036,7 +1043,7 @@ export function SlideEditorRightSidebar({
                         cursor: 'pointer',
                       }}
                     >
-                      {bgValue === 'transparent' ? 'Background: OFF' : 'Background: ON'}
+                      {bgValue === 'transparent' ? t('slideEditor.sidebar.backgroundOff') : t('slideEditor.sidebar.backgroundOn')}
                     </button>
                   </div>
 
@@ -1076,7 +1083,7 @@ export function SlideEditorRightSidebar({
                               : 'var(--text-secondary)',
                         }}
                       >
-                        {type === 'none' ? 'Off / Trans' : type}
+                        {type === 'none' ? t('slideEditor.sidebar.bgOffTrans') : type === 'color' ? t('slideEditor.sidebar.bgColor') : type === 'gradient' ? t('slideEditor.sidebar.bgGradient') : t('slideEditor.sidebar.bgImage')}
                       </button>
                     ))}
                   </div>
@@ -1104,6 +1111,7 @@ export function SlideEditorRightSidebar({
                   {bgType === 'gradient' && (
                     <GradientRampPicker
                       value={bgValue}
+                      t={t}
                       onChange={(css) => onUpdateSlide({ background: { type: 'gradient', value: css } })}
                     />
                   )}
@@ -1129,12 +1137,12 @@ export function SlideEditorRightSidebar({
                           gap: 6,
                         }}
                       >
-                        📁 Choose Image File
+                        <IconFolder size={13} /> {t('slideEditor.sidebar.chooseImage')}
                       </button>
 
                       {bgValue && bgValue.startsWith('data:') && (
-                        <div style={{ fontSize: 10, color: '#4ade80', fontWeight: 600, textAlign: 'center' }}>
-                          ✓ Custom image loaded
+                        <div style={{ fontSize: 10, color: '#4ade80', fontWeight: 600, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                          <IconCheck size={12} /> {t('slideEditor.sidebar.imageLoaded')}
                         </div>
                       )}
                     </div>
@@ -1148,20 +1156,20 @@ export function SlideEditorRightSidebar({
               <div style={styles.sectionCard}>
                 <div style={styles.sectionHeader}>
                   <span style={styles.sectionTitle}>
-                    Multi-Selection ({selectedElementIds.length} items)
+                    {t('slideEditor.sidebar.multiSelection', { count: selectedElementIds.length })}
                   </span>
                 </div>
                 <div style={styles.sectionBody}>
                   <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>Alignment</span>
+                    <span style={styles.propLabel}>{t('slideEditor.sidebar.alignment')}</span>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                       {[
-                        { label: '⇤ Align Left', align: 'left' },
-                        { label: '⤯ Center', align: 'center' },
-                        { label: '⇥ Right', align: 'right' },
-                        { label: '⤒ Top', align: 'top' },
-                        { label: '⤯ Middle', align: 'middle' },
-                        { label: '⤓ Bottom', align: 'bottom' },
+                        { label: t('slideEditor.sidebar.alignLeft'), align: 'left' },
+                        { label: t('slideEditor.sidebar.alignCenter'), align: 'center' },
+                        { label: t('slideEditor.sidebar.alignRight'), align: 'right' },
+                        { label: t('slideEditor.sidebar.alignTop'), align: 'top' },
+                        { label: t('slideEditor.sidebar.alignMiddle'), align: 'middle' },
+                        { label: t('slideEditor.sidebar.alignBottom'), align: 'bottom' },
                       ].map((item) => (
                         <button
                           key={item.align}
@@ -1201,7 +1209,7 @@ export function SlideEditorRightSidebar({
                             fontWeight: 600,
                             cursor: 'pointer',
                           }}
-                          title={`Align ${item.align}`}
+                          title={t('slideEditor.sidebar.alignTitle', { align: item.align })}
                         >
                           {item.label}
                         </button>
@@ -1224,7 +1232,7 @@ export function SlideEditorRightSidebar({
                         cursor: 'pointer',
                       }}
                     >
-                      ⌥ Duplicate All (⌘D)
+                      {t('slideEditor.sidebar.duplicateAll')}
                     </button>
                     <button
                       type="button"
@@ -1256,11 +1264,11 @@ export function SlideEditorRightSidebar({
               selectedElement && (
                 <div style={styles.sectionCard}>
                   <div style={styles.sectionHeader}>
-                    <span style={{ ...styles.sectionTitle, color: 'var(--text-dim)' }}>Typography</span>
+                    <span style={{ ...styles.sectionTitle, color: 'var(--text-dim)' }}>{t('slideEditor.sidebar.typography')}</span>
                   </div>
                   <div style={{ ...styles.sectionBody, color: 'var(--text-dim)', fontSize: 11 }}>
-                    {selectedElement.type === 'shape' ? 'A shape has no type.' : 'An image has no type.'} Select a
-                    text block to set its font.
+                    {selectedElement.type === 'shape' ? t('slideEditor.sidebar.shapeNoType') : t('slideEditor.sidebar.imageNoType')}{' '}
+                    {t('slideEditor.sidebar.selectTextHint')}
                   </div>
                 </div>
               )
@@ -1271,7 +1279,7 @@ export function SlideEditorRightSidebar({
                   Typography
                   {typographyScope === 'default' && targetTextElement && (
                     <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>
-                      {' '}— {(targetTextElement.content || 'first text block').toString().trim().slice(0, 18) || 'first text block'}
+                      {' '}— {(targetTextElement.content || t('slideEditor.sidebar.firstTextBlock')).toString().trim().slice(0, 18) || t('slideEditor.sidebar.firstTextBlock')}
                     </span>
                   )}
                 </span>
@@ -1282,7 +1290,7 @@ export function SlideEditorRightSidebar({
                 <div style={styles.sectionBody}>
                   {/* Font Family Dropdown */}
                   <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>Font</span>
+                    <span style={styles.propLabel}>{t('slideEditor.sidebar.font')}</span>
                     <CustomDropdown
                       value={currentFontFamily}
                       options={fontOptions}
@@ -1295,17 +1303,17 @@ export function SlideEditorRightSidebar({
                   {/* Font Style / Sub-family & Size Row */}
                   <div style={styles.twoColRow}>
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>Font Style</span>
+                      <span style={styles.propLabel}>{t('slideEditor.sidebar.fontStyle')}</span>
                       <CustomDropdown
                         value={String(currentFontWeight)}
-                        options={FONT_WEIGHTS}
+                        options={fontWeightOptions(t)}
                         onChange={(wt) => setText({ fontWeight: parseInt(wt, 10) })}
                         style={{ width: '100%' }}
                         zIndex={100005}
                       />
                     </div>
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>Size</span>
+                      <span style={styles.propLabel}>{t('slideEditor.sidebar.size')}</span>
                       <ScrubbableInput
                         value={currentFontSize}
                         onChange={(v) => setText({ fontSize: v })}
@@ -1314,7 +1322,7 @@ export function SlideEditorRightSidebar({
                         step={1}
                         badge="⤌⤍"
                         suffix="px"
-                        title="Font size: swipe left/right, drag, or click to type any custom value"
+                        title={t('slideEditor.sidebar.fontSizeTitle')}
                       />
                     </div>
                   </div>
@@ -1322,7 +1330,7 @@ export function SlideEditorRightSidebar({
                   {/* Line Height & Letter Spacing Row */}
                   <div style={styles.twoColRow}>
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>Line height</span>
+                      <span style={styles.propLabel}>{t('slideEditor.sidebar.lineHeight')}</span>
                       <ScrubbableInput
                         value={currentLineHeight}
                         onChange={(v) => setText({ lineHeight: v })}
@@ -1334,7 +1342,7 @@ export function SlideEditorRightSidebar({
                       />
                     </div>
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>Letter spacing</span>
+                      <span style={styles.propLabel}>{t('slideEditor.sidebar.letterSpacing')}</span>
                       <ScrubbableInput
                         value={currentLetterSpacing}
                         onChange={(v) => setText({ letterSpacing: v })}
@@ -1350,7 +1358,7 @@ export function SlideEditorRightSidebar({
 
                   {/* Color Swatch */}
                   <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>Color</span>
+                    <span style={styles.propLabel}>{t('slideEditor.sidebar.color')}</span>
                     <div style={styles.colorPillRow}>
                       <input
                         type="color"
@@ -1383,7 +1391,7 @@ export function SlideEditorRightSidebar({
 
                   {/* Horizontal & Vertical Alignment & Quick Styles */}
                   <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>Alignment & Styles</span>
+                    <span style={styles.propLabel}>{t('slideEditor.sidebar.alignmentStyles')}</span>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {/* Horizontal Alignment */}
                       <div style={{ ...styles.segmentGroup, flex: 1 }}>
@@ -1399,7 +1407,7 @@ export function SlideEditorRightSidebar({
                                 background: on ? 'var(--chrome-control-active)' : 'transparent',
                                 color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                               }}
-                              title={`Align ${align}`}
+                              title={t('slideEditor.sidebar.alignTitle', { align })}
                             >
                               <AlignIcon align={align} />
                             </button>
@@ -1420,7 +1428,7 @@ export function SlideEditorRightSidebar({
                             fontWeight: 700,
                             fontFamily: 'serif',
                           }}
-                          title="Italic"
+                          title={t('slideEditor.sidebar.italic')}
                         >
                           I
                         </button>
@@ -1434,7 +1442,7 @@ export function SlideEditorRightSidebar({
                             textDecoration: 'underline',
                             fontWeight: 700,
                           }}
-                          title="Underline"
+                          title={t('slideEditor.sidebar.underline')}
                         >
                           U
                         </button>
@@ -1454,7 +1462,7 @@ export function SlideEditorRightSidebar({
                                 background: on ? 'var(--chrome-control-active)' : 'transparent',
                                 color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                               }}
-                              title={`Vertical ${vAlign}`}
+                              title={t('slideEditor.sidebar.verticalAlign', { align: vAlign })}
                             >
                               <VAlignIcon vAlign={vAlign} />
                             </button>
@@ -1468,7 +1476,7 @@ export function SlideEditorRightSidebar({
                   <div style={styles.twoColRow}>
                     {/* Decoration */}
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>Decoration</span>
+                      <span style={styles.propLabel}>{t('slideEditor.sidebar.decoration')}</span>
                       <div style={styles.segmentGroup}>
                         {(['none', 'underline', 'line-through'] as const).map((deco) => {
                           const on = (targetTextElement?.textDecoration || 'none') === deco;
@@ -1483,7 +1491,7 @@ export function SlideEditorRightSidebar({
                                 color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                                 textDecoration: deco === 'none' ? undefined : deco,
                               }}
-                              title={deco === 'none' ? 'No decoration' : deco === 'underline' ? 'Underline' : 'Strikethrough'}
+                              title={deco === 'none' ? t('slideEditor.sidebar.noDecoration') : deco === 'underline' ? t('slideEditor.sidebar.underline') : t('slideEditor.sidebar.strikethrough')}
                             >
                               {deco === 'none' ? '―' : deco === 'underline' ? 'U' : 'S'}
                             </button>
@@ -1494,7 +1502,7 @@ export function SlideEditorRightSidebar({
 
                     {/* Case (BS, Bs, bs for BibleSong) */}
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>Case</span>
+                      <span style={styles.propLabel}>{t('slideEditor.sidebar.case')}</span>
                       <div style={styles.segmentGroup}>
                         {(['none', 'uppercase', 'capitalize', 'lowercase'] as const).map((tc) => {
                           const on = (targetTextElement?.textTransform || 'none') === tc;
@@ -1509,7 +1517,7 @@ export function SlideEditorRightSidebar({
                                 color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
                                 fontWeight: tc === 'uppercase' ? 700 : 500,
                               }}
-                              title={`Case: ${tc}`}
+                              title={t('slideEditor.sidebar.caseTitle', { tc })}
                             >
                               {tc === 'none' ? '―' : tc === 'uppercase' ? 'BS' : tc === 'capitalize' ? 'Bs' : 'bs'}
                             </button>
@@ -1527,7 +1535,7 @@ export function SlideEditorRightSidebar({
             {(selectedElement || pptxShape) && (
               <div style={styles.sectionCard}>
                 <div style={styles.sectionHeader} onClick={() => toggleSection('shape')}>
-                  <span style={styles.sectionTitle}>Shape, Fill & Border</span>
+                  <span style={styles.sectionTitle}>{t('slideEditor.sidebar.shapeFillBorder')}</span>
                   <ChevronIcon open={Boolean(openSections.shape)} />
                 </div>
 
@@ -1536,7 +1544,7 @@ export function SlideEditorRightSidebar({
                     {/* Fill Color & Transparent Toggle */}
                     <div style={styles.propRowCol}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>Fill Color</span>
+                        <span style={styles.propLabel}>{t('slideEditor.sidebar.fillColor')}</span>
                         {!pptxShape && selectedElement && (
                           <button
                             type="button"
@@ -1552,7 +1560,7 @@ export function SlideEditorRightSidebar({
                               cursor: 'pointer',
                             }}
                           >
-                            {selectedElement.backgroundColor === 'transparent' ? 'No Fill (Active)' : 'Clear Fill'}
+                            {selectedElement.backgroundColor === 'transparent' ? t('slideEditor.sidebar.noFillActive') : t('slideEditor.sidebar.clearFill')}
                           </button>
                         )}
                       </div>
@@ -1592,7 +1600,7 @@ export function SlideEditorRightSidebar({
                     {selectedElement && (
                       <div style={styles.propRowCol}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={styles.propLabel}>Fill Opacity</span>
+                          <span style={styles.propLabel}>{t('slideEditor.sidebar.fillOpacity')}</span>
                           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                             {Math.round((selectedElement.fillOpacity ?? 1) * 100)}%
                           </span>
@@ -1615,7 +1623,7 @@ export function SlideEditorRightSidebar({
 
                     {/* Border Color */}
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>Border Color</span>
+                      <span style={styles.propLabel}>{t('slideEditor.sidebar.borderColor')}</span>
                       <div style={styles.colorPillRow}>
                         <input
                           type="color"
@@ -1652,7 +1660,7 @@ export function SlideEditorRightSidebar({
                     {selectedElement && (
                       <div style={styles.propRowCol}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={styles.propLabel}>Stroke Opacity</span>
+                          <span style={styles.propLabel}>{t('slideEditor.sidebar.strokeOpacity')}</span>
                           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                             {Math.round((selectedElement.strokeOpacity ?? 1) * 100)}%
                           </span>
@@ -1676,7 +1684,7 @@ export function SlideEditorRightSidebar({
                     {/* Border Width Slider */}
                     <div style={styles.propRowCol}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>Border Width</span>
+                        <span style={styles.propLabel}>{t('slideEditor.sidebar.borderWidth')}</span>
                         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                           {pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (selectedElement ? (selectedElement.borderWidth ?? (selectedElement.type === 'shape' ? 3 : 0)) : 0)}px
                         </span>
@@ -1700,7 +1708,7 @@ export function SlideEditorRightSidebar({
                     {/* Corner Radius Slider (Works on All Shapes, Text Boxes & Images!) */}
                     <div style={styles.propRowCol}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>Corner Radius</span>
+                        <span style={styles.propLabel}>{t('slideEditor.sidebar.cornerRadius')}</span>
                         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                           {selectedElement?.borderRadius ?? 0}px
                         </span>
@@ -1723,7 +1731,7 @@ export function SlideEditorRightSidebar({
                     {/* Layer Opacity Slider */}
                     <div style={styles.propRowCol}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>Layer Opacity</span>
+                        <span style={styles.propLabel}>{t('slideEditor.sidebar.layerOpacity')}</span>
                         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                           {Math.round((selectedElement?.opacity ?? 1) * 100)}%
                         </span>
@@ -1751,7 +1759,7 @@ export function SlideEditorRightSidebar({
             {selectedElement && (
               <div style={styles.sectionCard}>
                 <div style={styles.sectionHeader} onClick={() => toggleSection('effects')}>
-                  <span style={styles.sectionTitle}>Effects & Shadows</span>
+                  <span style={styles.sectionTitle}>{t('slideEditor.sidebar.effectsShadows')}</span>
                   <ChevronIcon open={Boolean(openSections.effects)} />
                 </div>
 
@@ -1761,7 +1769,7 @@ export function SlideEditorRightSidebar({
                     {(selectedElement.type === 'text' || selectedElement.type === 'shape') && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 10, borderBottom: '1px solid var(--border-primary)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>Text Drop Shadow</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{t('slideEditor.sidebar.textDropShadow')}</span>
                           <input
                             type="checkbox"
                             checked={Boolean(selectedElement.shadowEnabled)}
@@ -1795,7 +1803,7 @@ export function SlideEditorRightSidebar({
                             {/* Blur Radius */}
                             <div style={styles.propRowCol}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={styles.propLabel}>Blur Radius</span>
+                                <span style={styles.propLabel}>{t('slideEditor.sidebar.blurRadius')}</span>
                                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                                   {selectedElement.shadowBlur ?? 8}px
                                 </span>
@@ -1813,7 +1821,7 @@ export function SlideEditorRightSidebar({
                             {/* Offset X & Y */}
                             <div style={styles.twoColRow}>
                               <div style={styles.propRowCol}>
-                                <span style={styles.propLabel}>Offset X</span>
+                                <span style={styles.propLabel}>{t('slideEditor.sidebar.offsetX')}</span>
                                 <ScrubbableInput
                                   value={selectedElement.shadowOffsetX ?? 0}
                                   onChange={(v) => onUpdateElement(selectedElement.id, { shadowOffsetX: v })}
@@ -1823,7 +1831,7 @@ export function SlideEditorRightSidebar({
                                 />
                               </div>
                               <div style={styles.propRowCol}>
-                                <span style={styles.propLabel}>Offset Y</span>
+                                <span style={styles.propLabel}>{t('slideEditor.sidebar.offsetY')}</span>
                                 <ScrubbableInput
                                   value={selectedElement.shadowOffsetY ?? 4}
                                   onChange={(v) => onUpdateElement(selectedElement.id, { shadowOffsetY: v })}
@@ -1837,7 +1845,7 @@ export function SlideEditorRightSidebar({
                             {/* Opacity */}
                             <div style={styles.propRowCol}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={styles.propLabel}>Shadow Opacity</span>
+                                <span style={styles.propLabel}>{t('slideEditor.sidebar.shadowOpacity')}</span>
                                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                                   {Math.round((selectedElement.shadowOpacity ?? 0.5) * 100)}%
                                 </span>
@@ -1859,7 +1867,7 @@ export function SlideEditorRightSidebar({
                     {/* Container Box Shadow (For Shapes, Images, & Containers) */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: (selectedElement.type === 'text' || selectedElement.type === 'shape') ? 6 : 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>Container Box Shadow</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{t('slideEditor.sidebar.containerBoxShadow')}</span>
                         <input
                           type="checkbox"
                           checked={Boolean(selectedElement.boxShadowEnabled)}
@@ -1872,7 +1880,7 @@ export function SlideEditorRightSidebar({
                         <>
                           {/* Color */}
                           <div style={styles.propRowCol}>
-                            <span style={styles.propLabel}>Box Shadow Color</span>
+                            <span style={styles.propLabel}>{t('slideEditor.sidebar.boxShadowColor')}</span>
                             <div style={styles.colorPillRow}>
                               <input
                                 type="color"
@@ -1893,7 +1901,7 @@ export function SlideEditorRightSidebar({
                           {/* Blur Radius */}
                           <div style={styles.propRowCol}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={styles.propLabel}>Blur Radius</span>
+                              <span style={styles.propLabel}>{t('slideEditor.sidebar.blurRadius')}</span>
                               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                                 {selectedElement.boxShadowBlur ?? 12}px
                               </span>
@@ -1911,7 +1919,7 @@ export function SlideEditorRightSidebar({
                           {/* Offset X & Y */}
                           <div style={styles.twoColRow}>
                             <div style={styles.propRowCol}>
-                              <span style={styles.propLabel}>Offset X</span>
+                              <span style={styles.propLabel}>{t('slideEditor.sidebar.offsetX')}</span>
                               <ScrubbableInput
                                 value={selectedElement.boxShadowOffsetX ?? 0}
                                 onChange={(v) => onUpdateElement(selectedElement.id, { boxShadowOffsetX: v })}
@@ -1921,7 +1929,7 @@ export function SlideEditorRightSidebar({
                               />
                             </div>
                             <div style={styles.propRowCol}>
-                              <span style={styles.propLabel}>Offset Y</span>
+                              <span style={styles.propLabel}>{t('slideEditor.sidebar.offsetY')}</span>
                               <ScrubbableInput
                                 value={selectedElement.boxShadowOffsetY ?? 6}
                                 onChange={(v) => onUpdateElement(selectedElement.id, { boxShadowOffsetY: v })}
@@ -1935,7 +1943,7 @@ export function SlideEditorRightSidebar({
                           {/* Opacity */}
                           <div style={styles.propRowCol}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={styles.propLabel}>Box Shadow Opacity</span>
+                              <span style={styles.propLabel}>{t('slideEditor.sidebar.boxShadowOpacity')}</span>
                               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
                                 {Math.round((selectedElement.boxShadowOpacity ?? 0.4) * 100)}%
                               </span>
@@ -1961,7 +1969,7 @@ export function SlideEditorRightSidebar({
             {selectedElement && (
               <div style={styles.sectionCard}>
                 <div style={styles.sectionHeader} onClick={() => toggleSection('geometry')}>
-                  <span style={styles.sectionTitle}>Geometry & Transform</span>
+                  <span style={styles.sectionTitle}>{t('slideEditor.sidebar.geometryTransform')}</span>
                   <ChevronIcon open={Boolean(openSections.geometry)} />
                 </div>
 
@@ -1969,7 +1977,7 @@ export function SlideEditorRightSidebar({
                   <div style={styles.sectionBody}>
                     <div style={styles.twoColRow}>
                       <div style={styles.propRowCol}>
-                        <span style={styles.propLabel}>X Position (%)</span>
+                        <span style={styles.propLabel}>{t('slideEditor.sidebar.xPosition')}</span>
                         <ScrubbableInput
                           value={selectedElement.x || 0}
                           onChange={(v) => onUpdateElement(selectedElement.id, { x: v })}
@@ -1979,7 +1987,7 @@ export function SlideEditorRightSidebar({
                         />
                       </div>
                       <div style={styles.propRowCol}>
-                        <span style={styles.propLabel}>Y Position (%)</span>
+                        <span style={styles.propLabel}>{t('slideEditor.sidebar.yPosition')}</span>
                         <ScrubbableInput
                           value={selectedElement.y || 0}
                           onChange={(v) => onUpdateElement(selectedElement.id, { y: v })}
@@ -1992,7 +2000,7 @@ export function SlideEditorRightSidebar({
 
                     <div style={styles.twoColRow}>
                       <div style={styles.propRowCol}>
-                        <span style={styles.propLabel}>Width (%)</span>
+                        <span style={styles.propLabel}>{t('slideEditor.sidebar.width')}</span>
                         <ScrubbableInput
                           value={selectedElement.width || 0}
                           onChange={(v) => onUpdateElement(selectedElement.id, { width: v })}
@@ -2002,7 +2010,7 @@ export function SlideEditorRightSidebar({
                         />
                       </div>
                       <div style={styles.propRowCol}>
-                        <span style={styles.propLabel}>Height (%)</span>
+                        <span style={styles.propLabel}>{t('slideEditor.sidebar.height')}</span>
                         <ScrubbableInput
                           value={selectedElement.height || 0}
                           onChange={(v) => onUpdateElement(selectedElement.id, { height: v })}
@@ -2016,13 +2024,13 @@ export function SlideEditorRightSidebar({
                     {/* Rotation Control */}
                     <div style={styles.propRowCol}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>Rotation Angle ({selectedElement.rotation || 0}°)</span>
+                        <span style={styles.propLabel}>{t('slideEditor.sidebar.rotationAngle', { deg: selectedElement.rotation || 0 })}</span>
                         <div style={{ display: 'flex', gap: 4 }}>
                           <button
                             type="button"
                             onClick={() => onUpdateElement(selectedElement.id, { rotation: ((selectedElement.rotation || 0) - 90) % 360 })}
                             style={{ background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', borderRadius: 4, color: 'var(--text-primary)', padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}
-                            title="Rotate 90° Left"
+                            title={t('slideEditor.sidebar.rotateLeft')}
                           >
                             ↺ -90°
                           </button>
@@ -2030,7 +2038,7 @@ export function SlideEditorRightSidebar({
                             type="button"
                             onClick={() => onUpdateElement(selectedElement.id, { rotation: ((selectedElement.rotation || 0) + 90) % 360 })}
                             style={{ background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', borderRadius: 4, color: 'var(--text-primary)', padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}
-                            title="Rotate 90° Right"
+                            title={t('slideEditor.sidebar.rotateRight')}
                           >
                             ↻ +90°
                           </button>
@@ -2056,7 +2064,7 @@ export function SlideEditorRightSidebar({
         {activeTab === 'layer' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.65)', textTransform: 'uppercase' }}>
-              Layers — top first
+              {t('slideEditor.sidebar.layersTopFirst')}
             </span>
 
             {pptx && (
@@ -2086,7 +2094,7 @@ export function SlideEditorRightSidebar({
                 onSelect={pptx.onSelectLayer}
                 onReorder={pptx.onReorderLayer}
                 onDelete={pptx.onDeleteLayer}
-                emptyHint="This slide's artwork all comes from its layout, so there is nothing on the slide itself to restack."
+                emptyHint={t('slideEditor.sidebar.emptyLayersPptx')}
               />
             ) : (
               <LayerList
@@ -2099,7 +2107,7 @@ export function SlideEditorRightSidebar({
                   const target = nativeElements.find((e) => e.id === id);
                   if (target) onUpdateElement(id, { locked: !target.locked });
                 }}
-                emptyHint="This slide has no elements yet. Add a text box or a shape from the toolbar."
+                emptyHint={t('slideEditor.sidebar.emptyLayersNative')}
               />
             )}
           </div>
@@ -2122,10 +2130,10 @@ export function SlideEditorRightSidebar({
                 color: '#FF5500',
               }}
             >
-              ✨
+              <IconSparkles size={22} />
             </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }}>
-              AI Studio
+              {t('slideEditor.sidebar.tabAi')}
             </div>
             <div
               style={{
@@ -2140,10 +2148,10 @@ export function SlideEditorRightSidebar({
                 textTransform: 'uppercase',
               }}
             >
-              Coming Soon
+              {t('slideEditor.sidebar.aiComingSoon')}
             </div>
             <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0, maxWidth: 220 }}>
-              AI-powered slide generation, smart sermon layouts, and automated theme styling are currently in development.
+              {t('slideEditor.sidebar.aiDescription')}
             </p>
           </div>
         )}

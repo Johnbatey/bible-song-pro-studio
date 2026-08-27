@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { AppleToggle } from '../AppleToggle';
+import { useI18n } from '../../../i18n/useI18n';
 import type { Theme, Song, PresentationDeck, Scene, BibleVerse, LiveScriptureState, TranscriptionState } from '../../types';
 
 export interface BackupOptions {
@@ -30,10 +31,10 @@ export interface BackupPackage {
 }
 
 export function BackupSystem() {
+  const { t } = useI18n();
   const store = useAppStore();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Backup Export Options (Toggles)
   const [options, setOptions] = useState<BackupOptions>({
     themes: true,
     songs: true,
@@ -43,7 +44,6 @@ export function BackupSystem() {
     settings: true,
   });
 
-  // Modals & Status States
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetInputText, setResetInputText] = useState('');
   const [isExporting, setIsExporting] = useState(false);
@@ -65,7 +65,6 @@ export function BackupSystem() {
     });
   };
 
-  // Export Selected Backup Package
   const handleExportBackup = () => {
     setIsExporting(true);
     try {
@@ -114,16 +113,15 @@ export function BackupSystem() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      setStatusMessage({ type: 'success', text: `Backup exported successfully as ${filename}` });
+      setStatusMessage({ type: 'success', text: t('settings.backup.exportSuccess', { filename }) });
     } catch (err) {
       console.error('Backup export failed:', err);
-      setStatusMessage({ type: 'error', text: 'Failed to export backup file.' });
+      setStatusMessage({ type: 'error', text: t('settings.backup.exportError') });
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Handle Backup Import File Selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -139,13 +137,12 @@ export function BackupSystem() {
         setImportSummary({ pkg: parsed, file });
       } catch (err) {
         console.error('Failed to parse backup:', err);
-        setStatusMessage({ type: 'error', text: 'Selected file is not a valid Bible Song Pro backup.' });
+        setStatusMessage({ type: 'error', text: t('settings.backup.invalidFile') });
       }
     };
     reader.readAsText(file);
   };
 
-  // Confirm Import
   const handleConfirmImport = () => {
     if (!importSummary) return;
     try {
@@ -154,12 +151,12 @@ export function BackupSystem() {
 
       if (Array.isArray(d.themes) && d.themes.length > 0) {
         const themeMap = new Map<string, Theme>();
-        store.themes.forEach((t: Theme) => themeMap.set(t.id, t));
-        d.themes.forEach((t: Theme) => themeMap.set(t.id, t));
+        store.themes.forEach((theme: Theme) => themeMap.set(theme.id, theme));
+        d.themes.forEach((theme: Theme) => themeMap.set(theme.id, theme));
         const mergedThemes = Array.from(themeMap.values());
         useAppStore.setState({ themes: mergedThemes });
         if (d.activeThemeId) {
-          const active = mergedThemes.find((t: Theme) => t.id === d.activeThemeId);
+          const active = mergedThemes.find((theme: Theme) => theme.id === d.activeThemeId);
           if (active) store.setActiveTheme(active);
         }
       }
@@ -189,16 +186,15 @@ export function BackupSystem() {
       if (d.liveScripture) store.setLiveScripture(d.liveScripture);
       if (d.transcription) store.setTranscription(d.transcription);
 
-      setStatusMessage({ type: 'success', text: 'Backup imported and merged successfully!' });
+      setStatusMessage({ type: 'success', text: t('settings.backup.importSuccess') });
       setImportSummary(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       console.error('Import error:', err);
-      setStatusMessage({ type: 'error', text: 'Failed to restore backup contents.' });
+      setStatusMessage({ type: 'error', text: t('settings.backup.importError') });
     }
   };
 
-  // Factory Reset App
   const handleFactoryReset = async () => {
     try {
       localStorage.clear();
@@ -221,7 +217,6 @@ export function BackupSystem() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Top Status Notification Banner */}
       {statusMessage && (
         <div
           style={{
@@ -241,13 +236,13 @@ export function BackupSystem() {
           <button
             onClick={() => setStatusMessage(null)}
             style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: 700 }}
+            aria-label={t('common.close')}
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* SECTION 1: Export Backup with Toggles */}
       <div
         style={{
           background: 'var(--settings-card)',
@@ -264,10 +259,10 @@ export function BackupSystem() {
                 <polyline points="17 21 17 13 7 13 7 21" />
                 <polyline points="7 3 7 8 15 8" />
               </svg>
-              Export Backup Bundle
+              {t('settings.backup.exportTitle')}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-              Choose items to include in your backup export file
+              {t('settings.backup.exportSub')}
             </div>
           </div>
 
@@ -276,26 +271,25 @@ export function BackupSystem() {
               onClick={() => toggleAll(true)}
               style={{ background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)', borderRadius: 4, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}
             >
-              Select All
+              {t('settings.backup.selectAll')}
             </button>
             <button
               onClick={() => toggleAll(false)}
               style={{ background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)', borderRadius: 4, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}
             >
-              Deselect All
+              {t('settings.backup.deselectAll')}
             </button>
           </div>
         </div>
 
-        {/* Toggles Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
           <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', padding: 10, borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.92 0 1.7-.72 1.7-1.61 0-.43-.17-.83-.44-1.14-.24-.28-.39-.64-.39-1.04 0-.88.72-1.6 1.6-1.6H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9z"/></svg>
-                Custom Themes & Presets
+                {t('settings.backup.themesTitle')}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{store.themes.length} custom design presets</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t('settings.backup.themesSub', { count: store.themes.length })}</div>
             </div>
             <AppleToggle checked={options.themes} onChange={() => toggleOption('themes')} />
           </div>
@@ -304,9 +298,9 @@ export function BackupSystem() {
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                Song Library
+                {t('settings.backup.songsTitle')}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{store.songs.length} saved songs & decks</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t('settings.backup.songsSub', { count: store.songs.length })}</div>
             </div>
             <AppleToggle checked={options.songs} onChange={() => toggleOption('songs')} />
           </div>
@@ -315,9 +309,9 @@ export function BackupSystem() {
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                Pro Presentations
+                {t('settings.backup.presentationsTitle')}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{store.presentationDecks.length} slide decks</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t('settings.backup.presentationsSub', { count: store.presentationDecks.length })}</div>
             </div>
             <AppleToggle checked={options.presentations} onChange={() => toggleOption('presentations')} />
           </div>
@@ -326,9 +320,9 @@ export function BackupSystem() {
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                Scenes & Staged Items
+                {t('settings.backup.scenesTitle')}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{store.scenes.length} saved scenes</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t('settings.backup.scenesSub', { count: store.scenes.length })}</div>
             </div>
             <AppleToggle checked={options.scenes} onChange={() => toggleOption('scenes')} />
           </div>
@@ -337,9 +331,9 @@ export function BackupSystem() {
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                App & Live Preferences
+                {t('settings.backup.settingsTitle')}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Display, NDI & AI settings</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t('settings.backup.settingsSub')}</div>
             </div>
             <AppleToggle checked={options.settings} onChange={() => toggleOption('settings')} />
           </div>
@@ -348,9 +342,9 @@ export function BackupSystem() {
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                Verse & Session History
+                {t('settings.backup.historyTitle')}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{store.verseHistory.length} logged verses</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t('settings.backup.historySub', { count: store.verseHistory.length })}</div>
             </div>
             <AppleToggle checked={options.history} onChange={() => toggleOption('history')} />
           </div>
@@ -377,11 +371,10 @@ export function BackupSystem() {
           }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          {isExporting ? 'Exporting Package...' : 'Export Backup Package (.json)'}
+          {isExporting ? t('settings.backup.exporting') : t('settings.backup.exportButton')}
         </button>
       </div>
 
-      {/* SECTION 2: Import Backup File */}
       <div
         style={{
           background: 'var(--settings-card)',
@@ -396,10 +389,10 @@ export function BackupSystem() {
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          Import Backup File
+          {t('settings.backup.importTitle')}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
-          Restore previously exported themes, songs, presentations, and settings
+          {t('settings.backup.importSub')}
         </div>
 
         <input
@@ -429,10 +422,9 @@ export function BackupSystem() {
           }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          Choose Backup File to Import...
+          {t('settings.backup.chooseFile')}
         </button>
 
-        {/* Import Summary Modal / Box */}
         {importSummary && (
           <div
             style={{
@@ -444,16 +436,19 @@ export function BackupSystem() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-              Backup Package Detected: {importSummary.file.name}
+              {t('settings.backup.packageDetected', { filename: importSummary.file.name })}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
-              Exported: {importSummary.pkg.exportDate || 'Unknown date'} • App Version: {importSummary.pkg.version || '3.1.0'}
+              {t('settings.backup.packageMeta', {
+                date: importSummary.pkg.exportDate || t('settings.backup.unknownDate'),
+                version: importSummary.pkg.version || '3.1.0',
+              })}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-              {importSummary.pkg.data.themes && <div>• {importSummary.pkg.data.themes.length} Themes</div>}
-              {importSummary.pkg.data.songs && <div>• {importSummary.pkg.data.songs.length} Songs</div>}
-              {importSummary.pkg.data.presentationDecks && <div>• {importSummary.pkg.data.presentationDecks.length} Slide Decks</div>}
-              {importSummary.pkg.data.scenes && <div>• {importSummary.pkg.data.scenes.length} Scenes</div>}
+              {importSummary.pkg.data.themes && <div>{t('settings.backup.summaryThemes', { count: importSummary.pkg.data.themes.length })}</div>}
+              {importSummary.pkg.data.songs && <div>{t('settings.backup.summarySongs', { count: importSummary.pkg.data.songs.length })}</div>}
+              {importSummary.pkg.data.presentationDecks && <div>{t('settings.backup.summaryDecks', { count: importSummary.pkg.data.presentationDecks.length })}</div>}
+              {importSummary.pkg.data.scenes && <div>{t('settings.backup.summaryScenes', { count: importSummary.pkg.data.scenes.length })}</div>}
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
@@ -461,20 +456,19 @@ export function BackupSystem() {
                 onClick={handleConfirmImport}
                 style={{ flex: 1, height: 34, background: '#2ecc71', border: 'none', borderRadius: 6, color: '#fff', fontWeight: 700, cursor: 'pointer' }}
               >
-                Confirm Import & Restore
+                {t('settings.backup.confirmImport')}
               </button>
               <button
                 onClick={() => setImportSummary(null)}
                 style={{ height: 34, padding: '0 14px', background: '#202024', border: '1px solid #262628', borderRadius: 6, color: '#a1a1aa', fontWeight: 600, cursor: 'pointer' }}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* SECTION 3: Factory Reset Block (With Warning & Confirmation) */}
       <div
         style={{
           background: 'rgba(231, 76, 60, 0.08)',
@@ -487,14 +481,14 @@ export function BackupSystem() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
           </svg>
-          Factory Reset Application
+          {t('settings.backup.resetTitle')}
         </div>
         <div style={{ fontSize: 12, color: '#e0a0a0', lineHeight: 1.5, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <div>
-            <strong>WARNING:</strong> Resetting Bible Song Pro will wipe all custom themes, song decks, slide presentations, history, and user settings to restore a completely fresh installation state.
+            {t('settings.backup.resetWarning')}
             <br />
-            <span style={{ color: '#ffffff', fontWeight: 600 }}>We strongly encourage exporting a backup file before proceeding.</span>
+            <span style={{ color: '#ffffff', fontWeight: 600 }}>{t('settings.backup.resetEncourage')}</span>
           </div>
         </div>
 
@@ -518,7 +512,7 @@ export function BackupSystem() {
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Export Backup First
+            {t('settings.backup.exportFirst')}
           </button>
 
           <button
@@ -540,12 +534,11 @@ export function BackupSystem() {
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            Reset App to Factory Fresh
+            {t('settings.backup.resetButton')}
           </button>
         </div>
       </div>
 
-      {/* Confirmation Modal for Reset */}
       {showResetConfirm && (
         <div
           style={{
@@ -574,15 +567,14 @@ export function BackupSystem() {
           >
             <div style={{ fontSize: 18, fontWeight: 800, color: '#e74c3c', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              Confirm Factory Reset
+              {t('settings.backup.confirmResetTitle')}
             </div>
             <div style={{ fontSize: 13, color: '#a1a1aa', lineHeight: 1.5, marginBottom: 16 }}>
-              Are you sure you want to restore Bible Song Pro Studio to a fresh factory state?
-              This action <strong>cannot be undone</strong>. All custom themes, songs, and slide decks will be deleted.
+              {t('settings.backup.confirmResetBody')}
             </div>
 
             <div style={{ fontSize: 12, color: '#ffffff', fontWeight: 600, marginBottom: 6 }}>
-              Type <span style={{ color: '#e74c3c', letterSpacing: 1 }}>RESET</span> below to confirm:
+              {t('settings.backup.typeReset')}
             </div>
 
             <input
@@ -590,7 +582,7 @@ export function BackupSystem() {
               type="text"
               value={resetInputText}
               onChange={(e) => setResetInputText(e.target.value)}
-              placeholder="RESET"
+              placeholder={t('settings.backup.resetPlaceholder')}
               style={{ width: '100%', height: 38, marginBottom: 16, textAlign: 'center', fontSize: 14, fontWeight: 700, letterSpacing: 2 }}
             />
 
@@ -609,7 +601,7 @@ export function BackupSystem() {
                   cursor: resetInputText.trim().toUpperCase() === 'RESET' ? 'pointer' : 'not-allowed',
                 }}
               >
-                Yes, Delete All & Reset
+                {t('settings.backup.confirmResetYes')}
               </button>
 
               <button
@@ -628,7 +620,7 @@ export function BackupSystem() {
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>

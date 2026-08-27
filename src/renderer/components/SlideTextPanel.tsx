@@ -1,16 +1,7 @@
-/* =========================================================================
-   <SlideTextPanel> — every text box on an imported slide, as fields
-   -------------------------------------------------------------------------
-   One field per real text box — PowerPoint's own unit — never one per split
-   run. Decorative custGeom art carries a throwaway txBody and is skipped, or a
-   single illustration slide would list hundreds of empty fields.
-
-   The canvas is directly editable too; this is the same text reached from the
-   inspector, for boxes that are small, overlapped or off to the edge.
-   ========================================================================= */
 import type { CSSProperties } from 'react';
 import { editableTextShapes, shapeFullText } from '../slide-engine/edit/text';
 import type { ParsedShape } from '../slide-engine/parser/slide-parser';
+import { useI18n } from '../../i18n/useI18n';
 
 export interface SlideTextPanelProps {
   shapes: ParsedShape[];
@@ -18,28 +9,26 @@ export interface SlideTextPanelProps {
 }
 
 export function SlideTextPanel({ shapes, onEdit }: SlideTextPanelProps) {
+  const { t } = useI18n();
   const boxes = editableTextShapes(shapes);
 
   if (boxes.length === 0) {
-    return <div style={styles.sectionEmpty}>No editable text on this slide.</div>;
+    return <div style={styles.sectionEmpty}>{t('slideEditor.textPanel.empty')}</div>;
   }
 
   return (
     <div style={styles.section}>
       <div style={styles.panelHead}>
-        {boxes.length} text box{boxes.length === 1 ? '' : 'es'}
+        {boxes.length === 1
+          ? t('slideEditor.textPanel.count', { count: boxes.length })
+          : t('slideEditor.textPanel.countPlural', { count: boxes.length })}
       </div>
       {boxes.map((shape, i) => {
-        const label = shape.paragraphs[0].map((r) => r.text).join('').trim().slice(0, 28) || `Text box ${i + 1}`;
+        const label = shape.paragraphs[0].map((r) => r.text).join('').trim().slice(0, 28) || t('slideEditor.textPanel.textBoxN', { n: i + 1 });
         return (
           <label key={shape.id} style={styles.field}>
             <span style={styles.fieldLabel}>{label}</span>
             <textarea
-              /* Controlled, so editing a run on the canvas is reflected here
-                 too. Uncontrolled would go stale, and the next keystroke in
-                 this field would then write the old text back over the canvas
-                 edit. onEdit writes through synchronously and bumps the
-                 revision, so the value is always what the box actually says. */
               value={shapeFullText(shape)}
               rows={Math.min(4, shape.paragraphs.length)}
               onChange={(e) => onEdit(shape, e.target.value)}

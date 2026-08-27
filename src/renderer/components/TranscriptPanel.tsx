@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { Block, BlockButton } from './Block';
+import { useI18n } from '../../i18n/useI18n';
 
 interface TranscriptPanelProps {
   onOpenLiveScripture?: () => void;
 }
 
 export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
+  const { t } = useI18n();
   const transcription = useAppStore((s) => s.transcription);
   const aiProviders = useAppStore((s) => s.aiProviders);
   const enabledProvider = aiProviders.find((p) => p.enabled);
@@ -48,9 +50,9 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
   return (
     <Block
       className="transcript-panel"
-      title="Live transcript"
+      title={t('transcript.title')}
       tools={(
-        <BlockButton icon onClick={onOpenLiveScripture} title="Open Live Scripture">
+        <BlockButton icon onClick={onOpenLiveScripture} title={t('transcript.openLive')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
             <polyline points="15 3 21 3 21 9" />
@@ -65,7 +67,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
           {transcription.isActive ? (
             <button style={styles.stopBtn} onClick={stopTranscription}>
               <span style={styles.stopDot} />
-              Stop transcribing
+              {t('transcript.stop')}
             </button>
           ) : (
             <button
@@ -78,7 +80,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                 <line x1="12" y1="19" x2="12" y2="22" />
               </svg>
-              <span style={styles.startLabel}>Start transcribing</span>
+              <span style={styles.startLabel}>{t('transcript.start')}</span>
             </button>
           )}
           <span
@@ -86,7 +88,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
               ...styles.recDot,
               background: transcription.isActive ? 'var(--tally-fault)' : 'var(--tally-hold)',
             }}
-            title={transcription.isActive ? 'Recording' : 'Idle'}
+            title={transcription.isActive ? t('transcript.recording') : t('transcript.idle')}
           />
         </>
       )}
@@ -116,7 +118,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
           </p>
         ) : (
           <p className="transcript-panel__idle">
-            {transcription.isActive ? 'Listening…' : 'Transcript appears here'}
+            {transcription.isActive ? t('transcript.listening') : t('transcript.empty')}
           </p>
         )}
       </div>

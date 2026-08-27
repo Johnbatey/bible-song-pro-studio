@@ -1,13 +1,7 @@
-/* =========================================================================
-   <ShapeInspector> — fill, outline, text colour, order and delete
-   -------------------------------------------------------------------------
-   Acts on the current selection. Only the controls that apply to what is
-   selected are shown: a picture has no fill, a connector has no text, and
-   offering either would be a control that silently does nothing.
-   ========================================================================= */
 import { useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import type { ParsedShape } from '../slide-engine/parser/slide-parser';
+import { useI18n } from '../../i18n/useI18n';
 
 export interface ShapeInspectorProps {
   selected: ParsedShape[];
@@ -21,8 +15,6 @@ export interface ShapeInspectorProps {
 const FILLABLE = new Set(['shape', 'text']);
 const STROKEABLE = new Set(['shape', 'text', 'connector', 'imagefill']);
 
-/** A colour input needs #rrggbb; anything else (a theme name, rgba, null)
-    would silently reset the swatch to black. */
 function toSwatch(value: unknown, fallback: string): string {
   const s = String(value || '');
   return /^#[0-9a-f]{6}$/i.test(s) ? s : fallback;
@@ -36,6 +28,7 @@ export function ShapeInspector({
   onReorder,
   onDelete,
 }: ShapeInspectorProps) {
+  const { t } = useI18n();
   const canFill = selected.some((s) => FILLABLE.has(s.kind));
   const canStroke = selected.some((s) => STROKEABLE.has(s.kind));
   const textShapes = selected.filter((s) => s.kind === 'text');
@@ -56,8 +49,8 @@ export function ShapeInspector({
   if (selected.length === 0) {
     return (
       <div style={styles.panel}>
-        <div style={styles.head}>Shape</div>
-        <div style={styles.hint}>Select a shape on the slide to restyle it.</div>
+        <div style={styles.head}>{t('slideEditor.shape.title')}</div>
+        <div style={styles.hint}>{t('slideEditor.shape.selectHint')}</div>
       </div>
     );
   }
@@ -65,12 +58,12 @@ export function ShapeInspector({
   return (
     <div style={styles.panel}>
       <div style={styles.head}>
-        {selected.length === 1 ? (selected[0].name as string) || selected[0].kind : `${selected.length} shapes`}
+        {selected.length === 1 ? (selected[0].name as string) || selected[0].kind : t('slideEditor.shape.multiple', { count: selected.length })}
       </div>
 
       {canFill && (
         <label style={styles.row}>
-          <span style={styles.label}>Fill</span>
+          <span style={styles.label}>{t('slideEditor.shape.fill')}</span>
           <input type="color" value={firstFill} onChange={(e) => onFill(e.target.value)} style={styles.color} />
         </label>
       )}
@@ -78,11 +71,11 @@ export function ShapeInspector({
       {canStroke && (
         <>
           <label style={styles.row}>
-            <span style={styles.label}>Outline</span>
+            <span style={styles.label}>{t('slideEditor.shape.outline')}</span>
             <input type="color" value={firstStroke} onChange={(e) => onStroke(e.target.value)} style={styles.color} />
           </label>
           <label style={styles.row}>
-            <span style={styles.label}>Width</span>
+            <span style={styles.label}>{t('slideEditor.shape.width')}</span>
             <input
               type="number"
               min={0}
@@ -97,17 +90,17 @@ export function ShapeInspector({
 
       {textShapes.length > 0 && (
         <label style={styles.row}>
-          <span style={styles.label}>Text</span>
+          <span style={styles.label}>{t('slideEditor.shape.text')}</span>
           <input type="color" value={firstRunColor} onChange={(e) => onTextColor(e.target.value)} style={styles.color} />
         </label>
       )}
 
       <div style={styles.buttons}>
-        <button style={styles.button} onClick={() => onReorder(true)}>Bring to front</button>
-        <button style={styles.button} onClick={() => onReorder(false)}>Send to back</button>
+        <button style={styles.button} onClick={() => onReorder(true)}>{t('slideEditor.shape.bringFront')}</button>
+        <button style={styles.button} onClick={() => onReorder(false)}>{t('slideEditor.shape.sendBack')}</button>
       </div>
       <button style={{ ...styles.button, ...styles.danger }} onClick={onDelete}>
-        Remove from slide
+        {t('slideEditor.shape.remove')}
       </button>
     </div>
   );

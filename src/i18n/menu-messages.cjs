@@ -30,6 +30,7 @@ const catalogs = {
     'menu.importWorkspace': 'Import Workspace…',
     'menu.exportLayout': 'Export {name}…',
     'menu.showLayoutsFolder': 'Show Layouts Folder',
+    'window.slideEditor': 'BSP Slide Editor',
   },
   fr: {
     'dock.bible': 'Bible',
@@ -59,6 +60,7 @@ const catalogs = {
     'menu.importWorkspace': 'Importer un espace…',
     'menu.exportLayout': 'Exporter {name}…',
     'menu.showLayoutsFolder': 'Afficher le dossier des dispositions',
+    'window.slideEditor': 'Éditeur BSP',
   },
   es: {
     'dock.bible': 'Biblia',
@@ -88,6 +90,7 @@ const catalogs = {
     'menu.importWorkspace': 'Importar espacio…',
     'menu.exportLayout': 'Exportar {name}…',
     'menu.showLayoutsFolder': 'Mostrar carpeta de disposiciones',
+    'window.slideEditor': 'Editor BSP',
   },
   pt: {
     'dock.bible': 'Bíblia',
@@ -117,6 +120,7 @@ const catalogs = {
     'menu.importWorkspace': 'Importar espaço…',
     'menu.exportLayout': 'Exportar {name}…',
     'menu.showLayoutsFolder': 'Mostrar pasta de disposições',
+    'window.slideEditor': 'Editor BSP',
   },
 };
 

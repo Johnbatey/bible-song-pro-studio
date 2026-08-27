@@ -8,6 +8,55 @@ interface WordStudyCardProps {
   onClose?: () => void;
 }
 
+const sectionIconProps = {
+  width: 14,
+  height: 14,
+  viewBox: '0 0 24 24',
+  fill: 'none' as const,
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true as const,
+};
+
+function IconLink() {
+  return (
+    <svg {...sectionIconProps}>
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+function IconBook() {
+  return (
+    <svg {...sectionIconProps}>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  );
+}
+
+function IconTag() {
+  return (
+    <svg {...sectionIconProps}>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </svg>
+  );
+}
+
+function IconMonitor() {
+  return (
+    <svg {...sectionIconProps}>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  );
+}
+
 export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
   const projectScene = useAppStore((s) => s.projectScene);
   const [currentEntry, setCurrentEntry] = useState<WordStudyEntry>(entry);
@@ -188,7 +237,7 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
             gap: 6,
           }}
         >
-          <span>🔗</span> DERIVATION & ETYMOLOGY
+          <IconLink /> DERIVATION & ETYMOLOGY
         </div>
         <div
           style={{
@@ -218,7 +267,7 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
             gap: 6,
           }}
         >
-          <span>📖</span> STRONGS DEFINITION
+          <IconBook /> STRONGS DEFINITION
         </div>
         <div
           style={{
@@ -246,7 +295,7 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
             gap: 6,
           }}
         >
-          <span>🏷️</span> KJV TRANSLATION USAGE
+          <IconTag /> KJV TRANSLATION USAGE
         </div>
         <div
           style={{
@@ -300,7 +349,7 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
             gap: 6,
           }}
         >
-          <span>📺</span> Project Word Study
+          <IconMonitor /> Project Word Study
         </button>
       </div>
     </div>

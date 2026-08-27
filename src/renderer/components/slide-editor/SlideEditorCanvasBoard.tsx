@@ -4,6 +4,7 @@ import { useAssetBaseUrl } from '../../hooks/useAssetBaseUrl';
 import { slideElementsFor, hexToRgba } from '../NativeSlideBoard';
 import { assetUrl } from '../../utils/asset-url';
 import type { ActiveTool } from './SlideEditorQuickToolbar';
+import { useI18n } from '../../../i18n/useI18n';
 
 function computeTextShadow(el: SlideElement): string | undefined {
   if (el.shadowEnabled) {
@@ -58,6 +59,7 @@ export function SlideEditorCanvasBoard({
   smartSnap,
   strokeWidth = 4,
 }: SlideEditorCanvasBoardProps) {
+  const { t } = useI18n();
   const activeSelection = selectedElementIds && selectedElementIds.length > 0
     ? selectedElementIds
     : (selectedElementId ? [selectedElementId] : []);
@@ -609,7 +611,12 @@ export function SlideEditorCanvasBoard({
           }}
         />
         <span>
-          Slide Builder Mode: {activeTool === 'pencil' ? 'Freehand Pencil Draw' : activeTool === 'bezier' ? 'Bezier Vector Pen Tool' : 'Creating Custom Slide Canvas'}
+          {t('slideEditor.canvas.modeLabel')}{' '}
+          {activeTool === 'pencil'
+            ? t('slideEditor.canvas.modePencil')
+            : activeTool === 'bezier'
+            ? t('slideEditor.canvas.modeBezier')
+            : t('slideEditor.canvas.modeDefault')}
         </span>
       </div>
 
@@ -628,7 +635,7 @@ export function SlideEditorCanvasBoard({
           <button
             type="button"
             onClick={() => setScale((s) => Math.max(0.2, s - 0.1))}
-            title="Zoom Out"
+            title={t('slideEditor.canvas.zoomOut')}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
           </button>
@@ -640,13 +647,13 @@ export function SlideEditorCanvasBoard({
             step={0.02}
             value={scale}
             onChange={(e) => setScale(parseFloat(e.target.value))}
-            title="Canvas zoom level"
+            title={t('slideEditor.canvas.zoomLevel')}
           />
 
           <button
             type="button"
             onClick={() => setScale((s) => Math.min(2.0, s + 0.1))}
-            title="Zoom In"
+            title={t('slideEditor.canvas.zoomIn')}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
           </button>
@@ -662,9 +669,9 @@ export function SlideEditorCanvasBoard({
             className="zoombar-fit"
             data-active={Math.abs(scale - 1) < 0.01 || undefined}
             onClick={fitToViewport}
-            title="Fit slide to view"
+            title={t('slideEditor.canvas.fitTitle')}
           >
-            Fit
+            {t('slideEditor.canvas.fit')}
           </button>
         </div>
       </div>
@@ -1047,7 +1054,7 @@ export function SlideEditorCanvasBoard({
                             zIndex: 25,
                             boxShadow: '0 0 6px rgba(0,0,0,0.6)',
                           }}
-                          title={canClosePath ? 'First Anchor: Click to Close Bezier Curve Loop' : `Anchor ${nodeIdx + 1}`}
+                          title={canClosePath ? t('slideEditor.canvas.closeBezierLoop') : t('slideEditor.canvas.anchorN', { n: nodeIdx + 1 })}
                         />
 
                         {/* Tangent Line & Handle Dot H1 */}
@@ -1088,7 +1095,7 @@ export function SlideEditorCanvasBoard({
                                   pointerEvents: 'auto',
                                   zIndex: 24,
                                 }}
-                                title="Control Handle 1"
+                                title={t('slideEditor.canvas.controlHandle1')}
                               />
                             </>
                           );
@@ -1132,7 +1139,7 @@ export function SlideEditorCanvasBoard({
                                   pointerEvents: 'auto',
                                   zIndex: 24,
                                 }}
-                                title="Control Handle 2"
+                                title={t('slideEditor.canvas.controlHandle2')}
                               />
                             </>
                           );
@@ -1189,7 +1196,7 @@ export function SlideEditorCanvasBoard({
                     width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     boxShadow: '0 2px 6px rgba(0,0,0,0.5)', zIndex: 12,
                   }}
-                  title="Layer is locked (unmovable)"
+                  title={t('slideEditor.canvas.layerLocked')}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="4" y="10" width="16" height="11" rx="2" />

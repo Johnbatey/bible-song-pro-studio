@@ -179,6 +179,86 @@ function openTutorials() {
   void window.BSP?.openExternal?.(TUTORIALS_URL);
 }
 
+const uiIconProps = {
+  width: 15,
+  height: 15,
+  viewBox: '0 0 24 24',
+  fill: 'none' as const,
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true as const,
+};
+
+function IconAlertCircle() {
+  return (
+    <svg {...uiIconProps}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
+function IconLightbulb() {
+  return (
+    <svg {...uiIconProps}>
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" />
+    </svg>
+  );
+}
+
+function IconExternalLink({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
+function IconSend() {
+  return (
+    <svg {...uiIconProps}>
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  );
+}
+
+function IconPlay({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  );
+}
+
+function IconCoffee({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+      <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z" />
+      <line x1="6" y1="2" x2="6" y2="4" />
+      <line x1="10" y1="2" x2="10" y2="4" />
+      <line x1="14" y1="2" x2="14" y2="4" />
+    </svg>
+  );
+}
+
+function IconCamera() {
+  return (
+    <svg {...uiIconProps}>
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
 export function SettingsModal() {
   const { t, locale } = useI18n();
   const setStoreUiLocale = useAppStore((s) => s.setUiLocale);
@@ -223,15 +303,15 @@ export function SettingsModal() {
     try {
       const res = await window.BSP.updates.check();
       if (res?.updateAvailable) {
-        setUpdateStatusText(`v${res.latestVersion} available!`);
+        setUpdateStatusText(t('settings.system.updateAvailable', { version: res.latestVersion || '' }));
         if (res.releaseUrl && window.BSP?.openExternal) {
           window.BSP.openExternal(res.releaseUrl);
         }
       } else {
-        setUpdateStatusText('You are on the latest version.');
+        setUpdateStatusText(t('settings.system.latestVersion'));
       }
-    } catch (err) {
-      setUpdateStatusText('Unable to reach update server.');
+    } catch {
+      setUpdateStatusText(t('settings.system.updateServerError'));
     } finally {
       setUpdateChecking(false);
     }
@@ -366,7 +446,7 @@ export function SettingsModal() {
         .filter((device) => device.deviceId !== 'default')
         .map((device, index) => ({
           deviceId: device.deviceId || `input-${index}`,
-          label: device.label || `Microphone ${index + 1}`,
+          label: device.label || t('settings.audio.fallbackMic', { n: index + 1 }),
         }));
       setAudioDevices(inputs);
 
@@ -375,7 +455,7 @@ export function SettingsModal() {
         .filter((device) => device.deviceId !== 'default')
         .map((device, index) => ({
           deviceId: device.deviceId || `output-${index}`,
-          label: device.label || `Soundcard / Output ${index + 1}`,
+          label: device.label || t('settings.audio.fallbackOutput', { n: index + 1 }),
         }));
       setOutputAudioDevices(outputs);
 
@@ -384,7 +464,7 @@ export function SettingsModal() {
       setAudioDevices([]);
       setOutputAudioDevices([]);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     refreshAudioDevices();
@@ -525,7 +605,7 @@ export function SettingsModal() {
               }}
               onMouseDown={handleMouseDown}
             >
-              Settings
+              {t('common.settings')}
             </div>
             <div style={modalStyles.menuList}>
               {categoryDefs.map((item) => {
@@ -588,7 +668,7 @@ export function SettingsModal() {
             <button
               style={modalStyles.closeBtn}
               onClick={closeSettings}
-              title="Close Settings"
+              title={t('settings.closeTitle')}
             >
               ✕
             </button>
@@ -600,25 +680,25 @@ export function SettingsModal() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>System Engine Specs</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.system.engineTitle')}</div>
                     <div style={modalStyles.rowSub}>
                       {platform === 'darwin'
-                        ? 'macOS Metal Hardware Acceleration • Port 8942'
+                        ? t('settings.system.engineMac')
                         : platform === 'win32'
-                        ? 'Windows DirectX / Direct3D Hardware Acceleration • Port 8942'
+                        ? t('settings.system.engineWin')
                         : platform === 'linux'
-                        ? 'Linux Vulkan / OpenGL Hardware Acceleration • Port 8942'
-                        : 'GPU Hardware Acceleration • Port 8942'}
+                        ? t('settings.system.engineLinux')
+                        : t('settings.system.engineDefault')}
                     </div>
                   </div>
-                  <span style={{ fontSize: 12, color: '#2ecc71', fontWeight: 600 }}>Active</span>
+                  <span style={{ fontSize: 12, color: '#2ecc71', fontWeight: 600 }}>{t('settings.system.active')}</span>
                 </div>
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Software Updates</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.system.updatesTitle')}</div>
                     <div style={modalStyles.rowSub}>
-                      App Version {appVersion || '3.1.0'} {updateStatusText ? `• ${updateStatusText}` : ''}
+                      {t('settings.system.appVersion', { version: appVersion || '3.1.0' })}{updateStatusText ? ` • ${updateStatusText}` : ''}
                     </div>
                   </div>
                   <button
@@ -635,7 +715,7 @@ export function SettingsModal() {
                     onClick={handleManualUpdateCheck}
                     disabled={updateChecking}
                   >
-                    {updateChecking ? 'Checking...' : 'Check for updates'}
+                    {updateChecking ? t('settings.system.checking') : t('settings.system.checkUpdates')}
                   </button>
                 </div>
 
@@ -648,8 +728,8 @@ export function SettingsModal() {
               <div>
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Show Bible Version</div>
-                    <div style={modalStyles.rowSub}>Display the translation label (e.g. NLT, KJV) in Scripture references on screen</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.bibleOpt.showVersionTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.bibleOpt.showVersionSub')}</div>
                   </div>
                   <AppleToggle
                     checked={activeTheme?.bibleOptions?.showVersion !== false}
@@ -659,8 +739,8 @@ export function SettingsModal() {
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Shorten Bible Version</div>
-                    <div style={modalStyles.rowSub}>Display concise abbreviations (e.g. NLT, NIV, KJV) instead of full version names</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.bibleOpt.shortenVersionTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.bibleOpt.shortenVersionSub')}</div>
                   </div>
                   <AppleToggle
                     checked={activeTheme?.bibleOptions?.shortenVersions !== false}
@@ -670,8 +750,8 @@ export function SettingsModal() {
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Shorten Bible Book Names</div>
-                    <div style={modalStyles.rowSub}>Abbreviate book names in citations (e.g. Gen. 1:1, Matt. 5:14, 1 Cor. 13:4)</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.bibleOpt.shortenBooksTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.bibleOpt.shortenBooksSub')}</div>
                   </div>
                   <AppleToggle
                     checked={Boolean(activeTheme?.bibleOptions?.shortenBooks)}
@@ -681,8 +761,8 @@ export function SettingsModal() {
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Show Verse Numbers</div>
-                    <div style={modalStyles.rowSub}>Include superscript verse numbers in displayed Scripture text</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.bibleOpt.showVerseNumbersTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.bibleOpt.showVerseNumbersSub')}</div>
                   </div>
                   <AppleToggle
                     checked={Boolean(activeTheme?.bibleOptions?.showVerseNumbers)}
@@ -692,8 +772,8 @@ export function SettingsModal() {
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Version Switch Updates Output</div>
-                    <div style={modalStyles.rowSub}>Switching Bible version immediately updates the live display in Basic mode</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.bibleOpt.versionSwitchTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.bibleOpt.versionSwitchSub')}</div>
                   </div>
                   <AppleToggle
                     checked={activeTheme?.bibleOptions?.versionSwitchUpdatesOutput !== false}
@@ -708,8 +788,8 @@ export function SettingsModal() {
               <div>
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Verse display Mode</div>
-                    <div style={modalStyles.rowSub}>How do you want detected verses to display?</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.scripture.verseModeTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.scripture.verseModeSub')}</div>
                   </div>
                   <div style={modalStyles.pillGroup}>
                     <button
@@ -720,7 +800,7 @@ export function SettingsModal() {
                       }}
                       onClick={() => setLive({ autoProject: true })}
                     >
-                      Auto
+                      {t('settings.scripture.auto')}
                     </button>
                     <button
                       style={{
@@ -730,15 +810,15 @@ export function SettingsModal() {
                       }}
                       onClick={() => setLive({ autoProject: false })}
                     >
-                      Manual
+                      {t('settings.scripture.manual')}
                     </button>
                   </div>
                 </div>
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Original Languages word study</div>
-                    <div style={modalStyles.rowSub}>Detect Greek/Hebrew root words in the sermon and show meaning on screen</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.scripture.wordStudyTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.scripture.wordStudySub')}</div>
                   </div>
                   <AppleToggle checked={wordStudy} onChange={setWordStudy} />
                 </div>
@@ -750,8 +830,8 @@ export function SettingsModal() {
             {activeCategory === 'songs' && (
               <div>
                 <div style={modalStyles.sectionIntro}>
-                  <div style={modalStyles.rowTitle}>Song packs</div>
-                  <div style={modalStyles.rowSub}>Browse and add song packs to your library</div>
+                  <div style={modalStyles.rowTitle}>{t('settings.songs.packsTitle')}</div>
+                  <div style={modalStyles.rowSub}>{t('settings.songs.packsSub')}</div>
                 </div>
                 <SongPacks />
               </div>
@@ -762,8 +842,8 @@ export function SettingsModal() {
               <div>
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Transcription mode</div>
-                    <div style={modalStyles.rowSub}>Run transcription via Cloud Deepgram Nova-2 API or locally offline</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.audio.transcriptionTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.audio.transcriptionSub')}</div>
                   </div>
                   <div style={modalStyles.pillGroup}>
                     <button
@@ -774,7 +854,7 @@ export function SettingsModal() {
                       }}
                       onClick={() => saveSettings({ sttEngine: 'deepgram' })}
                     >
-                      Cloud (Deepgram)
+                      {t('settings.audio.cloudDeepgram')}
                     </button>
                     <button
                       style={{
@@ -784,24 +864,18 @@ export function SettingsModal() {
                       }}
                       onClick={() => saveSettings({ sttEngine: 'local' })}
                     >
-                      On-device
+                      {t('settings.audio.onDevice')}
                     </button>
                   </div>
                 </div>
 
-                {/* The on-device model, shown only when it is the one running.
-                    Two families here: Whisper, which every install already has,
-                    and Moonshine, which was built for live speech and answers
-                    faster on the short utterances this app feeds it. Whichever
-                    is picked is downloaded once and then runs with no network
-                    at all. */}
                 {settings?.sttEngine === 'local' && (
                   <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                       <div>
-                        <div style={modalStyles.rowTitle}>On-device model</div>
+                        <div style={modalStyles.rowTitle}>{t('settings.audio.localModelTitle')}</div>
                         <div style={modalStyles.rowSub}>
-                          {localModel?.note || 'Runs on this computer. Downloaded once, then offline.'}
+                          {localModel?.note || t('settings.audio.localModelDefaultNote')}
                         </div>
                       </div>
                       <select
@@ -813,7 +887,7 @@ export function SettingsModal() {
                         {localModels.map((model) => (
                           <option key={model.key} value={model.key}>
                             {model.label} {model.approxSize ? `(~${model.approxSize})` : ''}
-                            {model.downloaded ? ' — on this computer' : ''}
+                            {model.downloaded ? t('settings.audio.onThisComputer') : ''}
                           </option>
                         ))}
                       </select>
@@ -827,13 +901,18 @@ export function SettingsModal() {
                       >
                         {localBusy
                           ? aiStatus?.warmupState === 'downloading'
-                            ? `Downloading… ${aiStatus?.downloadProgress ?? 0}% ${localModel?.approxSize ? `(~${localModel.approxSize})` : ''}`
-                            : 'Preparing…'
+                            ? t('settings.audio.downloading', {
+                                progress: aiStatus?.downloadProgress ?? 0,
+                                size: localModel?.approxSize ? ` (~${localModel.approxSize})` : '',
+                              })
+                            : t('settings.audio.preparing')
                           : aiStatus?.ready
-                          ? 'Ready'
+                          ? t('settings.audio.ready')
                           : localModel?.downloaded
-                          ? 'Load model'
-                          : `Download model ${localModel?.approxSize ? `(~${localModel.approxSize})` : ''}`}
+                          ? t('settings.audio.loadModel')
+                          : t('settings.audio.downloadModel', {
+                              size: localModel?.approxSize ? ` (~${localModel.approxSize})` : '',
+                            })}
                       </button>
                       <span
                         style={{
@@ -842,10 +921,10 @@ export function SettingsModal() {
                         }}
                       >
                         {aiStatus?.warmupState === 'error'
-                          ? aiStatus?.lastError || 'The model could not be loaded.'
+                          ? aiStatus?.lastError || t('settings.audio.modelLoadError')
                           : aiStatus?.ready
-                          ? 'Loaded and ready to transcribe.'
-                          : `Download size: ${localModel?.approxSize || '~145 MB'}. Downloaded once, then runs offline.`}
+                          ? t('settings.audio.modelReady')
+                          : t('settings.audio.downloadSizeHint', { size: localModel?.approxSize || '~145 MB' })}
                       </span>
                     </div>
                   </div>
@@ -853,19 +932,21 @@ export function SettingsModal() {
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Microphone Input</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.audio.micTitle')}</div>
                     <div style={modalStyles.rowSub}>
                       {micNamesHidden
-                        ? `${audioDevices.length} found — allow microphone access to see their names`
+                        ? t('settings.audio.micNamesHidden', { count: audioDevices.length })
                         : audioDevices.length === 0
-                        ? 'No microphone found on this computer'
-                        : `${audioDevices.length} microphone${audioDevices.length === 1 ? '' : 's'} available`}
+                        ? t('settings.audio.micNone')
+                        : audioDevices.length === 1
+                        ? t('settings.audio.micAvailableOne', { count: audioDevices.length })
+                        : t('settings.audio.micAvailableMany', { count: audioDevices.length })}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {micNamesHidden && (
                       <button style={modalStyles.actionBtn} onClick={revealMicNames}>
-                        Show names
+                        {t('settings.audio.showNames')}
                       </button>
                     )}
                     <select
@@ -873,7 +954,7 @@ export function SettingsModal() {
                       value={live.selectedInputId || 'default'}
                       onChange={(e) => setLive({ selectedInputId: e.target.value })}
                     >
-                      <option value="default">System Default Microphone</option>
+                      <option value="default">{t('settings.audio.defaultMic')}</option>
                       {audioDevices.map((d) => (
                         <option key={d.deviceId} value={d.deviceId}>
                           {d.label}
@@ -886,19 +967,19 @@ export function SettingsModal() {
                 <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <div style={modalStyles.rowTitle}>Deepgram API Key</div>
-                      <div style={modalStyles.rowSub}>Cloud STT API key for live scripture detection</div>
+                      <div style={modalStyles.rowTitle}>{t('settings.audio.deepgramKeyTitle')}</div>
+                      <div style={modalStyles.rowSub}>{t('settings.audio.deepgramKeySub')}</div>
                     </div>
                     {settings?.deepgramApiKeySet && (
                       <button style={{ ...modalStyles.actionBtn, color: 'var(--tally-fault)' }} onClick={clearDeepgramKey}>
-                        Clear Key
+                        {t('settings.audio.clearKey')}
                       </button>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <input
                       type="password"
-                      placeholder={settings?.deepgramApiKeySet ? '••••••••••••••••' : 'Paste Deepgram API Key...'}
+                      placeholder={settings?.deepgramApiKeySet ? t('settings.audio.deepgramPlaceholderSet') : t('settings.audio.deepgramPlaceholder')}
                       value={deepgramKeyDraft}
                       onChange={(e) => setDeepgramKeyDraft(e.target.value)}
                       style={modalStyles.textInput}
@@ -912,7 +993,7 @@ export function SettingsModal() {
                         }
                       }}
                     >
-                      Save Key
+                      {t('settings.audio.saveKey')}
                     </button>
                   </div>
                 </div>
@@ -920,10 +1001,10 @@ export function SettingsModal() {
                 <div style={modalStyles.formRow}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <div style={modalStyles.rowTitle}>Input gain</div>
+                      <div style={modalStyles.rowTitle}>{t('settings.audio.inputGainTitle')}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{inputGain}dB</div>
                     </div>
-                    <div style={modalStyles.rowSub}>Adjust microphone sensitivity</div>
+                    <div style={modalStyles.rowSub}>{t('settings.audio.inputGainSub')}</div>
                     <input
                       type="range"
                       min="-10"
@@ -937,32 +1018,28 @@ export function SettingsModal() {
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Voice commands</div>
-                    <div style={modalStyles.rowSub}>Allow hands-free control during sermons</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.audio.voiceCommandsTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.audio.voiceCommandsSub')}</div>
                   </div>
                   <AppleToggle checked={voiceCommands} onChange={setVoiceCommands} />
                 </div>
 
-                {/* Audio Output & Sound Routing Block */}
                 <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--settings-line)' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14 }}>
-                    Audio Output & Sound Routing
+                    {t('settings.audio.outputSectionTitle')}
                   </div>
 
-                  {/* Program Soundcard / HDMI / Dante Output */}
                   <div style={modalStyles.formRow}>
                     <div>
-                      <div style={modalStyles.rowTitle}>Program Audio Output Device</div>
-                      <div style={modalStyles.rowSub}>
-                        Routes media & video soundtrack audio (e.g. HDMI to Projector, Sound Desk, Dante)
-                      </div>
+                      <div style={modalStyles.rowTitle}>{t('settings.audio.programOutputTitle')}</div>
+                      <div style={modalStyles.rowSub}>{t('settings.audio.programOutputSub')}</div>
                     </div>
                     <select
                       style={modalStyles.selectInput}
                       value={settings?.audioOutputDeviceId || 'default'}
                       onChange={(e) => saveSettings({ audioOutputDeviceId: e.target.value })}
                     >
-                      <option value="default">System Default Audio Output</option>
+                      <option value="default">{t('settings.audio.defaultOutput')}</option>
                       {outputAudioDevices.map((d) => (
                         <option key={d.deviceId} value={d.deviceId}>
                           {d.label}
@@ -971,20 +1048,17 @@ export function SettingsModal() {
                     </select>
                   </div>
 
-                  {/* Cue / Headphones Output */}
                   <div style={modalStyles.formRow}>
                     <div>
-                      <div style={modalStyles.rowTitle}>Monitor / Cue Headphones Device</div>
-                      <div style={modalStyles.rowSub}>
-                        Operator headphones output for pre-listening to video audio in Studio Mode
-                      </div>
+                      <div style={modalStyles.rowTitle}>{t('settings.audio.monitorTitle')}</div>
+                      <div style={modalStyles.rowSub}>{t('settings.audio.monitorSub')}</div>
                     </div>
                     <select
                       style={modalStyles.selectInput}
                       value={settings?.audioCueDeviceId || 'default'}
                       onChange={(e) => saveSettings({ audioCueDeviceId: e.target.value })}
                     >
-                      <option value="default">System Default Headphones / Secondary Device</option>
+                      <option value="default">{t('settings.audio.defaultHeadphones')}</option>
                       {outputAudioDevices.map((d) => (
                         <option key={d.deviceId} value={d.deviceId}>
                           {d.label}
@@ -993,16 +1067,15 @@ export function SettingsModal() {
                     </select>
                   </div>
 
-                  {/* Master Program Volume */}
                   <div style={modalStyles.formRow}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <div style={modalStyles.rowTitle}>Master Program Volume</div>
+                        <div style={modalStyles.rowTitle}>{t('settings.audio.masterVolumeTitle')}</div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
                           {settings?.audioMasterVolume ?? 100}%
                         </div>
                       </div>
-                      <div style={modalStyles.rowSub}>Master output gain level for all played presentation media</div>
+                      <div style={modalStyles.rowSub}>{t('settings.audio.masterVolumeSub')}</div>
                       <input
                         type="range"
                         min="0"
@@ -1014,13 +1087,10 @@ export function SettingsModal() {
                     </div>
                   </div>
 
-                  {/* Mono Mixdown Toggle */}
                   <div style={modalStyles.formRow}>
                     <div>
-                      <div style={modalStyles.rowTitle}>Mono PA Mixdown</div>
-                      <div style={modalStyles.rowSub}>
-                        Combine stereo L/R channels into mono for single-channel church PA systems
-                      </div>
+                      <div style={modalStyles.rowTitle}>{t('settings.audio.monoMixdownTitle')}</div>
+                      <div style={modalStyles.rowSub}>{t('settings.audio.monoMixdownSub')}</div>
                     </div>
                     <AppleToggle
                       checked={Boolean(settings?.audioMonoMixdown)}
@@ -1036,8 +1106,8 @@ export function SettingsModal() {
               <div>
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Primary Audience Display</div>
-                    <div style={modalStyles.rowSub}>Monitor or projector target for main program output</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.output.primaryTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.output.primarySub')}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <select
@@ -1048,23 +1118,23 @@ export function SettingsModal() {
                         window.BSP?.display?.open?.(e.target.value);
                       }}
                     >
-                      <option value="auto">Auto (External Monitor)</option>
+                      <option value="auto">{t('settings.output.autoExternal')}</option>
                       {displays.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {d.label || `Display ${d.id}`}
+                          {d.label || t('settings.output.displayFallback', { id: d.id })}
                         </option>
                       ))}
                     </select>
                     <button style={modalStyles.actionBtn} onClick={() => window.BSP?.display?.open?.(selectedDisplayId)}>
-                      Open Display
+                      {t('settings.output.openDisplay')}
                     </button>
                   </div>
                 </div>
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Stage Display Target</div>
-                    <div style={modalStyles.rowSub}>Secondary confidence monitor for pastors and worship leaders</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.output.stageTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.output.stageSub')}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <select
@@ -1072,26 +1142,23 @@ export function SettingsModal() {
                       value={selectedStageDisplayId}
                       onChange={(e) => setSelectedStageDisplayId(e.target.value)}
                     >
-                      <option value="auto">Auto (Stage Monitor)</option>
+                      <option value="auto">{t('settings.output.autoStage')}</option>
                       {displays.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {d.label || `Display ${d.id}`}
+                          {d.label || t('settings.output.displayFallback', { id: d.id })}
                         </option>
                       ))}
                     </select>
                     <button style={modalStyles.actionBtn} onClick={() => window.BSP?.openStageDisplay?.(selectedStageDisplayId)}>
-                      Open Stage Display
+                      {t('settings.output.openStage')}
                     </button>
                   </div>
                 </div>
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Standby Card on Idle Screens</div>
-                    <div style={modalStyles.rowSub}>
-                      Show the “Bible Song Pro — Waiting for signal” card when nothing is being projected.
-                      Turn this off to leave audience screens plain black between items.
-                    </div>
+                    <div style={modalStyles.rowTitle}>{t('settings.output.standbyTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.output.standbySub')}</div>
                   </div>
                   <AppleToggle checked={showStandbyBrand} onChange={setShowStandbyBrand} />
                 </div>
@@ -1099,22 +1166,9 @@ export function SettingsModal() {
                 <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <div style={modalStyles.rowTitle}>NDI® Network Video Output</div>
-                      <div style={modalStyles.rowSub}>Publish program output live over local network for OBS, vMix, and NDI receivers</div>
+                      <div style={modalStyles.rowTitle}>{t('settings.output.ndiTitle')}</div>
+                      <div style={modalStyles.rowSub}>{t('settings.output.ndiSub')}</div>
                     </div>
-                    {/* One switch, like every other output on this page.
-                        A status pill reading NDI OFF next to a button reading
-                        Start NDI Stream said the same thing twice and made the
-                        operator read two controls to learn one fact. The
-                        toggle carries both: its position is the state, and it
-                        goes Signal orange when the stream is up — the same rule
-                        the tally works to. The connection count is a line below
-                        in the diagnostic strip, which is where the rest of the
-                        run-time numbers already live.
-
-                        Disabled when the NDI runtime is missing: there is
-                        nothing to switch on, and a control that accepts the
-                        click and then fails is worse than one that does not. */}
                     <AppleToggle
                       checked={Boolean(ndiStatus?.running)}
                       onChange={toggleNdiStream}
@@ -1124,14 +1178,13 @@ export function SettingsModal() {
 
                   {ndiStatus?.available === false && (
                     <div style={{ fontSize: 11, color: 'var(--tally-fault)' }}>
-                      The NDI runtime is not installed on this computer, so there is nothing to publish to.
+                      {t('settings.output.ndiRuntimeMissing')}
                     </div>
                   )}
 
-                  {/* NDI Stream Configuration Options */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, background: 'var(--settings-card)', padding: 12, borderRadius: 6, border: '1px solid var(--settings-line)' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>NDI Source Name</label>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>{t('settings.output.ndiSourceName')}</label>
                       <input
                         type="text"
                         style={{ ...modalStyles.textInput, width: '100%' }}
@@ -1142,20 +1195,20 @@ export function SettingsModal() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>Target Frame Rate</label>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>{t('settings.output.ndiFps')}</label>
                       <select
                         style={{ ...modalStyles.selectInput, width: '100%' }}
                         value={ndiFps}
                         onChange={(e) => setNdiFps(Number(e.target.value))}
                         disabled={ndiStatus?.running}
                       >
-                        <option value={15}>15 FPS (Standard)</option>
-                        <option value={30}>30 FPS (Smooth)</option>
-                        <option value={60}>60 FPS (Ultra Smooth)</option>
+                        <option value={15}>{t('settings.output.ndiFps15')}</option>
+                        <option value={30}>{t('settings.output.ndiFps30')}</option>
+                        <option value={60}>{t('settings.output.ndiFps60')}</option>
                       </select>
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>Capture Resolution</label>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>{t('settings.output.ndiResolution')}</label>
                       <select
                         style={{ ...modalStyles.selectInput, width: '100%' }}
                         value={`${ndiResWidth}x${ndiResHeight}`}
@@ -1166,18 +1219,17 @@ export function SettingsModal() {
                         }}
                         disabled={ndiStatus?.running}
                       >
-                        <option value="1280x720">720p (1280 x 720)</option>
-                        <option value="1920x1080">1080p (1920 x 1080)</option>
+                        <option value="1280x720">{t('settings.output.ndi720p')}</option>
+                        <option value="1920x1080">{t('settings.output.ndi1080p')}</option>
                       </select>
                     </div>
                   </div>
 
-                  {/* Diagnostic / Status Bar */}
                   {ndiStatus && (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', background: 'var(--settings-card)', border: '1px solid var(--settings-line)', padding: '6px 10px', borderRadius: 6 }}>
-                      <span>Frames Sent: <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.framesSent || 0}</strong></span>
-                      <span>Connections: <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.connections || 0}</strong></span>
-                      <span>Runtime: <strong style={{ color: ndiStatus.available ? 'var(--text-primary)' : 'var(--tally-fault)' }}>{ndiStatus.available ? 'NDI SDK Loaded' : 'NDI Runtime Missing'}</strong></span>
+                      <span>{t('settings.output.ndiFramesSent')} <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.framesSent || 0}</strong></span>
+                      <span>{t('settings.output.ndiConnections')} <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.connections || 0}</strong></span>
+                      <span>{t('settings.output.ndiRuntimeLabel')} <strong style={{ color: ndiStatus.available ? 'var(--text-primary)' : 'var(--tally-fault)' }}>{ndiStatus.available ? t('settings.output.ndiSdkLoaded') : t('settings.output.ndiRuntimeMissingShort')}</strong></span>
                     </div>
                   )}
 
@@ -1189,10 +1241,10 @@ export function SettingsModal() {
 
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                     <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText(`OBS NDI Source: ${ndiName}`)}>
-                      Copy OBS Setup Info
+                      {t('settings.output.copyObs')}
                     </button>
                     <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText(`vMix NDI Input: ${ndiName}`)}>
-                      Copy vMix Setup Info
+                      {t('settings.output.copyVmix')}
                     </button>
                   </div>
                 </div>
@@ -1204,8 +1256,8 @@ export function SettingsModal() {
               <div>
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Reference Font Size</div>
-                    <div style={modalStyles.rowSub}>Font size for Bible book/chapter and song title text</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.fs.refFontTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.fs.refFontSub')}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
@@ -1228,8 +1280,8 @@ export function SettingsModal() {
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Verse / Song Main Font Size</div>
-                    <div style={modalStyles.rowSub}>Main text font size for scriptures and lyrics</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.fs.mainFontTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.fs.mainFontSub')}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
@@ -1252,24 +1304,24 @@ export function SettingsModal() {
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Auto-Resize Mode</div>
-                    <div style={modalStyles.rowSub}>Shrink text dynamically when lines exceed display bounds</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.fs.autoResizeTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.fs.autoResizeSub')}</div>
                   </div>
                   <select
                     style={modalStyles.selectInput}
                     value={activeTheme?.fullScreen.autoResize || 'shrink'}
                     onChange={(e) => patchFullScreen({ autoResize: e.target.value as 'none' | 'shrink' | 'grow' })}
                   >
-                    <option value="none">None</option>
-                    <option value="shrink">Shrink to Fit</option>
-                    <option value="grow">Grow to Fit</option>
+                    <option value="none">{t('settings.fs.autoResizeNone')}</option>
+                    <option value="shrink">{t('settings.fs.autoResizeShrink')}</option>
+                    <option value="grow">{t('settings.fs.autoResizeGrow')}</option>
                   </select>
                 </div>
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Verse Text Alignment</div>
-                    <div style={modalStyles.rowSub}>Horizontal positioning of scripture text</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.fs.alignmentTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.fs.alignmentSub')}</div>
                   </div>
                   <div style={modalStyles.pillGroup}>
                     <button
@@ -1280,7 +1332,7 @@ export function SettingsModal() {
                       }}
                       onClick={() => patchFullScreen({ textAlign: 'left' })}
                     >
-                      Left
+                      {t('settings.fs.alignLeft')}
                     </button>
                     <button
                       style={{
@@ -1290,15 +1342,15 @@ export function SettingsModal() {
                       }}
                       onClick={() => patchFullScreen({ textAlign: 'center' })}
                     >
-                      Center
+                      {t('settings.fs.alignCenter')}
                     </button>
                   </div>
                 </div>
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Font Color</div>
-                    <div style={modalStyles.rowSub}>Main scripture and lyric text color</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.fs.fontColorTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.fs.fontColorSub')}</div>
                   </div>
                   <input
                     type="color"
@@ -1315,8 +1367,8 @@ export function SettingsModal() {
               <div>
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Lower Third Font Size</div>
-                    <div style={modalStyles.rowSub}>Main text font size in Lower Third overlay mode</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.lt.fontTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.lt.fontSub')}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
@@ -1339,18 +1391,18 @@ export function SettingsModal() {
 
                 <div style={modalStyles.formRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Lower Third Position</div>
-                    <div style={modalStyles.rowSub}>Screen vertical alignment</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.lt.positionTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.lt.positionSub')}</div>
                   </div>
                   <select
                     style={modalStyles.selectInput}
                     value={activeTheme?.lowerThird.position || 'bottom-center'}
                     onChange={(e) => patchLowerThird({ position: e.target.value as any })}
                   >
-                    <option value="bottom-center">Bottom Center Overlay</option>
-                    <option value="bottom-left">Bottom Left Overlay</option>
-                    <option value="bottom-right">Bottom Right Overlay</option>
-                    <option value="top-center">Top Center Overlay</option>
+                    <option value="bottom-center">{t('settings.lt.bottomCenter')}</option>
+                    <option value="bottom-left">{t('settings.lt.bottomLeft')}</option>
+                    <option value="bottom-right">{t('settings.lt.bottomRight')}</option>
+                    <option value="top-center">{t('settings.lt.topCenter')}</option>
                   </select>
                 </div>
               </div>
@@ -1397,53 +1449,46 @@ export function SettingsModal() {
                     onChange={(e) => saveSettings({ sermonLanguage: e.target.value as SermonLanguage })}
                   >
                     <option value="auto">{t('settings.language.auto')}</option>
-                    <option value="en">English</option>
-                    <option value="fr">Français</option>
-                    <option value="es">Español</option>
-                    <option value="pt">Português</option>
+                    {UI_LOCALES.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.nativeLabel}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
-                {/* The honest caveat. Moonshine and Whisper `.en` carry
-                    English-only weights, so choosing French here would do
-                    nothing at all unless the operator also switches model —
-                    which is exactly the sort of silent no-op the old mockup
-                    was made of. */}
                 {settings?.sermonLanguage && settings.sermonLanguage !== 'auto' && settings.sermonLanguage !== 'en'
                   && aiStatus && !aiStatus.multilingual && (
                   <div style={modalStyles.formRow}>
                     <div>
                       <div style={{ ...modalStyles.rowTitle, color: 'var(--tally-fault)' }}>
-                        {localModel?.label || 'The current model'} only understands English
+                        {t('settings.bundled.modelEnglishOnly', {
+                          model: localModel?.label || t('settings.bundled.currentModel'),
+                        })}
                       </div>
-                      <div style={modalStyles.rowSub}>
-                        Pick a multilingual model under Scripture → On-device model, or this
-                        setting will have no effect.
-                      </div>
+                      <div style={modalStyles.rowSub}>{t('settings.bundled.multilingualHint')}</div>
                     </div>
                   </div>
                 )}
 
                 <div style={{ marginTop: 16 }}>
-                  <div style={modalStyles.rowTitle}>Bible translations</div>
-                  <div style={modalStyles.rowSub}>
-                    Bundled and offline — no download. Public domain only; see BIBLES.md.
-                  </div>
+                  <div style={modalStyles.rowTitle}>{t('settings.bundled.translationsTitle')}</div>
+                  <div style={modalStyles.rowSub}>{t('settings.bundled.translationsHint')}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
                     {[
-                      { flag: '🇬🇧', label: 'English', texts: 'KJV · ASV · Darby · YLT' },
-                      { flag: '🇫🇷', label: 'French', texts: 'Louis Segond 1910 · Ostervald' },
-                      { flag: '🇪🇸', label: 'Spanish', texts: 'Reina-Valera 1909' },
+                      { flag: '🇬🇧', labelKey: 'settings.bundled.english' as const, textsKey: 'settings.bundled.englishTexts' as const },
+                      { flag: '🇫🇷', labelKey: 'settings.bundled.french' as const, textsKey: 'settings.bundled.frenchTexts' as const },
+                      { flag: '🇪🇸', labelKey: 'settings.bundled.spanish' as const, textsKey: 'settings.bundled.spanishTexts' as const },
                     ].map((row) => (
-                      <div key={row.label} style={modalStyles.formRow}>
+                      <div key={row.labelKey} style={modalStyles.formRow}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 18 }}>{row.flag}</span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{row.label}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{row.texts}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t(row.labelKey)}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t(row.textsKey)}</div>
                           </div>
                         </div>
-                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Installed</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t('settings.bundled.installed')}</span>
                       </div>
                     ))}
                   </div>
@@ -1455,31 +1500,31 @@ export function SettingsModal() {
             {activeCategory === 'hotkeys' && (
               <div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Toggle Fullscreen Output</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.fullscreen')}</span>
                   <span style={modalStyles.keyBadge}>Cmd + Shift + F</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Toggle Blackout Screen</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.blackout')}</span>
                   <span style={modalStyles.keyBadge}>Cmd + Shift + B</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Start NDI Video Stream</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.ndi')}</span>
                   <span style={modalStyles.keyBadge}>Cmd + Shift + N</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Toggle search mode</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.search')}</span>
                   <span style={modalStyles.keyBadge}>Tab</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Toggle live sync</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.liveSync')}</span>
                   <span style={modalStyles.keyBadge}>L</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Go live / Take to Program</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.take')}</span>
                   <span style={modalStyles.keyBadge}>Enter x2</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Close Settings / Modals</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.close')}</span>
                   <span style={modalStyles.keyBadge}>Esc</span>
                 </div>
               </div>
@@ -1490,26 +1535,32 @@ export function SettingsModal() {
               <div>
                 <div style={modalStyles.helpRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Dashboard tutorial</div>
-                    <div style={modalStyles.rowSub}>Video walkthroughs of the console, on the channel</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.help.dashboardTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.help.dashboardSub')}</div>
                   </div>
-                  <button style={modalStyles.actionBtn} onClick={openTutorials}>↗ Watch on YouTube</button>
+                  <button style={{ ...modalStyles.actionBtn, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={openTutorials}>
+                    <IconExternalLink />
+                    {t('settings.help.watchYoutube')}
+                  </button>
                 </div>
 
                 <div style={modalStyles.helpRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Theme designer tutorial</div>
-                    <div style={modalStyles.rowSub}>Learn how to use the theme designer</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.help.themeTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.help.themeSub')}</div>
                   </div>
-                  <button style={modalStyles.actionBtn} onClick={openTutorials}>↗ Watch on YouTube</button>
+                  <button style={{ ...modalStyles.actionBtn, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={openTutorials}>
+                    <IconExternalLink />
+                    {t('settings.help.watchYoutube')}
+                  </button>
                 </div>
 
                 <div style={modalStyles.helpRow}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Documentation</div>
-                    <div style={modalStyles.rowSub}>Open guides and product help</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.help.docsTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.help.docsSub')}</div>
                   </div>
-                  <button style={modalStyles.actionBtn}>Open docs</button>
+                  <button style={modalStyles.actionBtn}>{t('settings.help.openDocs')}</button>
                 </div>
 
               </div>
@@ -1524,30 +1575,38 @@ export function SettingsModal() {
                       ...modalStyles.pillBtn,
                       background: feedbackType === 'bug' ? '#FF5500' : 'transparent',
                       color: feedbackType === 'bug' ? '#ffffff' : 'var(--text-secondary)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
                     }}
                     onClick={() => setFeedbackType('bug')}
                   >
-                    🐛 Bug Report
+                    <IconAlertCircle />
+                    {t('settings.feedback.bugReport')}
                   </button>
                   <button
                     style={{
                       ...modalStyles.pillBtn,
                       background: feedbackType === 'feature' ? '#FF5500' : 'transparent',
                       color: feedbackType === 'feature' ? '#ffffff' : 'var(--text-secondary)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
                     }}
                     onClick={() => setFeedbackType('feature')}
                   >
-                    💡 Feature Request
+                    <IconLightbulb />
+                    {t('settings.feedback.featureRequest')}
                   </button>
                 </div>
 
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
-                    Church / Community Name <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
+                    {t('settings.feedback.churchLabel')} <span style={{ color: 'var(--text-dim)' }}>{t('settings.feedback.optional')}</span>
                   </div>
                   <input
                     type="text"
-                    placeholder="e.g. Grace Chapel / City Youth Ministry"
+                    placeholder={t('settings.feedback.churchPlaceholder')}
                     value={churchName}
                     onChange={(e) => setChurchName(e.target.value)}
                     style={modalStyles.textInput}
@@ -1556,20 +1615,14 @@ export function SettingsModal() {
 
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                    {feedbackType === 'bug' ? 'Describe the bug' : 'Describe the feature request'}
+                    {feedbackType === 'bug' ? t('settings.feedback.describeBug') : t('settings.feedback.describeFeature')}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                    {feedbackType === 'bug'
-                      ? 'A clear report helps us reproduce and fix it quickly.'
-                      : 'Let us know how this feature would help your church or media team.'}
+                    {feedbackType === 'bug' ? t('settings.feedback.bugHint') : t('settings.feedback.featureHint')}
                   </div>
                   <textarea
                     rows={5}
-                    placeholder={
-                      feedbackType === 'bug'
-                        ? 'Describe what you were doing, what you expected, and what happened...'
-                        : 'Describe the feature you would like to see in Bible Song Pro Studio...'
-                    }
+                    placeholder={feedbackType === 'bug' ? t('settings.feedback.bugPlaceholder') : t('settings.feedback.featurePlaceholder')}
                     value={feedbackDesc}
                     onChange={(e) => setFeedbackDesc(e.target.value)}
                     style={modalStyles.textareaInput}
@@ -1578,8 +1631,8 @@ export function SettingsModal() {
 
                 <div style={{ ...modalStyles.formRow, marginBottom: 16 }}>
                   <div>
-                    <div style={modalStyles.rowTitle}>Blocking Issue</div>
-                    <div style={modalStyles.rowSubtitle}>This issue prevents normal service or presentation setup</div>
+                    <div style={modalStyles.rowTitle}>{t('settings.feedback.blockingTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.feedback.blockingSub')}</div>
                   </div>
                   <AppleToggle checked={isBlocking} onChange={setIsBlocking} />
                 </div>
@@ -1601,9 +1654,10 @@ export function SettingsModal() {
                       <button
                         className="btn btn-sm"
                         onClick={() => void window.BSP?.openExternal(feedbackStatus.issueUrl!)}
-                        style={{ marginTop: 6, fontSize: 11, background: '#FF5500', color: '#FFF', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '4px 10px' }}
+                        style={{ marginTop: 6, fontSize: 11, background: '#FF5500', color: '#FFF', border: 'none', borderRadius: 4, cursor: 'pointer', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                       >
-                        🔗 Open Issue on GitHub
+                        <IconExternalLink size={13} />
+                        {t('settings.feedback.openIssue')}
                       </button>
                     )}
                   </div>
@@ -1619,6 +1673,9 @@ export function SettingsModal() {
                       fontWeight: 700,
                       opacity: feedbackSending || !feedbackDesc.trim() ? 0.6 : 1,
                       cursor: feedbackSending || !feedbackDesc.trim() ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
                     }}
                     disabled={feedbackSending || !feedbackDesc.trim()}
                     onClick={async () => {
@@ -1636,34 +1693,35 @@ export function SettingsModal() {
                         if (res && res.ok) {
                           setFeedbackStatus({
                             ok: true,
-                            msg: 'Thank you! Your feedback has been prepared for GitHub.',
+                            msg: t('settings.feedback.success'),
                             issueUrl: res.issueUrl,
                           });
                           setFeedbackDesc('');
                         } else {
                           setFeedbackStatus({
                             ok: false,
-                            msg: res?.error || 'Failed to submit feedback. You can use the link below.',
+                            msg: res?.error || t('settings.feedback.fail'),
                           });
                         }
-                      } catch (err) {
+                      } catch {
                         setFeedbackStatus({
                           ok: false,
-                          msg: 'Could not send directly. Click below to submit on GitHub.',
+                          msg: t('settings.feedback.fallback'),
                         });
                       } finally {
                         setFeedbackSending(false);
                       }
                     }}
                   >
-                    {feedbackSending ? 'Sending…' : '📤 Submit Feedback to GitHub'}
+                    <IconSend />
+                    {feedbackSending ? t('settings.feedback.sending') : t('settings.feedback.submit')}
                   </button>
 
                   <button
-                    style={modalStyles.actionBtn}
+                    style={{ ...modalStyles.actionBtn, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                     onClick={() => {
                       const issueTitle = `[${feedbackType.toUpperCase()}] Feedback from ${churchName ? churchName.trim() : 'App User'}`;
-                      const issueBody = `### ${feedbackType === 'bug' ? '🐛 Bug Report' : '💡 Feature Request'}\n\n` +
+                      const issueBody = `### ${feedbackType === 'bug' ? t('settings.feedback.bugReport') : t('settings.feedback.featureRequest')}\n\n` +
                         `**Church / Community**: ${churchName ? churchName.trim() : 'Not specified'}\n` +
                         `**Blocking Issue**: ${isBlocking ? 'Yes' : 'No'}\n\n` +
                         `---\n### Description\n\n${feedbackDesc.trim() || '(No description)'}\n`;
@@ -1671,7 +1729,8 @@ export function SettingsModal() {
                       void window.BSP?.openExternal(url);
                     }}
                   >
-                    🔗 Open directly on GitHub
+                    <IconExternalLink />
+                    {t('settings.feedback.openGithub')}
                   </button>
                 </div>
               </div>
@@ -1707,20 +1766,20 @@ export function SettingsModal() {
                         flexShrink: 0,
                       }}
                     >
-                      ☕
+                      <IconCoffee size={26} />
                     </div>
                     <div>
                       <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
                         Johnson Olakotan
                       </h3>
                       <p style={{ margin: '3px 0 0 0', fontSize: 12, color: '#FF5500', fontWeight: 600 }}>
-                        Lead Engineer & Creator of Bible Song Pro Studio
+                        {t('settings.support.creatorRole')}
                       </p>
                     </div>
                   </div>
 
                   <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                    Bible Song Pro Studio is built to empower churches, ministries, and live production teams with reliable, modern presentation tools and live scripture AI. Your support directly helps fund ongoing engineering, hosting costs, and future feature developments.
+                    {t('settings.support.description')}
                   </p>
 
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
@@ -1741,27 +1800,30 @@ export function SettingsModal() {
                         gap: 8,
                       }}
                     >
-                      ☕ Buy Me a Coffee / Support
+                      <IconCoffee size={15} />
+                      {t('settings.support.buyCoffee')}
                     </button>
                     <button
                       className="btn btn-secondary"
                       onClick={() => void window.BSP?.openExternal('https://www.instagram.com/johnsonolakotan')}
-                      style={{ padding: '10px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer' }}
+                      style={{ padding: '10px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}
                     >
-                      📷 Instagram @johnsonolakotan
+                      <IconCamera />
+                      {t('settings.support.instagram')}
                     </button>
                     <button
                       className="btn btn-secondary"
                       onClick={() => void window.BSP?.openExternal(TUTORIALS_URL)}
-                      style={{ padding: '10px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer' }}
+                      style={{ padding: '10px 14px', fontSize: 12, borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}
                     >
-                      ▶️ YouTube Tutorials
+                      <IconPlay />
+                      {t('settings.support.youtube')}
                     </button>
                   </div>
                 </div>
 
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, padding: '0 4px' }}>
-                  Thank you for using Bible Song Pro Studio to serve your church and media team!
+                  {t('settings.support.thankYou')}
                 </div>
               </div>
             )}

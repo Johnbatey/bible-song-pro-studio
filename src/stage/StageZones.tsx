@@ -298,8 +298,9 @@ export function StageZones({
 
                       {wordStudy.kjvUsage && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', width: '100%', marginTop: '0.6cqw' }}>
-                          <div style={{ fontSize: 'clamp(11px, 1.6cqw, 20px)', fontWeight: 800, letterSpacing: '0.08em', color: '#FF5500' }}>
-                            🏷️ KJV TRANSLATION USAGE
+                          <div style={{ fontSize: 'clamp(11px, 1.6cqw, 20px)', fontWeight: 800, letterSpacing: '0.08em', color: '#FF5500', display: 'flex', alignItems: 'center', gap: '0.5cqw' }}>
+                            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                            KJV TRANSLATION USAGE
                           </div>
                           <div
                             style={{
@@ -332,8 +333,9 @@ export function StageZones({
                     >
                       {wordStudy.etymology && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw' }}>
-                          <div style={{ fontSize: 'clamp(12px, 1.8cqw, 22px)', fontWeight: 800, letterSpacing: '0.1em', color: '#a1a1aa' }}>
-                            🔗 DERIVATION & ETYMOLOGY
+                          <div style={{ fontSize: 'clamp(12px, 1.8cqw, 22px)', fontWeight: 800, letterSpacing: '0.1em', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '0.5cqw' }}>
+                            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            DERIVATION & ETYMOLOGY
                           </div>
                           <div
                             style={{
@@ -352,8 +354,9 @@ export function StageZones({
                       )}
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw' }}>
-                        <div style={{ fontSize: 'clamp(12px, 1.8cqw, 22px)', fontWeight: 800, letterSpacing: '0.1em', color: '#a1a1aa' }}>
-                          📖 STRONGS DEFINITION
+                        <div style={{ fontSize: 'clamp(12px, 1.8cqw, 22px)', fontWeight: 800, letterSpacing: '0.1em', color: '#a1a1aa', display: 'flex', alignItems: 'center', gap: '0.5cqw' }}>
+                          <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                          STRONGS DEFINITION
                         </div>
                         <div
                           style={{

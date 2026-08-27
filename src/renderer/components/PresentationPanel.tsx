@@ -181,6 +181,7 @@ function CardThumb({ deck, fallback, caption }: { deck?: PresentationDeck; fallb
 
 export function PresentationPanel() {
   const { t } = useI18n();
+  const slideLabel = (num: number) => t('pres.slideNumber', { num });
   const openSlideEditor = useAppStore((s) => s.openSlideEditor);
   const presentationDecks = useAppStore((s) => s.presentationDecks);
   const addPresentationDeck = useAppStore((s) => s.addPresentationDeck);
@@ -279,9 +280,9 @@ export function PresentationPanel() {
       slides: [
         {
           id: `slide-${Date.now()}`,
-          title: 'Welcome',
+          title: t('pres.defaultWelcome'),
           body: title,
-          label: 'Slide 1',
+          label: slideLabel(1),
           notes: '',
           transition: 'fade',
           durationMs: 3000,
@@ -331,7 +332,7 @@ export function PresentationPanel() {
     const newDeck: PresentationDeck = {
       ...target,
       id: `deck-${Date.now()}`,
-      title: `${target.title} (Copy)`,
+      title: `${target.title} ${t('pres.copySuffix')}`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -361,9 +362,9 @@ export function PresentationPanel() {
     const count = (selectedDeck.slides?.length || 0) + 1;
     const newSlide: PresentationSlide = {
       id: `slide-${Date.now()}`,
-      title: `Slide ${count}`,
-      body: 'Enter slide text...',
-      label: `Slide ${count}`,
+      title: slideLabel(count),
+      body: t('pres.defaultSlideBody'),
+      label: slideLabel(count),
       notes: '',
       transition: 'fade',
       durationMs: 3000,
@@ -394,7 +395,7 @@ export function PresentationPanel() {
 
     if ('body' in slide) {
       const pSlide = slide as PresentationSlide;
-      text = pSlide.body || pSlide.title || pSlide.label || `Slide ${index + 1}`;
+      text = pSlide.body || pSlide.title || pSlide.label || slideLabel(index + 1);
       projection = projectNativeSlide(pSlide, selectedDeck);
       if (pSlide.background) {
         const b = pSlide.background as SlideBackground;
@@ -416,16 +417,16 @@ export function PresentationPanel() {
           });
         });
       });
-      text = runs.join('\n') || `Slide ${index + 1}`;
+      text = runs.join('\n') || slideLabel(index + 1);
       projection = projectParsedSlide(pSlide, pkg.slideSizeEmu);
     } else {
-      text = `Slide ${index + 1}`;
+      text = slideLabel(index + 1);
       projection = { kind: 'native', elements: [] };
     }
 
     const scene: Scene = {
       id: sceneId,
-      name: `${selectedDeck.title} — Slide ${index + 1}`,
+      name: t('pres.sceneName', { deck: selectedDeck.title, num: index + 1 }),
       type: 'presentation',
       content: {
         text,
@@ -433,7 +434,7 @@ export function PresentationPanel() {
         slideId: String(index),
         slides: selectedDeck.slides?.map((s: any, idx: number) => ({
           id: s.id || String(idx),
-          text: s.body || s.title || s.label || `Slide ${idx + 1}`,
+          text: s.body || s.title || s.label || slideLabel(idx + 1),
           notes: s.notes || '',
         })),
       },
@@ -506,7 +507,7 @@ export function PresentationPanel() {
       <button
         type="button"
         onClick={() => setCardZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))}
-        title="Zoom Out Thumbnails"
+        title={t('pres.zoomOutThumbnails')}
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
       </button>
@@ -518,14 +519,14 @@ export function PresentationPanel() {
         step={0.05}
         value={cardZoom}
         onChange={(e) => setCardZoom(parseFloat(e.target.value))}
-        title="Adjust thumbnail size"
+        title={t('pres.zoomAdjustThumbnails')}
         style={{ width: 64 }}
       />
 
       <button
         type="button"
         onClick={() => setCardZoom((z) => Math.min(1.8, Math.round((z + 0.1) * 10) / 10))}
-        title="Zoom In Thumbnails"
+        title={t('pres.zoomInThumbnails')}
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
       </button>
@@ -541,9 +542,9 @@ export function PresentationPanel() {
         className="zoombar-fit"
         data-active={Math.abs(cardZoom - 1.0) < 0.01 || undefined}
         onClick={() => setCardZoom(1.0)}
-        title="Reset thumbnail scale"
+        title={t('pres.zoomResetThumbnails')}
       >
-        Fit
+        {t('pres.zoomFit')}
       </button>
     </div>
   );
@@ -554,7 +555,7 @@ export function PresentationPanel() {
       <CustomDropdown
         value="create"
         options={[
-          { value: 'create', label: '+ Create new' },
+          { value: 'create', label: t('pres.createNew') },
           {
             value: 'manual',
             label: t('pres.createManual'),
@@ -567,7 +568,7 @@ export function PresentationPanel() {
           },
           {
             value: 'ai',
-            label: 'Generate with AI',
+            label: t('pres.generateAi'),
             icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"/></svg>,
           },
         ]}
@@ -597,7 +598,7 @@ export function PresentationPanel() {
       <MoveBarButton
         position={barPosition}
         onMove={moveBar}
-        label="Pro Slides"
+        label={t('dock.presentation')}
         style={styles.moveBarBtn}
       />
     </div>
@@ -621,15 +622,15 @@ export function PresentationPanel() {
       <button
         style={styles.addSlideBtn}
         onClick={handleAddSlideToDeck}
-        title="Add a new slide to this project"
+        title={t('pres.addSlideTooltip')}
       >
-        + Add Slide
+        {t('pres.addSlide')}
       </button>
 
       <MoveBarButton
         position={barPosition}
         onMove={moveBar}
-        label="Pro Slides"
+        label={t('dock.presentation')}
         style={styles.moveBarBtn}
       />
     </div>
@@ -641,7 +642,7 @@ export function PresentationPanel() {
 
     if (isPptxSelected && pkg.slides.length > 0) {
       return pkg.slides.map((s, idx) => {
-        let snippet = `Slide ${idx + 1}`;
+        let snippet = slideLabel(idx + 1);
         const shapes = (s.shapes as ParsedShape[]) || [];
         const textRuns: string[] = [];
         shapes.forEach((shp) => {
@@ -655,7 +656,7 @@ export function PresentationPanel() {
         return {
           slide: s,
           index: idx,
-          title: `Slide ${idx + 1}`,
+          title: slideLabel(idx + 1),
           subtitle: snippet,
         };
       });
@@ -664,7 +665,7 @@ export function PresentationPanel() {
     return (selectedDeck.slides || []).map((s: any, idx: number) => ({
       slide: s,
       index: idx,
-      title: s.title || s.label || `Slide ${idx + 1}`,
+      title: s.title || s.label || slideLabel(idx + 1),
       subtitle: s.body || s.notes || '',
     }));
   })();
@@ -710,7 +711,9 @@ export function PresentationPanel() {
           )}
           {presentations.length === 0 && (
             <div style={styles.emptyState}>
-              No decks yet. Use <strong>+ Create new</strong> to build one, or import a presentation.
+              {t('pres.emptyDecks').split('{action}')[0]}
+              <strong>{t('pres.emptyDecksAction')}</strong>
+              {t('pres.emptyDecks').split('{action}')[1] || ''}
             </div>
           )}
           {presentations
@@ -730,7 +733,7 @@ export function PresentationPanel() {
                     y: e.clientY,
                   });
                 }}
-                title="Click to view project slides · double-click to open editor · right-click for options"
+                title={t('pres.cardTooltip')}
               >
                 <CardThumb
                   deck={presentationDecks.find((d) => d.id === item.id)}
@@ -741,7 +744,7 @@ export function PresentationPanel() {
                 <div style={styles.cardFooter}>
                   <div>
                     <div style={styles.cardTitle}>{item.title}</div>
-                    <div style={styles.cardSubtitle}>{item.pagesCount} {item.pagesCount === 1 ? 'page' : 'pages'}</div>
+                    <div style={styles.cardSubtitle}>{item.pagesCount} {item.pagesCount === 1 ? t('pres.page') : t('pres.pages')}</div>
                   </div>
 
                   <button
@@ -771,13 +774,13 @@ export function PresentationPanel() {
         /* PAGE 2: PROJECT SLIDES VIEW */
         <Block
           className="blk-fill"
-          title={<>Project: <span style={{ color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }} title={t('pres.renameProject')} onClick={() => handleRenameDeck(selectedDeck.id)}>{selectedDeck.title} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span></>}
+          title={<>{t('pres.projectLabel')} <span style={{ color: 'var(--accent)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }} title={t('pres.renameProject')} onClick={() => handleRenameDeck(selectedDeck.id)}>{selectedDeck.title} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span></>}
           subtitle={page2SlidesList.length === 1
             ? t('pres.slide', { count: page2SlidesList.length })
             : t('pres.slides', { count: page2SlidesList.length })}
           tools={(
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <BlockButton onClick={() => setSelectedDeckId(null)}>← Projects</BlockButton>
+              <BlockButton onClick={() => setSelectedDeckId(null)}>{t('pres.backToProjects')}</BlockButton>
               <BlockButton
                 icon
                 onClick={() => stepSlide(-1)}
@@ -803,7 +806,7 @@ export function PresentationPanel() {
               <BlockButton onClick={() => handleEditSlide(selectedDeck.id)}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                  Open in Editor
+                  {t('pres.openEditor')}
                 </span>
               </BlockButton>
             </div>
@@ -818,7 +821,9 @@ export function PresentationPanel() {
 
           {filteredPage2Slides.length === 0 && (
             <div style={styles.emptyState}>
-              No slides found in this project. Use <strong>+ Add Slide</strong> above to create one.
+              {t('pres.emptySlides').split('{action}')[0]}
+              <strong>{t('pres.emptySlidesAction')}</strong>
+              {t('pres.emptySlides').split('{action}')[1] || ''}
             </div>
           )}
 
@@ -850,8 +855,8 @@ export function PresentationPanel() {
                 onClick={() => handleProjectSlide(slide, index, false)}
                 onDoubleClick={() => handleProjectSlide(slide, index, true)}
                 title={isStudio
-                  ? 'Click to stage in Preview · double-click to go straight to Program'
-                  : 'Click to project live · double-click to force Go Live'}
+                  ? t('pres.slideTooltipStudio')
+                  : t('pres.slideTooltipBasic')}
               >
                 {/* Slide Preview Miniature */}
                 <div style={{ position: 'relative', width: '100%' }}>
@@ -876,7 +881,7 @@ export function PresentationPanel() {
                 <div style={styles.projectSlideFooter}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={styles.projectSlideTitle}>{title}</div>
-                    <div style={styles.projectSlideSubtitle}>{subtitle || `Slide ${index + 1}`}</div>
+                    <div style={styles.projectSlideSubtitle}>{subtitle || slideLabel(index + 1)}</div>
                   </div>
 
                   <div style={{ display: 'flex', gap: 4 }}>
@@ -889,7 +894,7 @@ export function PresentationPanel() {
                           handleProjectSlide(slide, index, false);
                         }}
                       >
-                        Stage
+                        {t('pres.stage')}
                       </button>
                     )}
                     <button
@@ -946,7 +951,7 @@ export function PresentationPanel() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>Create New Pro Slide Project</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{t('pres.createModalTitle')}</div>
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
@@ -957,7 +962,7 @@ export function PresentationPanel() {
             </div>
 
             <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-              Enter a name for your new presentation deck project:
+              {t('pres.createModalDesc')}
             </div>
 
             <input
@@ -968,7 +973,7 @@ export function PresentationPanel() {
                 if (e.key === 'Enter') handleConfirmCreateProject();
               }}
               autoFocus
-              placeholder="e.g. Sunday Service Presentation"
+              placeholder={t('pres.createModalPlaceholder')}
               style={{
                 width: '100%',
                 padding: '10px 14px',
@@ -996,7 +1001,7 @@ export function PresentationPanel() {
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -1013,7 +1018,7 @@ export function PresentationPanel() {
                   boxShadow: '0 2px 10px rgba(244, 98, 31, 0.4)',
                 }}
               >
-                Create Project
+                {t('pres.createProject')}
               </button>
             </div>
           </div>
@@ -1053,7 +1058,7 @@ export function PresentationPanel() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>Rename Pro Slide Project</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{t('pres.renameModalTitle')}</div>
               <button
                 type="button"
                 onClick={() => setRenameDeckTarget(null)}
@@ -1064,7 +1069,7 @@ export function PresentationPanel() {
             </div>
 
             <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-              Enter a new title for this presentation project:
+              {t('pres.renameModalDesc')}
             </div>
 
             <input
@@ -1076,7 +1081,7 @@ export function PresentationPanel() {
                 if (e.key === 'Escape') setRenameDeckTarget(null);
               }}
               autoFocus
-              placeholder="e.g. Technology Consulting"
+              placeholder={t('pres.renameModalPlaceholder')}
               style={{
                 width: '100%',
                 padding: '10px 14px',
@@ -1104,7 +1109,7 @@ export function PresentationPanel() {
                   cursor: 'pointer',
                 }}
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -1121,7 +1126,7 @@ export function PresentationPanel() {
                   boxShadow: '0 2px 10px rgba(244, 98, 31, 0.4)',
                 }}
               >
-                Save Name
+                {t('pres.saveName')}
               </button>
             </div>
           </div>
@@ -1185,35 +1190,35 @@ export function PresentationPanel() {
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              <span>View project slides</span>
+              <span>{t('pres.menuViewSlides')}</span>
             </button>
             <button
               style={styles.menuItem}
               onClick={() => handleEditSlide(activeDeck.id)}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              <span>Edit design in editor</span>
+              <span>{t('pres.menuEditDesign')}</span>
             </button>
             <button
               style={styles.menuItem}
               onClick={() => handleRenameDeck(activeDeck.id)}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              <span>Rename project</span>
+              <span>{t('pres.menuRename')}</span>
             </button>
             <button
               style={styles.menuItem}
               onClick={() => handleDuplicateDeck(activeDeck.id)}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              <span>Duplicate project</span>
+              <span>{t('pres.menuDuplicate')}</span>
             </button>
             <button
               style={{ ...styles.menuItem, color: 'var(--tally-fault)' }}
               onClick={() => handleDeleteSlide(activeDeck.id)}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--tally-fault)' }}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-              <span>Delete project</span>
+              <span>{t('pres.menuDelete')}</span>
             </button>
           </div>,
           document.body
