@@ -141,6 +141,7 @@ function createOnnxWhisperService({ app }) {
   const cacheDir = path.join(userData, 'huggingface-cache');
   let pipe = null;
   let warmupState = 'idle';
+  let activeWarmupPromise = null;
   let lastError = '';
   /** A note about a successful-but-adjusted run. Never an error. */
   let lastNotice = '';
@@ -166,7 +167,7 @@ function createOnnxWhisperService({ app }) {
       modelLabel: model.label,
       family: model.family,
       available: true,
-      ready: warmupState === 'ready',
+      ready: warmupState === 'ready' && Boolean(pipe),
       warmupState,
       downloadProgress,
       cacheDir,
@@ -192,11 +193,19 @@ function createOnnxWhisperService({ app }) {
   }
 
   async function loadTransformers() {
+    try {
+      if (!fs.existsSync(cacheDir)) {
+        fs.mkdirSync(cacheDir, { recursive: true });
+      }
+    } catch (e) {
+      console.warn('Failed to create huggingface-cache directory:', e);
+    }
     if (!transformers) transformers = await import('@huggingface/transformers');
     /* v3 reads the cache location off `env` rather than the TRANSFORMERS_CACHE
        environment variable v2 used, so setting it has to happen after import
        and before the first pipeline call. */
     transformers.env.cacheDir = cacheDir;
+    transformers.env.allowLocalModels = true;
     return transformers;
   }
 
@@ -211,6 +220,7 @@ function createOnnxWhisperService({ app }) {
        from. */
     pipe = null;
     warmupState = 'idle';
+    activeWarmupPromise = null;
     downloadProgress = 0;
     lastError = '';
     lastNotice = '';
@@ -218,37 +228,49 @@ function createOnnxWhisperService({ app }) {
   }
 
   async function warmup(payload = {}) {
-    try {
-      const requested = payload.modelId || payload.modelKey;
-      if (requested) {
-        const result = setModel(requested);
-        if (!result.ok) return result;
-      }
-      if (pipe) return { ok: true, warmedUp: true, modelId: model.id, status: status() };
-
-      warmupState = 'loading';
-      downloadProgress = 0;
-      const { pipeline } = await loadTransformers();
-      pipe = await pipeline('automatic-speech-recognition', model.id, {
-        dtype: model.dtype,
-        progress_callback: (progress) => {
-          if (progress.status === 'progress') {
-            warmupState = 'downloading';
-            downloadProgress = Math.round(progress.progress || 0);
-          } else if (progress.status === 'done') {
-            downloadProgress = 100;
-          }
-        },
-      });
-      warmupState = 'ready';
-      downloadProgress = 100;
-      lastError = '';
-      return { ok: true, warmedUp: true, modelId: model.id, status: status() };
-    } catch (err) {
-      warmupState = 'error';
-      lastError = err.message;
-      return { ok: false, error: err.message, status: status() };
+    // If a warmup is already in progress, reuse the existing single-flight promise to prevent concurrent stream collisions
+    if (activeWarmupPromise) {
+      return activeWarmupPromise;
     }
+
+    activeWarmupPromise = (async () => {
+      try {
+        const requested = payload.modelId || payload.modelKey;
+        if (requested) {
+          const result = setModel(requested);
+          if (!result.ok) return result;
+        }
+        if (pipe) return { ok: true, warmedUp: true, modelId: model.id, status: status() };
+
+        warmupState = 'loading';
+        downloadProgress = 0;
+        const { pipeline } = await loadTransformers();
+        pipe = await pipeline('automatic-speech-recognition', model.id, {
+          dtype: model.dtype,
+          progress_callback: (progress) => {
+            if (progress.status === 'progress') {
+              warmupState = 'downloading';
+              downloadProgress = Math.round(progress.progress || 0);
+            } else if (progress.status === 'done') {
+              downloadProgress = 100;
+            }
+          },
+        });
+        warmupState = 'ready';
+        downloadProgress = 100;
+        lastError = '';
+        return { ok: true, warmedUp: true, modelId: model.id, status: status() };
+      } catch (err) {
+        warmupState = 'error';
+        lastError = err.message;
+        pipe = null;
+        return { ok: false, error: err.message, status: status() };
+      } finally {
+        activeWarmupPromise = null;
+      }
+    })();
+
+    return activeWarmupPromise;
   }
 
   async function transcribe(payload = {}) {

@@ -61,8 +61,10 @@ function nativeLayerRows(elements: SlideElement[], selectedIds: string[], t: (ke
       kind: el.type === 'text' ? 'text' : el.type === 'image' ? 'image' : el.type === 'pencil' ? 'pencil' : el.type === 'bezier' ? 'bezier' : 'shape',
       selected: selectedIds.includes(el.id),
       locked: Boolean(el.locked),
+      hidden: Boolean(el.hidden),
     }));
 }
+
 
 const FONT_FAMILIES = [
   { value: 'Inter', label: 'Inter' },
@@ -1535,12 +1537,53 @@ export function SlideEditorRightSidebar({
             {(selectedElement || pptxShape) && (
               <div style={styles.sectionCard}>
                 <div style={styles.sectionHeader} onClick={() => toggleSection('shape')}>
-                  <span style={styles.sectionTitle}>{t('slideEditor.sidebar.shapeFillBorder')}</span>
+                  <span style={styles.sectionTitle}>
+                    {selectedElement?.type === 'bezier'
+                      ? t('slideEditor.sidebar.vectorPathFillStroke')
+                      : t('slideEditor.sidebar.shapeFillBorder')}
+                  </span>
                   <ChevronIcon open={Boolean(openSections.shape)} />
                 </div>
 
                 {openSections.shape && (
                   <div style={styles.sectionBody}>
+                    {/* Path Closed/Open Loop Toggle for Bezier curves */}
+                    {!pptxShape && selectedElement?.type === 'bezier' && (
+                      <div style={styles.propRowCol}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={styles.propLabel}>Path State</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextClosed = !selectedElement.closed;
+                              onUpdateElement(selectedElement.id, {
+                                closed: nextClosed,
+                                isLoopFilled: nextClosed,
+                                backgroundColor: nextClosed ? (selectedElement.backgroundColor !== 'transparent' ? selectedElement.backgroundColor : '#FF5500') : selectedElement.backgroundColor,
+                                fillColor: nextClosed ? (selectedElement.fillColor !== 'transparent' ? selectedElement.fillColor : '#FF5500') : selectedElement.fillColor,
+                              });
+                            }}
+                            style={{
+                              background: selectedElement.closed ? 'var(--accent-dim)' : 'transparent',
+                              border: `1px solid ${selectedElement.closed ? 'var(--accent)' : 'var(--border-primary)'}`,
+                              borderRadius: 4,
+                              color: selectedElement.closed ? 'var(--accent)' : 'var(--text-dim)',
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: '3px 8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                            title="Toggle between closed shape loop and open line curve"
+                          >
+                            <span>{selectedElement.closed ? '● Closed Loop (Shape)' : '○ Open Curve'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Fill Color & Transparent Toggle */}
                     <div style={styles.propRowCol}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1548,7 +1591,14 @@ export function SlideEditorRightSidebar({
                         {!pptxShape && selectedElement && (
                           <button
                             type="button"
-                            onClick={() => onUpdateElement(selectedElement.id, { backgroundColor: selectedElement.backgroundColor === 'transparent' ? '#FF5500' : 'transparent' })}
+                            onClick={() => {
+                              const nextColor = selectedElement.backgroundColor === 'transparent' ? '#FF5500' : 'transparent';
+                              onUpdateElement(selectedElement.id, {
+                                backgroundColor: nextColor,
+                                fillColor: nextColor,
+                                isLoopFilled: nextColor !== 'transparent',
+                              });
+                            }}
                             style={{
                               background: selectedElement.backgroundColor === 'transparent' ? 'var(--accent-dim)' : 'transparent',
                               border: '1px solid var(--border-primary)',
@@ -1570,11 +1620,15 @@ export function SlideEditorRightSidebar({
                           value={
                             pptxShape
                               ? (normalizeHex(typeof pptxShape.fillColor === 'string' ? pptxShape.fillColor : undefined) || '#FF5500')
-                              : (normalizeHex(selectedElement?.backgroundColor) || '#FF5500')
+                              : (normalizeHex(selectedElement?.backgroundColor || selectedElement?.fillColor) || '#FF5500')
                           }
                           onChange={(e) => {
                             if (pptxShape) (pptx as PptxInspector | null)?.onFill(e.target.value);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, { backgroundColor: e.target.value });
+                            else if (selectedElement) onUpdateElement(selectedElement.id, {
+                              backgroundColor: e.target.value,
+                              fillColor: e.target.value,
+                              isLoopFilled: e.target.value !== 'transparent' && e.target.value !== 'none',
+                            });
                           }}
                           style={styles.colorSwatch}
                         />
@@ -1584,12 +1638,16 @@ export function SlideEditorRightSidebar({
                           value={
                             pptxShape
                               ? ((typeof pptxShape.fillColor === 'string' ? pptxShape.fillColor : '#FF5500')).toUpperCase()
-                              : ((selectedElement?.backgroundColor && selectedElement.backgroundColor !== 'transparent') ? (normalizeHex(selectedElement.backgroundColor) || selectedElement.backgroundColor) : '#FF5500').toUpperCase()
+                              : (((selectedElement?.backgroundColor || selectedElement?.fillColor) && selectedElement?.backgroundColor !== 'transparent' && selectedElement?.fillColor !== 'transparent') ? (normalizeHex(selectedElement?.backgroundColor || selectedElement?.fillColor) || selectedElement?.backgroundColor || selectedElement?.fillColor || '#FF5500') : '#FF5500').toUpperCase()
                           }
                           onChange={(e) => {
                             const val = e.target.value;
                             if (pptxShape) (pptx as PptxInspector | null)?.onFill(val);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, { backgroundColor: val });
+                            else if (selectedElement) onUpdateElement(selectedElement.id, {
+                              backgroundColor: val,
+                              fillColor: val,
+                              isLoopFilled: val !== 'transparent' && val !== 'none',
+                            });
                           }}
                           style={styles.colorHexInput}
                         />
@@ -1621,20 +1679,27 @@ export function SlideEditorRightSidebar({
                       </div>
                     )}
 
-                    {/* Border Color */}
+                    {/* Border / Stroke Color */}
                     <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>{t('slideEditor.sidebar.borderColor')}</span>
+                      <span style={styles.propLabel}>
+                        {selectedElement?.type === 'bezier'
+                          ? t('slideEditor.sidebar.strokeColor')
+                          : t('slideEditor.sidebar.borderColor')}
+                      </span>
                       <div style={styles.colorPillRow}>
                         <input
                           type="color"
                           value={
                             pptxShape
                               ? (normalizeHex(typeof pptxShape.strokeColor === 'string' ? pptxShape.strokeColor : undefined) || '#FF5500')
-                              : (normalizeHex(selectedElement?.borderColor) || '#FF5500')
+                              : (normalizeHex(selectedElement?.borderColor || selectedElement?.strokeColor) || '#FF5500')
                           }
                           onChange={(e) => {
                             if (pptxShape) (pptx as PptxInspector | null)?.onStroke(e.target.value, (pptxShape?.strokeWidthPx as number) || 2);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, { borderColor: e.target.value });
+                            else if (selectedElement) onUpdateElement(selectedElement.id, {
+                              borderColor: e.target.value,
+                              strokeColor: e.target.value,
+                            });
                           }}
                           style={styles.colorSwatch}
                         />
@@ -1644,12 +1709,15 @@ export function SlideEditorRightSidebar({
                           value={
                             pptxShape
                               ? ((typeof pptxShape.strokeColor === 'string' ? pptxShape.strokeColor : '#FF5500')).toUpperCase()
-                              : (selectedElement?.borderColor || '#FF5500').toUpperCase()
+                              : (selectedElement?.borderColor || selectedElement?.strokeColor || '#FF5500').toUpperCase()
                           }
                           onChange={(e) => {
                             const val = e.target.value;
                             if (pptxShape) (pptx as PptxInspector | null)?.onStroke(val);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, { borderColor: val });
+                            else if (selectedElement) onUpdateElement(selectedElement.id, {
+                              borderColor: val,
+                              strokeColor: val,
+                            });
                           }}
                           style={styles.colorHexInput}
                         />
@@ -1681,12 +1749,16 @@ export function SlideEditorRightSidebar({
                       </div>
                     )}
 
-                    {/* Border Width Slider */}
+                    {/* Border / Stroke Width Slider */}
                     <div style={styles.propRowCol}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>{t('slideEditor.sidebar.borderWidth')}</span>
+                        <span style={styles.propLabel}>
+                          {selectedElement?.type === 'bezier'
+                            ? t('slideEditor.sidebar.strokeWidth')
+                            : t('slideEditor.sidebar.borderWidth')}
+                        </span>
                         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (selectedElement ? (selectedElement.borderWidth ?? (selectedElement.type === 'shape' ? 3 : 0)) : 0)}px
+                          {pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (selectedElement ? (selectedElement.borderWidth ?? selectedElement.strokeWidth ?? (selectedElement.type === 'shape' ? 3 : 4)) : 0)}px
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1694,7 +1766,7 @@ export function SlideEditorRightSidebar({
                           type="range"
                           min="0"
                           max="30"
-                          value={pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (selectedElement ? (selectedElement.borderWidth ?? (selectedElement.type === 'shape' ? 3 : 0)) : 0)}
+                          value={pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (selectedElement ? (selectedElement.borderWidth ?? selectedElement.strokeWidth ?? (selectedElement.type === 'shape' ? 3 : 4)) : 0)}
                           onChange={(e) => {
                             const bw = parseInt(e.target.value, 10);
                             if (pptxShape) (pptx as PptxInspector | null)?.onStroke((typeof pptxShape?.strokeColor === 'string' ? pptxShape.strokeColor : '#FF5500'), bw);
@@ -2106,6 +2178,10 @@ export function SlideEditorRightSidebar({
                 onToggleLock={(id) => {
                   const target = nativeElements.find((e) => e.id === id);
                   if (target) onUpdateElement(id, { locked: !target.locked });
+                }}
+                onToggleVisible={(id) => {
+                  const target = nativeElements.find((e) => e.id === id);
+                  if (target) onUpdateElement(id, { hidden: !target.hidden });
                 }}
                 emptyHint={t('slideEditor.sidebar.emptyLayersNative')}
               />

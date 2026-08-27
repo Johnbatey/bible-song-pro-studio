@@ -140,6 +140,7 @@ function vJustify(vAlign?: SlideElement['vAlign']) {
 }
 
 function ElementBox({ el, src }: { el: SlideElement; src: (value?: string) => string }) {
+  if (el.hidden) return null;
   const isLocked = Boolean(el.locked);
   const outer: CSSProperties = {
     position: 'absolute',
@@ -206,7 +207,12 @@ function ElementBox({ el, src }: { el: SlideElement; src: (value?: string) => st
       }
     }
 
-    const fillOn = !!(el.isLoopFilled && (el.fillColor || el.backgroundColor) && (el.fillColor || el.backgroundColor) !== 'none');
+    const fillOn = Boolean(
+      (el.isLoopFilled || el.closed || el.type === 'bezier') &&
+      (el.fillColor || el.backgroundColor) &&
+      (el.fillColor || el.backgroundColor) !== 'none' &&
+      (el.fillColor || el.backgroundColor) !== 'transparent'
+    );
     const fillColor = fillOn ? (el.fillColor || el.backgroundColor || '#FF5500') : 'none';
     const strokeColor = el.strokeColor || el.borderColor || '#FF5500';
     const strokeWidth = el.strokeWidth ?? el.borderWidth ?? 4;

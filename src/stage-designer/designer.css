@@ -330,8 +330,7 @@
   line-height: 1;
   color: var(--dz-faint);
 }
-.dz-layer-actions button:hover:not(:disabled) { color: var(--dz-text); background: var(--dz-raised); }
-.dz-layer-actions button[data-active] { color: var(--dz-accent); background: transparent; }
+
 
 /* ---- floating toolbar --------------------------------------------------- */
 /* Over the canvas, not above it. Modelled on the theme designer's

@@ -144,6 +144,7 @@ export interface SlideElement {
   rotation?: number;
   zIndex?: number;
   locked?: boolean;
+  hidden?: boolean;
 }
 
 export interface SlideBackground {
