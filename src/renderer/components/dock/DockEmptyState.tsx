@@ -1,5 +1,7 @@
-import { DOCK_SECTIONS, type DockId } from './docks';
+import { DOCK_SECTIONS, getDockGroupLabel, getDockTitle, type DockId, type DockGroup } from './docks';
 import { openDock } from './dockController';
+import { useI18n } from '../../../i18n/useI18n';
+import type { MessageKey } from '../../../i18n';
 import './DockEmptyState.css';
 
 interface DockEmptyStateProps {
@@ -22,6 +24,8 @@ interface DockEmptyStateProps {
  * exactly what a first-time operator has not found yet.
  */
 export function DockEmptyState({ onRestoreLayout }: DockEmptyStateProps) {
+  const { t } = useI18n();
+
   return (
     <div className="dock-empty" data-testid="dock-empty">
       <div className="dock-empty__card">
@@ -32,11 +36,10 @@ export function DockEmptyState({ onRestoreLayout }: DockEmptyStateProps) {
           <span />
         </div>
 
-        <div className="dock-empty__title">Your workspace is empty</div>
+        <div className="dock-empty__title">{t('empty.title')}</div>
 
         <p className="dock-empty__body">
-          Open the panels this service needs, then drag any panel by its tab to split,
-          stack or float it. The arrangement is yours and it saves itself as you work.
+          {t('empty.body')}
         </p>
 
         <div className="dock-empty__actions">
@@ -45,7 +48,7 @@ export function DockEmptyState({ onRestoreLayout }: DockEmptyStateProps) {
             className="dock-empty__chip dock-empty__chip--primary"
             onClick={onRestoreLayout}
           >
-            Start from the default layout
+            {t('empty.startDefault')}
           </button>
         </div>
 
@@ -60,27 +63,32 @@ export function DockEmptyState({ onRestoreLayout }: DockEmptyStateProps) {
           {DOCK_SECTIONS.map((section) => (
             <section key={section.id} className="dock-empty__section">
               <div className="dock-empty__section-head">
-                <span className="dock-empty__section-label">{section.label}</span>
-                <span className="dock-empty__section-hint">{section.hint}</span>
+                <span className="dock-empty__section-label">{getDockGroupLabel(section.id as DockGroup)}</span>
+                <span className="dock-empty__section-hint">
+                  {t(`dock.group.${section.id}.hint` as MessageKey)}
+                </span>
               </div>
               <div className="dock-empty__section-chips">
-                {section.docks.map((dock) => (
-                  <button
-                    key={dock.id}
-                    type="button"
-                    className="dock-empty__chip"
-                    onClick={() => openDock(dock.id as DockId)}
-                    title={`Open the ${dock.title} panel`}
-                  >
-                    {dock.title}
-                  </button>
-                ))}
+                {section.docks.map((dock) => {
+                  const title = getDockTitle(dock.id);
+                  return (
+                    <button
+                      key={dock.id}
+                      type="button"
+                      className="dock-empty__chip"
+                      onClick={() => openDock(dock.id as DockId)}
+                      title={t('empty.openPanel', { name: title })}
+                    >
+                      {title}
+                    </button>
+                  );
+                })}
               </div>
             </section>
           ))}
         </div>
 
-        <div className="dock-empty__footnote">The tabs above cover the ones you open most</div>
+        <div className="dock-empty__footnote">{t('empty.footnote')}</div>
       </div>
     </div>
   );

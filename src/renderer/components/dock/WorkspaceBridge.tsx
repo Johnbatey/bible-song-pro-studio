@@ -14,6 +14,7 @@ import { applyLayout, captureLayout } from './dockController';
 import { resetDockLayout } from './DockHost';
 import { WorkspaceNameDialog, type WorkspacePromptRequest } from './WorkspaceNameDialog';
 import { parseWorkspace, serializeWorkspace, uniqueName } from './workspaceFile';
+import { t } from '../../../i18n';
 
 type WorkspaceAction =
   | 'activate' | 'save' | 'saveAs' | 'update'
@@ -87,7 +88,7 @@ export function WorkspaceBridge() {
       case 'saveAs': {
         const layout = captureLayout();
         if (!layout) {
-          notify('There is nothing to save — open a panel first.', 'warning');
+          notify(t('workspace.nothingToSave'), 'warning');
           return;
         }
         /* Save As starts from the active name so the fork reads as a fork.
@@ -96,15 +97,15 @@ export function WorkspaceBridge() {
           ? uniqueName(`${active.name} copy`, names)
           : '';
         setPrompt({
-          title: action === 'saveAs' ? 'Save as a new layout' : 'Save this layout',
+          title: action === 'saveAs' ? t('workspace.saveAsTitle') : t('workspace.saveTitle'),
           hint: action === 'saveAs'
-            ? `“${activeName}” stays as it is. This saves the current arrangement alongside it.`
-            : 'It will appear in the Workspace menu on every launch.',
+            ? t('workspace.saveAsHint', { name: activeName })
+            : t('workspace.saveHint'),
           initialValue: suggested,
-          confirmLabel: 'Save layout',
+          confirmLabel: t('workspace.saveConfirm'),
           onConfirm: (name) => {
             const saved = useAppStore.getState().saveWorkspace(uniqueName(name, names), layout);
-            notify(`Saved “${saved.name}”`);
+            notify(t('workspace.saved', { name: saved.name }));
           },
         });
         return;
@@ -115,11 +116,11 @@ export function WorkspaceBridge() {
         if (!active) return;
         const layout = captureLayout();
         if (!layout) {
-          notify('There is nothing to save — open a panel first.', 'warning');
+          notify(t('workspace.nothingToSave'), 'warning');
           return;
         }
         store.updateWorkspace(active.id, layout);
-        notify(`Updated “${active.name}”`);
+        notify(t('workspace.updated', { name: active.name }));
         return;
       }
 
@@ -127,9 +128,9 @@ export function WorkspaceBridge() {
       case 'rename': {
         if (!active) return;
         setPrompt({
-          title: 'Rename layout',
+          title: t('workspace.renameTitle'),
           initialValue: active.name,
-          confirmLabel: 'Rename',
+          confirmLabel: t('workspace.renameConfirm'),
           onConfirm: (name) => {
             const others = names.filter((n) => n !== active.name);
             store.renameWorkspace(active.id, uniqueName(name, others));
@@ -140,10 +141,10 @@ export function WorkspaceBridge() {
 
       case 'delete': {
         if (!active) return;
-        if (!window.confirm(`Delete “${active.name}”?\n\nThis cannot be undone. The panels themselves are not affected.`)) return;
+        if (!window.confirm(t('workspace.deleteConfirm', { name: active.name }))) return;
         store.deleteWorkspace(active.id);
         resetDockLayout();
-        notify(`Deleted “${active.name}”`);
+        notify(t('workspace.deleted', { name: active.name }));
         return;
       }
 

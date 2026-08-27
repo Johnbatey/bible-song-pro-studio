@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../../../i18n/useI18n';
 
 export interface WorkspacePromptRequest {
   title: string;
@@ -24,6 +25,7 @@ interface WorkspaceNameDialogProps {
  * app at all.
  */
 export function WorkspaceNameDialog({ request, onClose }: WorkspaceNameDialogProps) {
+  const { t } = useI18n();
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -68,13 +70,13 @@ export function WorkspaceNameDialog({ request, onClose }: WorkspaceNameDialogPro
             if (e.key === 'Enter') { e.preventDefault(); confirm(); }
             if (e.key === 'Escape') { e.preventDefault(); onClose(); }
           }}
-          placeholder="Sunday morning"
+          placeholder={t('workspace.placeholder')}
           maxLength={60}
           spellCheck={false}
           style={styles.input}
         />
         <div style={styles.actions}>
-          <button type="button" style={styles.secondary} onClick={onClose}>Cancel</button>
+          <button type="button" style={styles.secondary} onClick={onClose}>{t('common.cancel')}</button>
           <button
             type="button"
             style={{ ...styles.primary, opacity: canConfirm ? 1 : 0.45, cursor: canConfirm ? 'pointer' : 'not-allowed' }}

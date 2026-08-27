@@ -6,6 +6,7 @@ import { Block, BlockButton } from './Block';
 import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { assetUrl } from '../utils/asset-url';
 import { ThemeEditorForm, type ThemeSurface } from './ThemeEditorForm';
+import { useI18n } from '../../i18n/useI18n';
 
 const PRESET_THEMES: Theme[] = [
   {
@@ -406,6 +407,7 @@ const PRESET_THEMES: Theme[] = [
 ];
 
 export function ThemePanel() {
+  const { t } = useI18n();
   const themes = useAppStore((s) => s.themes);
   const addTheme = useAppStore((s) => s.addTheme);
   const updateTheme = useAppStore((s) => s.updateTheme);
@@ -465,14 +467,14 @@ export function ThemePanel() {
 
   const commitThemeName = (theme: Theme) => {
     const nextName = theme.name.trim();
-    const fallback = theme.name || 'Untitled Theme';
+    const fallback = theme.name || t('themes.untitled');
     applyThemeEdit({ ...theme, name: nextName || fallback });
   };
 
   const deleteTheme = (theme: Theme) => {
     const existing = themes.find((item) => item.id === theme.id);
     if (!existing) return;
-    const confirmed = window.confirm(`Delete "${theme.name}"? This cannot be undone.`);
+    const confirmed = window.confirm(t('themes.deleteConfirm', { name: theme.name }));
     if (!confirmed) return;
     removeTheme(theme.id);
     if (activeTheme?.id === theme.id) setActiveTheme(null);
@@ -484,20 +486,20 @@ export function ThemePanel() {
       {!editTheme ? (
         /* PAGE 1: PRESET GRID VIEW */
         <Block
-          title="Design Presets"
+          title={t('themes.presets')}
           subtitle={`${allThemes.length}`}
           tools={(
             <>
               {activeTheme && (
                 <BlockButton onClick={() => openEditor(activeTheme, thumbModeFor(activeTheme.id))}>
-                  Customize Active
+                  {t('themes.customizeActive')}
                 </BlockButton>
               )}
               <BlockButton
                 onClick={() => {
-                  const t: Theme = {
+                  const custom: Theme = {
                     id: `theme-${Date.now()}`,
-                    name: `Custom Design ${themes.length + 1}`,
+                    name: t('themes.customDesignNamed', { n: themes.length + 1 }),
                     lowerThird: {
                       background: 'rgba(0,0,0,0.85)',
                       backgroundColor: '#000000',
@@ -533,12 +535,12 @@ export function ThemePanel() {
                       transition: 'crossfade',
                     },
                   };
-                  addTheme(t);
-                  setActiveTheme(t);
-                  openEditor(t, 'full');
+                  addTheme(custom);
+                  setActiveTheme(custom);
+                  openEditor(custom, 'full');
                 }}
               >
-                + Custom Design
+                {t('themes.customDesign')}
               </BlockButton>
             </>
           )}
@@ -613,7 +615,7 @@ export function ThemePanel() {
                         openEditor(theme, thumbModeFor(theme.id));
                       }}
                     >
-                      Edit Design
+                      {t('themes.editDesign')}
                     </button>
                     {themes.some((item) => item.id === theme.id) && (
                       <button
@@ -624,7 +626,7 @@ export function ThemePanel() {
                           deleteTheme(theme);
                         }}
                       >
-                        Delete
+                        {t('themes.delete')}
                       </button>
                     )}
                   </div>
@@ -635,24 +637,24 @@ export function ThemePanel() {
       ) : (
         /* PAGE 2: PRESET EDITOR VIEW */
         <Block
-          title={<>Edit Design: <span style={{ color: 'var(--accent)' }}>{editTheme.name}</span></>}
+          title={<>{t('themes.editDesignTitle')} <span style={{ color: 'var(--accent)' }}>{editTheme.name}</span></>}
           bodyStyle={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
           tools={(
             <>
-              <BlockButton onClick={() => setEditTheme(null)}>← Presets</BlockButton>
+              <BlockButton onClick={() => setEditTheme(null)}>{t('themes.backPresets')}</BlockButton>
               {themes.some((theme) => theme.id === editTheme.id) && (
                 <BlockButton style={styles.deleteButton} onClick={() => deleteTheme(editTheme)}>
-                  Delete Design
+                  {t('themes.deleteDesign')}
                 </BlockButton>
               )}
-              <BlockButton active onClick={() => setEditTheme(null)}>Done</BlockButton>
+              <BlockButton active onClick={() => setEditTheme(null)}>{t('themes.done')}</BlockButton>
             </>
           )}
         >
             <div style={styles.editorCard}>
               <div style={styles.editorHeader}>
                 <label style={styles.nameField}>
-                  <span style={styles.nameLabel}>Design name</span>
+                  <span style={styles.nameLabel}>{t('themes.designName')}</span>
                   <input
                     className="input"
                     value={editTheme.name}
@@ -683,15 +685,13 @@ export function ThemePanel() {
                         fontWeight: selected ? fontWeight.semibold : fontWeight.medium,
                       }}
                     >
-                      {option.id === 'full' ? 'Full screen' : 'Lower third'}
+                      {option.id === 'full' ? t('themes.fullScreen') : t('themes.lowerThird')}
                     </button>
                   );
                 })}
               </div>
               <p style={styles.surfaceHint}>
-                {editSurface === 'full'
-                  ? 'Editing the full-stage look — colour, still or clip behind the verse.'
-                  : 'Editing the banner only. An image here fills the lower third, not the whole screen.'}
+                {editSurface === 'full' ? t('themes.hintFull') : t('themes.hintLt')}
               </p>
 
               <div style={styles.editorBody}>

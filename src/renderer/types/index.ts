@@ -902,6 +902,10 @@ declare global {
         listPopouts: () => Promise<string[]>;
         onPopoutsChanged: (cb: (ids: string[]) => void) => () => void;
       };
+      /** Keep the native app menu in the same UI locale as the renderer. */
+      i18n?: {
+        setLocale: (locale: string) => void;
+      };
       /** Named dock arrangements. See WorkspaceBridge. */
       workspace?: {
         /** Push the list and the active id so the Workspace menu can rebuild. */

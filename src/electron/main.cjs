@@ -73,6 +73,7 @@ const { createObsService } = require('./obs-service.cjs');
 const { listenWithFallback } = require('./listen-with-fallback.cjs');
 const lexiconService = require('./lexicon-service.cjs');
 const { stripHugeDataUrls } = require('./strip-data-urls.cjs');
+const { setMenuLocale, mt } = require('../i18n/menu-messages.cjs');
 
 const isDev = !app.isPackaged && !fs.existsSync(path.join(__dirname, '../../dist/index.html'));
 let mainWindow = null;
@@ -122,24 +123,24 @@ let verseDetectionService = null;
  */
 const DOCK_DEFS = [
   /* Sources — what goes on the screen. */
-  { id: 'bible', label: 'Scripture' },
-  { id: 'songs', label: 'Songs' },
-  { id: 'presentation', label: 'Pro Slides' },
-  { id: 'media', label: 'Media' },
+  { id: 'bible' },
+  { id: 'songs' },
+  { id: 'presentation' },
+  { id: 'media' },
   null, // separator
   /* Displays — the screens it goes to. */
-  { id: 'output', label: 'Output' },
-  { id: 'stage', label: 'Stage Display' },
+  { id: 'output' },
+  { id: 'stage' },
   null,
   /* Service — what is running right now. */
-  { id: 'live', label: 'Live Scripture' },
-  { id: 'transcript', label: 'Live Transcript' },
-  { id: 'queue', label: 'Queue' },
-  { id: 'history', label: 'History' },
+  { id: 'live' },
+  { id: 'transcript' },
+  { id: 'queue' },
+  { id: 'history' },
   null,
   /* Looks — how all of it is dressed. */
-  { id: 'scenes', label: 'Scenes' },
-  { id: 'themes', label: 'Themes' },
+  { id: 'scenes' },
+  { id: 'themes' },
 ];
 
 /**
@@ -173,7 +174,7 @@ function buildAppMenu(openIds) {
   const dockItems = DOCK_DEFS.map((def) => {
     if (def === null) return new MenuItem({ type: 'separator' });
     return new MenuItem({
-      label: def.label,
+      label: mt(`dock.${def.id}`),
       type: 'checkbox',
       checked: openSet.has(def.id),
       click() {
@@ -186,7 +187,7 @@ function buildAppMenu(openIds) {
 
   dockItems.push(new MenuItem({ type: 'separator' }));
   dockItems.push(new MenuItem({
-    label: 'Reset Layout',
+    label: mt('menu.resetLayout'),
     accelerator: process.platform === 'darwin' ? 'Cmd+Shift+R' : 'Ctrl+Shift+R',
     click() {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -203,11 +204,11 @@ function buildAppMenu(openIds) {
      to update, rename or delete, and the items that would act on it are
      disabled accordingly. */
   const active = menuWorkspaces.list.find((w) => w.id === menuWorkspaces.activeId) || null;
-  const activeLabel = active ? `“${active.name}”` : 'Default Layout';
+  const activeLabel = active ? `“${active.name}”` : mt('menu.defaultLayout');
 
   const workspaceItems = [
     new MenuItem({
-      label: 'Default Layout',
+      label: mt('menu.defaultLayout'),
       type: 'checkbox',
       checked: !active,
       click() { sendWorkspaceCommand('activate', null); },
@@ -228,16 +229,16 @@ function buildAppMenu(openIds) {
 
   workspaceItems.push(new MenuItem({ type: 'separator' }));
   workspaceItems.push(new MenuItem({
-    label: 'Save Layout…',
+    label: mt('menu.saveLayout'),
     accelerator: process.platform === 'darwin' ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
     click() { sendWorkspaceCommand('save'); },
   }));
   workspaceItems.push(new MenuItem({
-    label: 'Save as New Layout…',
+    label: mt('menu.saveAsLayout'),
     click() { sendWorkspaceCommand('saveAs'); },
   }));
   workspaceItems.push(new MenuItem({
-    label: `Update ${activeLabel}`,
+    label: mt('menu.updateLayout', { name: activeLabel }),
     // Nothing to update while the default is showing: it is rebuilt from code
     // every time, so a write would have nowhere to land.
     enabled: Boolean(active),
@@ -246,25 +247,25 @@ function buildAppMenu(openIds) {
 
   workspaceItems.push(new MenuItem({ type: 'separator' }));
   workspaceItems.push(new MenuItem({
-    label: `Rename ${activeLabel}…`,
+    label: mt('menu.renameLayout', { name: activeLabel }),
     enabled: Boolean(active),
     click() { sendWorkspaceCommand('rename'); },
   }));
   workspaceItems.push(new MenuItem({
-    label: `Delete ${activeLabel}`,
+    label: mt('menu.deleteLayout', { name: activeLabel }),
     enabled: Boolean(active),
     click() { sendWorkspaceCommand('delete'); },
   }));
 
   workspaceItems.push(new MenuItem({ type: 'separator' }));
   workspaceItems.push(new MenuItem({
-    label: 'Import Workspace…',
+    label: mt('menu.importWorkspace'),
     click() { sendWorkspaceCommand('import'); },
   }));
   workspaceItems.push(new MenuItem({
     // Export works off whatever is on screen, so the default layout is
     // exportable too — that is often exactly what someone wants to send.
-    label: `Export ${activeLabel}…`,
+    label: mt('menu.exportLayout', { name: activeLabel }),
     click() { sendWorkspaceCommand('export'); },
   }));
 
@@ -276,7 +277,7 @@ function buildAppMenu(openIds) {
        the path is per-platform, buried in a Library folder macOS hides by
        default, and the usual reason for wanting it — copy this machine's setup
        onto the other two in the booth — is not a rare one. */
-    label: 'Show Layouts Folder',
+    label: mt('menu.showLayoutsFolder'),
     click() { revealLayoutsFolder(); },
   }));
 
@@ -298,7 +299,7 @@ function buildAppMenu(openIds) {
       }]
       : []),
     {
-      label: 'Edit',
+      label: mt('menu.edit'),
       submenu: [
         { role: 'undo' },
         { role: 'redo' },
@@ -310,7 +311,7 @@ function buildAppMenu(openIds) {
       ],
     },
     {
-      label: 'View',
+      label: mt('menu.view'),
       submenu: [
         { role: 'reload' },
         { role: 'forceReload' },
@@ -319,15 +320,15 @@ function buildAppMenu(openIds) {
       ],
     },
     {
-      label: 'Dock',
+      label: mt('menu.dock'),
       submenu: dockItems,
     },
     {
-      label: 'Workspace',
+      label: mt('menu.workspace'),
       submenu: workspaceItems,
     },
     {
-      label: 'Window',
+      label: mt('menu.window'),
       submenu: [
         { role: 'minimize' },
         { role: 'zoom' },
@@ -1049,7 +1050,7 @@ function createDockPopoutWindow(dockId) {
     fullscreenable: true,
     thickFrame: true,
     backgroundColor: '#0C0B0B',
-    title: def.label,
+    title: mt(`dock.${def.id}`),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -1161,6 +1162,10 @@ app.whenReady().then(async () => {
   // the native menu checkmarks stay in sync without polling.
   ipcMain.on('dock:syncMenu', (_, openIds) => {
     menuOpenIds = Array.isArray(openIds) ? openIds : [];
+    buildAppMenu([...menuOpenIds, ...dockPopoutWindows.keys()]);
+  });
+  ipcMain.on('ui:setLocale', (_, locale) => {
+    setMenuLocale(locale);
     buildAppMenu([...menuOpenIds, ...dockPopoutWindows.keys()]);
   });
   ipcMain.handle('dock:popOut', (_, p) => createDockPopoutWindow(p?.id));

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import type { UpdateCheckResult } from '../types';
+import { useI18n } from '../../i18n/useI18n';
 
 export function UpdateBanner() {
+  const { t } = useI18n();
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
@@ -35,16 +37,16 @@ export function UpdateBanner() {
   return (
     <div style={styles.banner}>
       <div style={styles.content}>
-        <span style={styles.badge}>UPDATE AVAILABLE</span>
+        <span style={styles.badge}>{t('update.badge')}</span>
         <span style={styles.text}>
-          A new version <strong>Bible Song Pro Studio v{updateInfo.latestVersion}</strong> is ready.
+          {t('update.text', { version: updateInfo.latestVersion || '' })}
         </span>
       </div>
       <div style={styles.actions}>
         <button style={styles.updateBtn} onClick={handleOpenRelease}>
-          Download Update
+          {t('update.download')}
         </button>
-        <button style={styles.closeBtn} onClick={() => setDismissed(true)} title="Dismiss notice">
+        <button style={styles.closeBtn} onClick={() => setDismissed(true)} title={t('update.dismiss')}>
           ✕
         </button>
       </div>

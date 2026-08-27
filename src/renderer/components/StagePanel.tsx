@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Block } from './Block';
 import { fontWeight } from '../styles/type';
 import { CustomDropdown } from './CustomDropdown';
@@ -13,6 +13,7 @@ import { useLayoutLibrary } from '../../stage/layout-library';
 import { isPresetId } from '../../stage/layout-model';
 import type { StageTheme } from '../../stage/theme';
 import type { StageTimer } from '../../stage/stage-state';
+import { useI18n } from '../../i18n/useI18n';
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
@@ -20,12 +21,6 @@ const ZOOM_STEP = 0.05;
 const STAGE_ASPECT = 16 / 9;
 const SAFE_PAD = 76;
 const STAGE_LABEL_HEIGHT = 20;
-
-/* Read off the preset table rather than typed out again. The hand-kept copy
-   that used to live here was a second list of the same four layouts, and the
-   only thing it could ever do was disagree with the first — a preset added to
-   LAYOUTS was a preset the operator had no way to pick. */
-const PRESET_OPTIONS = LAYOUT_IDS.map((id) => ({ value: id, label: LAYOUTS[id].name, sublabel: 'Preset' }));
 
 type LayoutId = string;
 
@@ -46,6 +41,7 @@ function clampZoom(v: number) {
 }
 
 export function StagePanel() {
+  const { t } = useI18n();
   /* Whether a stage screen is up — asked for once, then kept current by the
      main process. This deliberately does not read `isExternalDisplayActive`:
      that is the projector, and the lamp on this pill answers for the stage.
@@ -102,10 +98,10 @@ export function StagePanel() {
      because from the desk they are the same decision — the difference between
      "shipped with the app" and "I made this" belongs in the sublabel, not in
      two separate controls. */
-  const layoutOptions = [
-    ...PRESET_OPTIONS,
-    ...library.layouts.map((item) => ({ value: item.id, label: item.name, sublabel: 'Saved' })),
-  ];
+  const layoutOptions = useMemo(() => [
+    ...LAYOUT_IDS.map((id) => ({ value: id, label: LAYOUTS[id].name, sublabel: t('stage.preset') })),
+    ...library.layouts.map((item) => ({ value: item.id, label: item.name, sublabel: t('stage.saved') })),
+  ], [library.layouts, t]);
 
   /* ── box size — measured from the viewport ── */
   const measureBox = useCallback(() => {
@@ -231,8 +227,8 @@ export function StagePanel() {
   return (
     <Block
       className="stage-panel-dock"
-      title="Stage Display"
-      subtitle="Operator monitor"
+      title={t('stage.title')}
+      subtitle={t('stage.subtitle')}
       flush
       bodyStyle={{ display: 'flex', overflow: 'hidden' }}
       footer={(
@@ -248,7 +244,7 @@ export function StagePanel() {
               type="button"
               onClick={toggleStageDisplay}
               aria-pressed={stageOpen}
-              title={stageOpen ? 'Close the stage display' : 'Open the stage display'}
+              title={stageOpen ? t('stage.close') : t('stage.open')}
               style={{
                 ...styles.stagePill,
                 background: stageOpen ? 'rgba(255,85,0,0.15)' : 'var(--chrome-control)',
@@ -272,11 +268,11 @@ export function StagePanel() {
             <button
               style={styles.iconBtn}
               onClick={() => timerCommand(stage.timer.running ? 'stop' : 'start')}
-              title={stage.timer.running ? 'Pause stage timer' : 'Start stage timer'}
+              title={stage.timer.running ? t('stage.timerPause') : t('stage.timerStart')}
             >
               {stage.timer.running ? '❙❙' : '▶'}
             </button>
-            <button style={styles.iconBtn} onClick={() => timerCommand('reset')} title="Reset stage timer">↺</button>
+            <button style={styles.iconBtn} onClick={() => timerCommand('reset')} title={t('stage.timerReset')}>↺</button>
           </div>
 
           {/* Centre: view scale controls */}
@@ -285,19 +281,19 @@ export function StagePanel() {
               <button
                 type="button"
                 onClick={() => setZoomAround(zoom - ZOOM_STEP)}
-                title="Zoom out"
+                title={t('stage.zoomOut')}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
               </button>
               <input
                 type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={0.01} value={zoom}
                 onChange={(e) => setZoomAround(Number(e.currentTarget.value))}
-                title="Stage preview scale"
+                title={t('stage.zoomScale')}
               />
               <button
                 type="button"
                 onClick={() => setZoomAround(zoom + ZOOM_STEP)}
-                title="Zoom in"
+                title={t('stage.zoomIn')}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
               </button>
@@ -308,7 +304,7 @@ export function StagePanel() {
                 className="zoombar-fit"
                 data-active={zoom === 1 || undefined}
                 onClick={fitStage}
-                title="Fit to view"
+                title={t('stage.fit')}
               >
                 Fit
               </button>
@@ -330,14 +326,14 @@ export function StagePanel() {
               value={activeLayout}
               options={layoutOptions}
               onChange={(v) => applyLayout(v as LayoutId)}
-              title="Switch stage layout"
+              title={t('stage.switchLayout')}
               buttonStyle={{ height: 26, padding: '0 10px', fontSize: 12, fontWeight: fontWeight.semibold }}
             />
 
             <button
               style={styles.settingsBtn}
               onClick={() => { void window.BSP?.openStageDesigner?.(); }}
-              title="Open the Stage Layout Designer in its own window"
+              title={t('stage.openDesigner')}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -352,7 +348,7 @@ export function StagePanel() {
               ref={settingsBtnRef}
               style={styles.settingsBtn}
               onClick={() => setSettingsOpen((open) => !open)}
-              title="Stage display appearance & theme options"
+              title={t('stage.appearance')}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { Block, BlockButton } from './Block';
+import { useI18n } from '../../i18n/useI18n';
 
 export function QueuePanel() {
+  const { t } = useI18n();
   const queue = useAppStore((s) => s.queue);
   const removeFromQueue = useAppStore((s) => s.removeFromQueue);
   const clearQueue = useAppStore((s) => s.clearQueue);
@@ -23,21 +25,25 @@ export function QueuePanel() {
     rowRefs.current[activeSceneId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [activeSceneId, queue.length]);
 
+  const emptyParts = t('queue.empty').split('{plus}');
+
   return (
     <Block
       className="blk-fill"
-      title="Queue"
+      title={t('queue.title')}
       tools={
         queue.length > 0 ? (
-          <BlockButton onClick={clearQueue} title="Clear all queued items">
-            ✕ Clear all
+          <BlockButton onClick={clearQueue} title={t('queue.clear')}>
+            {t('queue.clearAll')}
           </BlockButton>
         ) : undefined
       }
     >
       {queue.length === 0 ? (
         <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '24px 16px', textAlign: 'center' }}>
-          Queue is empty. Click the <strong style={{ color: '#FF5500' }}>+</strong> button on any scripture or song to queue it.
+          {emptyParts[0]}
+          <strong style={{ color: '#FF5500' }}>+</strong>
+          {emptyParts[1] || ''}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '2px 0' }}>
@@ -73,7 +79,7 @@ export function QueuePanel() {
                     {item.reference}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                    {item.source || 'Manual'}
+                    {item.source || t('queue.manual')}
                   </div>
                 </div>
 
@@ -114,7 +120,7 @@ export function QueuePanel() {
                       borderRadius: 4,
                       transition: 'transform 0.1s ease',
                     }}
-                    title="Send directly to LIVE full-screen output"
+                    title={t('queue.sendLive')}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                       <polygon points="5 3 19 12 5 21 5 3" />
@@ -139,7 +145,7 @@ export function QueuePanel() {
                       justifyContent: 'center',
                       borderRadius: 4,
                     }}
-                    title="Remove from queue"
+                    title={t('queue.remove')}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="18" y1="6" x2="6" y2="18" />

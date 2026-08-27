@@ -244,6 +244,11 @@ contextBridge.exposeInMainWorld('BSP', {
     },
   },
 
+  /** Keep the native app menu in the same UI locale as the renderer. */
+  i18n: {
+    setLocale: (locale) => ipcRenderer.send('ui:setLocale', locale),
+  },
+
   /* Named dock arrangements. The renderer owns the layout trees and the file
      format; this side only carries the menu's view of the list, the menu's
      commands back, and the two operations that need a native file dialog. */

@@ -40,6 +40,7 @@ export function App() {
 
   useEffect(() => {
     applyI18nLocale(uiLocale);
+    window.BSP?.i18n?.setLocale?.(uiLocale);
   }, [uiLocale]);
 
   useEffect(() => {

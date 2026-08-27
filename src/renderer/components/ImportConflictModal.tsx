@@ -8,6 +8,7 @@
 import { useEffect, useRef } from 'react';
 import type { Song } from '../types';
 import { type } from '../styles/type';
+import { useI18n } from '../../i18n/useI18n';
 
 export type ConflictResolution = 'skip' | 'overwrite' | 'cancel';
 
@@ -27,6 +28,7 @@ interface ImportConflictModalProps {
 }
 
 export function ImportConflictModal({ freshCount, conflicts, onResolve }: ImportConflictModalProps) {
+  const { t } = useI18n();
   const overlayRef = useRef<HTMLDivElement>(null);
 
   /* Close on Escape. */
@@ -58,9 +60,9 @@ export function ImportConflictModal({ freshCount, conflicts, onResolve }: Import
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
             </span>
-            <span id="import-conflict-title" style={styles.title}>Duplicate Songs Detected</span>
+            <span id="import-conflict-title" style={styles.title}>{t('import.dupTitle')}</span>
           </div>
-          <button type="button" style={styles.close} onClick={() => onResolve('cancel')} title="Cancel import" aria-label="Close">
+          <button type="button" style={styles.close} onClick={() => onResolve('cancel')} title={t('import.cancelImport')} aria-label={t('common.close')}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               <path d="M2 2l10 10M12 2L2 12" />
             </svg>
@@ -70,8 +72,7 @@ export function ImportConflictModal({ freshCount, conflicts, onResolve }: Import
         {/* Body */}
         <div style={styles.body}>
           <p style={styles.summary}>
-            <strong>{conflicts.length}</strong> of <strong>{total}</strong> song{total === 1 ? '' : 's'} already
-            {conflicts.length === 1 ? ' exists' : ' exist'} in your library:
+            {t('import.dupSummary', { conflicts: conflicts.length, total })}
           </p>
 
           <div style={styles.listWrap}>
@@ -96,7 +97,7 @@ export function ImportConflictModal({ freshCount, conflicts, onResolve }: Import
 
           {freshCount > 0 && (
             <p style={styles.freshNote}>
-              {freshCount} new song{freshCount === 1 ? '' : 's'} will be added regardless of your choice below.
+              {t('import.freshNote', { count: freshCount })}
             </p>
           )}
         </div>
@@ -104,24 +105,24 @@ export function ImportConflictModal({ freshCount, conflicts, onResolve }: Import
         {/* Footer */}
         <div style={styles.footer}>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => onResolve('cancel')}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               type="button"
               className="btn btn-secondary btn-sm"
               onClick={() => onResolve('skip')}
-              title="Import only the new songs, leave existing ones untouched"
+              title={t('import.skipHint')}
             >
-              Skip existing
+              {t('import.skipExisting')}
             </button>
             <button
               type="button"
               className="btn btn-primary btn-sm"
               onClick={() => onResolve('overwrite')}
-              title="Replace existing songs with the newly imported versions"
+              title={t('import.overwriteHint')}
             >
-              Overwrite existing
+              {t('import.overwriteExisting')}
             </button>
           </div>
         </div>
