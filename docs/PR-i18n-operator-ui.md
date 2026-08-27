@@ -5,12 +5,14 @@
 **Status:** Ready for review / PR drafting  
 **Related commits (on this line of history):**
 
-| Commit | Summary |
-|--------|---------|
-| `5f36a3f` | Core i18n infra + chrome / panels localization |
-| `e7881aa` | Native Electron menu localization + more UI wiring |
-| `4b31fde` | Slide Editor + Presentation creation i18n; emoji → SVG |
+
+| Commit    | Summary                                                     |
+| --------- | ----------------------------------------------------------- |
+| `5f36a3f` | Core i18n infra + chrome / panels localization              |
+| `e7881aa` | Native Electron menu localization + more UI wiring          |
+| `4b31fde` | Slide Editor + Presentation creation i18n; emoji → SVG      |
 | `d251170` | Live take-down toggle (Presentation + Queue) + queue dedupe |
+
 
 **Suggested PR title:**  
 `feat(i18n): localize operator UI (en/fr/es/pt) and improve live/queue controls`
@@ -38,15 +40,17 @@ This work adds a full operator-facing internationalization system for Bible Song
 
 ### 1. i18n infrastructure
 
-| Piece | Path / role |
-|-------|-------------|
-| Catalog types | `src/i18n/types.ts` — `UiLocale`, exhaustive `MessageKey` |
-| Runtime | `src/i18n/index.ts` — `t()`, `setUiLocale()`, `detectUiLocale()`, dock key helpers |
-| Hook | `src/i18n/useI18n.ts` — React subscription to locale changes |
-| Catalogs | `src/i18n/locales/{en,fr,es,pt}.ts` |
-| Electron menu strings | `src/i18n/menu-messages.cjs` — CJS catalog for main process |
-| Persist + first-run detect | `uiLocale` in `appStore` (+ `onRehydrateStorage`) |
-| Sync to native menu | `BSP.i18n.setLocale` (preload) → `ui:setLocale` → rebuild `Menu` |
+
+| Piece                      | Path / role                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------- |
+| Catalog types              | `src/i18n/types.ts` — `UiLocale`, exhaustive `MessageKey`                          |
+| Runtime                    | `src/i18n/index.ts` — `t()`, `setUiLocale()`, `detectUiLocale()`, dock key helpers |
+| Hook                       | `src/i18n/useI18n.ts` — React subscription to locale changes                       |
+| Catalogs                   | `src/i18n/locales/{en,fr,es,pt}.ts`                                                |
+| Electron menu strings      | `src/i18n/menu-messages.cjs` — CJS catalog for main process                        |
+| Persist + first-run detect | `uiLocale` in `appStore` (+ `onRehydrateStorage`)                                  |
+| Sync to native menu        | `BSP.i18n.setLocale` (preload) → `ui:setLocale` → rebuild `Menu`                   |
+
 
 **Settings → Language** keeps **UI locale** separate from **sermon / STT language**.
 
@@ -56,7 +60,7 @@ This work adds a full operator-facing internationalization system for Bible Song
 - **Panels:** Bible, Songs, Live Scripture, Media, Presentation (library + project), Stage, Queue, Themes, Scenes, Transcript
 - **Settings:** All category bodies (system, bible options, scripture AI, songs, audio, output, fullscreen, lower third, language, hotkeys, help, feedback, support) + **BackupSystem**
 - **Pro Slides:** Create/rename modals, context menus, zoom, empty states, tooltips, defaults
-- **Slide Editor (React):** Header, left rail, quick toolbar, canvas chrome, right sidebar (Design / Layer / AI Studio), LayerList, ShapeInspector, SlideTextPanel (~272 `slideEditor.*` keys)
+- **Slide Editor (React):** Header, left rail, quick toolbar, canvas chrome, right sidebar (Design / Layer / AI Studio), LayerList, ShapeInspector, SlideTextPanel (~272 `slideEditor.`* keys)
 - **Native app menu:** Dock labels, Workspace verbs, Edit / View / Window, slide-editor window title
 
 Helper for slide-editor string generation (optional tooling): `scripts/slideEditor-i18n-data.mjs`.
@@ -71,13 +75,15 @@ Emoji prefixes/buttons replaced with Lucide-style stroke SVGs in:
 
 ### 4. Live / queue UX
 
-| Behavior | Detail |
-|----------|--------|
+
+| Behavior               | Detail                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------- |
 | Presentation take-down | Re-projecting an already-live slide (card go-live / Go Live → **Take Down**) calls `clearProgram()` |
-| Queue play/pause | Play sends direct LIVE; while live, icon is pause and click clears Program |
-| Queue row click | If row is live, clears Program; otherwise stages/projects as before |
-| Queue dedupe | `addToQueue` no-ops when the same `scene.id` (or same type+reference+text) is already queued |
-| Store API | New `clearProgram()` — clears `currentScene` and matching `previewScene` |
+| Queue play/pause       | Play sends direct LIVE; while live, icon is pause and click clears Program                          |
+| Queue row click        | If row is live, clears Program; otherwise stages/projects as before                                 |
+| Queue dedupe           | `addToQueue` no-ops when the same `scene.id` (or same type+reference+text) is already queued        |
+| Store API              | New `clearProgram()` — clears `currentScene` and matching `previewScene`                            |
+
 
 ---
 
@@ -180,3 +186,4 @@ Approx. scale vs pre-i18n baseline (`ed30187..HEAD`): **~50 files**, **~6.6k ins
 - English catalog is the source of truth; missing keys fall back to `en`.
 - Main-process menu strings are duplicated in `menu-messages.cjs` (cannot import TS catalogs in CJS main). Keep in sync when adding Dock/menu keys.
 - `MessageCatalog` is a full `Record<MessageKey, string>` — all four locale files must define every key (enforced by `tsc`).
+
