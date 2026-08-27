@@ -325,6 +325,7 @@ export const pt: MessageCatalog = {
   'settings.backup.importError': 'Falha ao restaurar o conteúdo da cópia.',
 
   'panel.goLive': 'Go Live',
+  'panel.takeDown': 'Retirar',
   'panel.live': 'Live',
   'panel.preview': 'Preview',
   'panel.import': 'Importar',
@@ -479,6 +480,7 @@ export const pt: MessageCatalog = {
   'queue.empty': 'A fila está vazia. Clique no botão {plus} de qualquer escritura ou cântico para a enfileirar.',
   'queue.manual': 'Manual',
   'queue.sendLive': 'Enviar diretamente para LIVE em ecrã inteiro',
+  'queue.takeDown': 'Retirar da saída LIVE',
   'queue.remove': 'Remover da fila',
 
   'themes.presets': 'Predefinições de design',

@@ -192,6 +192,7 @@ export function PresentationPanel() {
   const previewScene = useAppStore((s) => s.display.previewScene);
   const projectScene = useAppStore((s) => s.projectScene);
   const cutToScene = useAppStore((s) => s.cutToScene);
+  const clearProgram = useAppStore((s) => s.clearProgram);
   const setPreviewScene = useAppStore((s) => s.setPreviewScene);
   const isStudio = useAppStore((s) => s.display.mode) === 'studio';
 
@@ -446,6 +447,14 @@ export function PresentationPanel() {
        Program looked fine — the LIVE lamp lied. */
     if (useAppStore.getState().display.outputMode === 'lowerThird') {
       useAppStore.getState().setOutputMode('fullscreen');
+    }
+
+    /* Re-clicking the live slide takes Program down (standby), same idea as
+       the queue play/pause toggle. */
+    const goesLive = direct || !isStudio;
+    if (goesLive && isSlideLive(index)) {
+      clearProgram();
+      return;
     }
 
     if (direct || !isStudio) {
@@ -905,7 +914,7 @@ export function PresentationPanel() {
                         handleProjectSlide(slide, index, true);
                       }}
                     >
-                      {live ? t('panel.live') : t('panel.goLive')}
+                      {live ? t('panel.takeDown') : t('panel.goLive')}
                     </button>
                   </div>
                 </div>

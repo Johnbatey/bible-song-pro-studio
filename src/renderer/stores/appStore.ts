@@ -112,6 +112,8 @@ interface AppState {
   setVideoMuted: (muted: boolean) => void;
   cutToScene: (scene: Scene) => void;
   transitionToScene: (scene: Scene, transitionType?: string) => void;
+  /** Clear Program (and matching Preview) so the output returns to standby. */
+  clearProgram: () => void;
 
   // Scenes
   scenes: Scene[];
@@ -384,6 +386,21 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     }));
   },
 
+  clearProgram: () => {
+    set((s) => {
+      const curId = s.display.currentScene?.id;
+      const previewMatches = Boolean(curId && s.display.previewScene?.id === curId);
+      return {
+        display: {
+          ...s.display,
+          currentScene: null,
+          previewScene: previewMatches ? null : s.display.previewScene,
+          isTransitioning: false,
+        },
+      };
+    });
+  },
+
   projectScene: (scene, opts = {}) => {
     const { display } = get();
     // Keep it in the scene list so it can be re-fired later
@@ -484,17 +501,25 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
 
   queue: [],
   addToQueue: (item) =>
-    set((s) => ({
-      queue: [
-        ...s.queue,
-        {
-          ...item,
-          id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          timestamp: Date.now(),
-        },
-      ],
-    })),
-      removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
+    set((s) => {
+      const sceneId = item.scene?.id;
+      const alreadyQueued = s.queue.some((q) => {
+        if (sceneId && q.scene?.id === sceneId) return true;
+        return q.type === item.type && q.reference === item.reference && q.text === item.text;
+      });
+      if (alreadyQueued) return s;
+      return {
+        queue: [
+          ...s.queue,
+          {
+            ...item,
+            id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            timestamp: Date.now(),
+          },
+        ],
+      };
+    }),
+  removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
   clearQueue: () => set({ queue: [] }),
 
   aiProviders: [

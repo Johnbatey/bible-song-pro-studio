@@ -325,6 +325,7 @@ export const fr: MessageCatalog = {
   'settings.backup.importError': 'Échec de la restauration du contenu de la sauvegarde.',
 
   'panel.goLive': 'Go Live',
+  'panel.takeDown': 'Retirer',
   'panel.live': 'Live',
   'panel.preview': 'Preview',
   'panel.import': 'Importer',
@@ -479,6 +480,7 @@ export const fr: MessageCatalog = {
   'queue.empty': 'La file est vide. Cliquez sur le bouton {plus} d’un verset ou d’un chant pour l’ajouter.',
   'queue.manual': 'Manuel',
   'queue.sendLive': 'Envoyer directement en LIVE plein écran',
+  'queue.takeDown': 'Retirer de la sortie LIVE',
   'queue.remove': 'Retirer de la file',
 
   'themes.presets': 'Préréglages de design',

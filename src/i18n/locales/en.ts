@@ -325,6 +325,7 @@ export const en: MessageCatalog = {
   'settings.backup.importError': 'Failed to restore backup contents.',
 
   'panel.goLive': 'Go Live',
+  'panel.takeDown': 'Take Down',
   'panel.live': 'Live',
   'panel.preview': 'Preview',
   'panel.import': 'Import',
@@ -479,6 +480,7 @@ export const en: MessageCatalog = {
   'queue.empty': 'Queue is empty. Click the {plus} button on any scripture or song to queue it.',
   'queue.manual': 'Manual',
   'queue.sendLive': 'Send directly to LIVE full-screen output',
+  'queue.takeDown': 'Remove from LIVE output',
   'queue.remove': 'Remove from queue',
 
   'themes.presets': 'Design Presets',

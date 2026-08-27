@@ -325,6 +325,7 @@ export const es: MessageCatalog = {
   'settings.backup.importError': 'Error al restaurar el contenido de la copia.',
 
   'panel.goLive': 'Go Live',
+  'panel.takeDown': 'Quitar',
   'panel.live': 'Live',
   'panel.preview': 'Preview',
   'panel.import': 'Importar',
@@ -479,6 +480,7 @@ export const es: MessageCatalog = {
   'queue.empty': 'La cola está vacía. Haz clic en el botón {plus} de cualquier escritura o canción para encolarla.',
   'queue.manual': 'Manual',
   'queue.sendLive': 'Enviar directamente a LIVE a pantalla completa',
+  'queue.takeDown': 'Quitar de la salida LIVE',
   'queue.remove': 'Quitar de la cola',
 
   'themes.presets': 'Preajustes de diseño',

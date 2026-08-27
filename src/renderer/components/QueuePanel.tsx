@@ -9,6 +9,7 @@ export function QueuePanel() {
   const removeFromQueue = useAppStore((s) => s.removeFromQueue);
   const clearQueue = useAppStore((s) => s.clearQueue);
   const projectScene = useAppStore((s) => s.projectScene);
+  const clearProgram = useAppStore((s) => s.clearProgram);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
 
@@ -50,13 +51,16 @@ export function QueuePanel() {
           {queue.map((item) => {
             const isLive = currentScene?.id === item.scene.id;
             const isPreview = previewScene?.id === item.scene.id;
-            const isActive = isLive || isPreview;
 
             return (
               <div
                 key={item.id}
                 ref={(el) => { rowRefs.current[item.scene.id] = el; }}
                 onClick={() => {
+                  if (isLive) {
+                    clearProgram();
+                    return;
+                  }
                   // In Studio Mode, clicking row sends to Preview first
                   projectScene(item.scene);
                 }}
@@ -101,12 +105,13 @@ export function QueuePanel() {
 
                 {/* Right Action Icons */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  {/* Play (▶) Button — Direct to Live */}
+                  {/* Play → LIVE / Pause → take down */}
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      projectScene(item.scene, { direct: true });
+                      if (isLive) clearProgram();
+                      else projectScene(item.scene, { direct: true });
                     }}
                     style={{
                       background: 'transparent',
@@ -120,11 +125,18 @@ export function QueuePanel() {
                       borderRadius: 4,
                       transition: 'transform 0.1s ease',
                     }}
-                    title={t('queue.sendLive')}
+                    title={isLive ? t('queue.takeDown') : t('queue.sendLive')}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
+                    {isLive ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <rect x="6" y="4" width="4" height="16" rx="1" />
+                        <rect x="14" y="4" width="4" height="16" rx="1" />
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    )}
                   </button>
 
                   {/* Delete (✕) Button */}

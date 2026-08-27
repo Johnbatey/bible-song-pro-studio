@@ -334,6 +334,7 @@ export type MessageKey =
   | 'settings.backup.importError'
   /* Shared panel actions */
   | 'panel.goLive'
+  | 'panel.takeDown'
   | 'panel.live'
   | 'panel.preview'
   | 'panel.import'
@@ -487,6 +488,7 @@ export type MessageKey =
   | 'queue.empty'
   | 'queue.manual'
   | 'queue.sendLive'
+  | 'queue.takeDown'
   | 'queue.remove'
   | 'themes.presets'
   | 'themes.customizeActive'
