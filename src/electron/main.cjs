@@ -26,6 +26,14 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+/* On Linux the GPU sandbox can fail (Wayland compositors, VMs, remote
+   desktops, older drivers), killing the process silently before any window
+   appears. Disabling it keeps rendering functional — software fallback is
+   fine for a presentation app — and letting the sandbox try first means
+   machines with working GPU acceleration still get it. */
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+}
 
 // Prevent unexpected stream destruction or network errors from showing modal crash dialogs
 process.on('uncaughtException', (err) => {
