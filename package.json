@@ -84,6 +84,7 @@
       "assets/**/*",
       "!assets/bin/**/*",
       "src/electron/**/*",
+      "src/i18n/**/*",
       "package.json"
     ],
     "asarUnpack": [

@@ -97,7 +97,15 @@ const { createObsService } = require('./obs-service.cjs');
 const { listenWithFallback } = require('./listen-with-fallback.cjs');
 const lexiconService = require('./lexicon-service.cjs');
 const { stripHugeDataUrls } = require('./strip-data-urls.cjs');
-const { setMenuLocale, mt } = require('../i18n/menu-messages.cjs');
+let setMenuLocale = () => {};
+let mt = (k, fallback) => fallback || k;
+try {
+  const menuMsg = require('../i18n/menu-messages.cjs');
+  setMenuLocale = menuMsg.setMenuLocale || setMenuLocale;
+  mt = menuMsg.mt || mt;
+} catch (err) {
+  console.warn('[Main] Warning: Could not load menu-messages.cjs, using default labels:', err?.message);
+}
 
 const isDev = !app.isPackaged && !fs.existsSync(path.join(__dirname, '../../dist/index.html'));
 let mainWindow = null;
