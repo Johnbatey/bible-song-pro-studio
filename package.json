@@ -97,18 +97,8 @@
       "category": "public.app-category.productivity",
       "icon": "assets/icons/bible-song-pro-icon.icns",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64"
-          ]
-        }
+        "dmg",
+        "zip"
       ],
       "identity": null,
       "hardenedRuntime": true,
