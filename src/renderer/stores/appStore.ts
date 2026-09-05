@@ -17,29 +17,52 @@ let _alertTimer: any = null;
 
 const bspStorage: StateStorage = {
   getItem: async (name) => {
-    if (window.BSP?.store) {
-      const result = await window.BSP.store.load().catch(() => null);
-      return result?.state ?? null;
+    try {
+      if (window.BSP?.store) {
+        const result = await window.BSP.store.load().catch(() => null);
+        if (result && typeof result.state === 'string' && result.state.trim().length > 0) {
+          // Validate it can be parsed as JSON before Zustand tries to deserialize it
+          JSON.parse(result.state);
+          return result.state;
+        }
+        return null;
+      }
+      const item = localStorage.getItem(name);
+      if (item && typeof item === 'string' && item.trim().length > 0) {
+        JSON.parse(item);
+        return item;
+      }
+      return null;
+    } catch (err) {
+      console.warn('[appStore] Persisted store read failed or was corrupted; starting with fresh defaults:', err);
+      return null;
     }
-    return localStorage.getItem(name);
   },
   setItem: async (name, value) => {
     let payload = value;
     try {
       payload = JSON.stringify(sanitizeForIpc(JSON.parse(value)));
     } catch { /* keep the original string */ }
-    if (window.BSP?.store) {
-      await window.BSP.store.save(payload).catch(() => {});
-      return;
+    try {
+      if (window.BSP?.store) {
+        await window.BSP.store.save(payload).catch(() => {});
+        return;
+      }
+      localStorage.setItem(name, payload);
+    } catch (err) {
+      console.warn('[appStore] Persisted store write failed:', err);
     }
-    localStorage.setItem(name, payload);
   },
   removeItem: async (name) => {
-    if (window.BSP?.store) {
-      await window.BSP.store.clear().catch(() => {});
-      return;
+    try {
+      if (window.BSP?.store) {
+        await window.BSP.store.clear().catch(() => {});
+        return;
+      }
+      localStorage.removeItem(name);
+    } catch (err) {
+      console.warn('[appStore] Persisted store remove failed:', err);
     }
-    localStorage.removeItem(name);
   },
 };
 
@@ -756,33 +779,44 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   // Custom merge: the persisted shape is flattened (outputMode, liveScripturePrefs), so a
   // shallow spread would clobber `display` and `liveScripture` with partial objects.
   merge: (persisted, current) => {
-    const saved = (persisted || {}) as Partial<PersistedState>;
-    return {
-      ...current,
-      scenes: unpinSceneMedia(saved.scenes) ?? current.scenes,
-      presentationDecks: saved.presentationDecks ?? current.presentationDecks,
-      songLinesPerSlide: saved.songLinesPerSlide ?? current.songLinesPerSlide,
-      songs: saved.songs ?? current.songs,
-      themes: saved.themes ?? current.themes,
-      activeTheme: saved.activeTheme ?? current.activeTheme,
-      verseHistory: saved.verseHistory ?? current.verseHistory,
-      currentBibleVersion: saved.currentBibleVersion ?? current.currentBibleVersion,
-      sidebarOpen: saved.sidebarOpen ?? current.sidebarOpen,
-      showStandbyBrand: saved.showStandbyBrand ?? current.showStandbyBrand,
-      workspaces: saved.workspaces ?? current.workspaces,
-      activeWorkspaceId: saved.activeWorkspaceId ?? current.activeWorkspaceId,
-      display: {
-        ...current.display,
-        outputMode: saved.outputMode ?? current.display.outputMode,
-        // Older builds stored 'program' | 'preview' | 'simple'. 'simple' was the
-        // program-only workflow, so it maps to basic; everything else to studio.
-        mode: saved.operatingMode === 'basic' || saved.operatingMode === 'simple'
-          ? 'basic'
-          : saved.operatingMode === 'studio' ? 'studio' : current.display.mode,
-      },
-      liveScripture: { ...current.liveScripture, ...(saved.liveScripturePrefs || {}) },
-      uiLocale: isUiLocale(saved.uiLocale) ? saved.uiLocale : current.uiLocale,
-    };
+    try {
+      if (!persisted || typeof persisted !== 'object') {
+        return current;
+      }
+      const saved = persisted as Partial<PersistedState>;
+      return {
+        ...current,
+        scenes: (Array.isArray(saved.scenes) ? unpinSceneMedia(saved.scenes) : null) ?? current.scenes,
+        presentationDecks: Array.isArray(saved.presentationDecks) ? saved.presentationDecks : current.presentationDecks,
+        songLinesPerSlide: (typeof saved.songLinesPerSlide === 'number' || saved.songLinesPerSlide === 'auto') ? saved.songLinesPerSlide : current.songLinesPerSlide,
+        songs: Array.isArray(saved.songs) ? saved.songs : current.songs,
+        themes: Array.isArray(saved.themes) ? saved.themes : current.themes,
+        activeTheme: saved.activeTheme ?? current.activeTheme,
+        verseHistory: Array.isArray(saved.verseHistory) ? saved.verseHistory : current.verseHistory,
+        currentBibleVersion: saved.currentBibleVersion ?? current.currentBibleVersion,
+        sidebarOpen: typeof saved.sidebarOpen === 'boolean' ? saved.sidebarOpen : current.sidebarOpen,
+        showStandbyBrand: typeof saved.showStandbyBrand === 'boolean' ? saved.showStandbyBrand : current.showStandbyBrand,
+        workspaces: Array.isArray(saved.workspaces) ? saved.workspaces : current.workspaces,
+        activeWorkspaceId: typeof saved.activeWorkspaceId === 'string' ? saved.activeWorkspaceId : current.activeWorkspaceId,
+        display: {
+          ...current.display,
+          outputMode: saved.outputMode ?? current.display.outputMode,
+          // Older builds stored 'program' | 'preview' | 'simple'. 'simple' was the
+          // program-only workflow, so it maps to basic; everything else to studio.
+          mode: saved.operatingMode === 'basic' || saved.operatingMode === 'simple'
+            ? 'basic'
+            : saved.operatingMode === 'studio' ? 'studio' : current.display.mode,
+        },
+        liveScripture: {
+          ...current.liveScripture,
+          ...(saved.liveScripturePrefs && typeof saved.liveScripturePrefs === 'object' ? saved.liveScripturePrefs : {})
+        },
+        uiLocale: isUiLocale(saved.uiLocale) ? saved.uiLocale : current.uiLocale,
+      };
+    } catch (err) {
+      console.warn('[appStore] Exception in merge persisted state; recovering with defaults:', err);
+      return current;
+    }
   },
 }));
 
