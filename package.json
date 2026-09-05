@@ -171,6 +171,7 @@
       ],
       "category": "AudioVideo",
       "maintainer": "Johnson Olakotan <support@biblesongpro.com>",
+      "executableArgs": ["--no-sandbox"],
       "extraResources": [
         {
           "from": "assets/bin/ndi/linux-x64",
