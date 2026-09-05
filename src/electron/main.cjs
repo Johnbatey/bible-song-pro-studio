@@ -1,6 +1,14 @@
 const { app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, dialog, systemPreferences, session, Menu, MenuItem, nativeTheme, shell } = require('electron');
 nativeTheme.themeSource = 'dark';
 
+// Guarantee single-instance execution across all operating systems.
+// If another instance is launched, focus the existing window rather than creating an invisible ghost process.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+  process.exit(0);
+}
+
 /* -------------------------------------------------------------------------
    Nothing on the projector is allowed to pause because nobody is looking at
    the operator's window.
@@ -699,6 +707,7 @@ function createSplashWindow() {
     backgroundColor: '#0C0B0B',
     center: true,
     show: true,
+    skipTaskbar: true,
     webPreferences: { nodeIntegration: false, contextIsolation: true }
   });
   /* The splash has no preload and no node access, so the version is passed in
@@ -715,14 +724,40 @@ function createMainWindow({ autoShow = true } = {}) {
   /* backgroundThrottling off here too: the operator's own Program pane plays
      the same clip, and an operator who alt-tabs to their notes and back should
      not find their preview a minute behind the room. */
-  const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 640, minHeight: 480, frame: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0C0B0B', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false } });
+  const win = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 640,
+    minHeight: 480,
+    frame: true,
+    resizable: true,
+    maximizable: true,
+    fullscreenable: true,
+    thickFrame: true,
+    backgroundColor: '#0C0B0B',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: true,
+      backgroundThrottling: false
+    }
+  });
   win.setResizable(true);
   win.setMinimumSize(640, 480);
   win.loadURL(isDev ? 'http://localhost:5173' : `file://${path.join(__dirname, '../../dist/index.html')}`);
   if (isDev) win.webContents.openDevTools();
   /* Bring-up passes autoShow:false and shows the window itself, so the
      console cannot appear from behind the splash mid-animation. */
-  if (autoShow) win.once('ready-to-show', () => { win.maximize(); win.show(); win.focus(); });
+  if (autoShow) {
+    win.once('ready-to-show', () => {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      try { win.maximize(); } catch (_) {}
+      win.focus();
+    });
+  }
   return win;
 }
 
@@ -1837,21 +1872,40 @@ app.whenReady().then(async () => {
     if (handedOver) return;
     handedOver = true;
 
-    // 1. Show and focus main application window first
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.show();
-      mainWindow.maximize();
-      mainWindow.focus();
-    }
-
-    // 2. Safely remove splash window without blocking focus
+    // 1. Remove splash window first so focus cleanly transfers to main window
     if (splash && !splash.isDestroyed()) {
       try {
         splash.setAlwaysOnTop(false);
+        splash.hide();
         splash.destroy();
       } catch (_) {}
     }
     splash = null;
+
+    // 2. Restore, show and focus main application window
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        if (!mainWindow.isMaximized() && !mainWindow.isFullScreen()) {
+          try { mainWindow.maximize(); } catch (_) {}
+        }
+        mainWindow.focus();
+      } catch (err) {
+        console.error('Failed to show mainWindow in handOver:', err);
+      }
+    }
+
+    // 3. Fallback tick to guarantee window visibility across OS window managers (Windows DWM / macOS / Linux X11/Wayland)
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          if (!mainWindow.isVisible()) mainWindow.show();
+          mainWindow.focus();
+        } catch (_) {}
+      }
+    }, 150);
   };
   const handOverAfterFloor = () => {
     setTimeout(handOver, Math.max(0, SPLASH_FLOOR_MS - (Date.now() - splashUpAt)));
@@ -1877,6 +1931,16 @@ app.whenReady().then(async () => {
   mainWindow.on('leave-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', false));
 });
 
+app.on('second-instance', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    } catch (_) {}
+  }
+});
+
 app.on('web-contents-created', (_evt, contents) => {
   try {
     contents.setVisualZoomLevelLimits(1, 1);
@@ -1890,4 +1954,14 @@ app.on('web-contents-created', (_evt, contents) => {
 
 app.on('window-all-closed', () => { appStoreService?.flush(); deepgramService?.destroy(); ndiService?.destroy(); sessionHistory?.endSession(); if (process.platform !== 'darwin') app.quit(); });
 app.on('will-quit', () => { appStoreService?.flush(); deepgramService?.destroy(); globalShortcut.unregisterAll(); ndiService?.destroy(); sessionHistory?.endSession(); });
-app.on('activate', () => { if (!mainWindow) mainWindow = createMainWindow(); });
+app.on('activate', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    mainWindow = createMainWindow({ autoShow: true });
+  } else {
+    try {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    } catch (_) {}
+  }
+});
