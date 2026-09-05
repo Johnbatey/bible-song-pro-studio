@@ -105,6 +105,7 @@ export function LiveScripturePanel() {
   const detectSequenceRef = useRef(0);
   const lastDetectionTextRef = useRef('');
   const lastProjectedRef = useRef({ key: '', at: 0 });
+  const lastSyncedRef = useRef({ key: '', at: 0 });
   /* A ref, not state: this is read inside the transcription loop, which must
      not be re-created — and re-rendering the panel every time Settings is
      touched would restart the recogniser mid-service. */
@@ -407,6 +408,8 @@ export function LiveScripturePanel() {
       if (shouldProject && (lastProjectedRef.current.key !== key || now - lastProjectedRef.current.at > 3500)) {
         lastProjectedRef.current = { key, at: now };
         sendHit(topHit, { goLive: true, confidence: effectiveDetections[0].confidence, sourceMode: mode });
+      } else if (prefs.syncBibleOnDetection !== false && effectiveDetections[0].confidence >= 0.80) {
+        syncToBiblePanel(topHit, false);
       }
     }
   }
@@ -546,6 +549,7 @@ export function LiveScripturePanel() {
     // Auto-project means Program/Audience, including in Studio mode. Without `direct`
     // the shared projector intentionally stages the scene in Preview only.
     projectScene(scene, { direct: options.goLive === true });
+    syncToBiblePanel(hit, true);
     window.BSP?.session?.addEntry({
       type: 'verse', reference: hit.reference, book: hit.book, chapter: hit.chapter, verse: hit.verse,
       text: hit.text, version: hit.version, mode: options.sourceMode || live.detectionMode, source: 'detection',
@@ -567,6 +571,28 @@ export function LiveScripturePanel() {
     if (enabled && live.bestHit && detection && classifyProjectionMode(detection.mode) === 'quoted') {
       sendHit(live.bestHit, { goLive: true, confidence: detection.confidence, sourceMode: detection.mode });
     }
+  }
+
+  function syncToBiblePanel(hit: { book?: string; chapter?: number; verse?: number; version?: string }, force = false) {
+    const prefs = useAppStore.getState().liveScripture;
+    if (prefs.syncBibleOnDetection === false) return;
+    if (!hit?.book || !hit?.chapter) return;
+    const key = `${hit.version || ''}|${hit.book}|${hit.chapter}|${hit.verse || ''}`;
+    const now = performance.now();
+    if (!force && lastSyncedRef.current.key === key && now - lastSyncedRef.current.at < 3000) {
+      return;
+    }
+    lastSyncedRef.current = { key, at: now };
+    window.dispatchEvent(
+      new CustomEvent('bsp:sync-bible', {
+        detail: {
+          book: hit.book,
+          chapter: hit.chapter,
+          verse: hit.verse,
+          version: hit.version,
+        },
+      })
+    );
   }
 
   function extractVerses(res: unknown): Array<{ book: string; chapter: number; verse: number; text: string; version?: string; reference?: string }> {

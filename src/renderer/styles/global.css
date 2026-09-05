@@ -1590,4 +1590,171 @@ body.light-theme .titlebar-pill-btn:hover:not([data-active="true"]) {
   color: var(--text-primary) !important;
 }
 
+/* ── BIBLE GRID PICKER (MATRIX SELECTOR) ─────────────────────────── */
+.bgp-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  text-align: center;
+  min-height: 48px;
+  box-sizing: border-box;
+}
+
+/* Dark Theme (Default) */
+.bgp-card-ot {
+  border: 1px solid rgba(217, 119, 6, 0.22);
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.08) 0%, var(--bg-secondary, #15181e) 100%);
+}
+.bgp-card-ot .bgp-abbrev {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #fef3c7;
+  line-height: 1.15;
+}
+.bgp-card-ot .bgp-name {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 96%;
+  margin-top: 2px;
+  line-height: 1.15;
+}
+
+.bgp-card-nt {
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, var(--bg-secondary, #15181e) 100%);
+}
+.bgp-card-nt .bgp-abbrev {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #e0e7ff;
+  line-height: 1.15;
+}
+.bgp-card-nt .bgp-name {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 96%;
+  margin-top: 2px;
+  line-height: 1.15;
+}
+
+.bgp-card:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.bgp-card-selected {
+  border-color: #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.16) !important;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.3) !important;
+}
+
+/* Light Theme Adaptations for Bible Grid Picker */
+[data-ui-theme="light"] .bgp-card-ot,
+body.light-theme .bgp-card-ot {
+  border: 1px solid rgba(180, 83, 9, 0.38) !important;
+  background: linear-gradient(180deg, rgba(254, 243, 199, 0.95) 0%, #FFFFFF 100%) !important;
+  box-shadow: 0 1px 3px rgba(180, 83, 9, 0.08) !important;
+}
+[data-ui-theme="light"] .bgp-card-ot .bgp-abbrev,
+body.light-theme .bgp-card-ot .bgp-abbrev {
+  color: #92400e !important;
+  font-weight: 800 !important;
+}
+[data-ui-theme="light"] .bgp-card-ot .bgp-name,
+body.light-theme .bgp-card-ot .bgp-name {
+  color: #78350f !important;
+  font-weight: 600 !important;
+}
+
+[data-ui-theme="light"] .bgp-card-nt,
+body.light-theme .bgp-card-nt {
+  border: 1px solid rgba(99, 102, 241, 0.38) !important;
+  background: linear-gradient(180deg, rgba(238, 242, 255, 0.95) 0%, #FFFFFF 100%) !important;
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.08) !important;
+}
+[data-ui-theme="light"] .bgp-card-nt .bgp-abbrev,
+body.light-theme .bgp-card-nt .bgp-abbrev {
+  color: #3730a3 !important;
+  font-weight: 800 !important;
+}
+[data-ui-theme="light"] .bgp-card-nt .bgp-name,
+body.light-theme .bgp-card-nt .bgp-name {
+  color: #4338ca !important;
+  font-weight: 600 !important;
+}
+
+[data-ui-theme="light"] .bgp-card-selected,
+body.light-theme .bgp-card-selected {
+  border-color: #0284c7 !important;
+  background: rgba(14, 165, 233, 0.18) !important;
+  box-shadow: 0 0 0 1.5px #0284c7, 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Light Theme Section Headers & Badges */
+[data-ui-theme="light"] .bgp-section-title-ot,
+body.light-theme .bgp-section-title-ot {
+  color: #b45309 !important;
+}
+[data-ui-theme="light"] .bgp-section-badge-ot,
+body.light-theme .bgp-section-badge-ot {
+  background: rgba(217, 119, 6, 0.16) !important;
+  color: #92400e !important;
+}
+
+[data-ui-theme="light"] .bgp-section-title-nt,
+body.light-theme .bgp-section-title-nt {
+  color: #4338ca !important;
+}
+[data-ui-theme="light"] .bgp-section-badge-nt,
+body.light-theme .bgp-section-badge-nt {
+  background: rgba(99, 102, 241, 0.16) !important;
+  color: #3730a3 !important;
+}
+
+/* Chapter & Verse Number Buttons in Light Theme */
+[data-ui-theme="light"] .bgp-num-green,
+body.light-theme .bgp-num-green {
+  border: 1px solid rgba(22, 163, 74, 0.35) !important;
+  background: linear-gradient(180deg, rgba(220, 252, 231, 0.9) 0%, #FFFFFF 100%) !important;
+  color: #15803d !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+[data-ui-theme="light"] .bgp-num-green-selected,
+body.light-theme .bgp-num-green-selected {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #15803d !important;
+  box-shadow: 0 0 8px rgba(22, 163, 74, 0.45) !important;
+}
+
+[data-ui-theme="light"] .bgp-num-blue,
+body.light-theme .bgp-num-blue {
+  border: 1px solid rgba(37, 99, 235, 0.35) !important;
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.9) 0%, #FFFFFF 100%) !important;
+  color: #1d4ed8 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+[data-ui-theme="light"] .bgp-num-blue-selected,
+body.light-theme .bgp-num-blue-selected {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.45) !important;
+}
+
 

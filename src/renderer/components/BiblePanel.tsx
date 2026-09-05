@@ -10,6 +10,7 @@ import { isFocusedDock } from './dock/dockFocus';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { Block, BlockButton } from './Block';
 import { useI18n } from '../../i18n/useI18n';
+import { BibleGridPicker } from './BibleGridPicker';
 
 const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', 'Revelation'];
 
@@ -342,6 +343,7 @@ export function BiblePanel() {
   } | null>(null);
   /** Where the control bar sits — above the verse list, or under it. */
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_bibleBarPosition', 'bottom');
+  const [showGridPicker, setShowGridPicker] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const searchTimerRef = useRef<number | null>(null);
 
@@ -670,6 +672,56 @@ export function BiblePanel() {
       return () => window.clearTimeout(timer);
     }
   }, [showStrongs]);
+
+  /* Sync from Live Scripture: when a best match / verse is detected or displayed,
+     load that book and chapter in the Bible window and focus/highlight the verse */
+  useEffect(() => {
+    const handleSync = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ book?: string; chapter?: number; verse?: number; version?: string }>;
+      const detail = customEvent.detail;
+      if (!detail?.book || !detail?.chapter) return;
+
+      const rawBook = detail.book.trim();
+      const norm = normalizeSearchText(rawBook).toLowerCase().replace(/\s+/g, '');
+      const matched =
+        bookOptions.find((b) => {
+          const bNorm = normalizeSearchText(b.name).toLowerCase().replace(/\s+/g, '');
+          return bNorm === norm || b.name.toLowerCase() === rawBook.toLowerCase();
+        }) ||
+        bookOptions.find((b) => {
+          const alias = BOOK_ALIASES[rawBook.toLowerCase().replace(/\s+/g, '')];
+          return alias && b.name.toLowerCase() === alias.toLowerCase();
+        });
+
+      const bookName = matched ? matched.name : rawBook;
+      const targetVersion = detail.version || selectedVersion;
+
+      setSelectedBook(bookName);
+      setChapter(detail.chapter);
+      setQuery('');
+      setResults([]);
+      setShowGridPicker(false);
+
+      if (window.BSP?.bible) {
+        const verses = await window.BSP.bible.getChapter({
+          versionId: targetVersion,
+          book: bookName,
+          chapter: detail.chapter,
+        }).catch(() => []);
+        setChapterVerses(verses);
+        if (detail.verse != null) {
+          setHighlightedVerse(detail.verse);
+          setSelectedVerseNumbers([detail.verse]);
+        } else if (verses.length > 0) {
+          setHighlightedVerse(verses[0].verse);
+          setSelectedVerseNumbers([verses[0].verse]);
+        }
+      }
+    };
+
+    window.addEventListener('bsp:sync-bible', handleSync);
+    return () => window.removeEventListener('bsp:sync-bible', handleSync);
+  }, [bookOptions, selectedVersion]);
 
   function bibleSceneId(verse: BibleVerse, isDual = dualVersion, secVer = secondaryVersion) {
     return isDual
@@ -1094,7 +1146,7 @@ export function BiblePanel() {
   const toolbar = (
       <div className="blk blk--bar">
         <div style={styles.controlsRow}>
-          {/* Custom dark translation dropdown */}
+          {/* 1. Custom dark translation dropdown */}
           <CustomDropdown
             value={selectedVersion}
             options={versionOptions.map((v) => ({ value: v.id, label: v.abbreviation, sublabel: v.name }))}
@@ -1103,37 +1155,47 @@ export function BiblePanel() {
             buttonStyle={{ height: 38 }}
           />
 
-          {/* Segmented Pill Switcher with Smooth Sliding Animation */}
-          <SlidingSwitch
-            value={dualVersion ? 'dual' : 'single'}
-            onChange={(val) => handleDualVersionToggle(val === 'dual')}
-            options={[
-              {
-                value: 'single',
-                label: t('bible.singleVersion'),
-                title: t('bible.singleVersionHint'),
-                icon: (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                  </svg>
-                ),
-              },
-              {
-                value: 'dual',
-                label: t('bible.dualVersion'),
-                title: t('bible.dualVersionHint'),
-                icon: (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
-                    <path d="M16 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h3c0 1-1 2-2 3v1c0 1 1 3 4 4z" />
-                  </svg>
-                ),
-              },
-            ]}
+          {/* 2. Matrix Grid Navigator Toggle Button (Books) */}
+          <button
+            onClick={() => setShowGridPicker((v) => !v)}
+            style={{
+              height: 38,
+              padding: '0 12px',
+              background: showGridPicker ? 'rgba(56, 189, 248, 0.15)' : 'var(--chrome-control)',
+              border: showGridPicker ? '1px solid #38bdf8' : '1px solid var(--border-primary)',
+              borderRadius: 6,
+              color: showGridPicker ? '#38bdf8' : 'var(--text-secondary)',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+            }}
+            title={t('bible.gridPicker')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            </svg>
+            <span>{t('bible.books')}</span>
+          </button>
+
+          {/* 3. Unified Search Input (reference or keyword) */}
+          <input
+            style={styles.searchInput}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onBlur={() => setQuery((current) => normalizeReferenceQuery(current))}
+            onKeyDown={handleSearchKeyDown}
+            placeholder={t('bible.searchPlaceholder')}
           />
 
-          {/* Strong's Lexicon Toggle Button */}
+          {/* 4. Strong's Lexicon Toggle Button */}
           <button
             onClick={() => setShowStrongs((v) => !v)}
             style={{
@@ -1193,28 +1255,7 @@ export function BiblePanel() {
             </button>
           )}
 
-          {/* Secondary Version Selector when Dual Version is active */}
-          {dualVersion && (
-            <CustomDropdown
-              value={secondaryVersion}
-              options={versionOptions.map((v) => ({ value: v.id, label: `+ ${v.abbreviation}`, sublabel: v.name }))}
-              onChange={(val) => handleSecondaryVersionChange(val)}
-              title="Secondary Parallel Translation"
-              buttonStyle={{ height: 38 }}
-            />
-          )}
-
-          {/* Unified Search Input (reference or keyword) */}
-          <input
-            style={styles.searchInput}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onBlur={() => setQuery((current) => normalizeReferenceQuery(current))}
-            onKeyDown={handleSearchKeyDown}
-            placeholder={t('bible.searchPlaceholder')}
-          />
-
-          {/* Previous and next chapter navigation */}
+          {/* 5. Previous and next verse navigation */}
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
             <button
               style={{
@@ -1246,7 +1287,50 @@ export function BiblePanel() {
             </button>
           </div>
 
-          {/* Send the whole bar to the other end of the panel. */}
+          {/* 6. Single / Dual Switch with Clean Parallel Icons */}
+          <SlidingSwitch
+            value={dualVersion ? 'dual' : 'single'}
+            onChange={(val) => handleDualVersionToggle(val === 'dual')}
+            options={[
+              {
+                value: 'single',
+                label: t('bible.singleVersion'),
+                title: t('bible.singleVersionHint'),
+                icon: (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="4" y="3" width="16" height="18" rx="2" />
+                    <line x1="8" y1="8" x2="16" y2="8" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                    <line x1="8" y1="16" x2="12" y2="16" />
+                  </svg>
+                ),
+              },
+              {
+                value: 'dual',
+                label: t('bible.dualVersion'),
+                title: t('bible.dualVersionHint'),
+                icon: (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="8" height="18" rx="1.5" />
+                    <rect x="13" y="3" width="8" height="18" rx="1.5" />
+                  </svg>
+                ),
+              },
+            ]}
+          />
+
+          {/* 7. Secondary Version Selector when Dual Version is active */}
+          {dualVersion && (
+            <CustomDropdown
+              value={secondaryVersion}
+              options={versionOptions.map((v) => ({ value: v.id, label: `+ ${v.abbreviation}`, sublabel: v.name }))}
+              onChange={(val) => handleSecondaryVersionChange(val)}
+              title="Secondary Parallel Translation"
+              buttonStyle={{ height: 38 }}
+            />
+          )}
+
+          {/* 8. Send the whole bar to the other end of the panel */}
           <MoveBarButton
             position={barPosition}
             onMove={moveBar}
@@ -1266,6 +1350,13 @@ export function BiblePanel() {
         title={chapterLabel}
         tools={(
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <BlockButton
+              onClick={() => setShowGridPicker((v) => !v)}
+              active={showGridPicker}
+              title={t('bible.gridPicker')}
+            >
+              {showGridPicker ? t('panel.close') : t('bible.books')}
+            </BlockButton>
             <BlockButton onClick={() => { void handlePickImport(); }} disabled={importing} title={t('bible.importTitle')}>
               {importing ? t('panel.importing') : t('panel.import')}
             </BlockButton>
@@ -1296,7 +1387,41 @@ export function BiblePanel() {
           </div>
         )}
 
-        {mode === 'text' ? (
+        {showGridPicker ? (
+          <BibleGridPicker
+            books={bookOptions}
+            selectedVersion={selectedVersion}
+            currentBook={selectedBook}
+            currentChapter={chapter}
+            onSelectPassage={async (passage) => {
+              setSelectedBook(passage.book);
+              setChapter(passage.chapter);
+              setHighlightedVerse(passage.verse);
+              setSelectedVerseNumbers([passage.verse]);
+              setResults([]);
+              setQuery('');
+              setShowGridPicker(false);
+
+              // Immediately fetch chapter verses and dispatch to display / preview
+              const verses = await window.BSP?.bible?.getChapter({
+                versionId: selectedVersion,
+                book: passage.book,
+                chapter: passage.chapter,
+              }).catch(() => []);
+
+              if (verses && verses.length > 0) {
+                setChapterVerses(verses);
+                const targetVerse = verses.find((v) => v.verse === passage.verse) || verses[0];
+                if (targetVerse) {
+                  // In Basic Mode: goes live to display immediately ({ direct: true })
+                  // In Studio Mode: goes to preview first ({ direct: false })
+                  void sendVerse(targetVerse, { direct: operatingMode === 'basic' });
+                }
+              }
+            }}
+            onClose={() => setShowGridPicker(false)}
+          />
+        ) : mode === 'text' ? (
           <textarea
             className="input"
             value={chapterVerses.map((v) => `${v.verse}. ${v.text}`).join('\n\n')}

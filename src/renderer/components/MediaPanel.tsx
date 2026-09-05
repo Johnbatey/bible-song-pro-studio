@@ -25,6 +25,8 @@ export function MediaPanel() {
   const pushNotice = useAppStore((s) => s.notify);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
+  const clearProgram = useAppStore((s) => s.clearProgram);
+  const isStudio = useAppStore((s) => s.display.mode === 'studio');
   const setVideoTransportTarget = useAppStore((s) => s.setVideoTransportTarget);
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_mediaBarPosition');
 
@@ -193,6 +195,25 @@ export function MediaPanel() {
       notify(`${item.name} is not at its saved location. Right-click it to relink.`, 'warning');
       return;
     }
+
+    const isLive = isSceneUsingItem(currentScene, item);
+    const isCued = isSceneUsingItem(previewScene, item);
+
+    // Clicking an active media item again clears it from display (matching slide presentation behavior)
+    if (isStudio) {
+      if (isCued) {
+        setPreviewScene(null);
+        return;
+      }
+      if (isLive) {
+        clearProgram();
+        return;
+      }
+    } else if (isLive) {
+      clearProgram();
+      return;
+    }
+
     const scene: Scene = {
       id: `media-${item.id}-${Date.now()}`,
       name: item.name,

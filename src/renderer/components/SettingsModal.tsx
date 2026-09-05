@@ -847,6 +847,17 @@ export function SettingsModal() {
                   </div>
                   <AppleToggle checked={wordStudy} onChange={setWordStudy} />
                 </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>{t('settings.scripture.syncBibleTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.scripture.syncBibleSub')}</div>
+                  </div>
+                  <AppleToggle
+                    checked={live.syncBibleOnDetection ?? true}
+                    onChange={(checked) => setLive({ syncBibleOnDetection: checked })}
+                  />
+                </div>
               </div>
             )}
 
@@ -1001,16 +1012,16 @@ export function SettingsModal() {
                       </button>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                     <input
                       type="password"
                       placeholder={settings?.deepgramApiKeySet ? t('settings.audio.deepgramPlaceholderSet') : t('settings.audio.deepgramPlaceholder')}
                       value={deepgramKeyDraft}
                       onChange={(e) => setDeepgramKeyDraft(e.target.value)}
-                      style={modalStyles.textInput}
+                      style={{ ...modalStyles.textInput, flex: 1 }}
                     />
                     <button
-                      style={{ ...modalStyles.actionBtn, background: '#FF5500', color: '#fff', border: 'none', whiteSpace: 'nowrap' }}
+                      style={{ ...modalStyles.actionBtn, height: 36, background: '#FF5500', color: '#fff', border: 'none', whiteSpace: 'nowrap' }}
                       onClick={() => {
                         if (deepgramKeyDraft.trim()) {
                           saveSettings({ deepgramApiKey: deepgramKeyDraft.trim() });
@@ -1523,33 +1534,33 @@ export function SettingsModal() {
 
             {/* 8. Keyboard Shortcuts (Hotkeys) */}
             {activeCategory === 'hotkeys' && (
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4 }}>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.fullscreen')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.hotkeys.fullscreen')}</span>
                   <span style={modalStyles.keyBadge}>Cmd + Shift + F</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.blackout')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.hotkeys.blackout')}</span>
                   <span style={modalStyles.keyBadge}>Cmd + Shift + B</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.ndi')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.hotkeys.ndi')}</span>
                   <span style={modalStyles.keyBadge}>Cmd + Shift + N</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.search')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.hotkeys.search')}</span>
                   <span style={modalStyles.keyBadge}>Tab</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.liveSync')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.hotkeys.liveSync')}</span>
                   <span style={modalStyles.keyBadge}>L</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.take')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.hotkeys.take')}</span>
                   <span style={modalStyles.keyBadge}>Enter x2</span>
                 </div>
                 <div style={modalStyles.shortcutRow}>
-                  <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{t('settings.hotkeys.close')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{t('settings.hotkeys.close')}</span>
                   <span style={modalStyles.keyBadge}>Esc</span>
                 </div>
               </div>
@@ -1634,7 +1645,7 @@ export function SettingsModal() {
                     placeholder={t('settings.feedback.churchPlaceholder')}
                     value={churchName}
                     onChange={(e) => setChurchName(e.target.value)}
-                    style={modalStyles.textInput}
+                    style={{ ...modalStyles.textInput, width: '100%' }}
                   />
                 </div>
 
@@ -2013,15 +2024,69 @@ const modalStyles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
-  selectInput: {
-    background: "var(--settings-card)",
-    border: "1px solid var(--settings-line)",
+  shortcutRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 16px',
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
     borderRadius: 6,
-    color: "var(--text-primary)",
+    marginBottom: 8,
+    gap: 12,
+  },
+  keyBadge: {
+    background: 'var(--bg-elevated, rgba(255, 255, 255, 0.08))',
+    border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
+    borderRadius: 5,
+    padding: '4px 9px',
+    fontSize: 11.5,
+    fontWeight: 700,
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    color: 'var(--text-primary)',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.25)',
+    letterSpacing: '0.3px',
+  },
+  selectInput: {
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
+    borderRadius: 6,
+    color: 'var(--text-primary)',
     fontSize: 13,
-    padding: "6px 12px",
-    outline: "none",
-    cursor: "pointer",
+    padding: '0 12px',
+    height: 36,
+    boxSizing: 'border-box',
+    outline: 'none',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-ui)',
+  },
+  textInput: {
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
+    borderRadius: 6,
+    color: 'var(--text-primary)',
+    fontSize: 13,
+    padding: '0 12px',
+    height: 36,
+    boxSizing: 'border-box',
+    outline: 'none',
+    fontFamily: 'var(--font-ui)',
+    transition: 'border-color 0.15s ease',
+  },
+  textareaInput: {
+    width: '100%',
+    background: 'var(--settings-card)',
+    border: '1px solid var(--settings-line)',
+    borderRadius: 6,
+    color: 'var(--text-primary)',
+    fontSize: 13,
+    padding: '10px 12px',
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'var(--font-ui)',
+    resize: 'vertical',
+    lineHeight: 1.5,
+    transition: 'border-color 0.15s ease',
   },
   toggleInput: {
     width: 38,
@@ -2036,7 +2101,11 @@ const modalStyles: Record<string, React.CSSProperties> = {
     marginTop: 6,
   },
   actionBtn: {
-    padding: "6px 14px",
+    padding: "0 14px",
+    height: 36,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
     background: "var(--settings-card)",
     border: "1px solid var(--settings-line)",
     borderRadius: 6,
@@ -2045,6 +2114,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: "pointer",
     whiteSpace: "nowrap",
+    boxSizing: "border-box",
   },
 };
 

@@ -544,6 +544,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     autoProject: true,
     autoVersionSwitch: true,
     autoProjectQuoted: false,
+    syncBibleOnDetection: true,
     allowParaphrase: true,
     requestedVersion: null,
     meter: {
@@ -741,6 +742,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       autoProject: state.liveScripture.autoProject,
       autoVersionSwitch: state.liveScripture.autoVersionSwitch,
       autoProjectQuoted: state.liveScripture.autoProjectQuoted,
+      syncBibleOnDetection: state.liveScripture.syncBibleOnDetection ?? true,
     },
     uiLocale: state.uiLocale,
   }),
@@ -802,7 +804,7 @@ interface PersistedState {
   operatingMode: OperatingMode | 'simple' | 'program' | 'preview';
   liveScripturePrefs: Pick<
     LiveScriptureState,
-    'detectionMode' | 'provider' | 'selectedInputId' | 'autoProject' | 'autoVersionSwitch' | 'autoProjectQuoted'
+    'detectionMode' | 'provider' | 'selectedInputId' | 'autoProject' | 'autoVersionSwitch' | 'autoProjectQuoted' | 'syncBibleOnDetection'
   >;
   uiLocale?: UiLocale;
 }
