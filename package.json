@@ -1,6 +1,6 @@
 {
   "name": "bible-song-pro-studio",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Bible Song Pro - Professional Church Presentation & Streaming Software",
   "main": "src/electron/main.cjs",
   "author": "Johnson Olakotan",
