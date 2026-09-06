@@ -54,7 +54,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
   const setLinesPerSlide = useAppStore((s) => s.setSongLinesPerSlide);
 
   // Workspace Mode: 'buttons' (slide grid) or 'text' (lyrics editor)
-  const [workspaceMode, setWorkspaceMode] = useState<'buttons' | 'text'>('text');
+  const [workspaceMode, setWorkspaceMode] = useState<'buttons' | 'text'>('buttons');
   // Multi-Tab Selection: 'primary' (main lyrics) or 'translation' (translated lyrics)
   const [lyricTab, setLyricTab] = useState<'primary' | 'translation'>('primary');
   // Text Editor state for primary and translated lyrics
