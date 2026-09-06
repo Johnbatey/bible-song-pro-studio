@@ -86,6 +86,7 @@ export function App() {
         activeAlert: state.activeAlert,
         blackout: state.display.blackout,
         showStandbyBrand: state.showStandbyBrand,
+        standbyMedia: state.standbyMedia,
         transcription: state.transcription.text,
         /* Only a program transport travels: a clip cued in preview has not
            reached the audience, and seeking it must not move what is on air. */
@@ -109,6 +110,7 @@ export function App() {
         state.activeAlert !== prev.activeAlert ||
         state.display.blackout !== prev.display.blackout ||
         state.showStandbyBrand !== prev.showStandbyBrand ||
+        state.standbyMedia !== prev.standbyMedia ||
         state.transcription.text !== prev.transcription.text ||
         state.display.videoTransport !== prev.display.videoTransport ||
         // Opening the output window has to push current state at it, or the

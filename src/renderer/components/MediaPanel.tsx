@@ -28,6 +28,8 @@ export function MediaPanel() {
   const clearProgram = useAppStore((s) => s.clearProgram);
   const isStudio = useAppStore((s) => s.display.mode === 'studio');
   const setVideoTransportTarget = useAppStore((s) => s.setVideoTransportTarget);
+  const standbyMedia = useAppStore((s) => s.standbyMedia);
+  const setStandbyMedia = useAppStore((s) => s.setStandbyMedia);
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_mediaBarPosition');
 
   /* The transport belongs to whichever surface is actually holding a video.
@@ -130,6 +132,9 @@ export function MediaPanel() {
   const handleRemove = async (item: MediaItem) => {
     const result = await window.BSP?.media?.remove(item.id).catch(() => null);
     if (result?.ok) {
+      if (standbyMedia?.url === item.url) {
+        setStandbyMedia(null);
+      }
       if (isSceneUsingItem(currentScene, item)) {
         if (currentScene?.type === 'media') {
           setCurrentScene(null);
@@ -147,6 +152,16 @@ export function MediaPanel() {
       refresh();
     } else {
       notify(result?.error || 'Could not remove that entry', 'warning');
+    }
+  };
+
+  const handleToggleStandby = (item: MediaItem) => {
+    if (standbyMedia?.url === item.url) {
+      setStandbyMedia(null);
+      notify(t('settings.output.resetDefaultStandby') || 'Restored default standby cover');
+    } else {
+      setStandbyMedia({ url: item.url, type: item.type, name: item.name });
+      notify(`${t('media.setStandby')}: ${item.name}`);
     }
   };
 
@@ -417,6 +432,30 @@ export function MediaPanel() {
                     <TallyBadge state={isLive ? 'live' : 'cued'} style={{ zIndex: 2 }} />
                   )}
 
+                  {standbyMedia?.url === item.url && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 6,
+                        right: 6,
+                        zIndex: 3,
+                        background: 'rgba(99, 102, 241, 0.92)',
+                        color: '#ffffff',
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                        padding: '2px 6px',
+                        borderRadius: 3,
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.5)',
+                        pointerEvents: 'none',
+                      }}
+                      title={t('media.standbyBadge')}
+                    >
+                      STANDBY
+                    </div>
+                  )}
+
                   {/* Fault, because that is what a source with no file is. The
                       badge sits over the thumbnail rather than replacing it —
                       the operator still needs to recognise the clip. */}
@@ -558,6 +597,7 @@ export function MediaPanel() {
             }}
           >
             {[
+              { label: standbyMedia?.url === menu.item.url ? t('media.clearStandby') : t('media.setStandby'), run: () => handleToggleStandby(menu.item), disabled: menu.item.missing },
               { label: menu.item.missing ? t('media.relink') : t('media.relink'), run: () => handleRelink(menu.item) },
               { label: t('media.showInFolder'), run: () => handleReveal(menu.item), disabled: !menu.item.sourcePath },
               { label: t('media.remove'), run: () => handleRemove(menu.item), fault: true },

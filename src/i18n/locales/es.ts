@@ -179,6 +179,8 @@ export const es: MessageCatalog = {
   'settings.output.openStage': 'Abrir Stage Display',
   'settings.output.standbyTitle': 'Tarjeta en espera en pantallas inactivas',
   'settings.output.standbySub': 'Mostrar la tarjeta « Bible Song Pro — Waiting for signal » cuando no se proyecta nada. Desactiva para dejar pantallas negras entre elementos.',
+  'settings.output.customStandby': 'Pantalla de espera personalizada: {name}',
+  'settings.output.resetDefaultStandby': 'Restablecer pantalla por defecto',
   'settings.output.ndiTitle': 'Salida de vídeo en red NDI®',
   'settings.output.ndiSub': 'Publicar salida Program en vivo por red local para OBS, vMix y receptores NDI',
   'settings.output.ndiRuntimeMissing': 'El runtime NDI no está instalado en este equipo, no hay nada que publicar.',
@@ -407,6 +409,9 @@ export const es: MessageCatalog = {
   'media.remove': 'Quitar de la biblioteca',
   'media.relink': 'Reenlazar…',
   'media.showInFolder': 'Mostrar en carpeta',
+  'media.setStandby': 'Establecer como pantalla de espera',
+  'media.clearStandby': 'Quitar pantalla de espera',
+  'media.standbyBadge': 'Pantalla de espera',
 
   'pres.projects': 'Proyectos de slides',
   'pres.slides': '{count} slides',

@@ -60,13 +60,14 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
      blackout is a statement about what is on air. It does follow the standby
      preference, so the two panes agree about the idle card. */
   const showStandbyBrand = useAppStore((s) => s.showStandbyBrand);
+  const standbyMedia = useAppStore((s) => s.standbyMedia);
   const previewSurfaceState = useMemo(
     () => ({
       scene: previewScene, outputMode, theme: activeTheme, videoTransport: previewTransport,
-      showStandbyBrand,
+      showStandbyBrand, standbyMedia,
       bgVideoLoop: resolveBgVideoLoop(previewScene?.background, activeTheme),
     }),
-    [previewScene, outputMode, activeTheme, previewTransport, showStandbyBrand],
+    [previewScene, outputMode, activeTheme, previewTransport, showStandbyBrand, standbyMedia],
   );
   /* Shared with the stage display's program pane — both are claims about what
      the congregation is seeing, so neither derives it privately. */

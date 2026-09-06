@@ -179,6 +179,8 @@ export const en: MessageCatalog = {
   'settings.output.openStage': 'Open Stage Display',
   'settings.output.standbyTitle': 'Standby Card on Idle Screens',
   'settings.output.standbySub': 'Show the “Bible Song Pro — Waiting for signal” card when nothing is being projected. Turn this off to leave audience screens plain black between items.',
+  'settings.output.customStandby': 'Custom Standby Cover: {name}',
+  'settings.output.resetDefaultStandby': 'Reset to Default Cover',
   'settings.output.ndiTitle': 'NDI® Network Video Output',
   'settings.output.ndiSub': 'Publish program output live over local network for OBS, vMix, and NDI receivers',
   'settings.output.ndiRuntimeMissing': 'The NDI runtime is not installed on this computer, so there is nothing to publish to.',
@@ -407,6 +409,9 @@ export const en: MessageCatalog = {
   'media.remove': 'Remove from library',
   'media.relink': 'Relink…',
   'media.showInFolder': 'Show in folder',
+  'media.setStandby': 'Set as Standby Cover',
+  'media.clearStandby': 'Remove Standby Cover',
+  'media.standbyBadge': 'Standby Cover',
 
   'pres.projects': 'Slides Projects',
   'pres.slides': '{count} slides',

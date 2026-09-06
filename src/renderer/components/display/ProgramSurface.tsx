@@ -24,6 +24,7 @@ export interface ProgramSurfaceState {
    * branded holding card between items is a distraction.
    */
   showStandbyBrand?: boolean;
+  standbyMedia?: { url: string; type: 'image' | 'video'; name?: string } | null;
   mode?: 'fullscreen' | 'lowerThird';
   fontFamily?: string;
   fontSize?: number;
@@ -431,10 +432,43 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
       )}
 
       {!scene && state.showStandbyBrand !== false && (
-        <div className="program-surface-standby">
-          <div className="program-surface-standby-title">Bible Song Pro<sup>STUDIO</sup></div>
-          <div className="program-surface-standby-sub">Waiting for signal...</div>
-        </div>
+        state.standbyMedia?.url ? (
+          state.standbyMedia.type === 'video' ? (
+            <video
+              src={assetUrl(state.standbyMedia.url, assetBaseUrl)}
+              autoPlay
+              loop
+              muted
+              playsInline
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                zIndex: 2,
+              }}
+            />
+          ) : (
+            <img
+              src={assetUrl(state.standbyMedia.url, assetBaseUrl)}
+              alt=""
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                zIndex: 2,
+              }}
+            />
+          )
+        ) : (
+          <div className="program-surface-standby">
+            <div className="program-surface-standby-title">Bible Song Pro<sup>STUDIO</sup></div>
+            <div className="program-surface-standby-sub">Waiting for signal...</div>
+          </div>
+        )
       )}
 
       {scene && mode === 'lowerThird' && !content?.wordStudy && (

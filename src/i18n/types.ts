@@ -188,6 +188,8 @@ export type MessageKey =
   | 'settings.output.openStage'
   | 'settings.output.standbyTitle'
   | 'settings.output.standbySub'
+  | 'settings.output.customStandby'
+  | 'settings.output.resetDefaultStandby'
   | 'settings.output.ndiTitle'
   | 'settings.output.ndiSub'
   | 'settings.output.ndiRuntimeMissing'
@@ -416,6 +418,9 @@ export type MessageKey =
   | 'media.remove'
   | 'media.relink'
   | 'media.showInFolder'
+  | 'media.setStandby'
+  | 'media.clearStandby'
+  | 'media.standbyBadge'
   /* Presentation panel */
   | 'pres.projects'
   | 'pres.slides'

@@ -3,7 +3,7 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import type {
   Scene, Theme, Song, BibleVersion, BibleVerse,
   DisplayState, AIProvider, TranscriptionState, Alert, LiveScriptureState, AudioInputDevice,
-  OperatingMode, QueueItem, PresentationDeck, Workspace
+  OperatingMode, QueueItem, PresentationDeck, Workspace, StandbyMedia
 } from '../types';
 import { createDefaultTheme } from '../utils/defaultTheme';
 import { sanitizeForIpc } from '../utils/sanitize-ipc';
@@ -173,6 +173,8 @@ interface AppState {
    */
   showStandbyBrand: boolean;
   setShowStandbyBrand: (show: boolean) => void;
+  standbyMedia: StandbyMedia | null;
+  setStandbyMedia: (media: StandbyMedia | null) => void;
 
   // Bible
   bibleVersions: BibleVersion[];
@@ -512,6 +514,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
 
   showStandbyBrand: true,
   setShowStandbyBrand: (showStandbyBrand) => set({ showStandbyBrand }),
+  standbyMedia: null,
+  setStandbyMedia: (standbyMedia) => set({ standbyMedia }),
   setSongLinesPerSlide: (songLinesPerSlide) => set({ songLinesPerSlide }),
 
   bibleVersions: [],
@@ -754,6 +758,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     currentBibleVersion: state.currentBibleVersion,
     sidebarOpen: state.sidebarOpen,
     showStandbyBrand: state.showStandbyBrand,
+    standbyMedia: state.standbyMedia,
     workspaces: state.workspaces,
     activeWorkspaceId: state.activeWorkspaceId,
     outputMode: state.display.outputMode,
@@ -796,6 +801,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         currentBibleVersion: saved.currentBibleVersion ?? current.currentBibleVersion,
         sidebarOpen: typeof saved.sidebarOpen === 'boolean' ? saved.sidebarOpen : current.sidebarOpen,
         showStandbyBrand: typeof saved.showStandbyBrand === 'boolean' ? saved.showStandbyBrand : current.showStandbyBrand,
+        standbyMedia: saved.standbyMedia && typeof saved.standbyMedia === 'object' && saved.standbyMedia.url ? saved.standbyMedia : null,
         workspaces: Array.isArray(saved.workspaces) ? saved.workspaces : current.workspaces,
         activeWorkspaceId: typeof saved.activeWorkspaceId === 'string' ? saved.activeWorkspaceId : current.activeWorkspaceId,
         display: {
@@ -831,6 +837,7 @@ interface PersistedState {
   currentBibleVersion: BibleVersion | null;
   sidebarOpen: boolean;
   showStandbyBrand: boolean;
+  standbyMedia?: StandbyMedia | null;
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
   outputMode: DisplayState['outputMode'];

@@ -147,6 +147,12 @@ export interface SlideElement {
   hidden?: boolean;
 }
 
+export interface StandbyMedia {
+  url: string;
+  type: 'image' | 'video';
+  name?: string;
+}
+
 export interface SlideBackground {
   type: 'color' | 'gradient' | 'image' | 'video';
   value: string;

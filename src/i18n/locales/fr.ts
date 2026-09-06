@@ -179,6 +179,8 @@ export const fr: MessageCatalog = {
   'settings.output.openStage': 'Ouvrir Stage Display',
   'settings.output.standbyTitle': 'Carte veille sur écrans inactifs',
   'settings.output.standbySub': 'Afficher la carte « Bible Song Pro — Waiting for signal » quand rien n’est projeté. Désactivez pour laisser les écrans noirs entre les éléments.',
+  'settings.output.customStandby': 'Écran de veille personnalisé : {name}',
+  'settings.output.resetDefaultStandby': 'Rétablir l’écran par défaut',
   'settings.output.ndiTitle': 'Sortie vidéo réseau NDI®',
   'settings.output.ndiSub': 'Publier la sortie Program en live sur le réseau local pour OBS, vMix et récepteurs NDI',
   'settings.output.ndiRuntimeMissing': 'Le runtime NDI n’est pas installé sur cet ordinateur, rien à publier.',
@@ -407,6 +409,9 @@ export const fr: MessageCatalog = {
   'media.remove': 'Retirer de la bibliothèque',
   'media.relink': 'Relier…',
   'media.showInFolder': 'Afficher dans le dossier',
+  'media.setStandby': 'Définir comme écran de veille',
+  'media.clearStandby': 'Retirer l’écran de veille',
+  'media.standbyBadge': 'Écran de veille',
 
   'pres.projects': 'Projets de slides',
   'pres.slides': '{count} slides',

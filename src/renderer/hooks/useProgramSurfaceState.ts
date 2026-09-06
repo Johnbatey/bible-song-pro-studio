@@ -25,6 +25,7 @@ export function useProgramSurfaceState(): ProgramSurfaceState {
      to know blackout is on is the only one who cannot see it. */
   const blackout = useAppStore((s) => s.display.blackout);
   const showStandbyBrand = useAppStore((s) => s.showStandbyBrand);
+  const standbyMedia = useAppStore((s) => s.standbyMedia);
   /* Only when the transport is pointed here — a surface handed someone else's
      transport would answer play and seek meant for a different clip. */
   const videoTransport = useAppStore((s) =>
@@ -35,11 +36,11 @@ export function useProgramSurfaceState(): ProgramSurfaceState {
   return useMemo(
     () => ({
       scene, outputMode, theme, activeAlert, transcription, videoTransport,
-      blackout, showStandbyBrand,
+      blackout, showStandbyBrand, standbyMedia,
       /* Read here as well as in App's sendState, or the operator's own panes
          loop a clip the audience window has stopped looping. */
       bgVideoLoop: resolveBgVideoLoop(scene?.background, theme),
     }),
-    [scene, outputMode, theme, activeAlert, transcription, videoTransport, blackout, showStandbyBrand],
+    [scene, outputMode, theme, activeAlert, transcription, videoTransport, blackout, showStandbyBrand, standbyMedia],
   );
 }

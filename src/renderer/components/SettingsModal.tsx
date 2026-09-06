@@ -281,6 +281,8 @@ export function SettingsModal() {
   const setLive = useAppStore((s) => s.setLiveScripture);
   const showStandbyBrand = useAppStore((s) => s.showStandbyBrand);
   const setShowStandbyBrand = useAppStore((s) => s.setShowStandbyBrand);
+  const standbyMedia = useAppStore((s) => s.standbyMedia);
+  const setStandbyMedia = useAppStore((s) => s.setStandbyMedia);
   const platform = useAppStore((s) => s.platform);
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(activeCategoryValue || 'scripture');
@@ -1191,12 +1193,29 @@ export function SettingsModal() {
                   </div>
                 </div>
 
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.output.standbyTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.output.standbySub')}</div>
+                <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={modalStyles.rowTitle}>{t('settings.output.standbyTitle')}</div>
+                      <div style={modalStyles.rowSub}>{t('settings.output.standbySub')}</div>
+                    </div>
+                    <AppleToggle checked={showStandbyBrand} onChange={setShowStandbyBrand} />
                   </div>
-                  <AppleToggle checked={showStandbyBrand} onChange={setShowStandbyBrand} />
+                  {standbyMedia && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: 6 }}>
+                      <span style={{ ...type.caption, color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {t('settings.output.customStandby', { name: standbyMedia.name || standbyMedia.type })}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => setStandbyMedia(null)}
+                        style={{ padding: '2px 8px', fontSize: 11 }}
+                      >
+                        {t('settings.output.resetDefaultStandby')}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 14 }}>
