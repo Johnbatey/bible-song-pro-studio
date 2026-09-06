@@ -155,15 +155,24 @@ function createSongImportService() {
    * with no tags at all fell through to a branch that made the whole file one
    * verse called `v1` — which is what an operator pasting a lyric sheet hit.
    */
-  function parseLyricSheet(text) {
+  function parseLyricSheet(text, fallbackTitle) {
     const titleMatch = String(text).match(/\{\s*(?:title|t)\s*:\s*([^}]+)\}/i);
-    const title = titleMatch ? titleMatch[1].trim() : 'Untitled';
+    let title = titleMatch ? titleMatch[1].trim() : '';
 
     const { sections, verseOrder } = arrangeLyrics(text);
     if (sections.length === 0) return [];
 
+    if (!title) {
+      if (fallbackTitle && String(fallbackTitle).trim() && String(fallbackTitle).trim().toLowerCase() !== 'untitled') {
+        title = String(fallbackTitle).trim();
+      } else {
+        const allLines = sections.flatMap((s) => s.lines);
+        title = inferSongTitleFromLyrics(allLines.join('\n'), 'Untitled');
+      }
+    }
+
     return [{
-      title,
+      title: title || fallbackTitle || 'Untitled',
       verses: sections.map((section) => ({ name: section.name, lines: section.lines })),
       format: looksLikeChordPro(text) ? 'chordpro' : 'plain',
       verseOrder,
@@ -429,6 +438,7 @@ function createSongImportService() {
   async function importFile(filePath) {
     if (!fs.existsSync(filePath)) return { ok: false, error: 'File not found: ' + filePath };
     const ext = path.extname(filePath).toLowerCase();
+    const baseName = path.basename(filePath, path.extname(filePath)).trim();
 
     // Check for SQLite database formats (EasyWorship & OpenLP)
     if (ext === '.db' || ext === '.ddb' || ext === '.sqlite' || ext === '.sqlite3') {
@@ -470,16 +480,33 @@ function createSongImportService() {
     if (looksBinary(content)) return { ok: false, error: BINARY_ERROR };
 
     if (ext === '.xml' || content.trim().startsWith('<?xml') || content.trim().startsWith('<song')) {
-      return { ok: true, songs: parseOpenLyrics(content), format: 'openlyrics' };
+      const songs = parseOpenLyrics(content);
+      if (baseName) {
+        songs.forEach((s) => {
+          if (!s.title || s.title.toLowerCase() === 'untitled') {
+            s.title = baseName;
+          }
+        });
+      }
+      return { ok: true, songs, format: 'openlyrics' };
     }
 
-    const songs = parseLyricSheet(content);
-    if (songs.length > 0) return { ok: true, songs, format: songs[0].format };
+    const songs = parseLyricSheet(content, baseName);
+    if (songs.length > 0) {
+      if (baseName) {
+        songs.forEach((s) => {
+          if (!s.title || s.title.toLowerCase() === 'untitled') {
+            s.title = baseName;
+          }
+        });
+      }
+      return { ok: true, songs, format: songs[0].format };
+    }
 
     return { ok: false, error: 'Unrecognized format. Supported: EasyWorship (.db, .ddb), OpenLP (.sqlite, .sqlite3), OpenLyrics (.xml), ChordPro (.chordpro, .chopro), plain lyrics (.txt)' };
   }
 
-  function importText(text) {
+  function importText(text, fallbackTitle) {
     const trimmed = String(text || '').trim();
     if (!trimmed) return { ok: false, error: 'File is empty' };
     if (looksBinary(trimmed)) return { ok: false, error: BINARY_ERROR };
@@ -487,12 +514,28 @@ function createSongImportService() {
     // OpenLyrics arrives as XML whether it came from a file or a paste
     if (trimmed.startsWith('<?xml') || trimmed.startsWith('<song')) {
       const parsed = parseOpenLyrics(trimmed);
-      if (parsed.length > 0) return { ok: true, songs: parsed, format: 'openlyrics' };
+      if (parsed.length > 0) {
+        if (fallbackTitle && fallbackTitle.toLowerCase() !== 'untitled') {
+          parsed.forEach((s) => {
+            if (!s.title || s.title.toLowerCase() === 'untitled') {
+              s.title = fallbackTitle;
+            }
+          });
+        }
+        return { ok: true, songs: parsed, format: 'openlyrics' };
+      }
       return { ok: false, error: 'XML file contained no <song> elements (expected OpenLyrics format)' };
     }
 
-    const songs = parseLyricSheet(text);
+    const songs = parseLyricSheet(text, fallbackTitle);
     if (songs.length === 0) return { ok: false, error: 'No lyrics found' };
+    if (fallbackTitle && fallbackTitle.toLowerCase() !== 'untitled') {
+      songs.forEach((s) => {
+        if (!s.title || s.title.toLowerCase() === 'untitled') {
+          s.title = fallbackTitle;
+        }
+      });
+    }
     return { ok: true, songs, format: songs[0].format };
   }
 

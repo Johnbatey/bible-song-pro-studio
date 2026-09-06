@@ -817,7 +817,7 @@ declare global {
       };
       song: {
         importFile: (payload: { filePath: string }) => Promise<SongImportResult>;
-        importText: (payload: { text: string }) => Promise<SongImportResult>;
+        importText: (payload: { text: string; title?: string }) => Promise<SongImportResult>;
         arrangeText: (payload: { text: string }) => Promise<ArrangeResult>;
         pick: (payload?: any) => Promise<{ ok: boolean; filePaths?: string[]; canceled?: boolean }>;
       };
