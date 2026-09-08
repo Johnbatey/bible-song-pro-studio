@@ -687,29 +687,17 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                     flexShrink: 0,
                   }}
                 >
-                  {/* Left: Compact Slide Count Badge */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  {/* Left: Clean Slide Count Text */}
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
                     <span
                       style={{
-                        fontSize: 11,
-                        fontWeight: 600,
+                        fontSize: 12,
+                        fontWeight: 500,
                         color: 'var(--text-secondary, #aaa)',
-                        backgroundColor: '#222226',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        padding: '4px 8px',
-                        borderRadius: 5,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 5,
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="3" width="20" height="14" rx="2" />
-                        <line x1="8" y1="21" x2="16" y2="21" />
-                        <line x1="12" y1="17" x2="12" y2="21" />
-                      </svg>
-                      <span>{parsedSlides.length} {parsedSlides.length === 1 ? 'Slide' : 'Slides'}</span>
+                      {parsedSlides.length} {parsedSlides.length === 1 ? 'Slide' : 'Slides'}
                     </span>
                   </div>
 

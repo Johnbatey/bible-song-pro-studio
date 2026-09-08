@@ -90,6 +90,9 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
   if (mode === 'lowerThird') {
     return { backgroundColor: 'transparent', backgroundImage: 'none' };
   }
+  if (!state.scene) {
+    return { backgroundColor: '#000000', backgroundImage: 'none' };
+  }
   const fit = state.bgFit === 'fill' ? '100% 100%' : state.bgFit || 'cover';
   const opacity = typeof state.bgOpacity === 'number' ? state.bgOpacity : 1;
   const style: React.CSSProperties = {
