@@ -93,7 +93,6 @@ export function QueuePanel() {
 
   // Drag & drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const setlistMenuRef = useRef<HTMLDivElement>(null);
@@ -347,25 +346,25 @@ export function QueuePanel() {
                 right: 0,
                 marginTop: 4,
                 width: 280,
-                backgroundColor: '#18181b',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
+                backgroundColor: 'var(--bg-surface)',
+                border: '1px solid var(--border-primary)',
                 borderRadius: 8,
-                boxShadow: '0 12px 28px rgba(0, 0, 0, 0.6)',
+                boxShadow: 'var(--shadow-lg)',
                 zIndex: 1000,
                 padding: 10,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 8,
-                color: '#fff',
+                color: 'var(--text-primary)',
               }}
             >
               {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim, #888)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-primary)', paddingBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
                   Service Setlists
                 </span>
-                <span style={{ fontSize: 10, color: 'var(--accent, #FF5500)' }}>
-                  {queue.length} items in active queue
+                <span style={{ fontSize: 10, color: 'var(--accent, #FF5500)', fontWeight: 600 }}>
+                  {queue.length} in queue
                 </span>
               </div>
 
@@ -373,7 +372,7 @@ export function QueuePanel() {
               <form onSubmit={handleSaveSetlist} style={{ display: 'flex', gap: 6 }}>
                 <input
                   type="text"
-                  placeholder="Setlist name (e.g. Sunday Service)..."
+                  placeholder="Setlist name..."
                   value={newSetlistName}
                   onChange={(e) => setNewSetlistName(e.target.value)}
                   style={{
@@ -381,10 +380,10 @@ export function QueuePanel() {
                     height: 26,
                     padding: '0 6px',
                     fontSize: 11,
-                    backgroundColor: '#121214',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'var(--bg-primary)',
+                    border: '1px solid var(--border-primary)',
                     borderRadius: 4,
-                    color: '#fff',
+                    color: 'var(--text-primary)',
                   }}
                 />
                 <button
@@ -395,7 +394,7 @@ export function QueuePanel() {
                     padding: '0 8px',
                     fontSize: 11,
                     fontWeight: 600,
-                    backgroundColor: queue.length > 0 ? 'var(--accent, #FF5500)' : '#333',
+                    backgroundColor: queue.length > 0 ? 'var(--accent, #FF5500)' : 'var(--chrome-control)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 4,
@@ -411,7 +410,7 @@ export function QueuePanel() {
               {/* Saved Setlists List */}
               <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {savedSetlists.length === 0 ? (
-                  <div style={{ padding: '12px 8px', textAlign: 'center', color: '#666', fontSize: 11 }}>
+                  <div style={{ padding: '12px 8px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 11 }}>
                     No saved setlists yet. Save your service queue above or import a .bspsetlist file.
                   </div>
                 ) : (
@@ -422,8 +421,8 @@ export function QueuePanel() {
                       onMouseLeave={() => setHoveredSetlistId(null)}
                       style={{
                         padding: '6px 8px',
-                        backgroundColor: '#141416',
-                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-primary)',
                         borderRadius: 4,
                         display: 'flex',
                         alignItems: 'center',
@@ -436,10 +435,10 @@ export function QueuePanel() {
                         style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
                         title={`Click to load "${sl.name}" (${sl.items.length} items)`}
                       >
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {sl.name}
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--text-dim, #888)' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                           {sl.items.length} item{sl.items.length === 1 ? '' : 's'} · {new Date(sl.updatedAt || sl.createdAt).toLocaleDateString()}
                         </div>
                       </div>
@@ -452,7 +451,7 @@ export function QueuePanel() {
                           style={{
                             background: 'transparent',
                             border: 'none',
-                            color: 'var(--text-dim, #888)',
+                            color: 'var(--text-dim)',
                             cursor: 'pointer',
                             padding: 2,
                           }}
@@ -471,11 +470,13 @@ export function QueuePanel() {
                           style={{
                             background: 'transparent',
                             border: 'none',
-                            color: hoveredSetlistId === sl.id ? 'var(--tally-fault, #ef4444)' : 'var(--text-dim, #888)',
+                            color: 'var(--text-dim)',
                             cursor: 'pointer',
                             padding: 2,
-                            opacity: hoveredSetlistId === sl.id ? 1 : 0.6,
+                            opacity: hoveredSetlistId === sl.id ? 1 : 0.4,
                           }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--tally-fault, #ef4444)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dim)'; }}
                           title="Delete setlist"
                         >
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -489,8 +490,8 @@ export function QueuePanel() {
                 )}
               </div>
 
-              {/* Footer File Actions */}
-              <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+              {/* Setlist Import / Export Action Bar */}
+              <div style={{ borderTop: '1px solid var(--border-primary)', paddingTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -499,10 +500,10 @@ export function QueuePanel() {
                     height: 24,
                     fontSize: 10,
                     fontWeight: 600,
-                    backgroundColor: '#27272a',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'var(--chrome-control)',
+                    border: '1px solid var(--border-primary)',
                     borderRadius: 4,
-                    color: '#ddd',
+                    color: 'var(--text-primary)',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -516,7 +517,7 @@ export function QueuePanel() {
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
                   </svg>
-                  <span>Import Setlist</span>
+                  <span>Import</span>
                 </button>
 
                 <button
@@ -528,10 +529,10 @@ export function QueuePanel() {
                     height: 24,
                     fontSize: 10,
                     fontWeight: 600,
-                    backgroundColor: '#27272a',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'var(--chrome-control)',
+                    border: '1px solid var(--border-primary)',
                     borderRadius: 4,
-                    color: queue.length > 0 ? '#ddd' : '#666',
+                    color: queue.length > 0 ? 'var(--text-primary)' : 'var(--text-dim)',
                     cursor: queue.length > 0 ? 'pointer' : 'default',
                     display: 'flex',
                     alignItems: 'center',
@@ -545,7 +546,7 @@ export function QueuePanel() {
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
-                  <span>Export Active</span>
+                  <span>Export</span>
                 </button>
               </div>
 
@@ -565,7 +566,7 @@ export function QueuePanel() {
       {queue.length === 0 ? (
         <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '24px 16px', textAlign: 'center' }}>
           {emptyParts[0]}
-          <strong style={{ color: '#FF5500' }}>+</strong>
+          <strong style={{ color: 'var(--accent, #FF5500)' }}>+</strong>
           {emptyParts[1] || ''}
         </div>
       ) : (
@@ -577,7 +578,7 @@ export function QueuePanel() {
               : currentScene?.id === item.scene.id;
             const isPreview = !isAlertItem && previewScene?.id === item.scene.id;
             const isHovered = hoveredItemId === item.id;
-            const isDragOver = dragOverIndex === index;
+            const isDraggingThis = draggedIndex === index;
 
             const handleTakeLive = () => {
               if (isAlertItem) {
@@ -607,22 +608,27 @@ export function QueuePanel() {
                   e.dataTransfer.setData('text/plain', String(index));
                   e.dataTransfer.effectAllowed = 'move';
                 }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  if (draggedIndex !== null && draggedIndex !== index) {
+                    reorderQueue(draggedIndex, index);
+                    setDraggedIndex(index);
+                  }
+                }}
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
-                  if (dragOverIndex !== index) setDragOverIndex(index);
+                  if (draggedIndex !== null && draggedIndex !== index) {
+                    reorderQueue(draggedIndex, index);
+                    setDraggedIndex(index);
+                  }
                 }}
-                onDragLeave={() => {
-                  if (dragOverIndex === index) setDragOverIndex(null);
+                onDragEnd={() => {
+                  setDraggedIndex(null);
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  const from = draggedIndex ?? Number(e.dataTransfer.getData('text/plain'));
-                  if (from !== null && from !== undefined && from !== index) {
-                    reorderQueue(from, index);
-                  }
                   setDraggedIndex(null);
-                  setDragOverIndex(null);
                 }}
                 onMouseEnter={() => setHoveredItemId(item.id)}
                 onMouseLeave={() => setHoveredItemId(null)}
@@ -643,22 +649,26 @@ export function QueuePanel() {
                   handleTakeLive();
                 }}
                 style={{
-                  padding: '10px 14px',
-                  background: isLive ? '#3d1403' : isPreview ? '#232221' : '#141416',
-                  border: isDragOver
+                  padding: '9px 12px',
+                  background: isLive
+                    ? 'var(--accent-dim, rgba(255, 85, 0, 0.12))'
+                    : isPreview
+                    ? 'var(--chrome-control-active, var(--bg-hover))'
+                    : 'var(--bg-secondary)',
+                  border: isLive
                     ? '1px solid var(--accent, #FF5500)'
-                    : isLive
-                    ? '1px solid #FF5500'
-                    : '1px solid #262628',
-                  borderTop: isDragOver ? '2px solid var(--accent, #FF5500)' : undefined,
+                    : isPreview
+                    ? '1px solid var(--border-accent, rgba(255, 85, 0, 0.4))'
+                    : '1px solid var(--border-primary)',
                   borderRadius: 6,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
                   cursor: 'grab',
-                  transition: 'all 0.15s ease',
+                  transition: 'background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease',
                   userSelect: 'none',
-                  opacity: draggedIndex === index ? 0.4 : 1,
+                  opacity: isDraggingThis ? 0.6 : 1,
+                  transform: isDraggingThis ? 'scale(1.01)' : 'none',
                   minWidth: 0,
                   overflow: 'hidden',
                 }}
@@ -666,11 +676,11 @@ export function QueuePanel() {
                 {/* Drag Handle Icon */}
                 <div
                   style={{
-                    color: 'var(--text-dim, #555)',
+                    color: 'var(--text-dim)',
                     display: 'flex',
                     alignItems: 'center',
                     cursor: 'grab',
-                    opacity: isHovered ? 0.8 : 0.3,
+                    opacity: isHovered ? 0.8 : 0.35,
                     transition: 'opacity 0.15s ease',
                     flexShrink: 0,
                   }}
@@ -686,40 +696,30 @@ export function QueuePanel() {
                   </svg>
                 </div>
 
-                {/* Left Meta Group */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0, overflow: 'hidden' }}>
-                    <span style={{ color: isLive ? '#FF5500' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                {/* Left Meta Group (Title + Subtitle Snippet on 2 lines) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                    <span style={{ color: isLive ? 'var(--accent, #FF5500)' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
                       {renderTypeIcon(item.type)}
                     </span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: isLive ? '#FF5500' : '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: isLive ? 'var(--accent, #FF5500)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
                       {item.reference}
                     </span>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.type} {item.source ? `· ${item.source}` : ''}
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ textTransform: 'capitalize', flexShrink: 0 }}>
+                      {item.type} {item.source ? `· ${item.source}` : ''}
+                    </span>
+                    {item.text && (
+                      <>
+                        <span style={{ opacity: 0.4 }}>·</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                          {item.text.replace(/\s+/g, ' ').trim()}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
-
-                {/* Content Snippet */}
-                {item.text && (
-                  <div
-                    style={{
-                      flex: '1 1 0',
-                      minWidth: 0,
-                      fontSize: 13,
-                      color: '#ffffff',
-                      lineHeight: 1.35,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {item.text}
-                  </div>
-                )}
 
                 {/* Right Action Icons & Up/Down Reorder */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 'auto' }}>
@@ -734,14 +734,14 @@ export function QueuePanel() {
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: index === 0 ? '#333' : 'var(--text-dim, #888)',
+                      color: index === 0 ? 'var(--text-dim)' : 'var(--text-secondary)',
                       cursor: index === 0 ? 'default' : 'pointer',
                       padding: 3,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       borderRadius: 3,
-                      opacity: isHovered ? (index === 0 ? 0.3 : 0.8) : 0,
+                      opacity: isHovered ? (index === 0 ? 0.2 : 0.8) : 0,
                       pointerEvents: isHovered && index > 0 ? 'auto' : 'none',
                       transition: 'opacity 0.12s ease',
                     }}
@@ -763,14 +763,14 @@ export function QueuePanel() {
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: index === queue.length - 1 ? '#333' : 'var(--text-dim, #888)',
+                      color: index === queue.length - 1 ? 'var(--text-dim)' : 'var(--text-secondary)',
                       cursor: index === queue.length - 1 ? 'default' : 'pointer',
                       padding: 3,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       borderRadius: 3,
-                      opacity: isHovered ? (index === queue.length - 1 ? 0.3 : 0.8) : 0,
+                      opacity: isHovered ? (index === queue.length - 1 ? 0.2 : 0.8) : 0,
                       pointerEvents: isHovered && index < queue.length - 1 ? 'auto' : 'none',
                       transition: 'opacity 0.12s ease',
                     }}
@@ -791,7 +791,7 @@ export function QueuePanel() {
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: isLive ? '#FF5500' : '#ffffff',
+                      color: isLive ? 'var(--accent, #FF5500)' : 'var(--text-primary)',
                       cursor: 'pointer',
                       padding: 4,
                       display: 'flex',
@@ -832,6 +832,8 @@ export function QueuePanel() {
                       justifyContent: 'center',
                       borderRadius: 4,
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--tally-fault, #ef4444)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dim)'; }}
                     title={t('queue.remove')}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

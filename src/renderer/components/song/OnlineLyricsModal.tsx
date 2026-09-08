@@ -677,40 +677,68 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                 {/* Import Bottom Action Footer */}
                 <div
                   style={{
-                    padding: '12px 16px',
+                    padding: '10px 16px',
                     borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                     backgroundColor: '#17171a',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    gap: 12,
                     flexShrink: 0,
                   }}
                 >
-                  <div style={{ fontSize: 11, color: 'var(--text-dim, #888)' }}>
-                    Ready to import <strong>{editTitle || 'this song'}</strong> ({parsedSlides.length} slides)
+                  {/* Left: Compact Slide Count Badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: 'var(--text-secondary, #aaa)',
+                        backgroundColor: '#222226',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        padding: '4px 8px',
+                        borderRadius: 5,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                        <line x1="8" y1="21" x2="16" y2="21" />
+                        <line x1="12" y1="17" x2="12" y2="21" />
+                      </svg>
+                      <span>{parsedSlides.length} {parsedSlides.length === 1 ? 'Slide' : 'Slides'}</span>
+                    </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {/* Right: Perfectly Aligned Action Buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     <button
                       type="button"
                       onClick={handleImportAndQueue}
                       style={{
-                        height: 32,
-                        padding: '0 12px',
+                        height: 34,
+                        padding: '0 14px',
                         backgroundColor: '#27272a',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
-                        borderRadius: 5,
+                        border: '1px solid rgba(255, 255, 255, 0.14)',
+                        borderRadius: 6,
                         color: '#fff',
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 5,
+                        gap: 6,
+                        whiteSpace: 'nowrap',
+                        transition: 'background 0.15s ease, border-color 0.15s ease',
                       }}
-                      title="Import to library and add to active queue"
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#323238'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#27272a'; }}
+                      title="Import to song library and add to active queue"
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19" />
                         <line x1="5" y1="12" x2="19" y2="12" />
                       </svg>
@@ -721,23 +749,27 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                       type="button"
                       onClick={handleImportOnly}
                       style={{
-                        height: 32,
+                        height: 34,
                         padding: '0 16px',
                         backgroundColor: 'var(--accent, #FF5500)',
-                        border: 'none',
-                        borderRadius: 5,
+                        border: '1px solid transparent',
+                        borderRadius: 6,
                         color: '#fff',
                         fontSize: 12,
-                        fontWeight: 700,
+                        fontWeight: 600,
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 6,
+                        whiteSpace: 'nowrap',
                         boxShadow: '0 2px 6px rgba(255, 85, 0, 0.3)',
+                        transition: 'opacity 0.15s ease, transform 0.1s ease',
                       }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.92'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
                       title="Save to Song Library"
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                         <polyline points="7 10 12 15 17 10" />
                         <line x1="12" y1="15" x2="12" y2="3" />

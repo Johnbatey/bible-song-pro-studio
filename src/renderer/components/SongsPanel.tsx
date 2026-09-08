@@ -754,25 +754,21 @@ export function SongsPanel() {
               style={styles.bgHeader}
               title={bgOpen ? 'Hide background options' : 'Set what this song sits on'}
             >
-              <span>{t('panel.background')}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                {t('panel.background') || 'Background'}
+              </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span
                   aria-hidden
                   style={{
-                    width: 14,
-                    height: 14,
+                    width: 13,
+                    height: 13,
                     borderRadius: 3,
-                    border: '1px solid rgba(255,255,255,0.2)',
+                    border: '1px solid var(--border-primary)',
                     background: backgroundSwatchCss(selectedSong.background),
                   }}
                 />
-                <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>
-                  {describeBackground(
-                    selectedSong.background,
-                    mediaNameFor(selectedSong.background?.mediaUrl),
-                  )}
-                </span>
-                <span style={{ color: 'var(--text-dim)' }}>{bgOpen ? '▾' : '▸'}</span>
+                <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>{bgOpen ? '▾' : '▸'}</span>
               </span>
             </button>
             {bgOpen && (
@@ -821,12 +817,14 @@ export function SongsPanel() {
               style={styles.bgHeader}
               title={arrOpen ? 'Hide play order' : 'Set the order sections are sung in'}
             >
-              <span>{t('songs.arrangement')}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                {t('songs.arrangement') || 'Arrangement'}
+              </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: 'var(--text-dim)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: 10, textTransform: 'none', letterSpacing: 0 }}>
                   {describeArrangement(selectedSong)}
                 </span>
-                <span style={{ color: 'var(--text-dim)' }}>{arrOpen ? '▾' : '▸'}</span>
+                <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>{arrOpen ? '▾' : '▸'}</span>
               </span>
             </button>
 
@@ -982,10 +980,12 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: '1px solid var(--border-primary)',
   },
   bgHeader: {
-    ...type.label,
+    fontFamily: 'var(--font-ui)',
+    fontSize: 11,
+    lineHeight: '14px',
     fontWeight: fontWeight.semibold,
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
+    letterSpacing: 0,
+    textTransform: 'none',
     color: 'var(--text-secondary)',
     display: 'flex',
     alignItems: 'center',
