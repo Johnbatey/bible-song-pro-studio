@@ -106,6 +106,7 @@
       "notarize": false,
       "entitlements": "assets/entitlements.mac.plist",
       "entitlementsInherit": "assets/entitlements.mac.plist",
+      "x64ArchFiles": "**/bin/ndi/**/*",
       "extraResources": [
         {
           "from": "assets/bin/ndi/darwin",
