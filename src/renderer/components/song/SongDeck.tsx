@@ -361,10 +361,31 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
       <Block
         className="blk-fill"
         title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'nowrap', minWidth: 0 }}>
-            <span style={{ fontWeight: fontWeight.bold, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {title ?? (song ? song.title : 'Songs Workspace')}
-            </span>
+          <span style={{ fontWeight: fontWeight.bold, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {title ?? (song ? song.title : 'Songs Workspace')}
+          </span>
+        }
+        tools={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
+            {/* Mode Switcher: Text vs Buttons (comes first) */}
+            <BlockSegment>
+              <BlockButton
+                active={workspaceMode === 'text'}
+                onClick={() => setWorkspaceMode('text')}
+                title="Switch to full text editor view"
+              >
+                Text
+              </BlockButton>
+              <BlockButton
+                active={workspaceMode === 'buttons'}
+                onClick={() => setWorkspaceMode('buttons')}
+                title="Switch to slide cards button view"
+              >
+                Buttons
+              </BlockButton>
+            </BlockSegment>
+
+            {/* Multi-Tab Lyric Switcher: Primary vs Translation (comes after Text/Buttons) */}
             {song && (
               <div style={deckStyles.tabSegmentContainer}>
                 <button
@@ -389,27 +410,6 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                 </button>
               </div>
             )}
-          </div>
-        }
-        tools={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {/* Mode Switcher: Text vs Buttons */}
-            <BlockSegment>
-              <BlockButton
-                active={workspaceMode === 'text'}
-                onClick={() => setWorkspaceMode('text')}
-                title="Switch to full text editor view"
-              >
-                Text
-              </BlockButton>
-              <BlockButton
-                active={workspaceMode === 'buttons'}
-                onClick={() => setWorkspaceMode('buttons')}
-                title="Switch to slide cards button view"
-              >
-                Buttons
-              </BlockButton>
-            </BlockSegment>
 
             {song && workspaceMode === 'buttons' && (
               <>
@@ -755,19 +755,21 @@ const deckStyles: Record<string, React.CSSProperties> = {
   tabSegmentContainer: {
     display: 'inline-flex',
     alignItems: 'center',
-    background: 'rgba(255,255,255,0.06)',
-    borderRadius: 6,
+    background: 'transparent',
+    border: '1px solid var(--block-line)',
+    borderRadius: 'var(--radius-md)',
     padding: 2,
     gap: 2,
   },
   tabBtn: {
     border: 'none',
     background: 'transparent',
-    color: 'var(--text-dim)',
-    fontSize: 12,
+    color: 'var(--text-secondary)',
+    fontSize: 'var(--fs-secondary)',
     fontWeight: 500,
-    padding: '3px 10px',
-    borderRadius: 4,
+    height: 24,
+    padding: '0 8px',
+    borderRadius: 'var(--radius-sm)',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
