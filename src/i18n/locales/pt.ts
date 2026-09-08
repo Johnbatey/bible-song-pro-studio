@@ -40,6 +40,7 @@ export const pt: MessageCatalog = {
   'dock.output': 'Saída',
   'dock.stage': 'Palco',
   'dock.live': 'Live',
+  'dock.messages': 'Anúncios',
   'dock.transcript': 'Transcrição ao vivo',
   'dock.queue': 'Fila',
   'dock.history': 'Histórico',

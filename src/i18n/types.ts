@@ -49,6 +49,7 @@ export type MessageKey =
   | 'dock.output'
   | 'dock.stage'
   | 'dock.live'
+  | 'dock.messages'
   | 'dock.transcript'
   | 'dock.queue'
   | 'dock.history'

@@ -35,6 +35,10 @@ export function TitleBar() {
    * been fed from the store — the one thing missing was the button writing
    * there. */
   const setCurrentScene = useAppStore((s) => s.setCurrentScene);
+  const clearProgram = useAppStore((s) => s.clearProgram);
+  const standbyMedia = useAppStore((s) => s.standbyMedia);
+  const isWorkspaceLocked = useAppStore((s) => s.isWorkspaceLocked);
+  const toggleWorkspaceLocked = useAppStore((s) => s.toggleWorkspaceLocked);
   const isBlackout = useAppStore((s) => s.display.blackout);
   const setBlackout = useAppStore((s) => s.setBlackout);
   const uiThemeMode = useAppStore((s) => s.uiThemeMode);
@@ -61,6 +65,28 @@ export function TitleBar() {
     const timer = setInterval(checkNdi, 2500);
     return () => clearInterval(timer);
   }, []);
+
+  // Global Logo Hotkey (Ctrl+L / Cmd+L)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) return;
+        e.preventDefault();
+        clearProgram();
+        notify({
+          id: `logo-${Date.now()}`,
+          text: standbyMedia ? 'Logo Standby Screen Active' : 'Standby Screen Active',
+          type: 'info',
+          duration: 3,
+          animation: 'slideDown',
+        });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [clearProgram, standbyMedia, notify]);
 
   const toggleNdi = async () => {
     if (ndiStatus?.running) {
@@ -317,6 +343,30 @@ export function TitleBar() {
           {isBlackout ? 'BLACKOUT' : currentScene ? 'LIVE' : 'STANDBY'}
         </button>
 
+        {/* Logo / Standby Mode Button */}
+        <button
+          className="titlebar-logo-btn"
+          style={{
+            ...styles.blackBtn,
+            background: !currentScene && standbyMedia ? 'rgba(99, 102, 241, 0.2)' : 'var(--chrome-control)',
+            borderColor: !currentScene && standbyMedia ? 'var(--accent)' : 'var(--border-primary)',
+            color: !currentScene && standbyMedia ? 'var(--accent)' : 'var(--text-secondary)',
+          }}
+          onClick={() => {
+            clearProgram();
+            notify({
+              id: `logo-${Date.now()}`,
+              text: standbyMedia ? 'Logo Standby Screen Active' : 'Standby Screen Active',
+              type: 'info',
+              duration: 3,
+              animation: 'slideDown',
+            });
+          }}
+          title={standbyMedia ? 'Display Church Logo / Standby Screen (Ctrl+L)' : 'Clear program to default standby (Ctrl+L)'}
+        >
+          LOGO
+        </button>
+
         {/* Blackout Toggle Button */}
         <button
           className="titlebar-black-btn"
@@ -337,6 +387,32 @@ export function TitleBar() {
 
         {/* Quick Toolbar Action Buttons: Outputs, NDI, Alerts, Settings */}
         <div style={styles.toolbarGroup}>
+          {/* Workspace Layout Lock Button */}
+          <button
+            className="titlebar-icon-btn"
+            style={{
+              ...styles.toolbarBtn,
+              background: isWorkspaceLocked ? 'rgba(234, 179, 8, 0.18)' : styles.toolbarBtn.background,
+              borderColor: isWorkspaceLocked ? '#EAB308' : 'var(--border-primary)',
+              color: isWorkspaceLocked ? '#EAB308' : 'var(--text-secondary)',
+            }}
+            onClick={toggleWorkspaceLocked}
+            title={isWorkspaceLocked ? 'Workspace Locked — Layout and docks cannot be moved (Click to Unlock)' : 'Lock Workspace Layout to prevent accidental moves'}
+            aria-label="Lock Workspace"
+          >
+            {isWorkspaceLocked ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+              </svg>
+            )}
+          </button>
+
           {/* Audience Display Button */}
           <button
             className="titlebar-icon-btn"
@@ -586,39 +662,6 @@ export function TitleBar() {
                 </button>
               </div>
             )}
-
-            {/* Presets */}
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', marginBottom: 8 }}>
-                Quick Presets
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {[
-                  'Nursery Call #101',
-                  'Nursery Call #402',
-                  'Car Lights On (ABC-123)',
-                  'Service Starting Soon',
-                  'Quiet Please',
-                ].map((preset) => (
-                  <button
-                    key={preset}
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setAlertText(preset)}
-                    style={{
-                      fontSize: 12,
-                      padding: '4px 10px',
-                      borderRadius: 6,
-                      background: alertText === preset ? 'rgba(255, 85, 0, 0.15)' : 'var(--chrome-control)',
-                      borderColor: alertText === preset ? '#FF5500' : 'var(--border-primary)',
-                      color: alertText === preset ? '#FF5500' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* Input Message */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

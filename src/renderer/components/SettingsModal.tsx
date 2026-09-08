@@ -1203,7 +1203,7 @@ export function SettingsModal() {
                   </div>
                   {standbyMedia && (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: 6 }}>
-                      <span style={{ ...type.caption, color: 'var(--text-primary)', fontWeight: 600 }}>
+                      <span style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--text-primary)', fontWeight: 600 }}>
                         {t('settings.output.customStandby', { name: standbyMedia.name || standbyMedia.type })}
                       </span>
                       <button

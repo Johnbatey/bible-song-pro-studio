@@ -11,10 +11,14 @@ export interface QueueItem {
   id: string;
   reference: string;
   text: string;
-  type: 'bible' | 'song' | 'slide' | 'media';
+  type: 'bible' | 'song' | 'slide' | 'media' | 'ticker' | 'nursery';
   source?: 'Manual' | 'Auto';
   scene: Scene;
   timestamp: number;
+  alertConfig?: Alert;
+  songId?: string;
+  slideId?: string;
+  linesPerSlide?: number | 'auto';
 }
 
 export interface SceneContent {
@@ -825,6 +829,19 @@ declare global {
         importFile: (payload: { filePath: string }) => Promise<SongImportResult>;
         importText: (payload: { text: string; title?: string }) => Promise<SongImportResult>;
         arrangeText: (payload: { text: string }) => Promise<ArrangeResult>;
+        searchOnline: (payload: { query: string }) => Promise<{
+          ok: boolean;
+          results?: Array<{
+            id: number | string;
+            title: string;
+            artist: string;
+            album?: string;
+            duration?: number;
+            plainLyrics?: string;
+            syncedLyrics?: string;
+          }>;
+          error?: string;
+        }>;
         pick: (payload?: any) => Promise<{ ok: boolean; filePaths?: string[]; canceled?: boolean }>;
       };
       deck: {

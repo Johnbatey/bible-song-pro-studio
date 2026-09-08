@@ -709,12 +709,14 @@ export function BiblePanel() {
           chapter: detail.chapter,
         }).catch(() => []);
         setChapterVerses(verses);
-        if (detail.verse != null) {
-          setHighlightedVerse(detail.verse);
-          setSelectedVerseNumbers([detail.verse]);
-        } else if (verses.length > 0) {
-          setHighlightedVerse(verses[0].verse);
-          setSelectedVerseNumbers([verses[0].verse]);
+        const vNum = detail.verse != null ? detail.verse : (verses.length > 0 ? verses[0].verse : null);
+        if (vNum != null) {
+          setHighlightedVerse(vNum);
+          setSelectedVerseNumbers([vNum]);
+          const targetRef = `${bookName} ${detail.chapter}:${vNum}`;
+          setTimeout(() => {
+            verseRefs.current[targetRef]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 80);
         }
       }
     };

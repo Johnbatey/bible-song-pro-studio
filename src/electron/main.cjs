@@ -1538,6 +1538,49 @@ app.whenReady().then(async () => {
     return { ok: true, filePaths: result.filePaths };
   });
 
+  ipcMain.handle('song:searchOnline', async (_, p) => {
+    const query = String(p?.query || '').trim();
+    if (!query) return { ok: true, results: [] };
+    try {
+      const url = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'BibleSongProStudio/3.3.0 (https://github.com/Johnbatey/bible-song-pro-studio)',
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) {
+        return { ok: false, error: `Search service returned HTTP ${res.status}`, results: [] };
+      }
+      const data = await res.json();
+      if (!Array.isArray(data)) return { ok: true, results: [] };
+
+      const results = data.map((item) => {
+        let plainLyrics = item.plainLyrics;
+        if (!plainLyrics && item.syncedLyrics) {
+          // Strip timestamp markers like [00:12.34]
+          plainLyrics = item.syncedLyrics.replace(/\[\d{2}:\d{2}\.\d{2,3}\]\s*/g, '').trim();
+        }
+        return {
+          id: item.id,
+          title: item.trackName || item.name || 'Untitled',
+          artist: item.artistName || 'Unknown Artist',
+          album: item.albumName || '',
+          duration: item.duration || 0,
+          plainLyrics: plainLyrics || '',
+          syncedLyrics: item.syncedLyrics || '',
+        };
+      }).filter((r) => Boolean(r.plainLyrics));
+
+      return { ok: true, results };
+    } catch (err) {
+      return { ok: false, error: err?.message || 'Failed to search lyrics online', results: [] };
+    }
+  });
+
   // Settings IPC — secrets are write-only from the renderer's point of view
   function broadcastSettings(settings) {
     if (!settings) return;

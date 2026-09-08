@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { importSongFiles, pickAndImportSongs, SONG_FILE_ACCEPT } from '../utils/song-import';
-import type { Scene, Song } from '../types';
+import type { Scene, Song, Background } from '../types';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { AppleToggle } from './AppleToggle';
@@ -12,7 +12,9 @@ import { useMediaLibrary } from '../hooks/useMediaLibrary';
 import { backgroundSwatchCss, describeBackground } from '../utils/background';
 import { isFocusedDock } from './dock/dockFocus';
 import { arrangeExistingSong, describeArrangement, shortLabel, type ArrangeProposal } from '../utils/song-arrange';
+import { getFormattedSlides, buildSongScene } from '../utils/song-slides';
 import { ImportConflictModal, type ConflictResolution, type ImportConflict } from './ImportConflictModal';
+import { OnlineLyricsModal } from './song/OnlineLyricsModal';
 import { useI18n } from '../../i18n/useI18n';
 
 const DEMO_SONGS: Song[] = [
@@ -60,6 +62,7 @@ export function SongsPanel() {
   const { t } = useI18n();
   const songs = useAppStore((s) => s.songs);
   const setSongs = useAppStore((s) => s.setSongs);
+  const addSong = useAppStore((s) => s.addSong);
   const updateSong = useAppStore((s) => s.updateSong);
   const removeSongs = useAppStore((s) => s.removeSongs);
   const projectScene = useAppStore((s) => s.projectScene);
@@ -70,15 +73,44 @@ export function SongsPanel() {
   const operatingMode = useAppStore((s) => s.display.mode);
   const showSongCredits = useAppStore((s) => s.showSongCredits);
   const setShowSongCredits = useAppStore((s) => s.setShowSongCredits);
+  const linesPerSlide = useAppStore((s) => s.songLinesPerSlide);
+  const setSongLinesPerSlide = useAppStore((s) => s.setSongLinesPerSlide);
+  const doubleClickToGoLive = useAppStore((s) => s.doubleClickToGoLive);
   const addToQueue = useAppStore((s) => s.addToQueue);
   const pushNotice = useAppStore((s) => s.notify);
 
   const [search, setSearch] = useState('');
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
+  const songItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    const handleSyncSong = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      const targetSong = (detail.songId && songs.find((s) => s.id === detail.songId)) ||
+        (detail.songTitle && songs.find((s) => s.title.trim().toLowerCase() === detail.songTitle.trim().toLowerCase())) ||
+        (detail.text && songs.find((s) => s.slides.some((sl) => sl.text.includes(detail.text))));
+
+      if (targetSong) {
+        setSelectedSong(targetSong);
+        if (detail.text) setLyricTarget(detail.text);
+        setTimeout(() => {
+          songItemRefs.current[targetSong.id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 60);
+      }
+      if (detail.linesPerSlide !== undefined && (typeof detail.linesPerSlide === 'number' || detail.linesPerSlide === 'auto')) {
+        setSongLinesPerSlide(detail.linesPerSlide);
+      }
+    };
+
+    window.addEventListener('bsp:sync-song', handleSyncSong);
+    return () => window.removeEventListener('bsp:sync-song', handleSyncSong);
+  }, [songs, setSongLinesPerSlide]);
   /** Multi-select: ids of songs the operator has checked for bulk delete. */
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   /** Selection mode toggle: enables checkboxes and batch operations. */
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const [hoveredSongId, setHoveredSongId] = useState<string | null>(null);
   const [bgOpen, setBgOpen] = useState(false);
   const [arrOpen, setArrOpen] = useState(false);
   const [arranging, setArranging] = useState(false);
@@ -95,6 +127,7 @@ export function SongsPanel() {
   const [lyricTarget, setLyricTarget] = useState<string | null>(null);
   /** Pending import held while the conflict modal is up. */
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [onlineSearchOpen, setOnlineSearchOpen] = useState(false);
   const [listWidth, setListWidth] = useState<number>(() => {
     const saved = localStorage.getItem('bsp_songsListWidth');
     return saved ? parseInt(saved, 10) : 300;
@@ -108,6 +141,22 @@ export function SongsPanel() {
 
   const handleAddDemoSongs = () => {
     setSongs(DEMO_SONGS);
+  };
+
+  const handleCreateNewSong = () => {
+    const newSong: Song = {
+      id: `song-${Date.now()}`,
+      title: 'New Song',
+      author: '',
+      key: '',
+      slides: [
+        { id: `slide-${Date.now()}-1`, label: 'Verse 1', text: '' },
+      ],
+      categories: ['Custom'],
+    };
+    addSong(newSong);
+    setSelectedSong(newSong);
+    notify('Created new song. Edit title and lyrics in the editor.');
   };
 
   /* Import feedback is for the operator only. */
@@ -280,6 +329,30 @@ export function SongsPanel() {
     updateSong(updated.id, patch);
   };
 
+  const [applyBgToAllSongs, setApplyBgToAllSongs] = useState<boolean>(() => {
+    return localStorage.getItem('bsp_applyBgToAllSongs') === 'true';
+  });
+
+  const handleToggleApplyBgToAll = (enabled: boolean) => {
+    setApplyBgToAllSongs(enabled);
+    localStorage.setItem('bsp_applyBgToAllSongs', String(enabled));
+    if (enabled && selectedSong?.background) {
+      setSongs(songs.map((s) => ({ ...s, background: selectedSong.background })));
+      notify('Applied current background to all songs');
+    }
+  };
+
+  const handleSongBackgroundChange = (background: Background | undefined) => {
+    if (applyBgToAllSongs) {
+      setSongs(songs.map((s) => ({ ...s, background })));
+      if (selectedSong) {
+        setSelectedSong({ ...selectedSong, background });
+      }
+    } else {
+      patchSelectedSong({ background });
+    }
+  };
+
   /* The order as the deck will play it. An absent arrangement means the slide
      list, which is what the editor starts from when the operator first opens it. */
   const effectiveOrder = selectedSong
@@ -365,6 +438,15 @@ export function SongsPanel() {
         />
       )}
 
+      {/* Online lyrics search engine modal */}
+      {onlineSearchOpen && (
+        <OnlineLyricsModal
+          isOpen={onlineSearchOpen}
+          onClose={() => setOnlineSearchOpen(false)}
+          onSongImported={(song) => setSelectedSong(song)}
+        />
+      )}
+
       {/* Left block: search & song list */}
       <Block
         title={t('songs.title')}
@@ -372,6 +454,22 @@ export function SongsPanel() {
         style={{ flex: `0 0 ${listWidth}px`, minWidth: 180 }}
         tools={(
           <>
+            <BlockButton
+              onClick={() => setOnlineSearchOpen(true)}
+              title="Search online worship songs and hymns"
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+                <span>Online</span>
+              </span>
+            </BlockButton>
+            <BlockButton onClick={handleCreateNewSong} title="Create a new song manually">
+              + New
+            </BlockButton>
             {songs.length > 0 && (
               <BlockButton
                 active={isSelectMode}
@@ -514,7 +612,10 @@ export function SongsPanel() {
               return (
                 <div
                   key={song.id}
+                  ref={(el) => { songItemRefs.current[song.id] = el; }}
                   className={`card card-hover`}
+                  onMouseEnter={() => setHoveredSongId(song.id)}
+                  onMouseLeave={() => setHoveredSongId(null)}
                   style={{
                     cursor: 'pointer',
                     borderColor: isSelected
@@ -540,6 +641,21 @@ export function SongsPanel() {
                       setSelectedSong(song);
                     }
                   }}
+                  onDoubleClick={() => {
+                    if (isSelectMode) return;
+                    if (song.slides && song.slides.length > 0) {
+                      const formatted = getFormattedSlides(song, linesPerSlide);
+                      if (formatted.length > 0) {
+                        projectScene(
+                          buildSongScene(song, formatted[0], {
+                            includeCredits: showSongCredits && linesPerSlide === 'auto',
+                            target: song.isBilingual ? 'bilingual' : 'primary',
+                          }),
+                          { direct: true }
+                        );
+                      }
+                    }
+                  }}
                 >
                   {/* Multi-select checkbox: only shown during Select Mode */}
                   {isSelectMode && (
@@ -562,13 +678,19 @@ export function SongsPanel() {
                     <div style={{ ...type.heading, fontWeight: isSelected ? fontWeight.semibold : fontWeight.medium, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {song.title}
                     </div>
-                    {/* Single-song delete button: hidden during Select Mode */}
+                    {/* Single-song delete button: revealed only on row hover */}
                     {!isSelectMode && (
                       <button
                         type="button"
                         title={`Delete ${song.title}`}
                         onClick={(e) => { e.stopPropagation(); handleDeleteSongs([song.id]); }}
-                        style={songDeleteBtnStyle}
+                        style={{
+                          ...songDeleteBtnStyle,
+                          opacity: hoveredSongId === song.id ? 0.8 : 0,
+                          pointerEvents: hoveredSongId === song.id ? 'auto' : 'none',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--tally-fault, #ef4444)'; e.currentTarget.style.opacity = '1'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dim)'; e.currentTarget.style.opacity = '0.8'; }}
                       >
                         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                           <path d="M2.5 4.5h11" />
@@ -654,10 +776,34 @@ export function SongsPanel() {
               </span>
             </button>
             {bgOpen && (
-              <div style={{ paddingTop: 8 }}>
+              <div style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Apply to All Songs Toggle */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 10px',
+                    borderRadius: 4,
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                  }}
+                >
+                  <span style={{ ...type.caption, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                    Apply background to all songs
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={applyBgToAllSongs}
+                    onChange={(e) => handleToggleApplyBgToAll(e.target.checked)}
+                    style={{ accentColor: 'var(--accent, #FF5500)', cursor: 'pointer', margin: 0 }}
+                    title="When enabled, changing background applies across all songs in the library"
+                  />
+                </div>
+
                 <BackgroundPicker
                   value={selectedSong.background}
-                  onChange={(background) => patchSelectedSong({ background })}
+                  onChange={handleSongBackgroundChange}
                 />
               </div>
             )}

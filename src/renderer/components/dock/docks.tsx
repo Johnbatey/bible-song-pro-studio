@@ -11,6 +11,7 @@ import { ScenePanel } from '../ScenePanel';
 import { PresentationPanel } from '../PresentationPanel';
 import { ThemePanel } from '../ThemePanel';
 import { StagePanel } from '../StagePanel';
+import { MessagePanel } from '../MessagePanel';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { openDock } from './dockController';
 import { DockedContext } from './DockedContext';
@@ -73,6 +74,7 @@ export const DOCKS = [
   { id: 'stage', title: 'Stage', nav: true, group: 'displays' },
 
   { id: 'live', title: 'Live', nav: true, group: 'service' },
+  { id: 'messages', title: 'Announce', nav: true, group: 'service' },
   { id: 'transcript', title: 'Live transcript', nav: false, group: 'service' },
   { id: 'queue', title: 'Queue', nav: false, group: 'service' },
   { id: 'history', title: 'History', nav: false, group: 'service' },
@@ -146,6 +148,7 @@ export const DOCK_COMPONENTS: Record<string, React.FunctionComponent<IDockviewPa
   songs: panel('Songs', () => <SongsPanel />),
   presentation: panel('Pro Slides', () => <PresentationPanel />),
   live: panel('Live Scripture', () => <LiveScripturePanel />),
+  messages: panel('Announce', () => <MessagePanel />, true),
   media: panel('Media', () => <MediaPanel />, true),
   stage: panel('Stage Display', () => <StagePanel />, true),
   scenes: panel('Scenes', () => <ScenePanel />, true),

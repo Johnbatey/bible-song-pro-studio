@@ -189,16 +189,20 @@ interface AppState {
   addToQueue: (item: Omit<QueueItem, 'id' | 'timestamp'>) => void;
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
+  setQueue: (items: QueueItem[]) => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => void;
 
   // AI / Transcription
   aiProviders: AIProvider[];
   transcription: TranscriptionState;
   liveScripture: LiveScriptureState;
   audioInputDevices: AudioInputDevice[];
+  syncTranscriptWithLive: boolean;
   setAIProvider: (id: string, updates: Partial<AIProvider>) => void;
   setTranscription: (state: Partial<TranscriptionState>) => void;
   setLiveScripture: (state: Partial<LiveScriptureState>) => void;
   setAudioInputDevices: (devices: AudioInputDevice[]) => void;
+  setSyncTranscriptWithLive: (enabled: boolean) => void;
 
   // Alerts
   /**
@@ -280,6 +284,12 @@ interface AppState {
   themeTransitionTarget: 'dark' | 'light';
   setUIThemeMode: (mode: 'dark' | 'light') => void;
   toggleUIThemeMode: () => void;
+
+  isWorkspaceLocked: boolean;
+  setIsWorkspaceLocked: (locked: boolean) => void;
+  toggleWorkspaceLocked: () => void;
+  doubleClickToGoLive: boolean;
+  setDoubleClickToGoLive: (enabled: boolean) => void;
 
   /** Operator console language (menus / chrome). Independent of sermonLanguage. */
   uiLocale: UiLocale;
@@ -548,6 +558,17 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     }),
   removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
   clearQueue: () => set({ queue: [] }),
+  setQueue: (items) => set({ queue: items }),
+  reorderQueue: (fromIndex, toIndex) =>
+    set((s) => {
+      if (fromIndex < 0 || fromIndex >= s.queue.length || toIndex < 0 || toIndex >= s.queue.length || fromIndex === toIndex) {
+        return s;
+      }
+      const updated = [...s.queue];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return { queue: updated };
+    }),
 
   aiProviders: [
     { id: 'deepgram', name: 'Deepgram Nova-2', type: 'deepgram', enabled: true },
@@ -581,6 +602,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     },
   },
   audioInputDevices: [],
+  syncTranscriptWithLive: true,
   setAIProvider: (id, updates) =>
     set((s) => ({
       aiProviders: s.aiProviders.map((p) => (p.id === id ? { ...p, ...updates } : p)),
@@ -590,6 +612,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   setLiveScripture: (state) =>
     set((s) => ({ liveScripture: { ...s.liveScripture, ...state } })),
   setAudioInputDevices: (devices) => set({ audioInputDevices: devices }),
+  setSyncTranscriptWithLive: (syncTranscriptWithLive) => set({ syncTranscriptWithLive }),
 
   alerts: [],
   activeAlert: null,
@@ -734,6 +757,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     }, 260);
   },
 
+  isWorkspaceLocked: false,
+  setIsWorkspaceLocked: (isWorkspaceLocked) => set({ isWorkspaceLocked }),
+  toggleWorkspaceLocked: () => set((s) => ({ isWorkspaceLocked: !s.isWorkspaceLocked })),
+  doubleClickToGoLive: true,
+  setDoubleClickToGoLive: (doubleClickToGoLive) => set({ doubleClickToGoLive }),
+
   uiLocale: typeof navigator !== 'undefined' ? detectUiLocale() : 'en',
   setUiLocale: (uiLocale) => {
     applyUiLocale(uiLocale);
@@ -761,8 +790,11 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     standbyMedia: state.standbyMedia,
     workspaces: state.workspaces,
     activeWorkspaceId: state.activeWorkspaceId,
+    isWorkspaceLocked: state.isWorkspaceLocked,
+    doubleClickToGoLive: state.doubleClickToGoLive,
     outputMode: state.display.outputMode,
     operatingMode: state.display.mode,
+    syncTranscriptWithLive: state.syncTranscriptWithLive,
     liveScripturePrefs: {
       detectionMode: state.liveScripture.detectionMode,
       provider: state.liveScripture.provider,
@@ -804,6 +836,9 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         standbyMedia: saved.standbyMedia && typeof saved.standbyMedia === 'object' && saved.standbyMedia.url ? saved.standbyMedia : null,
         workspaces: Array.isArray(saved.workspaces) ? saved.workspaces : current.workspaces,
         activeWorkspaceId: typeof saved.activeWorkspaceId === 'string' ? saved.activeWorkspaceId : current.activeWorkspaceId,
+        isWorkspaceLocked: typeof saved.isWorkspaceLocked === 'boolean' ? saved.isWorkspaceLocked : current.isWorkspaceLocked,
+        doubleClickToGoLive: typeof saved.doubleClickToGoLive === 'boolean' ? saved.doubleClickToGoLive : current.doubleClickToGoLive,
+        syncTranscriptWithLive: typeof saved.syncTranscriptWithLive === 'boolean' ? saved.syncTranscriptWithLive : current.syncTranscriptWithLive,
         display: {
           ...current.display,
           outputMode: saved.outputMode ?? current.display.outputMode,
@@ -840,9 +875,12 @@ interface PersistedState {
   standbyMedia?: StandbyMedia | null;
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
+  isWorkspaceLocked?: boolean;
+  doubleClickToGoLive?: boolean;
   outputMode: DisplayState['outputMode'];
   /** 'simple' only appears in state written by pre-studio/basic builds. */
   operatingMode: OperatingMode | 'simple' | 'program' | 'preview';
+  syncTranscriptWithLive?: boolean;
   liveScripturePrefs: Pick<
     LiveScriptureState,
     'detectionMode' | 'provider' | 'selectedInputId' | 'autoProject' | 'autoVersionSwitch' | 'autoProjectQuoted' | 'syncBibleOnDetection'

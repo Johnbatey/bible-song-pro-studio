@@ -63,6 +63,8 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
   const transcription = useAppStore((s) => s.transcription);
   const setTranscription = useAppStore((s) => s.setTranscription);
   const aiProviders = useAppStore((s) => s.aiProviders);
+  const syncTranscriptWithLive = useAppStore((s) => s.syncTranscriptWithLive);
+  const setSyncTranscriptWithLive = useAppStore((s) => s.setSyncTranscriptWithLive);
   const enabledProvider = aiProviders.find((p) => p.enabled);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1074,26 +1076,65 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
       flush
       bodyStyle={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}
       footer={(
-        <>
-          {transcription.isActive ? (
-            <button style={styles.stopBtn} onClick={stopTranscription}>
-              <span style={styles.stopDot} />
-              {t('transcript.stop')}
-            </button>
-          ) : (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {transcription.isActive ? (
+              <button style={styles.stopBtn} onClick={stopTranscription}>
+                <span style={styles.stopDot} />
+                {t('transcript.stop')}
+              </button>
+            ) : (
+              <button
+                style={{ ...styles.startBtn, opacity: enabledProvider ? 1 : 0.6 }}
+                onClick={handleStartClick}
+                disabled={!enabledProvider}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                </svg>
+                <span style={styles.startLabel}>{t('transcript.start')}</span>
+              </button>
+            )}
+
+            {/* Live AI Detection sync toggle button */}
             <button
-              style={{ ...styles.startBtn, opacity: enabledProvider ? 1 : 0.6 }}
-              onClick={handleStartClick}
-              disabled={!enabledProvider}
+              type="button"
+              onClick={() => setSyncTranscriptWithLive(!syncTranscriptWithLive)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '4px 8px',
+                background: syncTranscriptWithLive ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
+                border: `1px solid ${syncTranscriptWithLive ? 'rgba(34, 197, 94, 0.28)' : 'var(--border-primary, rgba(255,255,255,0.12))'}`,
+                borderRadius: 5,
+                cursor: 'pointer',
+                color: syncTranscriptWithLive ? 'var(--tally-preview)' : 'var(--text-dim)',
+                fontSize: 11,
+                fontWeight: 600,
+                fontFamily: 'var(--font-ui)',
+                transition: 'all 0.15s ease',
+              }}
+              title={syncTranscriptWithLive ? 'Live Sync Active: Playing Live AI also records transcript text' : 'Live Sync Inactive: AI detects scripture without recording transcript text'}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-              <span style={styles.startLabel}>{t('transcript.start')}</span>
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: syncTranscriptWithLive ? 'var(--tally-preview)' : 'var(--text-dim)',
+                  boxShadow: syncTranscriptWithLive ? '0 0 5px rgba(34, 197, 94, 0.6)' : 'none',
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+                Live Sync
+              </span>
             </button>
-          )}
+          </div>
+
           <span
             style={{
               ...styles.recDot,
@@ -1101,7 +1142,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
             }}
             title={transcription.isActive ? t('transcript.recording') : t('transcript.idle')}
           />
-        </>
+        </div>
       )}
     >
       {/* Feedback Toast Notification */}

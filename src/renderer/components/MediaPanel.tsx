@@ -30,6 +30,7 @@ export function MediaPanel() {
   const setVideoTransportTarget = useAppStore((s) => s.setVideoTransportTarget);
   const standbyMedia = useAppStore((s) => s.standbyMedia);
   const setStandbyMedia = useAppStore((s) => s.setStandbyMedia);
+  const doubleClickToGoLive = useAppStore((s) => s.doubleClickToGoLive);
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_mediaBarPosition');
 
   /* The transport belongs to whichever surface is actually holding a video.
@@ -67,6 +68,7 @@ export function MediaPanel() {
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState<{ item: MediaItem; x: number; y: number } | null>(null);
   const [mutedMediaIds, setMutedMediaIds] = useState<Record<string, boolean>>({});
+  const [hoveredMediaId, setHoveredMediaId] = useState<string | null>(null);
 
   /* An operator notice, not a room announcement — "Imported 1 file" has no
      business on the projector. */
@@ -202,7 +204,7 @@ export function MediaPanel() {
     };
   }, [menu]);
 
-  const sendMedia = (item: MediaItem) => {
+  const sendMedia = (item: MediaItem, opts: { direct?: boolean } = {}) => {
     /* Nothing reaches the screen the operator has not seen. A missing file
        would take a black frame to air, so the take is refused and the fix is
        named instead. */
@@ -215,18 +217,20 @@ export function MediaPanel() {
     const isCued = isSceneUsingItem(previewScene, item);
 
     // Clicking an active media item again clears it from display (matching slide presentation behavior)
-    if (isStudio) {
-      if (isCued) {
-        setPreviewScene(null);
-        return;
-      }
-      if (isLive) {
+    if (!opts.direct) {
+      if (isStudio) {
+        if (isCued) {
+          setPreviewScene(null);
+          return;
+        }
+        if (isLive) {
+          clearProgram();
+          return;
+        }
+      } else if (isLive) {
         clearProgram();
         return;
       }
-    } else if (isLive) {
-      clearProgram();
-      return;
     }
 
     const scene: Scene = {
@@ -248,7 +252,7 @@ export function MediaPanel() {
         opacity: 1,
       },
     };
-    projectScene(scene);
+    projectScene(scene, { direct: opts.direct });
   };
 
   /* Whole-panel drop. The dashed box that used to sit here took a fifth of
@@ -380,13 +384,18 @@ export function MediaPanel() {
               const isLive = programUrl === item.url;
               const isCued = previewUrl === item.url && !isLive;
               const tally = isLive ? 'var(--tally-program)' : 'var(--tally-preview)';
+              const isHovered = hoveredMediaId === item.id;
 
               return (
               <div
                 key={item.id}
                 className="card card-hover"
+                onMouseEnter={() => setHoveredMediaId(item.id)}
+                onMouseLeave={() => setHoveredMediaId(null)}
                 style={{
-                  width: 180,
+                  width: 156,
+                  padding: 6,
+                  cursor: 'pointer',
                   /* The tally reaches the whole tile, not just a corner chip —
                      at a glance across a dark pane the operator reads the lit
                      edge before they read any word. */
@@ -394,6 +403,25 @@ export function MediaPanel() {
                     ? { borderColor: tally, boxShadow: isLive ? `0 0 0 1px ${tally}, 0 0 12px var(--accent-glow)` : `0 0 0 1px ${tally}` }
                     : null),
                 }}
+                onClick={() => {
+                  if (doubleClickToGoLive && isStudio) {
+                    sendMedia(item, { direct: false });
+                  } else {
+                    sendMedia(item);
+                  }
+                }}
+                onDoubleClick={() => {
+                  sendMedia(item, { direct: true });
+                }}
+                title={
+                  item.missing
+                    ? `${item.name} — file not found. Right-click to relink.`
+                    : isLive
+                    ? `${item.name} (${item.type.toUpperCase()} • ${formatSize(item.size)}) — ON AIR`
+                    : isCued
+                    ? `${item.name} (${item.type.toUpperCase()} • ${formatSize(item.size)}) — PREVIEW`
+                    : `${item.name} (${item.type.toUpperCase()} • ${formatSize(item.size)})`
+                }
                 onContextMenu={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -401,16 +429,6 @@ export function MediaPanel() {
                 }}
               >
                 <div
-                  onClick={() => sendMedia(item)}
-                  title={
-                    item.missing
-                      ? `${item.name} — file not found. Right-click to relink.`
-                      : isLive
-                      ? `${item.name} is on the audience screen now`
-                      : isCued
-                      ? `${item.name} is cued in Preview — Take to put it on screen`
-                      : `Preview ${item.name}`
-                  }
                   style={{
                     position: 'relative',
                     width: '100%',
@@ -418,8 +436,7 @@ export function MediaPanel() {
                     background: '#000',
                     borderRadius: 'var(--radius-sm)',
                     overflow: 'hidden',
-                    marginBottom: 8,
-                    cursor: 'pointer',
+                    marginBottom: 4,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -511,6 +528,7 @@ export function MediaPanel() {
                           e.stopPropagation();
                           setMutedMediaIds((prev) => ({ ...prev, [item.id]: !prev[item.id] }));
                         }}
+                        onDoubleClick={(e) => e.stopPropagation()}
                         title={mutedMediaIds[item.id] ? "Pre-muted: Audio will be muted when played. Click to unmute." : "Audio Enabled: Audio will play. Click to pre-mute."}
                         style={{
                           position: 'absolute',
@@ -546,25 +564,45 @@ export function MediaPanel() {
                     </>
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ ...type.secondary, fontWeight: fontWeight.medium, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {item.name}
-                    </div>
-                    {/* Format and size only. State is the badge's job — saying
-                        it twice on one tile just costs a line of wrap. */}
-                    <div
-                      style={{ ...type.caption, color: item.missing ? 'var(--tally-fault)' : 'var(--text-dim)', textTransform: 'uppercase' }}
-                      title={item.sourcePath || ''}
-                    >
-                      {item.missing ? t('media.fileNotFound') : `${item.type} · ${formatSize(item.size)}`}
-                    </div>
+                {/* Single compact title row with hover delete */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, height: 20 }}>
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: fontWeight.medium,
+                      color: item.missing ? 'var(--tally-fault)' : 'var(--text-primary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                    }}
+                    title={item.sourcePath || item.name}
+                  >
+                    {item.name}
                   </div>
                   <button
-                    className="btn btn-sm btn-ghost"
-                    onClick={() => handleRemove(item)}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemove(item);
+                    }}
+                    onDoubleClick={(e) => e.stopPropagation()}
                     title={t('media.remove')}
-                    style={{ padding: '2px 6px', flexShrink: 0 }}
+                    style={{
+                      padding: '1px 4px',
+                      flexShrink: 0,
+                      background: 'transparent',
+                      border: 'none',
+                      borderRadius: 3,
+                      color: 'var(--text-dim)',
+                      cursor: isHovered ? 'pointer' : 'default',
+                      opacity: isHovered ? 0.8 : 0,
+                      pointerEvents: isHovered ? 'auto' : 'none',
+                      transition: 'opacity 0.15s ease, color 0.15s ease',
+                      fontSize: 11,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--tally-fault, #ef4444)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dim)'; }}
                   >
                     ✕
                   </button>
@@ -597,6 +635,12 @@ export function MediaPanel() {
             }}
           >
             {[
+              ...(isStudio ? [
+                { label: 'Take Live Directly', run: () => sendMedia(menu.item, { direct: true }), disabled: menu.item.missing },
+                { label: 'Stage in Preview', run: () => sendMedia(menu.item, { direct: false }), disabled: menu.item.missing },
+              ] : [
+                { label: 'Project Live', run: () => sendMedia(menu.item, { direct: true }), disabled: menu.item.missing },
+              ]),
               { label: standbyMedia?.url === menu.item.url ? t('media.clearStandby') : t('media.setStandby'), run: () => handleToggleStandby(menu.item), disabled: menu.item.missing },
               { label: menu.item.missing ? t('media.relink') : t('media.relink'), run: () => handleRelink(menu.item) },
               { label: t('media.showInFolder'), run: () => handleReveal(menu.item), disabled: !menu.item.sourcePath },

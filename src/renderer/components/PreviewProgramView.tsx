@@ -272,11 +272,7 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
             onClick={() => {
               if (isStudio) {
                 setMode('basic');
-                onPanelChange?.('bible');
               } else {
-                /* Switching to Studio used to open the Scenes window as well.
-                   Changing mode is a claim about how takes work, not a request
-                   to rearrange the operator's panels — the layout is theirs. */
                 setMode('studio');
               }
             }}

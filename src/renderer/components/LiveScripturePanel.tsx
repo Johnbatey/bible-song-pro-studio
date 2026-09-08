@@ -222,11 +222,13 @@ export function LiveScripturePanel() {
     setLive({ transcript: combined });
     // Sent apart so the panel can hold settled text still and only redraw the
     // tail the engine is still revising.
-    setTranscription({
-      isActive: true,
-      text: finalTranscriptRef.current,
-      interimText: interimTranscriptRef.current,
-    });
+    if (useAppStore.getState().syncTranscriptWithLive) {
+      setTranscription({
+        isActive: true,
+        text: finalTranscriptRef.current,
+        interimText: interimTranscriptRef.current,
+      });
+    }
     // Feed the active recent utterance with rolling window across chunk boundaries
     const activeUtterance = isFinal
       ? `${finalTranscriptRef.current.split(/\s+/).slice(-14).join(' ')} ${text}`.trim()
@@ -387,7 +389,9 @@ export function LiveScripturePanel() {
     setDetectionIsFinal(isFinal);
     setDetectionLatencyMs(Math.max(0, Math.round(performance.now() - detectionStartedAt)));
     setLive({ bestHit: topHit, suggestions: effectiveSuggestions });
-    setTranscription({ isActive: true, confidence: effectiveDetections[0]?.confidence ?? (topHit ? 0.65 : 0.45) });
+    if (useAppStore.getState().syncTranscriptWithLive) {
+      setTranscription({ isActive: true, confidence: effectiveDetections[0]?.confidence ?? (topHit ? 0.65 : 0.45) });
+    }
 
     // Live Word Study / Lexicon term detection
     window.BSP?.lexicon?.detect(cleaned).then((match) => {
@@ -505,7 +509,9 @@ export function LiveScripturePanel() {
       });
       setLive({ isActive: true, provider: engine });
       const provider = useAppStore.getState().aiProviders.find((entry) => entry.type === (engine === 'deepgram' ? 'deepgram' : 'local')) || null;
-      setTranscription({ isActive: true, provider });
+      if (useAppStore.getState().syncTranscriptWithLive) {
+        setTranscription({ isActive: true, provider });
+      }
     } catch (err) {
       reportFault(err instanceof Error ? err.message : 'Could not open the microphone');
       if (engine === 'deepgram') window.BSP?.stt?.stop();
@@ -520,7 +526,9 @@ export function LiveScripturePanel() {
         .catch(() => {});
     }
     setLive({ isActive: false });
-    setTranscription({ isActive: false });
+    if (useAppStore.getState().syncTranscriptWithLive) {
+      setTranscription({ isActive: false });
+    }
   }
 
   function sendHit(hit: BibleSearchResult, options: { goLive?: boolean; confidence?: number; sourceMode?: string } = {}) {

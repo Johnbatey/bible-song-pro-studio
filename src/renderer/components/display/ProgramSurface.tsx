@@ -1,4 +1,4 @@
-import type { Alert, Scene, FullScreenTheme, LowerThirdTheme, Theme, VideoTransport, AppSettings } from '../../types';
+import type { Alert, Scene, FullScreenTheme, LowerThirdTheme, Theme, VideoTransport, AppSettings, Background } from '../../types';
 import { memo, useEffect, useRef } from 'react';
 import type React from 'react';
 import { SlideStage } from './SlideStage';
@@ -165,7 +165,43 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
   return style;
 }
 
-function lowerThirdBandStyle(lt: LowerThirdTheme | undefined, assetBaseUrl?: string): React.CSSProperties {
+function lowerThirdBandStyle(lt: LowerThirdTheme | undefined, sceneBg?: Background, assetBaseUrl?: string): React.CSSProperties {
+  if (sceneBg && sceneBg.type && (sceneBg.type as string) !== 'theme') {
+    if (sceneBg.type === 'solid' || (sceneBg.type as string) === 'color') {
+      return {
+        backgroundColor: sceneBg.color || '#000000',
+        backgroundImage: 'none',
+      };
+    }
+    if (sceneBg.type === 'gradient' && sceneBg.gradient) {
+      return {
+        backgroundImage: sceneBg.gradient,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      };
+    }
+    if (sceneBg.type === 'image' && sceneBg.mediaUrl) {
+      const mediaUrl = assetUrl(sceneBg.mediaUrl, assetBaseUrl);
+      const fit = sceneBg.fit === 'fill' ? '100% 100%' : (sceneBg.fit || 'cover');
+      return {
+        backgroundColor: '#000000',
+        backgroundImage: `url("${mediaUrl.replace(/"/g, '%22')}")`,
+        backgroundSize: fit,
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      };
+    }
+    if (sceneBg.type === 'video' && sceneBg.mediaUrl) {
+      return {
+        backgroundColor: '#000000',
+        backgroundImage: 'none',
+      };
+    }
+    if (sceneBg.type === 'transparent') {
+      return { background: 'transparent' };
+    }
+  }
+
   const mediaUrl = lt?.backgroundMediaUrl ? assetUrl(lt.backgroundMediaUrl, assetBaseUrl) : '';
   const hasImage = Boolean(mediaUrl && lt?.backgroundMediaType === 'image');
   const hasVideo = Boolean(mediaUrl && lt?.backgroundMediaType === 'video');
@@ -188,7 +224,27 @@ function lowerThirdBandStyle(lt: LowerThirdTheme | undefined, assetBaseUrl?: str
   return { background: lt?.background || undefined };
 }
 
-function lowerThirdBandMedia(lt: LowerThirdTheme | undefined, assetBaseUrl?: string) {
+function lowerThirdBandMedia(lt: LowerThirdTheme | undefined, sceneBg?: Background, assetBaseUrl?: string) {
+  if (sceneBg && sceneBg.type === 'video' && sceneBg.mediaUrl) {
+    const mediaUrl = assetUrl(sceneBg.mediaUrl, assetBaseUrl);
+    const fit = sceneBg.fit === 'contain' ? 'contain' : sceneBg.fit === 'fill' ? 'fill' : 'cover';
+    return (
+      <video
+        className="program-lt-media"
+        src={mediaUrl}
+        autoPlay
+        muted
+        loop={sceneBg.loop !== false}
+        playsInline
+        style={{ objectFit: fit }}
+      />
+    );
+  }
+
+  if (sceneBg && sceneBg.type && (sceneBg.type as string) !== 'theme') {
+    return null;
+  }
+
   const mediaUrl = lt?.backgroundMediaUrl ? assetUrl(lt.backgroundMediaUrl, assetBaseUrl) : '';
   if (!mediaUrl || lt?.backgroundMediaType !== 'video') return null;
   const fit = lt.backgroundFit === 'contain' ? 'contain' : lt.backgroundFit === 'fill' ? 'fill' : 'cover';
@@ -475,7 +531,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
         <div
           className="program-lower-third"
           style={{
-            ...lowerThirdBandStyle(state.theme?.lowerThird, assetBaseUrl),
+            ...lowerThirdBandStyle(state.theme?.lowerThird, scene?.background, assetBaseUrl),
             borderRadius: state.theme?.lowerThird?.borderRadius,
             width: ltWidth ? `${ltWidth}%` : undefined,
             left: ltWidth ? '50%' : undefined,
@@ -484,7 +540,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
             textAlign: isCompare ? dualTextAlign : textAlign,
           }}
         >
-          {lowerThirdBandMedia(state.theme?.lowerThird, assetBaseUrl)}
+          {lowerThirdBandMedia(state.theme?.lowerThird, scene?.background, assetBaseUrl)}
           {isCompare ? (
             <div
               className="program-compare-lt"

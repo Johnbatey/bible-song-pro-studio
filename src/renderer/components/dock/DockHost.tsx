@@ -315,22 +315,20 @@ export function DockHost() {
     });
   }, [setPoppedOutDockIds]);
 
-  /* Closing the last dock used to leave the window blank, which is
-     indistinguishable from a failed render. The empty state sits over
-     dockview rather than replacing it: dockview has to stay mounted or its
-     api — and every panel the chips are about to open — goes with it. */
+  const isWorkspaceLocked = useAppStore((s) => s.isWorkspaceLocked);
   const isEmpty = openDockIds.length === 0;
 
   return (
     <div className="dock-stage">
       <DockviewReact
-        className="bsp-dock-root"
+        className={`bsp-dock-root ${isWorkspaceLocked ? 'bsp-dock-locked' : ''}`}
         components={DOCK_COMPONENTS}
         theme={BSP_THEME}
         onReady={onReady}
         defaultTabComponent={DockTab}
         singleTabMode="fullwidth"
-        disableFloatingGroups={false}
+        disableDnd={isWorkspaceLocked}
+        disableFloatingGroups={isWorkspaceLocked}
         floatingGroupDragHandle="titlebar"
         floatingGroupBounds="boundedWithinViewport"
       />

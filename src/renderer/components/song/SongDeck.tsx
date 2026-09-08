@@ -52,31 +52,75 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
   const addToQueue = useAppStore((s) => s.addToQueue);
   const linesPerSlide = useAppStore((s) => s.songLinesPerSlide);
   const setLinesPerSlide = useAppStore((s) => s.setSongLinesPerSlide);
+  const doubleClickToGoLive = useAppStore((s) => s.doubleClickToGoLive);
 
   // Workspace Mode: 'buttons' (slide grid) or 'text' (lyrics editor)
   const [workspaceMode, setWorkspaceMode] = useState<'buttons' | 'text'>('buttons');
   // Multi-Tab Selection: 'primary' (main lyrics) or 'translation' (translated lyrics)
   const [lyricTab, setLyricTab] = useState<'primary' | 'translation'>('primary');
+  
+  // Metadata drafts
+  const [titleDraft, setTitleDraft] = useState('');
+  const [artistDraft, setArtistDraft] = useState('');
+  const [keyDraft, setKeyDraft] = useState('');
+  const [ccliDraft, setCcliDraft] = useState('');
+  const [copyrightDraft, setCopyrightDraft] = useState('');
+
   // Text Editor state for primary and translated lyrics
   const [primaryTextDraft, setPrimaryTextDraft] = useState('');
   const [translationTextDraft, setTranslationTextDraft] = useState('');
   const [selectedLang, setSelectedLang] = useState('es');
 
+  const currentSongIdRef = useRef<string | undefined>(song?.id);
+  const isTypingPrimaryRef = useRef(false);
+  const isTypingTransRef = useRef(false);
+  const primaryDebounceTimer = useRef<any>(null);
+  const transDebounceTimer = useRef<any>(null);
+  const metaDebounceTimer = useRef<any>(null);
+
+  // Initialize and sync state when a different song is loaded
   useEffect(() => {
     if (!song) {
+      setTitleDraft('');
+      setArtistDraft('');
+      setKeyDraft('');
+      setCcliDraft('');
+      setCopyrightDraft('');
       setPrimaryTextDraft('');
       setTranslationTextDraft('');
+      currentSongIdRef.current = undefined;
       return;
     }
-    setSelectedLang(song.translationLang || 'es');
-    // Format primary slides to text
-    const primaryStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.text || ''}`).join('\n\n');
-    setPrimaryTextDraft(primaryStr);
 
-    // Format translated slides to text
-    const transStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.translation || ''}`).join('\n\n');
-    setTranslationTextDraft(transStr);
-  }, [song?.id, song?.slides]);
+    const isDifferentSong = song.id !== currentSongIdRef.current;
+    currentSongIdRef.current = song.id;
+
+    if (isDifferentSong) {
+      setWorkspaceMode('buttons');
+      setTitleDraft(song.title || '');
+      setArtistDraft(song.author || song.artist || '');
+      setKeyDraft(song.key || '');
+      setCcliDraft(song.ccli || '');
+      setCopyrightDraft(song.copyright || '');
+      setSelectedLang(song.translationLang || 'es');
+
+      const primaryStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.text || ''}`).join('\n\n');
+      setPrimaryTextDraft(primaryStr);
+
+      const transStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.translation || ''}`).join('\n\n');
+      setTranslationTextDraft(transStr);
+    } else {
+      // Same song: only sync if not actively typing
+      if (!isTypingPrimaryRef.current) {
+        const primaryStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.text || ''}`).join('\n\n');
+        setPrimaryTextDraft(primaryStr);
+      }
+      if (!isTypingTransRef.current) {
+        const transStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.translation || ''}`).join('\n\n');
+        setTranslationTextDraft(transStr);
+      }
+    }
+  }, [song?.id, song?.slides, song?.title, song?.author, song?.artist, song?.key, song?.ccli, song?.copyright]);
 
   const slides = song ? getFormattedSlides(song, linesPerSlide) : [];
   const includeCredits = showSongCredits && linesPerSlide === 'auto';
@@ -154,8 +198,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
     return sections;
   }
 
-  function handleSavePrimaryText(text: string) {
-    setPrimaryTextDraft(text);
+  function commitPrimaryText(text: string) {
     if (!song || !onUpdateSong) return;
     const sections = parseSectionsFromText(text);
     const updatedSlides: SongSlide[] = sections.map((sec, idx) => {
@@ -170,8 +213,17 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
     onUpdateSong({ slides: updatedSlides });
   }
 
-  function handleSaveTranslationText(text: string) {
-    setTranslationTextDraft(text);
+  function handleSavePrimaryText(text: string) {
+    setPrimaryTextDraft(text);
+    isTypingPrimaryRef.current = true;
+    if (primaryDebounceTimer.current) clearTimeout(primaryDebounceTimer.current);
+    primaryDebounceTimer.current = setTimeout(() => {
+      isTypingPrimaryRef.current = false;
+      commitPrimaryText(text);
+    }, 450);
+  }
+
+  function commitTranslationText(text: string) {
     if (!song || !onUpdateSong) return;
     const sections = parseSectionsFromText(text);
     const updatedSlides: SongSlide[] = song.slides.map((slide, idx) => {
@@ -182,6 +234,24 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
       };
     });
     onUpdateSong({ slides: updatedSlides, translationLang: selectedLang });
+  }
+
+  function handleSaveTranslationText(text: string) {
+    setTranslationTextDraft(text);
+    isTypingTransRef.current = true;
+    if (transDebounceTimer.current) clearTimeout(transDebounceTimer.current);
+    transDebounceTimer.current = setTimeout(() => {
+      isTypingTransRef.current = false;
+      commitTranslationText(text);
+    }, 450);
+  }
+
+  function handleSaveMetadata(patch: Partial<Song>) {
+    if (!song || !onUpdateSong) return;
+    if (metaDebounceTimer.current) clearTimeout(metaDebounceTimer.current);
+    metaDebounceTimer.current = setTimeout(() => {
+      onUpdateSong(patch);
+    }, 350);
   }
 
   function handleRemoveTranslation() {
@@ -313,6 +383,70 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
         ) : workspaceMode === 'text' ? (
           /* TEXT MODE */
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 10 }}>
+            {/* Song Metadata Editor (Title, Artist, Key, CCLI) */}
+            <div style={deckStyles.metadataBar}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: '2 1 180px', minWidth: 140 }}>
+                <label style={deckStyles.fieldLabel}>Song Title</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={titleDraft}
+                  onChange={(e) => {
+                    setTitleDraft(e.target.value);
+                    handleSaveMetadata({ title: e.target.value });
+                  }}
+                  onBlur={() => onUpdateSong?.({ title: titleDraft })}
+                  placeholder="Song Title"
+                  style={deckStyles.metaInput}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 120px', minWidth: 100 }}>
+                <label style={deckStyles.fieldLabel}>Artist / Author</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={artistDraft}
+                  onChange={(e) => {
+                    setArtistDraft(e.target.value);
+                    handleSaveMetadata({ author: e.target.value, artist: e.target.value });
+                  }}
+                  onBlur={() => onUpdateSong?.({ author: artistDraft, artist: artistDraft })}
+                  placeholder="Artist / Author"
+                  style={deckStyles.metaInput}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', width: 70, flexShrink: 0 }}>
+                <label style={deckStyles.fieldLabel}>Key</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={keyDraft}
+                  onChange={(e) => {
+                    setKeyDraft(e.target.value);
+                    handleSaveMetadata({ key: e.target.value });
+                  }}
+                  onBlur={() => onUpdateSong?.({ key: keyDraft })}
+                  placeholder="e.g. G"
+                  style={deckStyles.metaInput}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', width: 90, flexShrink: 0 }}>
+                <label style={deckStyles.fieldLabel}>CCLI #</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={ccliDraft}
+                  onChange={(e) => {
+                    setCcliDraft(e.target.value);
+                    handleSaveMetadata({ ccli: e.target.value });
+                  }}
+                  onBlur={() => onUpdateSong?.({ ccli: ccliDraft })}
+                  placeholder="CCLI #"
+                  style={deckStyles.metaInput}
+                />
+              </div>
+            </div>
+
             {lyricTab === 'primary' ? (
               /* PRIMARY LYRICS TEXT VIEW */
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -324,6 +458,10 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                 <textarea
                   value={primaryTextDraft}
                   onChange={(e) => handleSavePrimaryText(e.target.value)}
+                  onBlur={() => {
+                    isTypingPrimaryRef.current = false;
+                    commitPrimaryText(primaryTextDraft);
+                  }}
                   placeholder="[Verse 1]&#10;Enter primary lyrics here..."
                   style={deckStyles.lyricsTextarea}
                   spellCheck={false}
@@ -392,6 +530,10 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                   <textarea
                     value={translationTextDraft}
                     onChange={(e) => handleSaveTranslationText(e.target.value)}
+                    onBlur={() => {
+                      isTypingTransRef.current = false;
+                      commitTranslationText(translationTextDraft);
+                    }}
                     placeholder="PLEASE SELECT TWO DISTINCT LANGUAGES OR ENTER TRANSLATED LYRICS"
                     style={deckStyles.lyricsTextarea}
                     spellCheck={false}
@@ -448,7 +590,13 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                     fontFamily: 'var(--font-ui)',
                     transition: 'all 0.15s ease',
                   }}
-                  onClick={() => send(slide)}
+                  onClick={() => {
+                    if (doubleClickToGoLive && operatingMode === 'studio') {
+                      send(slide, { direct: false });
+                    } else {
+                      send(slide);
+                    }
+                  }}
                   onDoubleClick={() => send(slide, { direct: true })}
                   title={operatingMode === 'studio'
                     ? 'Click to stage in Preview · double-click to go straight to Program'
@@ -479,6 +627,9 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                             type: 'song',
                             source: 'Manual',
                             scene: buildSongScene(song, slide, { includeCredits, target: lyricTab === 'translation' ? 'translation' : 'primary' }),
+                            songId: song.id,
+                            slideId: slide.id,
+                            linesPerSlide: linesPerSlide,
                           });
                         }}
                         style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: 16, cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}
@@ -507,6 +658,33 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
 }
 
 const deckStyles: Record<string, React.CSSProperties> = {
+  metadataBar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    padding: '8px 10px',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: 6,
+    border: '1px solid var(--border-primary)',
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: 'var(--text-dim)',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+  },
+  metaInput: {
+    height: 28,
+    fontSize: 12,
+    padding: '3px 8px',
+    background: 'var(--bg-secondary)',
+    borderColor: 'var(--border-primary)',
+    color: 'var(--text-primary)',
+    borderRadius: 4,
+  },
   tabSegmentContainer: {
     display: 'inline-flex',
     alignItems: 'center',

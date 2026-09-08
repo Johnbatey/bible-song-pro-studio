@@ -40,6 +40,7 @@ export const en: MessageCatalog = {
   'dock.output': 'Output',
   'dock.stage': 'Stage',
   'dock.live': 'Live',
+  'dock.messages': 'Announce',
   'dock.transcript': 'Live transcript',
   'dock.queue': 'Queue',
   'dock.history': 'History',
