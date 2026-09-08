@@ -63,6 +63,15 @@
   opacity: .72;
 }
 
+@keyframes bsp-crossfade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .program-fullscreen-content {
   position: absolute;
   inset: 0;
@@ -72,6 +81,14 @@
   align-items: center;
   justify-content: center;
   padding: 32px 72px;
+  animation: bsp-crossfade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.program-slide-stage-wrapper {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  animation: bsp-crossfade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .program-ref-row {
@@ -139,6 +156,7 @@
   background-position: center;
   background-repeat: no-repeat;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .36);
+  animation: bsp-crossfade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .program-lt-media {

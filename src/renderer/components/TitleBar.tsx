@@ -270,13 +270,14 @@ export function TitleBar() {
 
       {/* Right Controls: Live status, Black, Toolbar & Window Actions */}
       <div style={styles.controlsRight}>
-        {/* Cut / Take Buttons if Studio Pending */}
+        {/* Cut / Fade Buttons if Studio Pending */}
         {hasPendingTake && (
           <div style={styles.takeGroup}>
             <button
               className="btn btn-sm btn-secondary"
               style={styles.takeBtn}
               onClick={() => takeToProgram(false)}
+              title="Cut directly to Program live (Instant)"
             >
               Cut
             </button>
@@ -284,8 +285,9 @@ export function TitleBar() {
               className="btn btn-sm btn-primary"
               style={{ ...styles.takeBtn, background: 'var(--accent)', borderColor: 'var(--accent)' }}
               onClick={() => takeToProgram(true)}
+              title="Fade smoothly into Program live (Smooth transition)"
             >
-              Take
+              Fade
             </button>
           </div>
         )}

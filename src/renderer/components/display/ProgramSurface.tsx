@@ -529,6 +529,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
 
       {scene && mode === 'lowerThird' && !content?.wordStudy && (
         <div
+          key={scene?.id || 'lt'}
           className="program-lower-third"
           style={{
             ...lowerThirdBandStyle(state.theme?.lowerThird, scene?.background, assetBaseUrl),
@@ -764,11 +765,13 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           sits this one out. Lower third keeps the text — a whole slide crammed
           into a strap across the bottom is nobody's intent. */}
       {scene && mode === 'fullscreen' && content?.slide && !content?.wordStudy && (
-        <SlideStage projection={content.slide} className="program-slide-stage" />
+        <div key={scene?.id || 'slide'} className="program-slide-stage-wrapper">
+          <SlideStage projection={content.slide} className="program-slide-stage" />
+        </div>
       )}
 
       {scene && mode === 'fullscreen' && !content?.slide && !content?.wordStudy && (
-        <div className="program-fullscreen-content" style={fullscreenStyle}>
+        <div key={scene?.id || 'fs'} className="program-fullscreen-content" style={fullscreenStyle}>
           {content?.html ? (
             <div className="program-slide-html" dangerouslySetInnerHTML={{ __html: content.html }} />
           ) : isCompare ? (

@@ -461,19 +461,22 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   },
 
   transitionToScene: (scene, transitionType = 'fade') => {
-    const state = get();
     set((s) => ({
-      display: { ...s.display, previewScene: scene, isTransitioning: true },
+      display: {
+        ...s.display,
+        currentScene: scene,
+        previewScene: scene,
+        isTransitioning: true,
+      },
     }));
     setTimeout(() => {
       set((s) => ({
         display: {
           ...s.display,
-          currentScene: scene,
           isTransitioning: false,
         },
       }));
-    }, state.display.mode === 'basic' ? 0 : 400);
+    }, 350);
   },
 
   scenes: [],
