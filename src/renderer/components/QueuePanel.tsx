@@ -3,16 +3,9 @@ import { useAppStore } from '../stores/appStore';
 import { Block, BlockButton } from './Block';
 import { useI18n } from '../../i18n/useI18n';
 import type { QueueItem } from '../types';
+import { SetlistManagerModal, type SavedSetlist } from './setlist/SetlistManagerModal';
 
 const STORAGE_KEY_SETLISTS = 'bsp_saved_setlists';
-
-export interface SavedSetlist {
-  id: string;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
-  items: QueueItem[];
-}
 
 function syncQueueItemToPanel(item: QueueItem) {
   if (!item) return;
@@ -86,9 +79,7 @@ export function QueuePanel() {
       return [];
     }
   });
-  const [showSetlistMenu, setShowSetlistMenu] = useState(false);
-  const [newSetlistName, setNewSetlistName] = useState('');
-  const [hoveredSetlistId, setHoveredSetlistId] = useState<string | null>(null);
+  const [showSetlistModal, setShowSetlistModal] = useState(false);
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
   // Pointer-based fluid drag state
@@ -108,8 +99,6 @@ export function QueuePanel() {
     hasMoved: boolean;
   } | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const setlistMenuRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Persist setlists
@@ -120,18 +109,12 @@ export function QueuePanel() {
     } catch {}
   };
 
-  // Close setlist menu when clicking outside
+  // Listen to global open-setlists events (e.g. from TitleBar, Shortcuts)
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (setlistMenuRef.current && !setlistMenuRef.current.contains(e.target as Node)) {
-        setShowSetlistMenu(false);
-      }
-    };
-    if (showSetlistMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showSetlistMenu]);
+    const handleOpenSetlists = () => setShowSetlistModal(true);
+    window.addEventListener('bsp:open-setlists', handleOpenSetlists);
+    return () => window.removeEventListener('bsp:open-setlists', handleOpenSetlists);
+  }, []);
 
   /** Live wins over staged, matching how the rows colour themselves. */
   const activeSceneId = queue.some((q) => q.scene.id === currentScene?.id)
@@ -144,9 +127,8 @@ export function QueuePanel() {
     rowRefs.current[activeSceneId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [activeSceneId, queue.length]);
 
-  const handleSaveSetlist = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const name = newSetlistName.trim() || `Service Setlist ${new Date().toLocaleDateString()}`;
+  const handleSaveSetlist = (name: string) => {
+    const cleanName = name.trim() || `Service Setlist ${new Date().toLocaleDateString()}`;
     if (queue.length === 0) {
       pushNotice({ id: `setlist-err-${Date.now()}`, text: 'Queue is empty. Add items before saving setlist.', type: 'warning', duration: 3, animation: 'slideDown' });
       return;
@@ -154,16 +136,15 @@ export function QueuePanel() {
 
     const newSetlist: SavedSetlist = {
       id: `setlist-${Date.now()}`,
-      name,
+      name: cleanName,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       items: [...queue],
     };
 
-    const updated = [newSetlist, ...savedSetlists.filter((s) => s.name.toLowerCase() !== name.toLowerCase())];
+    const updated = [newSetlist, ...savedSetlists.filter((s) => s.name.toLowerCase() !== cleanName.toLowerCase())];
     persistSetlists(updated);
-    setNewSetlistName('');
-    pushNotice({ id: `setlist-save-${Date.now()}`, text: `Saved setlist "${name}" (${queue.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
+    pushNotice({ id: `setlist-save-${Date.now()}`, text: `Saved setlist "${cleanName}" (${queue.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
   };
 
   const handleLoadSetlist = (setlist: SavedSetlist, mode: 'replace' | 'append' = 'replace') => {
@@ -174,7 +155,7 @@ export function QueuePanel() {
       setQueue([...queue, ...setlist.items]);
       pushNotice({ id: `setlist-append-${Date.now()}`, text: `Appended setlist "${setlist.name}" (+${setlist.items.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
     }
-    setShowSetlistMenu(false);
+    setShowSetlistModal(false);
   };
 
   const handleDeleteSetlist = (id: string, name: string) => {
@@ -234,7 +215,7 @@ export function QueuePanel() {
           persistSetlists([newSetlist, ...savedSetlists]);
           setQueue(importedItems);
           pushNotice({ id: `setlist-imp-${Date.now()}`, text: `Imported setlist "${name}" (${importedItems.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
-          setShowSetlistMenu(false);
+          setShowSetlistModal(false);
         } else {
           pushNotice({ id: `setlist-err-${Date.now()}`, text: 'Invalid setlist file: no valid items found.', type: 'warning', duration: 4, animation: 'slideDown' });
         }
@@ -243,7 +224,7 @@ export function QueuePanel() {
       }
     };
     reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    e.target.value = '';
   };
 
   const renderTypeIcon = (type: string) => {
@@ -315,13 +296,12 @@ export function QueuePanel() {
     <Block
       className="blk-fill"
       title={t('queue.title')}
-      subtitle={queue.length > 0 ? `${queue.length}` : undefined}
-      tools={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }} ref={setlistMenuRef}>
-          {/* Setlists Dropdown Trigger */}
+      subtitle={queue.length > 0 ? `${queue.length}` : undefined}      tools={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Setlists Modal Trigger Button */}
           <BlockButton
-            active={showSetlistMenu}
-            onClick={() => setShowSetlistMenu((v) => !v)}
+            active={showSetlistModal}
+            onClick={() => setShowSetlistModal(true)}
             title="Service Setlists & Schedules"
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -350,233 +330,21 @@ export function QueuePanel() {
               {t('queue.clearAll')}
             </BlockButton>
           )}
-
-          {/* Setlists Popover Menu */}
-          {showSetlistMenu && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                marginTop: 4,
-                width: 280,
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-primary)',
-                borderRadius: 8,
-                boxShadow: 'var(--shadow-lg)',
-                zIndex: 1000,
-                padding: 10,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                color: 'var(--text-primary)',
-              }}
-            >
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-primary)', paddingBottom: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-                  Service Setlists
-                </span>
-                <span style={{ fontSize: 10, color: 'var(--accent, #FF5500)', fontWeight: 600 }}>
-                  {queue.length} in queue
-                </span>
-              </div>
-
-              {/* Save Active Queue */}
-              <form onSubmit={handleSaveSetlist} style={{ display: 'flex', gap: 6 }}>
-                <input
-                  type="text"
-                  placeholder="Setlist name..."
-                  value={newSetlistName}
-                  onChange={(e) => setNewSetlistName(e.target.value)}
-                  style={{
-                    flex: 1,
-                    height: 26,
-                    padding: '0 6px',
-                    fontSize: 11,
-                    backgroundColor: 'var(--bg-primary)',
-                    border: '1px solid var(--border-primary)',
-                    borderRadius: 4,
-                    color: 'var(--text-primary)',
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={queue.length === 0}
-                  style={{
-                    height: 26,
-                    padding: '0 8px',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    backgroundColor: queue.length > 0 ? 'var(--accent, #FF5500)' : 'var(--chrome-control)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 4,
-                    cursor: queue.length > 0 ? 'pointer' : 'default',
-                    opacity: queue.length > 0 ? 1 : 0.5,
-                  }}
-                  title="Save current queue as a named setlist"
-                >
-                  Save
-                </button>
-              </form>
-
-              {/* Saved Setlists List */}
-              <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {savedSetlists.length === 0 ? (
-                  <div style={{ padding: '12px 8px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 11 }}>
-                    No saved setlists yet. Save your service queue above or import a .bspsetlist file.
-                  </div>
-                ) : (
-                  savedSetlists.map((sl) => (
-                    <div
-                      key={sl.id}
-                      onMouseEnter={() => setHoveredSetlistId(sl.id)}
-                      onMouseLeave={() => setHoveredSetlistId(null)}
-                      style={{
-                        padding: '6px 8px',
-                        backgroundColor: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-primary)',
-                        borderRadius: 4,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 6,
-                      }}
-                    >
-                      <div
-                        onClick={() => handleLoadSetlist(sl, 'replace')}
-                        style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
-                        title={`Click to load "${sl.name}" (${sl.items.length} items)`}
-                      >
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {sl.name}
-                        </div>
-                        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                          {sl.items.length} item{sl.items.length === 1 ? '' : 's'} · {new Date(sl.updatedAt || sl.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-
-                      {/* Setlist Row Action Buttons */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <button
-                          type="button"
-                          onClick={() => handleExportSetlist(sl)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text-dim)',
-                            cursor: 'pointer',
-                            padding: 2,
-                          }}
-                          title="Export as .bspsetlist file"
-                        >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                            <polyline points="7 10 12 15 17 10" />
-                            <line x1="12" y1="15" x2="12" y2="3" />
-                          </svg>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSetlist(sl.id, sl.name)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text-dim)',
-                            cursor: 'pointer',
-                            padding: 2,
-                            opacity: hoveredSetlistId === sl.id ? 1 : 0.4,
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--tally-fault, #ef4444)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dim)'; }}
-                          title="Delete setlist"
-                        >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Setlist Import / Export Action Bar */}
-              <div style={{ borderTop: '1px solid var(--border-primary)', paddingTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    flex: 1,
-                    height: 24,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    backgroundColor: 'var(--chrome-control)',
-                    border: '1px solid var(--border-primary)',
-                    borderRadius: 4,
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 4,
-                  }}
-                  title="Import .bspsetlist or .json setlist file"
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  <span>Import</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={queue.length === 0}
-                  onClick={() => handleExportSetlist({ name: newSetlistName.trim() || 'Service_Setlist', items: queue })}
-                  style={{
-                    flex: 1,
-                    height: 24,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    backgroundColor: 'var(--chrome-control)',
-                    border: '1px solid var(--border-primary)',
-                    borderRadius: 4,
-                    color: queue.length > 0 ? 'var(--text-primary)' : 'var(--text-dim)',
-                    cursor: queue.length > 0 ? 'pointer' : 'default',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 4,
-                  }}
-                  title="Export active queue to .bspsetlist"
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  <span>Export</span>
-                </button>
-              </div>
-
-              {/* Hidden file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".bspsetlist,.json"
-                style={{ display: 'none' }}
-                onChange={handleImportFile}
-              />
-            </div>
-          )}
         </div>
       }
     >
+      {/* Service Setlists & Schedules Modal Dialog (Portaled to root) */}
+      <SetlistManagerModal
+        isOpen={showSetlistModal}
+        onClose={() => setShowSetlistModal(false)}
+        savedSetlists={savedSetlists}
+        activeQueue={queue}
+        onSaveSetlist={handleSaveSetlist}
+        onLoadSetlist={handleLoadSetlist}
+        onDeleteSetlist={handleDeleteSetlist}
+        onExportSetlist={handleExportSetlist}
+        onImportFile={handleImportFile}
+      />
       {queue.length === 0 ? (
         <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '24px 16px', textAlign: 'center' }}>
           {emptyParts[0]}

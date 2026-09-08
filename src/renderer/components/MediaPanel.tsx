@@ -763,6 +763,7 @@ export function MediaPanel() {
                   title={opt.desc}
                   onClick={() => { setMenu(null); updateMediaFit(menu.item, opt.fit); }}
                   style={{
+                    ...type.body,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -775,7 +776,6 @@ export function MediaPanel() {
                     color: isSelected ? 'var(--accent, #FF5500)' : 'var(--text-primary)',
                     fontWeight: isSelected ? 600 : 400,
                     cursor: 'pointer',
-                    ...type.body,
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = isSelected ? 'var(--accent-dim, rgba(255, 85, 0, 0.18))' : 'var(--bg-hover)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = isSelected ? 'var(--accent-dim, rgba(255, 85, 0, 0.12))' : 'transparent'; }}

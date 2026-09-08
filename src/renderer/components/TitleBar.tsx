@@ -492,6 +492,19 @@ export function TitleBar() {
             )}
           </button>
 
+          {/* Setlists & Service Schedule Manager Button */}
+          <button
+            className="titlebar-icon-btn"
+            style={styles.toolbarBtn}
+            onClick={() => window.dispatchEvent(new CustomEvent('bsp:open-setlists'))}
+            title="Service Setlists & Schedules Manager"
+            aria-label="Service Setlists"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+
           {/* Settings Button */}
           <button
             className="titlebar-icon-btn"
