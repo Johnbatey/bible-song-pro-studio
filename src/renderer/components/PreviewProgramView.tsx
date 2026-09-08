@@ -411,11 +411,6 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                 ? 'repeating-conic-gradient(#262628 0% 25%, #161414 0% 50%) 50% / 24px 24px'
                 : '#000',
             }}>
-              {isTransitioning && (
-                <div style={styles.transitionOverlay}>
-                  <div style={styles.transitionSpinner} />
-                </div>
-              )}
               <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
                 <ProgramSurface
                   preview
@@ -559,23 +554,6 @@ const styles: Record<string, React.CSSProperties> = {
     width: 1920,
     height: 1080,
     transformOrigin: 'top left',
-  },
-  transitionOverlay: {
-    position: 'absolute',
-    inset: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(0,0,0,0.5)',
-    zIndex: 10,
-  },
-  transitionSpinner: {
-    width: 20,
-    height: 20,
-    border: '2px solid rgba(255,255,255,0.1)',
-    borderTopColor: 'var(--accent)',
-    borderRadius: '50%',
-    animation: 'spin 0.6s linear infinite',
   },
   footerLabel: {
     ...type.label,

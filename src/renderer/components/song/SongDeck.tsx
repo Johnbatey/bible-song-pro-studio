@@ -162,6 +162,73 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
     projectScene(buildSongScene(song, slide, { includeCredits, target: sceneTarget }), { direct: opts.direct });
   }
 
+  function handleLinesPerSlideChange(val: number | 'auto') {
+    setLinesPerSlide(val);
+    if (!song) return;
+
+    const newSlides = getFormattedSlides(song, val);
+    if (!newSlides.length) return;
+
+    const withCredits = showSongCredits && val === 'auto';
+    const sceneTarget = lyricTab === 'translation' ? 'translation' : (song.isBilingual ? 'bilingual' : 'primary');
+
+    const curSongPrefix = `song-${song.id}-`;
+    const isCurrentActive = Boolean(currentScene?.type === 'song' && currentScene.id.startsWith(curSongPrefix));
+    const isPreviewActive = Boolean(previewScene?.type === 'song' && previewScene.id.startsWith(curSongPrefix));
+
+    if (operatingMode === 'basic') {
+      if (isCurrentActive) {
+        const curText = currentScene?.content?.text?.trim() || '';
+        const matched = newSlides.find((s) => s.text.trim() === curText)
+          || newSlides.find((s) => curText.includes(s.text.trim()) || s.text.trim().includes(curText))
+          || newSlides[0];
+        if (matched) {
+          projectScene(buildSongScene(song, matched, { includeCredits: withCredits, target: sceneTarget }), { direct: true });
+        }
+      }
+    } else {
+      // Studio mode: land in Preview window so operator can inspect before committing live
+      if (isPreviewActive || isCurrentActive) {
+        const refText = (previewScene?.content?.text || currentScene?.content?.text || '').trim();
+        const matched = newSlides.find((s) => s.text.trim() === refText)
+          || newSlides.find((s) => refText.includes(s.text.trim()) || s.text.trim().includes(refText))
+          || newSlides[0];
+        if (matched) {
+          projectScene(buildSongScene(song, matched, { includeCredits: withCredits, target: sceneTarget }), { direct: false });
+        }
+      }
+    }
+  }
+
+  function handleCreditsToggle(checked: boolean) {
+    setShowSongCredits(checked);
+    if (!song) return;
+
+    const curSongPrefix = `song-${song.id}-`;
+    const isCurrentActive = Boolean(currentScene?.type === 'song' && currentScene.id.startsWith(curSongPrefix));
+    const isPreviewActive = Boolean(previewScene?.type === 'song' && previewScene.id.startsWith(curSongPrefix));
+
+    const withCredits = checked && linesPerSlide === 'auto';
+    const sceneTarget = lyricTab === 'translation' ? 'translation' : (song.isBilingual ? 'bilingual' : 'primary');
+
+    if (operatingMode === 'basic') {
+      if (isCurrentActive && currentScene) {
+        const activeSlide = slides.find((s) => songSceneId(song, s) === currentScene.id) || slides[0];
+        if (activeSlide) {
+          projectScene(buildSongScene(song, activeSlide, { includeCredits: withCredits, target: sceneTarget }), { direct: true });
+        }
+      }
+    } else {
+      if ((isPreviewActive || isCurrentActive) && (previewScene || currentScene)) {
+        const activeId = previewScene?.id || currentScene?.id;
+        const activeSlide = slides.find((s) => songSceneId(song, s) === activeId) || slides[0];
+        if (activeSlide) {
+          projectScene(buildSongScene(song, activeSlide, { includeCredits: withCredits, target: sceneTarget }), { direct: false });
+        }
+      }
+    }
+  }
+
   function step(direction: 1 | -1) {
     if (!song || slides.length === 0) return;
     const index = slides.findIndex((s) => songSceneId(song, s) === activeSceneId);
@@ -361,7 +428,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                   <BlockButton
                     key={String(val)}
                     active={linesPerSlide === val}
-                    onClick={() => setLinesPerSlide(val)}
+                    onClick={() => handleLinesPerSlideChange(val)}
                   >
                     {val === 'auto' ? 'Auto' : String(val)}
                   </BlockButton>
@@ -371,7 +438,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
             <AppleToggle
               label="Display credits"
               checked={showSongCredits}
-              onChange={setShowSongCredits}
+              onChange={handleCreditsToggle}
             />
           </>
         ) : undefined}
