@@ -524,60 +524,75 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
               </div>
             ) : (
               /* TRANSLATION LYRICS TEXT VIEW */
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: 10 }}>
-                {/* Translation Controls Bar */}
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: 8 }}>
+                {/* Compact Unified Translation Toolbar */}
                 <div style={deckStyles.translationBar}>
+                  {/* Left: Language Select & Inline Toggles */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ ...type.caption, color: 'var(--text-primary)', fontWeight: fontWeight.bold }}>
-                      Translation <span style={{ color: 'var(--accent)', fontWeight: fontWeight.regular }}>Ready ({selectedLang})</span>
-                    </span>
-                    <select
-                      value={selectedLang}
-                      onChange={(e) => {
-                        setSelectedLang(e.target.value);
-                        onUpdateSong?.({ translationLang: e.target.value });
-                      }}
-                      style={deckStyles.langSelect}
-                    >
-                      {SUPPORTED_TRANSLATION_LANGS.map((l) => (
-                        <option key={l.code} value={l.code}>{l.label}</option>
-                      ))}
-                    </select>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)' }}>Language</span>
+                      <select
+                        value={selectedLang}
+                        onChange={(e) => {
+                          setSelectedLang(e.target.value);
+                          onUpdateSong?.({ translationLang: e.target.value });
+                        }}
+                        style={deckStyles.langSelect}
+                      >
+                        {SUPPORTED_TRANSLATION_LANGS.map((l) => (
+                          <option key={l.code} value={l.code}>{l.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <span style={{ width: 1, height: 16, background: 'var(--border-primary, rgba(255,255,255,0.1))' }} />
+
+                    {/* Bilingual Toggle */}
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(song.isBilingual)}
+                        onChange={(e) => onUpdateSong?.({ isBilingual: e.target.checked })}
+                        style={{ accentColor: 'var(--accent, #FF5500)', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: 11, color: song.isBilingual ? 'var(--text-primary)' : 'var(--text-dim)', fontWeight: song.isBilingual ? 600 : 400 }}>
+                        Bilingual
+                      </span>
+                    </label>
+
+                    {/* Lock Toggle */}
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(song.lockTranslation)}
+                        onChange={(e) => onUpdateSong?.({ lockTranslation: e.target.checked })}
+                        style={{ accentColor: 'var(--accent, #FF5500)', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: 11, color: song.lockTranslation ? 'var(--text-primary)' : 'var(--text-dim)', fontWeight: song.lockTranslation ? 600 : 400 }}>
+                        Lock
+                      </span>
+                    </label>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {/* Right: Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button
                       type="button"
                       style={deckStyles.primaryActionBtn}
                       onClick={() => handleSaveTranslationText(translationTextDraft)}
+                      title="Save / Update translated lyrics"
                     >
-                      Update Translation
+                      Update
                     </button>
                     <button
                       type="button"
                       style={deckStyles.secondaryActionBtn}
                       onClick={handleRemoveTranslation}
+                      title="Remove translation from song"
                     >
-                      Remove Translation
+                      Clear
                     </button>
                   </div>
-                </div>
-
-                {/* Translation Toggles Row */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span style={{ ...type.caption, color: 'var(--text-secondary)' }}>Show bilingual globally</span>
-                  <AppleToggle
-                    checked={Boolean(song.isBilingual)}
-                    onChange={(checked) => onUpdateSong?.({ isBilingual: checked })}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span style={{ ...type.caption, color: 'var(--text-secondary)' }}>Lock translation</span>
-                  <AppleToggle
-                    checked={Boolean(song.lockTranslation)}
-                    onChange={(checked) => onUpdateSong?.({ lockTranslation: checked })}
-                  />
                 </div>
 
                 {/* Translation Textarea */}
@@ -785,40 +800,50 @@ const deckStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     flexWrap: 'wrap',
-    padding: '8px 10px',
-    background: 'rgba(255,255,255,0.03)',
+    padding: '4px 8px',
+    background: 'var(--bg-secondary, rgba(255,255,255,0.03))',
     borderRadius: 6,
-    border: '1px solid rgba(255,255,255,0.06)',
+    border: '1px solid var(--border-primary, rgba(255,255,255,0.08))',
+    minHeight: 32,
   },
   langSelect: {
-    background: '#16191f',
-    border: '1px solid rgba(255,255,255,0.15)',
+    background: 'var(--bg-primary, #16191f)',
+    border: '1px solid var(--border-primary, rgba(255,255,255,0.15))',
     borderRadius: 4,
-    color: '#ffffff',
-    fontSize: 12,
-    padding: '3px 8px',
+    color: 'var(--text-primary, #ffffff)',
+    fontSize: 11,
+    height: 24,
+    padding: '0 6px',
     outline: 'none',
   },
   primaryActionBtn: {
-    background: '#ff5500',
+    background: 'var(--accent, #ff5500)',
     border: 'none',
     borderRadius: 4,
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
-    padding: '5px 12px',
+    height: 24,
+    padding: '0 10px',
     cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   secondaryActionBtn: {
-    background: '#ff5500',
-    border: 'none',
+    background: 'var(--chrome-control, rgba(255,255,255,0.08))',
+    border: '1px solid var(--border-primary, rgba(255,255,255,0.12))',
     borderRadius: 4,
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 600,
-    padding: '5px 12px',
+    color: 'var(--text-secondary, #cccccc)',
+    fontSize: 11,
+    fontWeight: 500,
+    height: 24,
+    padding: '0 8px',
     cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 };
