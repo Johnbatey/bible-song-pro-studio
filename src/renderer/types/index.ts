@@ -540,6 +540,8 @@ export interface MediaItem {
   url: string;
   /** True when the file is not at its path right now — offer a relink, not a delete. */
   missing?: boolean;
+  /** Display transform fit: 'contain' (Fit to Screen), 'cover' (Fill/Zoom & Crop), or 'fill' (Stretch to Fit). */
+  fit?: 'cover' | 'contain' | 'fill';
 }
 
 export interface MediaImportResult {

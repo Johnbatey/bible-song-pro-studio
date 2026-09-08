@@ -93,7 +93,8 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
   if (!state.scene) {
     return { backgroundColor: '#000000', backgroundImage: 'none' };
   }
-  const fit = state.bgFit === 'fill' ? '100% 100%' : state.bgFit || 'cover';
+  const rawFit = state.bgFit || state.scene?.background?.fit || (state.scene?.type === 'media' ? 'contain' : 'cover');
+  const fit = rawFit === 'fill' ? '100% 100%' : rawFit;
   const opacity = typeof state.bgOpacity === 'number' ? state.bgOpacity : 1;
   const style: React.CSSProperties = {
     backgroundColor: '#000',
@@ -486,7 +487,13 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
             currentTime: e.currentTarget.currentTime,
             duration: Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0,
           })}
-          style={{ objectFit: state.bgFit === 'contain' ? 'contain' : state.bgFit === 'fill' ? 'fill' : 'cover' }}
+          style={{
+            objectFit: (state.bgFit || state.scene?.background?.fit || (state.scene?.type === 'media' ? 'contain' : 'cover')) === 'contain'
+              ? 'contain'
+              : (state.bgFit || state.scene?.background?.fit || (state.scene?.type === 'media' ? 'contain' : 'cover')) === 'fill'
+              ? 'fill'
+              : 'cover'
+          }}
         />
       )}
 

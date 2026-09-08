@@ -62,7 +62,7 @@ export function backgroundFieldsFor(scene: Scene | null, theme: Theme | null, ou
     bgVideo: '' as string,
     bgCustomImage: '' as string,
     bgFill: '' as string,
-    bgFit: bg?.fit || (!bg ? themeFs?.backgroundFit : undefined) || 'cover',
+    bgFit: bg?.fit || (scene?.type === 'media' ? 'contain' : (!bg ? themeFs?.backgroundFit : undefined)) || 'contain',
     bgOpacity: typeof bg?.opacity === 'number' ? bg.opacity : 1,
     bgVideoLoop: resolveBgVideoLoop(bg, theme),
   };

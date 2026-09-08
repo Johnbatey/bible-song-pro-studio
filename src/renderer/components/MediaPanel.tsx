@@ -69,11 +69,58 @@ export function MediaPanel() {
   const [menu, setMenu] = useState<{ item: MediaItem; x: number; y: number } | null>(null);
   const [mutedMediaIds, setMutedMediaIds] = useState<Record<string, boolean>>({});
   const [hoveredMediaId, setHoveredMediaId] = useState<string | null>(null);
+  const [mediaFits, setMediaFits] = useState<Record<string, 'contain' | 'cover' | 'fill'>>(() => {
+    try {
+      const saved = localStorage.getItem('bsp_media_fits');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const getMediaFit = (item: MediaItem): 'contain' | 'cover' | 'fill' => {
+    return mediaFits[item.id] || item.fit || 'contain';
+  };
 
   /* An operator notice, not a room announcement — "Imported 1 file" has no
      business on the projector. */
   const notify = (text: string, type: 'info' | 'warning' = 'info') => {
     pushNotice({ id: `media-${Date.now()}`, text, type, duration: 4, animation: 'slideDown' });
+  };
+
+  const updateMediaFit = (item: MediaItem, fit: 'contain' | 'cover' | 'fill') => {
+    const updated = { ...mediaFits, [item.id]: fit };
+    setMediaFits(updated);
+    try {
+      localStorage.setItem('bsp_media_fits', JSON.stringify(updated));
+    } catch {}
+
+    // If currently live on Program or cued on Preview, update scene transform dynamically
+    if (isSceneUsingItem(currentScene, item) && currentScene) {
+      setCurrentScene({
+        ...currentScene,
+        background: {
+          ...(currentScene.background || { type: item.type, mediaUrl: item.url, mediaType: item.type }),
+          fit,
+        },
+      });
+    }
+    if (isSceneUsingItem(previewScene, item) && previewScene) {
+      setPreviewScene({
+        ...previewScene,
+        background: {
+          ...(previewScene.background || { type: item.type, mediaUrl: item.url, mediaType: item.type }),
+          fit,
+        },
+      });
+    }
+
+    const fitLabels: Record<'contain' | 'cover' | 'fill', string> = {
+      contain: 'Fit to Screen',
+      cover: 'Fill (Zoom & Crop)',
+      fill: 'Stretch to Fit',
+    };
+    notify(`${item.name}: ${fitLabels[fit]}`);
   };
 
   useEffect(() => {
@@ -246,7 +293,7 @@ export function MediaPanel() {
            scene supplies the origin. */
         mediaUrl: item.url,
         mediaType: item.type,
-        fit: 'cover',
+        fit: getMediaFit(item),
         loop: true,
         muted: Boolean(mutedMediaIds[item.id]),
         opacity: 1,
@@ -505,11 +552,38 @@ export function MediaPanel() {
                       </span>
                     </div>
                   )}
+                  {getMediaFit(item) !== 'contain' && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 6,
+                        right: 6,
+                        background: 'rgba(0, 0, 0, 0.75)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: 3,
+                        padding: '1px 5px',
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        color: 'var(--accent, #FF5500)',
+                        zIndex: 2,
+                        pointerEvents: 'none',
+                      }}
+                      title={`Transform mode: ${getMediaFit(item) === 'cover' ? 'Fill (Zoom & Crop)' : 'Stretch to Fit'}`}
+                    >
+                      {getMediaFit(item) === 'cover' ? 'FILL' : 'STRETCH'}
+                    </div>
+                  )}
                   {item.type === 'image' ? (
                     <img
                       src={absoluteUrl(item)}
                       alt={item.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: getMediaFit(item) === 'fill' ? 'fill' : getMediaFit(item) === 'cover' ? 'cover' : 'contain',
+                      }}
                     />
                   ) : (
                     <>
@@ -520,7 +594,11 @@ export function MediaPanel() {
                         preload="metadata"
                         onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
                         onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: getMediaFit(item) === 'fill' ? 'fill' : getMediaFit(item) === 'cover' ? 'cover' : 'contain',
+                        }}
                       />
                       <button
                         type="button"
@@ -622,25 +700,96 @@ export function MediaPanel() {
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
             style={{
               position: 'fixed',
-              left: Math.min(menu.x, window.innerWidth - 230),
-              top: Math.min(menu.y, window.innerHeight - 160),
+              left: Math.min(menu.x, window.innerWidth - 240),
+              top: Math.min(menu.y, window.innerHeight - 340),
               zIndex: 1000,
-              width: 220,
-              maxWidth: 240,
-              padding: 4,
+              width: 230,
+              maxWidth: 250,
+              padding: 5,
               background: 'var(--bsp-raised)',
               border: '1px solid var(--border-primary)',
               borderRadius: 'var(--radius-md)',
               boxShadow: 'var(--shadow-md)',
             }}
           >
+            {/* Projection Commands */}
+            {(isStudio ? [
+              { label: 'Take Live Directly', run: () => sendMedia(menu.item, { direct: true }), disabled: menu.item.missing },
+              { label: 'Stage in Preview', run: () => sendMedia(menu.item, { direct: false }), disabled: menu.item.missing },
+            ] : [
+              { label: 'Project Live', run: () => sendMedia(menu.item, { direct: true }), disabled: menu.item.missing },
+            ]).map((entry) => (
+              <button
+                key={entry.label}
+                role="menuitem"
+                disabled={entry.disabled}
+                onClick={() => { setMenu(null); entry.run(); }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '6px 10px',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'transparent',
+                  color: entry.disabled ? 'var(--text-mute)' : 'var(--text-primary)',
+                  cursor: entry.disabled ? 'default' : 'pointer',
+                  ...type.body,
+                }}
+                onMouseEnter={(e) => { if (!entry.disabled) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                {entry.label}
+              </button>
+            ))}
+
+            <div style={{ height: 1, background: 'var(--border-primary)', margin: '4px 0' }} />
+
+            {/* Transform / Aspect Ratio options */}
+            <div style={{ padding: '4px 10px 2px', fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Transform / Aspect Ratio
+            </div>
+
             {[
-              ...(isStudio ? [
-                { label: 'Take Live Directly', run: () => sendMedia(menu.item, { direct: true }), disabled: menu.item.missing },
-                { label: 'Stage in Preview', run: () => sendMedia(menu.item, { direct: false }), disabled: menu.item.missing },
-              ] : [
-                { label: 'Project Live', run: () => sendMedia(menu.item, { direct: true }), disabled: menu.item.missing },
-              ]),
+              { label: 'Fit to Screen', fit: 'contain' as const, desc: 'Preserves aspect ratio without cropping' },
+              { label: 'Fill (Zoom & Crop)', fit: 'cover' as const, desc: 'Fills 16:9 screen without black bars' },
+              { label: 'Stretch to Fit', fit: 'fill' as const, desc: 'Stretches media to screen width & height' },
+            ].map((opt) => {
+              const isSelected = getMediaFit(menu.item) === opt.fit;
+              return (
+                <button
+                  key={opt.fit}
+                  role="menuitem"
+                  title={opt.desc}
+                  onClick={() => { setMenu(null); updateMediaFit(menu.item, opt.fit); }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '6px 10px',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    background: isSelected ? 'var(--accent-dim, rgba(255, 85, 0, 0.12))' : 'transparent',
+                    color: isSelected ? 'var(--accent, #FF5500)' : 'var(--text-primary)',
+                    fontWeight: isSelected ? 600 : 400,
+                    cursor: 'pointer',
+                    ...type.body,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = isSelected ? 'var(--accent-dim, rgba(255, 85, 0, 0.18))' : 'var(--bg-hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = isSelected ? 'var(--accent-dim, rgba(255, 85, 0, 0.12))' : 'transparent'; }}
+                >
+                  <span>{opt.label}</span>
+                  {isSelected && <span style={{ fontSize: 12, fontWeight: 700 }}>✓</span>}
+                </button>
+              );
+            })}
+
+            <div style={{ height: 1, background: 'var(--border-primary)', margin: '4px 0' }} />
+
+            {/* Utility options */}
+            {[
               { label: standbyMedia?.url === menu.item.url ? t('media.clearStandby') : t('media.setStandby'), run: () => handleToggleStandby(menu.item), disabled: menu.item.missing },
               { label: menu.item.missing ? t('media.relink') : t('media.relink'), run: () => handleRelink(menu.item) },
               { label: t('media.showInFolder'), run: () => handleReveal(menu.item), disabled: !menu.item.sourcePath },
