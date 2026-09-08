@@ -91,9 +91,22 @@ export function QueuePanel() {
   const [hoveredSetlistId, setHoveredSetlistId] = useState<string | null>(null);
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
-  // Drag & drop state
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
+  // Pointer-based fluid drag state
+  const [dragState, setDragState] = useState<{
+    draggedIndex: number;
+    overIndex: number;
+    deltaY: number;
+    itemHeight: number;
+  } | null>(null);
+
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const dragInfoRef = useRef<{
+    startIndex: number;
+    startY: number;
+    rects: { center: number; height: number }[];
+    itemHeight: number;
+    hasMoved: boolean;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const setlistMenuRef = useRef<HTMLDivElement>(null);
@@ -571,7 +584,7 @@ export function QueuePanel() {
           {emptyParts[1] || ''}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '2px 0' }}>
+        <div ref={listContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '2px 0' }}>
           {queue.map((item, index) => {
             const isAlertItem = item.type === 'ticker' || item.type === 'nursery' || Boolean(item.alertConfig);
             const isLive = isAlertItem
@@ -579,7 +592,7 @@ export function QueuePanel() {
               : currentScene?.id === item.scene.id;
             const isPreview = !isAlertItem && previewScene?.id === item.scene.id;
             const isHovered = hoveredItemId === item.id;
-            const isDraggingThis = draggedIndex === index;
+            const isThisDragged = dragState?.draggedIndex === index;
 
             const handleTakeLive = () => {
               if (isAlertItem) {
@@ -599,70 +612,117 @@ export function QueuePanel() {
               }
             };
 
-            // Calculate fluid animated displacement for items as user drags over
-            let translateY = 'none';
-            if (draggedIndex !== null && overIndex !== null && draggedIndex !== overIndex) {
-              if (draggedIndex < overIndex && index > draggedIndex && index <= overIndex) {
-                translateY = 'translateY(calc(-100% - 6px))';
+            // Fluid animated displacement calculation
+            let transform = 'none';
+            if (dragState) {
+              const { draggedIndex, overIndex, deltaY, itemHeight } = dragState;
+              const shift = itemHeight + 6;
+              if (isThisDragged) {
+                transform = `translateY(${deltaY}px) scale(1.015)`;
+              } else if (draggedIndex < overIndex && index > draggedIndex && index <= overIndex) {
+                transform = `translateY(-${shift}px)`;
               } else if (draggedIndex > overIndex && index < draggedIndex && index >= overIndex) {
-                translateY = 'translateY(calc(100% + 6px))';
+                transform = `translateY(${shift}px)`;
               }
             }
 
-            return (
-              <div
-                key={item.id}
-                ref={(el) => { rowRefs.current[item.scene.id] = el; }}
-                draggable
-                onDragStart={(e) => {
-                  setDraggedIndex(index);
-                  setOverIndex(index);
-                  e.dataTransfer.setData('text/plain', String(index));
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                onDragEnter={(e) => {
-                  e.preventDefault();
-                  if (overIndex !== index) {
-                    setOverIndex(index);
+            const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+              if (e.button !== 0) return;
+              const target = e.target as HTMLElement;
+              if (target.closest('button, input, textarea, a, select')) return;
+
+              const container = listContainerRef.current;
+              if (!container) return;
+
+              const children = Array.from(container.children) as HTMLElement[];
+              const rects = children.map((el) => {
+                const r = el.getBoundingClientRect();
+                return {
+                  height: r.height,
+                  center: r.top + r.height / 2,
+                };
+              });
+
+              const itemHeight = rects[index]?.height || 54;
+              dragInfoRef.current = {
+                startIndex: index,
+                startY: e.clientY,
+                rects,
+                itemHeight,
+                hasMoved: false,
+              };
+
+              const handlePointerMove = (moveEv: PointerEvent) => {
+                if (!dragInfoRef.current) return;
+                const { startIndex, startY, rects: itemRects, itemHeight: h } = dragInfoRef.current;
+                const deltaY = moveEv.clientY - startY;
+
+                if (!dragInfoRef.current.hasMoved && Math.abs(deltaY) > 3) {
+                  dragInfoRef.current.hasMoved = true;
+                }
+
+                if (dragInfoRef.current.hasMoved) {
+                  const currentCenter = (itemRects[startIndex]?.center || 0) + deltaY;
+                  let newOver = startIndex;
+                  let minDiff = Infinity;
+
+                  for (let i = 0; i < itemRects.length; i++) {
+                    const diff = Math.abs(itemRects[i].center - currentCenter);
+                    if (diff < minDiff) {
+                      minDiff = diff;
+                      newOver = i;
+                    }
                   }
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = 'move';
-                  if (overIndex !== index) {
-                    setOverIndex(index);
-                  }
-                }}
-                onDragEnd={() => {
-                  if (draggedIndex !== null && overIndex !== null && draggedIndex !== overIndex) {
-                    reorderQueue(draggedIndex, overIndex);
-                  }
-                  setDraggedIndex(null);
-                  setOverIndex(null);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (draggedIndex !== null && overIndex !== null && draggedIndex !== overIndex) {
-                    reorderQueue(draggedIndex, overIndex);
-                  }
-                  setDraggedIndex(null);
-                  setOverIndex(null);
-                }}
-                onMouseEnter={() => setHoveredItemId(item.id)}
-                onMouseLeave={() => setHoveredItemId(null)}
-                onClick={() => {
+
+                  setDragState({
+                    draggedIndex: startIndex,
+                    overIndex: newOver,
+                    deltaY,
+                    itemHeight: h,
+                  });
+                }
+              };
+
+              const handlePointerUp = () => {
+                window.removeEventListener('pointermove', handlePointerMove);
+                window.removeEventListener('pointerup', handlePointerUp);
+
+                const info = dragInfoRef.current;
+                dragInfoRef.current = null;
+
+                if (info && info.hasMoved) {
+                  setDragState((prev) => {
+                    if (prev && prev.draggedIndex !== prev.overIndex) {
+                      reorderQueue(prev.draggedIndex, prev.overIndex);
+                    }
+                    return null;
+                  });
+                } else {
+                  setDragState(null);
                   if (isAlertItem) {
                     handleTakeLive();
                   } else {
                     if (isLive) {
                       clearProgram();
-                      return;
+                    } else {
+                      projectScene(item.scene);
+                      syncQueueItemToPanel(item);
                     }
-                    // In Studio Mode, clicking row sends to Preview first
-                    projectScene(item.scene);
-                    syncQueueItemToPanel(item);
                   }
-                }}
+                }
+              };
+
+              window.addEventListener('pointermove', handlePointerMove, { passive: false });
+              window.addEventListener('pointerup', handlePointerUp);
+            };
+
+            return (
+              <div
+                key={item.id}
+                ref={(el) => { rowRefs.current[item.scene.id] = el; }}
+                onPointerDown={handlePointerDown}
+                onMouseEnter={() => setHoveredItemId(item.id)}
+                onMouseLeave={() => setHoveredItemId(null)}
                 onDoubleClick={() => {
                   handleTakeLive();
                 }}
@@ -677,33 +737,35 @@ export function QueuePanel() {
                     ? '1px solid var(--accent, #FF5500)'
                     : isPreview
                     ? '1px solid var(--border-accent, rgba(255, 85, 0, 0.4))'
+                    : isThisDragged
+                    ? '1px solid var(--accent, #FF5500)'
                     : '1px solid var(--border-primary)',
                   borderRadius: 6,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  cursor: 'grab',
+                  cursor: 'default',
                   userSelect: 'none',
                   position: 'relative',
-                  zIndex: isDraggingThis ? 10 : 1,
-                  opacity: isDraggingThis ? 0.65 : 1,
-                  transform: isDraggingThis ? 'scale(1.02)' : translateY,
-                  boxShadow: isDraggingThis ? '0 8px 24px rgba(0, 0, 0, 0.35)' : 'none',
-                  transition: isDraggingThis
-                    ? 'opacity 0.15s ease, box-shadow 0.15s ease'
-                    : 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease',
+                  zIndex: isThisDragged ? 50 : 1,
+                  opacity: isThisDragged ? 0.95 : 1,
+                  transform,
+                  boxShadow: isThisDragged ? '0 12px 32px rgba(0, 0, 0, 0.5)' : 'none',
+                  transition: isThisDragged
+                    ? 'box-shadow 0.15s ease, opacity 0.15s ease'
+                    : 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1), background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease',
                   minWidth: 0,
                   overflow: 'hidden',
                 }}
               >
-                {/* Drag Handle Icon */}
+                {/* Drag Handle Icon (Clean subtle dots, default cursor) */}
                 <div
                   style={{
                     color: 'var(--text-dim)',
                     display: 'flex',
                     alignItems: 'center',
-                    cursor: 'grab',
-                    opacity: isHovered ? 0.8 : 0.35,
+                    cursor: 'default',
+                    opacity: isHovered ? 0.85 : 0.35,
                     transition: 'opacity 0.15s ease',
                     flexShrink: 0,
                   }}
@@ -837,7 +899,7 @@ export function QueuePanel() {
                     )}
                   </button>
 
-                  {/* Delete (✕) Button */}
+                  {/* Delete (✕) Button - Only visible on hover */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -854,6 +916,9 @@ export function QueuePanel() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       borderRadius: 4,
+                      opacity: isHovered ? 1 : 0,
+                      pointerEvents: isHovered ? 'auto' : 'none',
+                      transition: 'opacity 0.15s ease, color 0.15s ease',
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--tally-fault, #ef4444)'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dim)'; }}
