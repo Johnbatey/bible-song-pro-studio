@@ -468,9 +468,9 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
         ) : workspaceMode === 'text' ? (
           /* TEXT MODE */
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 10 }}>
-            {/* Song Metadata Editor (Title, Artist, Key, CCLI) */}
+            {/* Song Metadata Editor (Title & Artist / Author) */}
             <div style={deckStyles.metadataBar}>
-              <div style={{ display: 'flex', flexDirection: 'column', flex: '2 1 180px', minWidth: 140 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: '2 1 200px', minWidth: 140 }}>
                 <label style={deckStyles.fieldLabel}>Song Title</label>
                 <input
                   type="text"
@@ -485,7 +485,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                   style={deckStyles.metaInput}
                 />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 120px', minWidth: 100 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 140px', minWidth: 120 }}>
                 <label style={deckStyles.fieldLabel}>Artist / Author</label>
                 <input
                   type="text"
@@ -497,36 +497,6 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                   }}
                   onBlur={() => onUpdateSong?.({ author: artistDraft, artist: artistDraft })}
                   placeholder="Artist / Author"
-                  style={deckStyles.metaInput}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', width: 70, flexShrink: 0 }}>
-                <label style={deckStyles.fieldLabel}>Key</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={keyDraft}
-                  onChange={(e) => {
-                    setKeyDraft(e.target.value);
-                    handleSaveMetadata({ key: e.target.value });
-                  }}
-                  onBlur={() => onUpdateSong?.({ key: keyDraft })}
-                  placeholder="e.g. G"
-                  style={deckStyles.metaInput}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', width: 90, flexShrink: 0 }}>
-                <label style={deckStyles.fieldLabel}>CCLI #</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={ccliDraft}
-                  onChange={(e) => {
-                    setCcliDraft(e.target.value);
-                    handleSaveMetadata({ ccli: e.target.value });
-                  }}
-                  onBlur={() => onUpdateSong?.({ ccli: ccliDraft })}
-                  placeholder="CCLI #"
                   style={deckStyles.metaInput}
                 />
               </div>
