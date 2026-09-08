@@ -654,11 +654,13 @@ export function QueuePanel() {
                   borderRadius: 6,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 12,
+                  gap: 10,
                   cursor: 'grab',
                   transition: 'all 0.15s ease',
                   userSelect: 'none',
                   opacity: draggedIndex === index ? 0.4 : 1,
+                  minWidth: 0,
+                  overflow: 'hidden',
                 }}
               >
                 {/* Drag Handle Icon */}
@@ -685,38 +687,42 @@ export function QueuePanel() {
                 </div>
 
                 {/* Left Meta Group */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 100, flexShrink: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ color: isLive ? '#FF5500' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0, overflow: 'hidden' }}>
+                    <span style={{ color: isLive ? '#FF5500' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
                       {renderTypeIcon(item.type)}
                     </span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: isLive ? '#FF5500' : '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: isLive ? '#FF5500' : '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
                       {item.reference}
                     </span>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'capitalize' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {item.type} {item.source ? `· ${item.source}` : ''}
                   </div>
                 </div>
 
                 {/* Content Snippet */}
-                <div
-                  style={{
-                    flex: 1,
-                    fontSize: 13,
-                    color: '#ffffff',
-                    lineHeight: 1.35,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {item.text}
-                </div>
+                {item.text && (
+                  <div
+                    style={{
+                      flex: '1 1 0',
+                      minWidth: 0,
+                      fontSize: 13,
+                      color: '#ffffff',
+                      lineHeight: 1.35,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {item.text}
+                  </div>
+                )}
 
                 {/* Right Action Icons & Up/Down Reorder */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 'auto' }}>
                   {/* Reorder Up */}
                   <button
                     type="button"
