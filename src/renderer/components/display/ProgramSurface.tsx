@@ -487,43 +487,36 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
         />
       )}
 
-      {!scene && state.showStandbyBrand !== false && (
-        state.standbyMedia?.url ? (
-          state.standbyMedia.type === 'video' ? (
-            <video
-              src={assetUrl(state.standbyMedia.url, assetBaseUrl)}
-              autoPlay
-              loop
-              muted
-              playsInline
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                zIndex: 2,
-              }}
-            />
-          ) : (
-            <img
-              src={assetUrl(state.standbyMedia.url, assetBaseUrl)}
-              alt=""
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                zIndex: 2,
-              }}
-            />
-          )
+      {!scene && Boolean(state.standbyMedia?.url) && (
+        state.standbyMedia!.type === 'video' ? (
+          <video
+            src={assetUrl(state.standbyMedia!.url, assetBaseUrl)}
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              zIndex: 2,
+            }}
+          />
         ) : (
-          <div className="program-surface-standby">
-            <div className="program-surface-standby-title">Bible Song Pro<sup>STUDIO</sup></div>
-            <div className="program-surface-standby-sub">Waiting for signal...</div>
-          </div>
+          <img
+            src={assetUrl(state.standbyMedia!.url, assetBaseUrl)}
+            alt=""
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              zIndex: 2,
+            }}
+          />
         )
       )}
 

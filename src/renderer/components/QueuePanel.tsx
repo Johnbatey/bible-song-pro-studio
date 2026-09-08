@@ -93,6 +93,7 @@ export function QueuePanel() {
 
   // Drag & drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const setlistMenuRef = useRef<HTMLDivElement>(null);
@@ -598,6 +599,16 @@ export function QueuePanel() {
               }
             };
 
+            // Calculate fluid animated displacement for items as user drags over
+            let translateY = 'none';
+            if (draggedIndex !== null && overIndex !== null && draggedIndex !== overIndex) {
+              if (draggedIndex < overIndex && index > draggedIndex && index <= overIndex) {
+                translateY = 'translateY(calc(-100% - 6px))';
+              } else if (draggedIndex > overIndex && index < draggedIndex && index >= overIndex) {
+                translateY = 'translateY(calc(100% + 6px))';
+              }
+            }
+
             return (
               <div
                 key={item.id}
@@ -605,30 +616,37 @@ export function QueuePanel() {
                 draggable
                 onDragStart={(e) => {
                   setDraggedIndex(index);
+                  setOverIndex(index);
                   e.dataTransfer.setData('text/plain', String(index));
                   e.dataTransfer.effectAllowed = 'move';
                 }}
                 onDragEnter={(e) => {
                   e.preventDefault();
-                  if (draggedIndex !== null && draggedIndex !== index) {
-                    reorderQueue(draggedIndex, index);
-                    setDraggedIndex(index);
+                  if (overIndex !== index) {
+                    setOverIndex(index);
                   }
                 }}
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
-                  if (draggedIndex !== null && draggedIndex !== index) {
-                    reorderQueue(draggedIndex, index);
-                    setDraggedIndex(index);
+                  if (overIndex !== index) {
+                    setOverIndex(index);
                   }
                 }}
                 onDragEnd={() => {
+                  if (draggedIndex !== null && overIndex !== null && draggedIndex !== overIndex) {
+                    reorderQueue(draggedIndex, overIndex);
+                  }
                   setDraggedIndex(null);
+                  setOverIndex(null);
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
+                  if (draggedIndex !== null && overIndex !== null && draggedIndex !== overIndex) {
+                    reorderQueue(draggedIndex, overIndex);
+                  }
                   setDraggedIndex(null);
+                  setOverIndex(null);
                 }}
                 onMouseEnter={() => setHoveredItemId(item.id)}
                 onMouseLeave={() => setHoveredItemId(null)}
@@ -665,10 +683,15 @@ export function QueuePanel() {
                   alignItems: 'center',
                   gap: 10,
                   cursor: 'grab',
-                  transition: 'background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease',
                   userSelect: 'none',
-                  opacity: isDraggingThis ? 0.6 : 1,
-                  transform: isDraggingThis ? 'scale(1.01)' : 'none',
+                  position: 'relative',
+                  zIndex: isDraggingThis ? 10 : 1,
+                  opacity: isDraggingThis ? 0.65 : 1,
+                  transform: isDraggingThis ? 'scale(1.02)' : translateY,
+                  boxShadow: isDraggingThis ? '0 8px 24px rgba(0, 0, 0, 0.35)' : 'none',
+                  transition: isDraggingThis
+                    ? 'opacity 0.15s ease, box-shadow 0.15s ease'
+                    : 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease',
                   minWidth: 0,
                   overflow: 'hidden',
                 }}
