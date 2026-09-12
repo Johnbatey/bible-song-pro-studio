@@ -289,14 +289,15 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
           maxWidth: '96vw',
           height: '620px',
           maxHeight: '90vh',
-          backgroundColor: '#121214',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
+          backgroundColor: 'var(--settings-panel, #121214)',
+          border: '1px solid var(--settings-line, rgba(255, 255, 255, 0.12))',
           borderRadius: 10,
-          boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6)',
+          boxShadow: '0 24px 48px rgba(0, 0, 0, 0.45)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          color: '#ffffff',
+          color: 'var(--text-primary, #ffffff)',
+          fontFamily: 'var(--font-ui)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -305,11 +306,11 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
           style={{
             height: 48,
             padding: '0 16px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            borderBottom: '1px solid var(--settings-line, rgba(255, 255, 255, 0.08))',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: '#18181b',
+            backgroundColor: 'var(--settings-sidebar, #18181b)',
             flexShrink: 0,
           }}
         >
@@ -321,7 +322,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
               </svg>
             </span>
-            <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.01em' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.01em', color: 'var(--text-primary)' }}>
               Online Song Lyrics Search Engine
             </span>
             <span
@@ -355,7 +356,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
               transition: 'color 0.15s ease',
             }}
             title="Close (Esc)"
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary)')}
             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-dim, #888)')}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -369,8 +370,8 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
         <div
           style={{
             padding: '12px 16px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            backgroundColor: '#141416',
+            borderBottom: '1px solid var(--settings-line, rgba(255, 255, 255, 0.08))',
+            backgroundColor: 'var(--settings-card, #141416)',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
@@ -379,7 +380,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
         >
           <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
             <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-              <span style={{ position: 'absolute', left: 10, color: '#666', pointerEvents: 'none', display: 'flex' }}>
+              <span style={{ position: 'absolute', left: 10, color: 'var(--text-dim, #666)', pointerEvents: 'none', display: 'flex' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -396,10 +397,10 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                   height: 36,
                   paddingLeft: 34,
                   paddingRight: 32,
-                  backgroundColor: '#1f1f23',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backgroundColor: 'var(--settings-panel, #1f1f23)',
+                  border: '1px solid var(--settings-line, rgba(255, 255, 255, 0.12))',
                   borderRadius: 6,
-                  color: '#ffffff',
+                  color: 'var(--text-primary, #ffffff)',
                   fontSize: 13,
                   outline: 'none',
                 }}
@@ -413,7 +414,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                     right: 8,
                     background: 'transparent',
                     border: 'none',
-                    color: '#888',
+                    color: 'var(--text-dim, #888)',
                     cursor: 'pointer',
                     padding: 4,
                   }}
@@ -430,7 +431,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
               style={{
                 height: 36,
                 padding: '0 18px',
-                backgroundColor: isSearching ? '#333' : 'var(--accent, #FF5500)',
+                backgroundColor: isSearching ? 'var(--chrome-control, #333)' : 'var(--accent, #FF5500)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: 6,
@@ -470,10 +471,10 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
           <div
             style={{
               width: 320,
-              borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRight: '1px solid var(--settings-line, rgba(255, 255, 255, 0.08))',
               display: 'flex',
               flexDirection: 'column',
-              backgroundColor: '#111113',
+              backgroundColor: 'var(--settings-sidebar, #111113)',
             }}
           >
             <div
@@ -484,7 +485,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                 textTransform: 'uppercase',
                 color: 'var(--text-dim, #888)',
                 letterSpacing: '0.04em',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                borderBottom: '1px solid var(--settings-line, rgba(255, 255, 255, 0.06))',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -496,7 +497,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
 
             <div style={{ flex: 1, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {isSearching && (
-                <div style={{ padding: 24, textAlign: 'center', color: '#888', fontSize: 12 }}>
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary, #888)', fontSize: 12 }}>
                   Searching online worship lyrics database...
                 </div>
               )}
@@ -508,7 +509,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
               )}
 
               {!isSearching && !searchError && results.length === 0 && (
-                <div style={{ padding: 24, textAlign: 'center', color: '#666', fontSize: 12, lineHeight: 1.5 }}>
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary, #666)', fontSize: 12, lineHeight: 1.5 }}>
                   Type a song title or artist name above and click <strong>Search</strong> to query thousands of worship songs and hymn lyrics online.
                 </div>
               )}
@@ -522,8 +523,8 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                     style={{
                       padding: '10px 12px',
                       borderRadius: 6,
-                      backgroundColor: isSelected ? 'var(--chrome-control-active, #2c221e)' : '#18181c',
-                      border: isSelected ? '1px solid var(--accent, #FF5500)' : '1px solid rgba(255, 255, 255, 0.06)',
+                      backgroundColor: isSelected ? 'var(--accent-dim, var(--chrome-control-active))' : 'var(--settings-card, var(--bg-surface))',
+                      border: isSelected ? '1px solid var(--accent, #FF5500)' : '1px solid var(--settings-line, rgba(255, 255, 255, 0.06))',
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
@@ -531,7 +532,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                       transition: 'all 0.12s ease',
                     }}
                   >
-                    <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? 'var(--accent, #FF5500)' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? 'var(--accent, #FF5500)' : 'var(--text-primary, #fff)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {item.title}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-secondary, #aaa)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -539,7 +540,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                         {item.artist} {item.album ? `· ${item.album}` : ''}
                       </span>
                       {item.duration ? (
-                        <span style={{ color: '#777', fontSize: 10, flexShrink: 0 }}>
+                        <span style={{ color: 'var(--text-dim, #777)', fontSize: 10, flexShrink: 0 }}>
                           {formatDuration(item.duration)}
                         </span>
                       ) : null}
@@ -551,18 +552,18 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
           </div>
 
           {/* Right Column: Song Preview, Auto-Sectioning & Import */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#141417', minWidth: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--settings-panel, #141417)', minWidth: 0 }}>
             {selectedResult ? (
               <>
                 {/* Meta Edit Bar */}
                 <div
                   style={{
                     padding: '10px 16px',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderBottom: '1px solid var(--settings-line, rgba(255, 255, 255, 0.08))',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 12,
-                    backgroundColor: '#19191d',
+                    backgroundColor: 'var(--settings-sidebar, #19191d)',
                     flexShrink: 0,
                   }}
                 >
@@ -577,12 +578,13 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                       style={{
                         height: 28,
                         padding: '0 8px',
-                        backgroundColor: '#222228',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backgroundColor: 'var(--settings-panel, #222228)',
+                        border: '1px solid var(--settings-line, rgba(255, 255, 255, 0.1))',
                         borderRadius: 4,
-                        color: '#fff',
+                        color: 'var(--text-primary, #fff)',
                         fontSize: 12,
                         fontWeight: 600,
+                        outline: 'none',
                       }}
                     />
                   </div>
@@ -598,11 +600,12 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                       style={{
                         height: 28,
                         padding: '0 8px',
-                        backgroundColor: '#222228',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backgroundColor: 'var(--settings-panel, #222228)',
+                        border: '1px solid var(--settings-line, rgba(255, 255, 255, 0.1))',
                         borderRadius: 4,
-                        color: '#fff',
+                        color: 'var(--text-primary, #fff)',
                         fontSize: 12,
+                        outline: 'none',
                       }}
                     />
                   </div>
@@ -626,8 +629,8 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                       key={slide.id || sIdx}
                       style={{
                         padding: '12px 14px',
-                        backgroundColor: '#1b1b1f',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        backgroundColor: 'var(--settings-card, #1b1b1f)',
+                        border: '1px solid var(--settings-line, rgba(255, 255, 255, 0.08))',
                         borderRadius: 6,
                         display: 'flex',
                         flexDirection: 'column',
@@ -642,15 +645,15 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                             padding: '2px 8px',
                             borderRadius: 4,
                             backgroundColor: slide.label.toLowerCase().includes('chorus')
-                              ? 'rgba(255, 85, 0, 0.2)'
+                              ? 'rgba(255, 85, 0, 0.18)'
                               : slide.label.toLowerCase().includes('bridge')
-                              ? 'rgba(168, 85, 247, 0.2)'
-                              : 'rgba(255, 255, 255, 0.1)',
+                              ? 'rgba(168, 85, 247, 0.18)'
+                              : 'var(--chrome-control-active, rgba(255, 255, 255, 0.1))',
                             color: slide.label.toLowerCase().includes('chorus')
-                              ? '#ff7733'
+                              ? 'var(--accent, #ff7733)'
                               : slide.label.toLowerCase().includes('bridge')
-                              ? '#c084fc'
-                              : '#ffffff',
+                              ? '#a855f7'
+                              : 'var(--text-primary, #ffffff)',
                           }}
                         >
                           {slide.label}
@@ -662,7 +665,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                       <div
                         style={{
                           fontSize: 13,
-                          color: '#e4e4e7',
+                          color: 'var(--text-primary, #e4e4e7)',
                           lineHeight: 1.45,
                           whiteSpace: 'pre-wrap',
                           fontFamily: 'inherit',
@@ -678,8 +681,8 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                 <div
                   style={{
                     padding: '10px 16px',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                    backgroundColor: '#17171a',
+                    borderTop: '1px solid var(--settings-line, rgba(255, 255, 255, 0.08))',
+                    backgroundColor: 'var(--settings-sidebar, #17171a)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -709,10 +712,10 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                       style={{
                         height: 34,
                         padding: '0 14px',
-                        backgroundColor: '#27272a',
-                        border: '1px solid rgba(255, 255, 255, 0.14)',
+                        backgroundColor: 'var(--chrome-control, #27272a)',
+                        border: '1px solid var(--settings-line, rgba(255, 255, 255, 0.14))',
                         borderRadius: 6,
-                        color: '#fff',
+                        color: 'var(--text-primary, #fff)',
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -722,8 +725,8 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                         whiteSpace: 'nowrap',
                         transition: 'background 0.15s ease, border-color 0.15s ease',
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#323238'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#27272a'; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chrome-control-active, #323238)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--chrome-control, #27272a)'; }}
                       title="Import to song library and add to active queue"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -776,7 +779,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                   justifyContent: 'center',
                   flexDirection: 'column',
                   gap: 12,
-                  color: '#666',
+                  color: 'var(--text-secondary, #666)',
                   padding: 24,
                 }}
               >
@@ -785,7 +788,7 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
                   <circle cx="6" cy="18" r="3" />
                   <circle cx="18" cy="16" r="3" />
                 </svg>
-                <div style={{ fontSize: 13, textAlign: 'center', maxWidth: 320, lineHeight: 1.4 }}>
+                <div style={{ fontSize: 13, textAlign: 'center', maxWidth: 320, lineHeight: 1.4, color: 'var(--text-secondary)' }}>
                   Select a song from search results to preview structured slides and import directly into your library.
                 </div>
               </div>

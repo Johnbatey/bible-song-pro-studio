@@ -43,7 +43,7 @@ const DEFAULT_LAYOUT_JSON = {
                     activeView: 'transcript',
                     id: '1',
                   },
-                  size: 292.3333333333333,
+                  size: 291.3333333333333,
                 },
                 {
                   type: 'leaf',
@@ -52,7 +52,7 @@ const DEFAULT_LAYOUT_JSON = {
                     activeView: 'bible',
                     id: '3',
                   },
-                  size: 718.3333333333334,
+                  size: 719.3333333333334,
                 },
                 {
                   type: 'leaf',
@@ -64,7 +64,7 @@ const DEFAULT_LAYOUT_JSON = {
                   size: 653.3333333333334,
                 },
               ],
-              size: 535,
+              size: 504,
             },
             {
               type: 'branch',
@@ -72,11 +72,11 @@ const DEFAULT_LAYOUT_JSON = {
                 {
                   type: 'leaf',
                   data: {
-                    views: ['history'],
-                    activeView: 'history',
+                    views: ['messages'],
+                    activeView: 'messages',
                     id: '2',
                   },
-                  size: 292,
+                  size: 291,
                 },
                 {
                   type: 'leaf',
@@ -85,7 +85,7 @@ const DEFAULT_LAYOUT_JSON = {
                     activeView: 'live',
                     id: '4',
                   },
-                  size: 624,
+                  size: 626,
                 },
                 {
                   type: 'leaf',
@@ -103,10 +103,10 @@ const DEFAULT_LAYOUT_JSON = {
                     activeView: 'queue',
                     id: '7',
                   },
-                  size: 344,
+                  size: 343,
                 },
               ],
-              size: 421,
+              size: 452,
             },
           ],
           size: 1672,
@@ -143,11 +143,11 @@ const DEFAULT_LAYOUT_JSON = {
       tabComponent: 'props.defaultTabComponent',
       title: 'Output',
     },
-    history: {
-      id: 'history',
-      contentComponent: 'history',
+    messages: {
+      id: 'messages',
+      contentComponent: 'messages',
       tabComponent: 'props.defaultTabComponent',
-      title: 'History',
+      title: 'Announce',
     },
     live: {
       id: 'live',

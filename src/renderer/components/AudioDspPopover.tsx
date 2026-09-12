@@ -52,19 +52,20 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
   const measure = useCallback(() => {
     if (!anchorEl) return;
     const anchor = anchorEl.getBoundingClientRect();
-    const estimatedHeight = 440;
+    const popoverHeight = popoverRef.current?.offsetHeight || 420;
 
     // Check if there's enough space below the button, otherwise display above
     const spaceBelow = window.innerHeight - anchor.bottom;
     let top: number;
-    if (spaceBelow >= estimatedHeight || anchor.top < estimatedHeight) {
-      top = anchor.bottom + 8;
+    if (spaceBelow >= popoverHeight + 8 || spaceBelow >= anchor.top) {
+      top = Math.min(window.innerHeight - popoverHeight - 12, anchor.bottom + 6);
     } else {
-      top = Math.max(12, anchor.top - estimatedHeight - 8);
+      top = Math.max(12, anchor.top - popoverHeight - 6);
     }
 
-    // Align right edge of popover with right edge of button/cluster, bounded to window
-    const idealLeft = anchor.right - POPOVER_WIDTH;
+    // Center popover horizontally directly underneath the anchor button, clamped to window
+    const anchorCenter = anchor.left + anchor.width / 2;
+    const idealLeft = anchorCenter - POPOVER_WIDTH / 2;
     const safeLeft = Math.max(12, Math.min(idealLeft, window.innerWidth - POPOVER_WIDTH - 12));
 
     setCoords({ top, left: safeLeft });
@@ -73,9 +74,11 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
   useLayoutEffect(() => {
     if (!isOpen) return;
     measure();
+    const req = requestAnimationFrame(measure);
     window.addEventListener('resize', measure);
     window.addEventListener('scroll', measure, true);
     return () => {
+      cancelAnimationFrame(req);
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
     };

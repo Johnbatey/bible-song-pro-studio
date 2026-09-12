@@ -21,9 +21,8 @@ export function TitleBar() {
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertText, setAlertText] = useState('Nursery Call #402');
   const [alertType, setAlertType] = useState<'announcement' | 'warning' | 'info'>('announcement');
-  const [alertPosition, setAlertPosition] = useState<'bottom' | 'top'>('bottom');
-  const [alertSpeed, setAlertSpeed] = useState<number>(1.0);
-  const [alertCycles, setAlertCycles] = useState<number>(2);
+  const [alertPosition, setAlertPosition] = useState<'bottom' | 'top'>('top');
+  const [alertDuration, setAlertDuration] = useState<number>(15);
   const openDockIds = useAppStore((s) => s.openDockIds);
   const poppedOutDockIds = useAppStore((s) => s.poppedOutDockIds);
 
@@ -198,10 +197,8 @@ export function TitleBar() {
       text: alertText.trim(),
       type: alertType,
       position: alertPosition,
-      speed: alertSpeed,
-      cycles: alertCycles,
-      duration: alertCycles > 0 ? alertCycles * (16 / alertSpeed) : 0,
-      animation: 'crawl',
+      duration: alertDuration,
+      animation: 'slideDown',
     });
     notify({
       id: `alert-sent-${Date.now()}`,
@@ -750,64 +747,37 @@ export function TitleBar() {
                     color: 'var(--text-primary)',
                   }}
                 >
-                  <option value="bottom">Bottom Ticker Bar</option>
-                  <option value="top">Top Ticker Bar</option>
+                  <option value="top">Top Badge (Recommended)</option>
+                  <option value="bottom">Bottom Badge</option>
                 </select>
               </div>
             </div>
 
-            {/* Alert Controls Row 2: Cycle Count & Crawl Speed Slider */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Cycle Count (Loop Times)
-                </label>
-                <select
-                  className="input"
-                  value={alertCycles}
-                  onChange={(e) => setAlertCycles(Number(e.target.value))}
-                  style={{
-                    height: 36,
-                    padding: '0 8px',
-                    fontSize: 12,
-                    borderRadius: 6,
-                    border: '1px solid var(--border-primary)',
-                    background: 'var(--chrome-control)',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <option value={1}>1 Loop (1 Cycle)</option>
-                  <option value={2}>2 Loops (2 Cycles)</option>
-                  <option value={3}>3 Loops (3 Cycles)</option>
-                  <option value={5}>5 Loops (5 Cycles)</option>
-                  <option value={0}>Continuous (Until Cleared)</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Crawl Speed
-                  </label>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#FF5500' }}>
-                    {alertSpeed.toFixed(1)}x
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.5"
-                  step="0.1"
-                  value={alertSpeed}
-                  onChange={(e) => setAlertSpeed(parseFloat(e.target.value))}
-                  style={{
-                    width: '100%',
-                    height: 36,
-                    accentColor: '#FF5500',
-                    cursor: 'pointer',
-                  }}
-                />
-              </div>
+            {/* Alert Controls Row 2: Duration */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Display Duration
+              </label>
+              <select
+                className="input"
+                value={alertDuration}
+                onChange={(e) => setAlertDuration(Number(e.target.value))}
+                style={{
+                  height: 36,
+                  padding: '0 8px',
+                  fontSize: 12,
+                  borderRadius: 6,
+                  border: '1px solid var(--border-primary)',
+                  background: 'var(--chrome-control)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <option value={10}>10 seconds</option>
+                <option value={15}>15 seconds (Recommended)</option>
+                <option value={30}>30 seconds</option>
+                <option value={60}>60 seconds (1 minute)</option>
+                <option value={0}>Until Cleared (Manual Dismiss)</option>
+              </select>
             </div>
 
             {/* Footer Buttons */}

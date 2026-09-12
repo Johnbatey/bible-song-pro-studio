@@ -642,7 +642,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                       ? '1px solid var(--chrome-control-active)'
                       : '1px solid var(--border-primary)',
                     background: isLive
-                      ? '#3d1403'
+                      ? 'var(--accent-dim)'
                       : isPreview
                       ? 'rgba(59, 130, 246, 0.08)'
                       : isTarget

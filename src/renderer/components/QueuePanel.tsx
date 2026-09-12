@@ -356,7 +356,14 @@ export function QueuePanel() {
           {queue.map((item, index) => {
             const isAlertItem = item.type === 'ticker' || item.type === 'nursery' || Boolean(item.alertConfig);
             const isLive = isAlertItem
-              ? Boolean(activeAlert?.text && (activeAlert.text === item.text || activeAlert.text === item.alertConfig?.text || activeAlert.text.includes(item.reference)))
+              ? Boolean(
+                  activeAlert &&
+                  (
+                    (activeAlert.id && item.alertConfig?.id && activeAlert.id === item.alertConfig.id) ||
+                    (activeAlert.id && item.id && activeAlert.id === item.id) ||
+                    (!item.alertConfig?.id && (activeAlert.text === item.text || activeAlert.text === item.alertConfig?.text))
+                  )
+                )
               : currentScene?.id === item.scene.id;
             const isPreview = !isAlertItem && previewScene?.id === item.scene.id;
             const isHovered = hoveredItemId === item.id;
@@ -367,7 +374,7 @@ export function QueuePanel() {
                 if (isLive) {
                   dismissAlert();
                 } else if (item.alertConfig) {
-                  triggerAlert(item.alertConfig);
+                  triggerAlert({ ...item.alertConfig, id: item.alertConfig.id || item.id });
                   syncQueueItemToPanel(item);
                 }
               } else {

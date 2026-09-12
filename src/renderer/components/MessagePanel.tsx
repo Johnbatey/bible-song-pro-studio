@@ -30,7 +30,7 @@ export function MessagePanel() {
   const [viewTab, setViewTab] = useState<'broadcast' | 'notes' | 'history'>('broadcast');
 
   // Broadcast state
-  const [mode, setMode] = useState<'overlay' | 'slide' | 'nursery'>('overlay');
+  const [mode, setMode] = useState<'overlay' | 'slide'>('overlay');
   const [titleText, setTitleText] = useState('ANNOUNCEMENT');
   const [messageText, setMessageText] = useState('');
   const [alertType, setAlertType] = useState<Alert['type']>('announcement');
@@ -104,14 +104,11 @@ export function MessagePanel() {
       if (!detail) return;
       setViewTab('broadcast');
       if (detail.text) {
-        if (detail.type === 'nursery') {
-          setMode('nursery');
-          setMessageText(detail.text);
-        } else if (detail.type === 'ticker') {
-          setMode('overlay');
+        if (detail.type === 'slide') {
+          setMode('slide');
           setMessageText(detail.text);
         } else {
-          setMode('slide');
+          setMode('overlay');
           setMessageText(detail.text);
         }
       }
@@ -142,18 +139,18 @@ export function MessagePanel() {
 
     triggerAlert({
       id: `alert-${Date.now()}`,
-      text: mode === 'nursery' ? `${titleText ? `${titleText}: ` : ''}${messageText.trim()}` : messageText.trim(),
+      text: messageText.trim(),
       type: alertType,
-      position: mode === 'nursery' ? 'top' : position,
+      position: position,
       speed: speed,
       cycles: cycles,
-      duration: durationSec,
-      animation: mode === 'nursery' ? 'slideDown' : 'crawl',
+      duration: cycles > 0 ? cycles * (16 / speed) : 0,
+      animation: 'crawl',
     });
 
     pushNotice({
       id: `msg-sent-${Date.now()}`,
-      text: `Broadcast alert sent to output screens`,
+      text: `Broadcast ticker sent to output screens`,
       type: 'info',
       duration: 3,
       animation: 'slideDown',
@@ -218,21 +215,22 @@ export function MessagePanel() {
       ? `${titleText.trim()}\n\n${messageText.trim()}`
       : messageText.trim();
 
+    const alertId = `alert-${Date.now()}`;
     const alertConfig: Alert | undefined = mode === 'slide' ? undefined : {
-      id: `alert-${Date.now()}`,
-      text: mode === 'nursery' ? `${titleText ? `${titleText}: ` : ''}${messageText.trim()}` : messageText.trim(),
+      id: alertId,
+      text: messageText.trim(),
       type: alertType,
-      position: mode === 'nursery' ? 'top' : position,
+      position: position,
       speed: speed,
       cycles: cycles,
-      duration: durationSec,
-      animation: mode === 'nursery' ? 'slideDown' : 'crawl',
+      duration: cycles > 0 ? cycles * (16 / speed) : 0,
+      animation: 'crawl',
     };
 
     addToQueue({
-      reference: titleText.trim() || (mode === 'nursery' ? 'Nursery Alert' : 'Announcement'),
+      reference: titleText.trim() || 'Announcement',
       text: fullText,
-      type: mode === 'overlay' ? 'ticker' : mode === 'nursery' ? 'nursery' : 'slide',
+      type: mode === 'overlay' ? 'ticker' : 'slide',
       source: 'Manual',
       alertConfig,
       scene: {
@@ -556,7 +554,7 @@ export function MessagePanel() {
                   <rect x="2" y="3" width="20" height="18" rx="2" />
                   <line x1="2" y1="16" x2="22" y2="16" stroke="var(--accent, #FF5500)" strokeWidth="2.5" />
                 </svg>
-                <span>Ticker / Banner</span>
+                <span>Ticker</span>
               </button>
 
               <button
@@ -583,33 +581,6 @@ export function MessagePanel() {
                 </svg>
                 <span>Fullscreen Slide</span>
               </button>
-
-              <button
-                type="button"
-                className="btn btn-sm"
-                style={{
-                  flex: 1,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  gap: 5,
-                  background: mode === 'nursery' ? 'var(--chrome-control-active)' : 'transparent',
-                  color: mode === 'nursery' ? 'var(--text-primary)' : 'var(--text-dim)',
-                  border: 'none',
-                  borderRadius: 4,
-                  boxShadow: mode === 'nursery' ? '0 1px 3px rgba(0,0,0,0.4)' : 'none',
-                }}
-                onClick={() => {
-                  setMode('nursery');
-                  if (titleText === 'ANNOUNCEMENT') setTitleText('NURSERY ALERT');
-                }}
-                title="Discreet nursery or parking lot alert badge"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                </svg>
-                <span>Nursery Code</span>
-              </button>
             </div>
 
             {/* Title / Header Input */}
@@ -620,7 +591,7 @@ export function MessagePanel() {
                   className="input"
                   value={titleText}
                   onChange={(e) => setTitleText(e.target.value)}
-                  placeholder="Header / Tag (e.g. ANNOUNCEMENT, NOTICE, NURSERY)"
+                  placeholder="Header / Tag (e.g. ANNOUNCEMENT, NOTICE)"
                   style={{
                     width: '100%',
                     height: 28,
@@ -669,9 +640,7 @@ export function MessagePanel() {
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 placeholder={
-                  mode === 'nursery'
-                    ? "Enter child code or vehicle tag (e.g. Baby #402, Green Toyota AB123)..."
-                    : mode === 'overlay'
+                  mode === 'overlay'
                     ? "Enter message to scroll across the screen (e.g. Welcome to Sunday Service • Next prayer meeting Wednesday 7PM)..."
                     : "Type announcement text to project full screen..."
                 }
@@ -687,7 +656,7 @@ export function MessagePanel() {
               />
             </div>
 
-            {/* Overlay Parameters (Only visible in Ticker/Overlay Mode) */}
+            {/* Overlay Parameters (Only visible in Ticker Mode) */}
             {mode === 'overlay' && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div>
@@ -725,25 +694,25 @@ export function MessagePanel() {
                     onChange={(e) => setSpeed(Number(e.target.value))}
                     style={{ height: 24, fontSize: 11, padding: '0 4px', width: '100%' }}
                   >
-                    <option value={0.7}>Slow</option>
-                    <option value={1}>Normal</option>
-                    <option value={1.4}>Fast</option>
+                    <option value={0.7}>Slow (0.7x)</option>
+                    <option value={1}>Normal (1.0x)</option>
+                    <option value={1.4}>Fast (1.4x)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ ...type.caption, fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Duration</label>
+                  <label style={{ ...type.caption, fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Cycles</label>
                   <select
                     className="input"
-                    value={durationSec}
-                    onChange={(e) => setDurationSec(Number(e.target.value))}
+                    value={cycles}
+                    onChange={(e) => setCycles(Number(e.target.value))}
                     style={{ height: 24, fontSize: 11, padding: '0 4px', width: '100%' }}
                   >
-                    <option value={10}>10s</option>
-                    <option value={15}>15s</option>
-                    <option value={20}>20s</option>
-                    <option value={30}>30s</option>
-                    <option value={60}>60s</option>
+                    <option value={1}>1 Loop</option>
+                    <option value={2}>2 Loops</option>
+                    <option value={3}>3 Loops</option>
+                    <option value={5}>5 Loops</option>
+                    <option value={0}>Continuous</option>
                   </select>
                 </div>
               </div>

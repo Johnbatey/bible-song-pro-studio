@@ -576,7 +576,15 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
             </div>
           ) : (
             <>
-              <div className="program-lt-text" style={textStyle}>{content?.text || ''}</div>
+              <div className="program-lt-text" style={textStyle}>
+                {content?.text?.includes('\n\n') ? (
+                  content.text.split(/\n\n+/).map((para, i) => (
+                    <div key={i} className="program-text-paragraph">{para}</div>
+                  ))
+                ) : (
+                  content?.text || ''
+                )}
+              </div>
               {showReference && formattedRef && (
                 <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign }}>
                   {formattedRef}
@@ -800,7 +808,17 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
                   <span style={refStyle}>{formattedRef}</span>
                 </div>
               )}
-              <div className="program-main-text" style={textStyle}>{content?.text || ''}</div>
+              <div className="program-main-text" style={textStyle}>
+                {content?.text?.includes('\n\n') ? (
+                  content.text.split(/\n\n+/).map((para, i) => (
+                    <div key={i} className="program-text-paragraph">
+                      {para}
+                    </div>
+                  ))
+                ) : (
+                  content?.text || ''
+                )}
+              </div>
               {songCredit(scene) && <div className="program-song-credit">{songCredit(scene)}</div>}
             </>
           )}
@@ -808,18 +826,37 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
       )}
 
       {state.activeAlert && (
-        <div className={`program-alert program-alert-${state.activeAlert.type} program-alert-${state.activeAlert.position || 'bottom'}`}>
-          <div className="program-alert-track">
-            <span
-              className="program-alert-text"
-              style={{
-                animationDuration: `${16 / (state.activeAlert.speed || 1)}s`,
-              }}
-            >
-              {state.activeAlert.text}
-            </span>
+        state.activeAlert.animation === 'crawl' ? (
+          <div className={`program-alert program-alert-ticker program-alert-${state.activeAlert.type} program-alert-${state.activeAlert.position || 'bottom'}`}>
+            <div className="program-alert-track">
+              <span
+                className="program-alert-text"
+                style={{
+                  animationDuration: `${16 / (state.activeAlert.speed || 1)}s`,
+                }}
+              >
+                {state.activeAlert.text}
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className={`program-alert-badge program-alert-badge-${state.activeAlert.type} program-alert-badge-${state.activeAlert.position || 'top'}`}>
+            <div className="program-alert-badge-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </div>
+            <div className="program-alert-badge-content">
+              <div className="program-alert-badge-tag">
+                {state.activeAlert.type === 'warning' ? 'URGENT ALERT' : state.activeAlert.type === 'info' ? 'NOTICE' : 'ALERT'}
+              </div>
+              <div className="program-alert-badge-text">
+                {state.activeAlert.text}
+              </div>
+            </div>
+          </div>
+        )
       )}
       {state.blackout && <div className="program-blackout" />}
     </div>
