@@ -645,6 +645,8 @@ export interface AudioMeterState {
   levelR?: number;
   peakL?: number;
   peakR?: number;
+  isVoiceActive?: boolean;
+  gateGain?: number;
   isMonitoring: boolean;
 }
 

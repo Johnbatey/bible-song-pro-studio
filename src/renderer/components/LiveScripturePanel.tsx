@@ -536,6 +536,8 @@ export function LiveScripturePanel() {
               levelR: levels.levelR,
               peakL,
               peakR,
+              isVoiceActive: levels.isVoiceActive,
+              gateGain: levels.gateGain,
               isMonitoring: true,
             },
           });
@@ -1123,6 +1125,7 @@ export function LiveScripturePanel() {
             dsp={audioDsp}
             onChangeDsp={handleDspChange}
             anchorEl={fxBtnRef.current}
+            meter={live.meter}
           />
 
           {/* Dual L & R Stereo VU Meter */}

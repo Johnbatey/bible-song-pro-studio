@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from
 import { createPortal } from 'react-dom';
 import { AppleToggle } from './AppleToggle';
 import type { AudioDspOptions } from '../services/audio-capture';
+import type { AudioMeterState } from '../types';
 
 interface AudioDspPopoverProps {
   isOpen: boolean;
@@ -9,18 +10,19 @@ interface AudioDspPopoverProps {
   dsp: AudioDspOptions;
   onChangeDsp: (next: AudioDspOptions) => void;
   anchorEl: HTMLElement | null;
+  meter?: AudioMeterState;
 }
 
-const POPOVER_WIDTH = 270;
+const POPOVER_WIDTH = 290;
 
-export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }: AudioDspPopoverProps) {
+export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, meter }: AudioDspPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
 
   const measure = useCallback(() => {
     if (!anchorEl) return;
     const anchor = anchorEl.getBoundingClientRect();
-    const estimatedHeight = 360;
+    const estimatedHeight = 440;
 
     // Check if there's enough space below the button, otherwise display above
     const spaceBelow = window.innerHeight - anchor.bottom;
@@ -79,6 +81,11 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }:
   const currentGain = dsp.digitalGain ?? 1.0;
   const gainDb = 20 * Math.log10(currentGain);
   const formattedDb = `${gainDb >= 0 ? '+' : ''}${gainDb.toFixed(1)} dB`;
+  const suppressionLevel = dsp.noiseSuppressionLevel || 'aggressive';
+  const sensitivity = dsp.noiseSuppressionSensitivity ?? 1.0;
+  const isVoiceActive = meter?.isVoiceActive ?? false;
+  const gateGain = meter?.gateGain ?? 1.0;
+  const isNoiseSuppressed = Boolean(dsp.noiseSuppression);
 
   return createPortal(
     <div
@@ -91,7 +98,7 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }:
         background: 'var(--bg-secondary, #18191f)',
         border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.15))',
         borderRadius: 8,
-        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.35)',
+        boxShadow: '0 14px 36px rgba(0, 0, 0, 0.65), 0 2px 10px rgba(0, 0, 0, 0.4)',
         padding: '12px 14px',
         zIndex: 99999,
         color: 'var(--text-primary, #ffffff)',
@@ -166,7 +173,7 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }:
                 Headphone Monitor
               </div>
               <div style={{ fontSize: 9.5, color: 'var(--text-dim, #888)' }}>
-                {dsp.isHeadphoneMonitoring ? 'Listening to mic input live' : 'Monitor muted'}
+                {dsp.isHeadphoneMonitoring ? 'Listening to post-DSP audio live' : 'Monitor muted'}
               </div>
             </div>
           </div>
@@ -204,21 +211,142 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }:
 
       {/* DSP Toggles */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontWeight: 500, fontSize: 11.5 }}>Noise Suppression</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim, #888)' }}>Removes background fan / room hum</div>
+        {/* Noise Suppression & Mode Selector */}
+        <div
+          style={{
+            background: isNoiseSuppressed ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+            padding: isNoiseSuppressed ? '8px 10px' : '0 2px',
+            borderRadius: 6,
+            border: isNoiseSuppressed ? '1px solid rgba(99, 102, 241, 0.25)' : 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>Noise Suppression</span>
+                {isNoiseSuppressed && (
+                  <span
+                    style={{
+                      fontSize: 9,
+                      padding: '1px 5px',
+                      borderRadius: 3,
+                      fontWeight: 700,
+                      background: isVoiceActive ? 'rgba(74, 222, 128, 0.2)' : 'rgba(239, 68, 68, 0.15)',
+                      color: isVoiceActive ? '#4ade80' : '#f87171',
+                      border: `1px solid ${isVoiceActive ? 'rgba(74, 222, 128, 0.4)' : 'rgba(239, 68, 68, 0.3)'}`,
+                      letterSpacing: '0.02em',
+                      transition: 'all 0.1s ease',
+                    }}
+                  >
+                    {isVoiceActive ? '🟢 VOICE ACTIVE' : `🔇 GATED (${Math.round(20 * Math.log10(Math.max(0.0001, gateGain)))} dB)`}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 9.5, color: 'var(--text-dim, #888)', marginTop: 1 }}>
+                {isNoiseSuppressed ? 'Adaptive multi-band spectral room gate' : 'Cuts background fan, hum & room noise'}
+              </div>
+            </div>
+            <AppleToggle
+              checked={isNoiseSuppressed}
+              onChange={(checked) => onChangeDsp({ ...dsp, noiseSuppression: checked })}
+            />
           </div>
-          <AppleToggle
-            checked={Boolean(dsp.noiseSuppression)}
-            onChange={(checked) => onChangeDsp({ ...dsp, noiseSuppression: checked })}
-          />
+
+          {isNoiseSuppressed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              {/* Profile Selector */}
+              <div style={{ display: 'flex', gap: 4, background: 'rgba(0, 0, 0, 0.25)', padding: 2, borderRadius: 5 }}>
+                <button
+                  type="button"
+                  onClick={() => onChangeDsp({ ...dsp, noiseSuppressionLevel: 'aggressive' })}
+                  style={{
+                    flex: 1,
+                    padding: '4px 0',
+                    fontSize: 9.5,
+                    fontWeight: suppressionLevel === 'aggressive' ? 700 : 500,
+                    background: suppressionLevel === 'aggressive' ? 'var(--accent-primary, #6366f1)' : 'transparent',
+                    color: suppressionLevel === 'aggressive' ? '#fff' : 'var(--text-dim, #888)',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    transition: 'all 0.1s ease',
+                  }}
+                  title="Deep background noise elimination (Google Meet & Zoom standard)"
+                >
+                  Meet / Zoom
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChangeDsp({ ...dsp, noiseSuppressionLevel: 'studio' })}
+                  style={{
+                    flex: 1,
+                    padding: '4px 0',
+                    fontSize: 9.5,
+                    fontWeight: suppressionLevel === 'studio' ? 700 : 500,
+                    background: suppressionLevel === 'studio' ? 'var(--accent-primary, #6366f1)' : 'transparent',
+                    color: suppressionLevel === 'studio' ? '#fff' : 'var(--text-dim, #888)',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    transition: 'all 0.1s ease',
+                  }}
+                  title="Natural studio expander (-22 dB room reduction, best for singing)"
+                >
+                  Studio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChangeDsp({ ...dsp, noiseSuppressionLevel: 'extreme' })}
+                  style={{
+                    flex: 1,
+                    padding: '4px 0',
+                    fontSize: 9.5,
+                    fontWeight: suppressionLevel === 'extreme' ? 700 : 500,
+                    background: suppressionLevel === 'extreme' ? 'var(--accent-primary, #6366f1)' : 'transparent',
+                    color: suppressionLevel === 'extreme' ? '#fff' : 'var(--text-dim, #888)',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    transition: 'all 0.1s ease',
+                  }}
+                  title="Extreme isolation (-72 dB total silence during pauses)"
+                >
+                  Extreme
+                </button>
+              </div>
+
+              {/* Sensitivity Slider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <span style={{ fontSize: 9.5, color: 'var(--text-dim, #888)', minWidth: 54 }}>Sensitivity</span>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.0"
+                  step="0.1"
+                  value={sensitivity}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    onChangeDsp({ ...dsp, noiseSuppressionSensitivity: val });
+                  }}
+                  style={{
+                    flex: 1,
+                    accentColor: 'var(--accent-primary, #6366f1)',
+                    cursor: 'pointer',
+                  }}
+                />
+                <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 9.5, minWidth: 26, textAlign: 'right', color: 'var(--text-dim, #888)' }}>
+                  {sensitivity === 1.0 ? 'Auto' : `${sensitivity.toFixed(1)}x`}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
           <div>
             <div style={{ fontWeight: 500, fontSize: 11.5 }}>Echo Cancellation</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim, #888)' }}>Reduces speaker acoustic feedback</div>
+            <div style={{ fontSize: 9.5, color: 'var(--text-dim, #888)' }}>Reduces speaker acoustic feedback</div>
           </div>
           <AppleToggle
             checked={Boolean(dsp.echoCancellation)}
@@ -226,10 +354,10 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }:
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
           <div>
             <div style={{ fontWeight: 500, fontSize: 11.5 }}>Auto Gain Control (AGC)</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim, #888)' }}>Hardware auto-volume leveling</div>
+            <div style={{ fontSize: 9.5, color: 'var(--text-dim, #888)' }}>Broadcast dynamics leveler &amp; compressor</div>
           </div>
           <AppleToggle
             checked={Boolean(dsp.autoGainControl)}
@@ -312,7 +440,7 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }:
           paddingTop: 6,
         }}
       >
-        💡 <strong>Pro Tip:</strong> For direct mixer feeds, keep DSP toggles <strong>OFF</strong> and use the <strong>Gain Slider</strong> to dial in healthy green levels.
+        💡 <strong>Pro Tip:</strong> Select <strong>Meet / Zoom</strong> to actively eliminate fan, AC, and room noise with sub-millisecond voice attack.
       </div>
     </div>,
     document.body
