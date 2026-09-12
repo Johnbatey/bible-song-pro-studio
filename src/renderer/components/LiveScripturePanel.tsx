@@ -1274,11 +1274,10 @@ export function LiveScripturePanel() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                   <CustomDropdown
                     value={live.selectedInputId}
-                    onChange={(val) => {
+                    onChange={async (val) => {
                       setLive({ selectedInputId: val });
-                      if (live.isActive) {
-                        stopLive();
-                        setTimeout(() => startLive(), 100);
+                      if (live.isActive && captureRef.current) {
+                        await captureRef.current.switchDevice(val);
                       }
                     }}
                     options={

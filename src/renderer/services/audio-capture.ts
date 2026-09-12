@@ -18,7 +18,11 @@ class CaptureProcessor extends AudioWorkletProcessor {
     this.lastSample = 0;
   }
   process(inputs) {
-    const channel = inputs[0] && inputs[0][0];
+    const input = inputs[0];
+    if (!input || input.length === 0) return true;
+
+    // Take primary channel directly to prevent destructive mono phase cancellation
+    const channel = input[0];
     if (!channel || channel.length === 0) return true;
 
     if (Math.abs(sampleRate - this.targetRate) < 1) {
@@ -71,6 +75,7 @@ export interface AudioCaptureHandle {
   setGain: (gain: number) => void;
   setMonitor: (enabled: boolean, volume?: number) => void;
   updateDspConstraints: (dsp: AudioDspOptions) => Promise<void>;
+  switchDevice: (deviceId?: string) => Promise<void>;
 }
 
 export interface AudioCaptureOptions {
@@ -96,6 +101,33 @@ export function toPcm16Buffer(frames: Float32Array): ArrayBuffer {
   return floatToPcm16(frames).buffer as ArrayBuffer;
 }
 
+function buildAudioConstraints(deviceId?: string, dsp: AudioDspOptions = {}): MediaStreamConstraints {
+  const isEcho = Boolean(dsp.echoCancellation);
+  const isNoise = Boolean(dsp.noiseSuppression);
+  const isAgc = Boolean(dsp.autoGainControl);
+
+  const audioTrackConstraints: any = {
+    echoCancellation: isEcho,
+    noiseSuppression: isNoise,
+    autoGainControl: isAgc,
+    // Disable Chromium's internal telephony VoiceProcessing algorithms when user turned them off
+    googEchoCancellation: isEcho,
+    googAutoGainControl: isAgc,
+    googNoiseSuppression: isNoise,
+    googHighpassFilter: isNoise,
+    googTypingNoiseDetection: isNoise,
+    googAudioMirroring: false,
+    channelCount: { ideal: 2 },
+    sampleRate: { ideal: 48000 },
+  };
+
+  if (deviceId) {
+    audioTrackConstraints.deviceId = { exact: deviceId };
+  }
+
+  return { audio: audioTrackConstraints, video: false };
+}
+
 /**
  * Opens the microphone and streams audio at native studio broadcast quality.
  * The internal graph runs at full 44.1k/48k resolution, while the AudioWorklet
@@ -103,26 +135,18 @@ export function toPcm16Buffer(frames: Float32Array): ArrayBuffer {
  */
 export async function startAudioCapture(options: AudioCaptureOptions): Promise<AudioCaptureHandle> {
   const dsp = options.dsp || {};
-  const audioConstraints: MediaTrackConstraints = {
-    echoCancellation: dsp.echoCancellation ?? false,
-    noiseSuppression: dsp.noiseSuppression ?? false,
-    autoGainControl: dsp.autoGainControl ?? false,
-  };
-
-  if (options.deviceId) {
-    audioConstraints.deviceId = { exact: options.deviceId };
-  }
+  const constraints = buildAudioConstraints(options.deviceId, dsp);
 
   let stream: MediaStream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
   } catch {
-    // Fallback to basic audio constraints if exact device/DSP constraints fail
+    // Fallback if exact constraints fail
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        echoCancellation: dsp.echoCancellation ?? false,
-        noiseSuppression: dsp.noiseSuppression ?? false,
-        autoGainControl: dsp.autoGainControl ?? false,
+        echoCancellation: Boolean(dsp.echoCancellation),
+        noiseSuppression: Boolean(dsp.noiseSuppression),
+        autoGainControl: Boolean(dsp.autoGainControl),
       },
     });
   }
@@ -137,27 +161,28 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     URL.revokeObjectURL(blobUrl);
   }
 
-  const source = context.createMediaStreamSource(stream);
+  let source = context.createMediaStreamSource(stream);
 
-  // 1. Studio High-Pass Filter (eliminates sub-85Hz mic rumble, stage thumps, HVAC hum)
-  const hpFilter = context.createBiquadFilter();
-  hpFilter.type = 'highpass';
-  hpFilter.frequency.setValueAtTime(dsp.noiseSuppression ? 85 : 10, context.currentTime);
-
-  // 2. Real-time digital preamp gain node with smooth DAW-style automation
+  // 1. Digital Preamp Gain Node (smooth DAW automation)
   const gainNode = context.createGain();
   const initialGain = typeof dsp.digitalGain === 'number' ? Math.max(0.1, Math.min(10, dsp.digitalGain)) : 1.0;
   gainNode.gain.setValueAtTime(initialGain, context.currentTime);
 
-  // 3. Studio Broadcast Dynamics Compressor / Auto-Gain Leveler
+  // 2. High-Pass Filter (Cuts sub-85Hz rumble/hum when Noise Suppression is ON)
+  const hpFilter = context.createBiquadFilter();
+  hpFilter.type = 'highpass';
+  hpFilter.frequency.setValueAtTime(dsp.noiseSuppression ? 85 : 10, context.currentTime);
+  hpFilter.Q.setValueAtTime(0.707, context.currentTime);
+
+  // 3. Dynamics Compressor (Active only when AGC is enabled)
   const compressor = context.createDynamicsCompressor();
   compressor.knee.setValueAtTime(30, context.currentTime);
-  compressor.ratio.setValueAtTime(6, context.currentTime);
+  compressor.ratio.setValueAtTime(dsp.autoGainControl ? 6 : 1, context.currentTime);
   compressor.attack.setValueAtTime(0.003, context.currentTime);
   compressor.release.setValueAtTime(0.25, context.currentTime);
   compressor.threshold.setValueAtTime(dsp.autoGainControl ? -24 : 0, context.currentTime);
 
-  // 4. Dedicated Headphone Monitor Gain Node (Routing to native destination)
+  // 4. Dedicated Headphone Monitor Gain Node (Pristine uncolored direct output)
   const monitorGainNode = context.createGain();
   const initialMonitorVolume = typeof dsp.monitorVolume === 'number' ? Math.max(0, Math.min(1, dsp.monitorVolume)) : 1.0;
   monitorGainNode.gain.setValueAtTime(dsp.isHeadphoneMonitoring ? initialMonitorVolume : 0, context.currentTime);
@@ -176,13 +201,14 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
   };
 
   // Connect Audio Processing Graph:
-  // source -> hpFilter -> gainNode -> compressor -> node (STT Worklet)
-  //                                  compressor -> monitorGainNode -> destination (Headphones)
-  source.connect(hpFilter);
-  hpFilter.connect(gainNode);
-  gainNode.connect(compressor);
+  // source -> gainNode -> hpFilter -> compressor -> node (STT Worklet)
+  // source -> gainNode -> monitorGainNode -> destination (Headphone direct monitor at full 48k fidelity)
+  source.connect(gainNode);
+  gainNode.connect(hpFilter);
+  hpFilter.connect(compressor);
   compressor.connect(node);
-  compressor.connect(monitorGainNode);
+
+  gainNode.connect(monitorGainNode);
   monitorGainNode.connect(context.destination);
 
   // Worklets need a downstream connection to be pulled; a zero-gain sink keeps the
@@ -199,8 +225,8 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     node.port.onmessage = null;
     try {
       source.disconnect();
-      hpFilter.disconnect();
       gainNode.disconnect();
+      hpFilter.disconnect();
       compressor.disconnect();
       monitorGainNode.disconnect();
       node.disconnect();
@@ -242,7 +268,6 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
   const updateDspConstraints = async (newDsp: AudioDspOptions) => {
     if (stopped || !context) return;
 
-    // Update real Web Audio DSP filter nodes smoothly
     if (hpFilter) {
       const freq = newDsp.noiseSuppression ? 85 : 10;
       try {
@@ -254,10 +279,13 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
 
     if (compressor) {
       const threshold = newDsp.autoGainControl ? -24 : 0;
+      const ratio = newDsp.autoGainControl ? 6 : 1;
       try {
         compressor.threshold.setTargetAtTime(threshold, context.currentTime, 0.03);
+        compressor.ratio.setTargetAtTime(ratio, context.currentTime, 0.03);
       } catch {
         compressor.threshold.value = threshold;
+        compressor.ratio.value = ratio;
       }
     }
 
@@ -269,15 +297,14 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
       setMonitor(Boolean(newDsp.isHeadphoneMonitoring), newDsp.monitorVolume);
     }
 
-    // Also update hardware browser track constraints if supported
     if (stream) {
       const track = stream.getAudioTracks()[0];
       if (track && typeof track.applyConstraints === 'function') {
         try {
           await track.applyConstraints({
-            echoCancellation: newDsp.echoCancellation ?? false,
-            noiseSuppression: newDsp.noiseSuppression ?? false,
-            autoGainControl: newDsp.autoGainControl ?? false,
+            echoCancellation: Boolean(newDsp.echoCancellation),
+            noiseSuppression: Boolean(newDsp.noiseSuppression),
+            autoGainControl: Boolean(newDsp.autoGainControl),
           });
         } catch (err) {
           console.warn('Track applyConstraints notice:', err);
@@ -286,7 +313,30 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     }
   };
 
-  return { stop, context, setGain, setMonitor, updateDspConstraints };
+  /**
+   * Seamless live microphone hot-swapping without restarting the AI, STT engine, or AudioContext
+   */
+  const switchDevice = async (newDeviceId?: string) => {
+    if (stopped || !context) return;
+    try {
+      const newConstraints = buildAudioConstraints(newDeviceId, dsp);
+      const newStream = await navigator.mediaDevices.getUserMedia(newConstraints);
+      const newSource = context.createMediaStreamSource(newStream);
+
+      // Connect new microphone into the active gainNode before tearing down the old source
+      newSource.connect(gainNode);
+
+      try {
+        source.disconnect();
+        stream.getTracks().forEach((t) => t.stop());
+      } catch {}
+
+      stream = newStream;
+      source = newSource;
+    } catch (err) {
+      console.error('Failed to hot-swap audio device:', err);
+    }
+  };
+
+  return { stop, context, setGain, setMonitor, updateDspConstraints, switchDevice };
 }
-
-
