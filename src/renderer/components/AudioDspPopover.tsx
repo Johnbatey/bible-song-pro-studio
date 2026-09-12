@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { AppleToggle } from './AppleToggle';
 import type { AudioDspOptions } from '../services/audio-capture';
 
@@ -10,58 +11,93 @@ interface AudioDspPopoverProps {
   anchorEl: HTMLElement | null;
 }
 
+const POPOVER_WIDTH = 260;
+
 export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }: AudioDspPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+
+  const measure = useCallback(() => {
+    if (!anchorEl) return;
+    const anchor = anchorEl.getBoundingClientRect();
+    const estimatedHeight = 310;
+
+    // Check if there's enough space below the button, otherwise display above
+    const spaceBelow = window.innerHeight - anchor.bottom;
+    let top: number;
+    if (spaceBelow >= estimatedHeight || anchor.top < estimatedHeight) {
+      top = anchor.bottom + 8;
+    } else {
+      top = Math.max(12, anchor.top - estimatedHeight - 8);
+    }
+
+    // Align right edge of popover with right edge of button/cluster, bounded to window
+    const idealLeft = anchor.right - POPOVER_WIDTH;
+    const safeLeft = Math.max(12, Math.min(idealLeft, window.innerWidth - POPOVER_WIDTH - 12));
+
+    setCoords({ top, left: safeLeft });
+  }, [anchorEl]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
+    };
+  }, [isOpen, measure]);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    const handlePointerDown = (e: PointerEvent) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node) &&
-        (!anchorEl || !anchorEl.contains(e.target as Node))
-      ) {
-        onClose();
-      }
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target) || anchorEl?.contains(target)) return;
+      onClose();
     };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
 
-    window.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('keydown', handleKeyDown);
+    const timerId = window.setTimeout(() => {
+      document.addEventListener('mousedown', onDown);
+      document.addEventListener('keydown', onKey);
+    }, 0);
+
     return () => {
-      window.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('keydown', handleKeyDown);
+      window.clearTimeout(timerId);
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
     };
   }, [isOpen, onClose, anchorEl]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !coords) return null;
 
   const currentGain = dsp.digitalGain ?? 1.0;
   const gainDb = 20 * Math.log10(currentGain);
   const formattedDb = `${gainDb >= 0 ? '+' : ''}${gainDb.toFixed(1)} dB`;
 
-  return (
+  return createPortal(
     <div
       ref={popoverRef}
       style={{
-        position: 'absolute',
-        top: 'calc(100% + 8px)',
-        right: 0,
-        width: 250,
+        position: 'fixed',
+        top: coords.top,
+        left: coords.left,
+        width: POPOVER_WIDTH,
         background: 'var(--bg-secondary, #18191f)',
-        border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
+        border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.15))',
         borderRadius: 8,
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25)',
+        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.35)',
         padding: '12px 14px',
-        zIndex: 9999,
+        zIndex: 99999,
         color: 'var(--text-primary, #ffffff)',
         fontFamily: 'var(--font-ui, system-ui, sans-serif)',
         fontSize: 12,
-        backdropFilter: 'blur(16px)',
+        backdropFilter: 'blur(20px)',
       }}
     >
       {/* Header */}
@@ -220,6 +256,7 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }:
       >
         💡 <strong>Pro Tip:</strong> For direct mixer feeds, keep DSP toggles <strong>OFF</strong> and use the <strong>Gain Slider</strong> to dial in healthy green levels.
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
