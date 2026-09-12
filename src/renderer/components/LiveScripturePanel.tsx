@@ -577,14 +577,8 @@ export function LiveScripturePanel() {
       if (next.isHeadphoneMonitoring !== undefined || next.monitorVolume !== undefined) {
         captureRef.current.setMonitor(Boolean(next.isHeadphoneMonitoring), next.monitorVolume ?? 1.0);
       }
-      // Apply browser/hardware DSP constraint updates live in-place without restart or mute!
-      if (
-        next.echoCancellation !== audioDsp.echoCancellation ||
-        next.noiseSuppression !== audioDsp.noiseSuppression ||
-        next.autoGainControl !== audioDsp.autoGainControl
-      ) {
-        captureRef.current.updateDspConstraints(next);
-      }
+      // Apply browser/hardware and Web Audio DSP updates live in-place
+      captureRef.current.updateDspConstraints(next);
     }
   };
 

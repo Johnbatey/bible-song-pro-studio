@@ -347,8 +347,8 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
                 <span style={{ fontSize: 9.5, color: 'var(--text-dim, #888)', minWidth: 54 }}>Sensitivity</span>
                 <input
                   type="range"
-                  min="0.5"
-                  max="2.0"
+                  min="0.3"
+                  max="2.5"
                   step="0.1"
                   value={sensitivity}
                   onChange={(e) => {

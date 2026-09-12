@@ -80,19 +80,19 @@ class CaptureProcessor extends AudioWorkletProcessor {
     if (this.noiseSuppression) {
       // Attenuation Floor:
       // aggressive (Meet/Zoom): -48 dB (0.004 min gain)
-      // studio (Natural): -22 dB (0.08 min gain)
+      // studio (Natural): -20 dB (0.10 min gain)
       // extreme (Max Isolation): -72 dB (0.00025 min gain)
       let minGain = 0.004;
       let thresholdScale = 2.4;
       let hangoverLength = Math.round(sampleRate * 0.20 / len); // ~200ms hold time
 
       if (this.suppressionLevel === 'studio') {
-        minGain = 0.08;
+        minGain = 0.10;
         thresholdScale = 1.6;
         hangoverLength = Math.round(sampleRate * 0.24 / len);
       } else if (this.suppressionLevel === 'extreme') {
         minGain = 0.00025;
-        thresholdScale = 3.2;
+        thresholdScale = 3.4;
         hangoverLength = Math.round(sampleRate * 0.16 / len);
       }
 
@@ -142,7 +142,6 @@ class CaptureProcessor extends AudioWorkletProcessor {
         filteredR[i] = hpR;
 
         // 2. Frequency splitting for Vocal Presence (500Hz - 4kHz) vs High Hiss (> 4kHz)
-        // Mid lowpass pole ~4kHz (alpha = 0.55)
         const midLpL = this.crossLp1_L + 0.55 * (hpL - this.crossLp1_L);
         this.crossLp1_L = midLpL;
 
@@ -162,8 +161,6 @@ class CaptureProcessor extends AudioWorkletProcessor {
       const meanTotal = Math.sqrt(blockTotalEnergy / (len * 2));
 
       // 3. Adaptive Minimum-Statistics Noise Floor Tracking
-      // If signal drops, noise floor adapts downwards fast (50ms).
-      // If signal is high (speech), noise floor only creeps up extremely slowly (30s time constant).
       if (meanTotal < this.noiseFloorTotal) {
         this.noiseFloorTotal += (meanTotal - this.noiseFloorTotal) * 0.12;
       } else {
@@ -176,17 +173,18 @@ class CaptureProcessor extends AudioWorkletProcessor {
         this.noiseFloorMid += (meanMid - this.noiseFloorMid) * 0.0003;
       }
 
-      // Bound noise floor floor so it doesn't collapse to 0
-      this.noiseFloorTotal = Math.max(0.0008, Math.min(0.08, this.noiseFloorTotal));
-      this.noiseFloorMid = Math.max(0.0006, Math.min(0.06, this.noiseFloorMid));
+      this.noiseFloorTotal = Math.max(0.0006, Math.min(0.08, this.noiseFloorTotal));
+      this.noiseFloorMid = Math.max(0.0005, Math.min(0.06, this.noiseFloorMid));
 
-      // 4. Voice Activity Detection (VAD)
-      // Human vocal formants produce high mid-band SNR above stationary noise floor
+      // 4. Voice Activity Detection (VAD) with Sensitivity Control
+      const sens = Math.max(0.2, this.sensitivity);
+      const threshold = thresholdScale / sens;
+      const minEnergyThreshold = this.noiseFloorTotal * (1.5 / sens);
+
       const midSnr = meanMid / this.noiseFloorMid;
       const totalSnr = meanTotal / this.noiseFloorTotal;
-      const threshold = thresholdScale / this.sensitivity;
 
-      const isVoiceInstant = (midSnr > threshold || totalSnr > (threshold * 1.15)) && meanTotal > 0.004;
+      const isVoiceInstant = (midSnr > threshold || totalSnr > (threshold * 1.1)) && meanTotal > minEnergyThreshold;
 
       if (isVoiceInstant) {
         this.hangoverFrames = hangoverLength;
@@ -198,28 +196,31 @@ class CaptureProcessor extends AudioWorkletProcessor {
         this.isVoiceActive = false;
       }
 
-      // 5. Dynamic Gain Computation (Sub-millisecond attack, smooth natural release)
+      // 5. Dynamic Gain (Sub-millisecond attack, smooth release)
       if (this.isVoiceActive) {
-        // Instant opening (< 1ms attack) so speech consonants are 100% crystal clear
         this.targetGateGain = 1.0;
         this.gateGain += (1.0 - this.gateGain) * 0.75;
       } else {
-        // Compute expansion ratio based on distance below noise threshold
         const snrRatio = Math.max(0, Math.min(1.0, meanTotal / (this.noiseFloorTotal * threshold)));
         const target = minGain + (1.0 - minGain) * Math.pow(snrRatio, 2.5);
         this.targetGateGain = target;
-        // Smooth release decay (no pumping or clicking)
-        this.gateGain += (target - this.gateGain) * 0.06;
+        this.gateGain += (target - this.gateGain) * 0.10;
       }
 
-      // Apply gate gain to filtered audio
       for (let i = 0; i < len; i++) {
         processedL[i] = filteredL[i] * this.gateGain;
         processedR[i] = filteredR[i] * this.gateGain;
       }
     } else {
+      // Complete pure transparent bypass - resets all filter states
       this.isVoiceActive = true;
       this.gateGain = 1.0;
+      this.targetGateGain = 1.0;
+      this.hangoverFrames = 0;
+      this.hpX1_L = 0; this.hpX2_L = 0; this.hpY1_L = 0; this.hpY2_L = 0;
+      this.hpX1_R = 0; this.hpX2_R = 0; this.hpY1_R = 0; this.hpY2_R = 0;
+      this.crossLp1_L = 0; this.crossLp2_L = 0;
+      this.crossLp1_R = 0; this.crossLp2_R = 0;
       processedL.set(chL);
       processedR.set(chR);
     }
@@ -363,8 +364,15 @@ function buildAudioConstraints(deviceId?: string, dsp: AudioDspOptions = {}): Me
  * Dynamics Compressor, Preamp Gain, and true post-DSP headphone monitoring.
  */
 export async function startAudioCapture(options: AudioCaptureOptions): Promise<AudioCaptureHandle> {
-  const dsp = options.dsp || {};
-  const constraints = buildAudioConstraints(options.deviceId, dsp);
+  let activeDsp = { ...options.dsp };
+  let currentDeviceId = options.deviceId;
+  let currentHardwareDsp = {
+    echoCancellation: Boolean(activeDsp.echoCancellation),
+    noiseSuppression: Boolean(activeDsp.noiseSuppression),
+    autoGainControl: Boolean(activeDsp.autoGainControl),
+  };
+
+  const constraints = buildAudioConstraints(currentDeviceId, activeDsp);
 
   let stream: MediaStream;
   try {
@@ -373,9 +381,9 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     // Fallback if exact constraints fail
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        echoCancellation: Boolean(dsp.echoCancellation),
-        noiseSuppression: Boolean(dsp.noiseSuppression),
-        autoGainControl: Boolean(dsp.autoGainControl),
+        echoCancellation: Boolean(activeDsp.echoCancellation),
+        noiseSuppression: Boolean(activeDsp.noiseSuppression),
+        autoGainControl: Boolean(activeDsp.autoGainControl),
       },
     });
   }
@@ -394,7 +402,7 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
 
   // 1. Digital Preamp Gain Node (smooth DAW automation)
   const gainNode = context.createGain();
-  const initialGain = typeof dsp.digitalGain === 'number' ? Math.max(0.1, Math.min(10, dsp.digitalGain)) : 1.0;
+  const initialGain = typeof activeDsp.digitalGain === 'number' ? Math.max(0.1, Math.min(10, activeDsp.digitalGain)) : 1.0;
   gainNode.gain.setValueAtTime(initialGain, context.currentTime);
 
   // 2. AudioWorklet Node (Adaptive Multi-Band Noise Suppressor & Downsampler)
@@ -407,23 +415,23 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
   // Initialize DSP settings in worklet
   node.port.postMessage({
     type: 'SET_DSP',
-    noiseSuppression: Boolean(dsp.noiseSuppression),
-    suppressionLevel: dsp.noiseSuppressionLevel || 'aggressive',
-    sensitivity: dsp.noiseSuppressionSensitivity ?? 1.0,
+    noiseSuppression: Boolean(activeDsp.noiseSuppression),
+    suppressionLevel: activeDsp.noiseSuppressionLevel || 'aggressive',
+    sensitivity: activeDsp.noiseSuppressionSensitivity ?? 1.0,
   });
 
   // 3. Dynamics Compressor (Active when AGC is enabled)
   const compressor = context.createDynamicsCompressor();
-  compressor.knee.setValueAtTime(30, context.currentTime);
-  compressor.ratio.setValueAtTime(dsp.autoGainControl ? 6 : 1, context.currentTime);
+  compressor.knee.setValueAtTime(activeDsp.autoGainControl ? 30 : 0, context.currentTime);
+  compressor.ratio.setValueAtTime(activeDsp.autoGainControl ? 6 : 1, context.currentTime);
   compressor.attack.setValueAtTime(0.003, context.currentTime);
   compressor.release.setValueAtTime(0.25, context.currentTime);
-  compressor.threshold.setValueAtTime(dsp.autoGainControl ? -24 : 0, context.currentTime);
+  compressor.threshold.setValueAtTime(activeDsp.autoGainControl ? -24 : 0, context.currentTime);
 
   // 4. Dedicated Headphone Monitor Gain Node (Connected POST-DSP so filters are heard live)
   const monitorGainNode = context.createGain();
-  const initialMonitorVolume = typeof dsp.monitorVolume === 'number' ? Math.max(0, Math.min(1, dsp.monitorVolume)) : 1.0;
-  monitorGainNode.gain.setValueAtTime(dsp.isHeadphoneMonitoring ? initialMonitorVolume : 0, context.currentTime);
+  const initialMonitorVolume = typeof activeDsp.monitorVolume === 'number' ? Math.max(0, Math.min(1, activeDsp.monitorVolume)) : 1.0;
+  monitorGainNode.gain.setValueAtTime(activeDsp.isHeadphoneMonitoring ? initialMonitorVolume : 0, context.currentTime);
 
   node.port.onmessage = (event) => {
     const data = event.data;
@@ -505,62 +513,13 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
   };
 
   /**
-   * In-place hardware and Web Audio DSP filter update without audio pipeline recreation
-   */
-  const updateDspConstraints = async (newDsp: AudioDspOptions) => {
-    if (stopped || !context) return;
-
-    // Send updated noise suppression config directly into audio worklet
-    node.port.postMessage({
-      type: 'SET_DSP',
-      noiseSuppression: Boolean(newDsp.noiseSuppression),
-      suppressionLevel: newDsp.noiseSuppressionLevel || 'aggressive',
-      sensitivity: newDsp.noiseSuppressionSensitivity ?? 1.0,
-    });
-
-    if (compressor) {
-      const threshold = newDsp.autoGainControl ? -24 : 0;
-      const ratio = newDsp.autoGainControl ? 6 : 1;
-      try {
-        compressor.threshold.setTargetAtTime(threshold, context.currentTime, 0.03);
-        compressor.ratio.setTargetAtTime(ratio, context.currentTime, 0.03);
-      } catch {
-        compressor.threshold.value = threshold;
-        compressor.ratio.value = ratio;
-      }
-    }
-
-    if (newDsp.digitalGain !== undefined) {
-      setGain(newDsp.digitalGain);
-    }
-
-    if (newDsp.isHeadphoneMonitoring !== undefined || newDsp.monitorVolume !== undefined) {
-      setMonitor(Boolean(newDsp.isHeadphoneMonitoring), newDsp.monitorVolume);
-    }
-
-    if (stream) {
-      const track = stream.getAudioTracks()[0];
-      if (track && typeof track.applyConstraints === 'function') {
-        try {
-          await track.applyConstraints({
-            echoCancellation: Boolean(newDsp.echoCancellation),
-            noiseSuppression: Boolean(newDsp.noiseSuppression),
-            autoGainControl: Boolean(newDsp.autoGainControl),
-          });
-        } catch (err) {
-          console.warn('Track applyConstraints notice:', err);
-        }
-      }
-    }
-  };
-
-  /**
    * Seamless live microphone hot-swapping without restarting the AI, STT engine, or AudioContext
    */
   const switchDevice = async (newDeviceId?: string) => {
     if (stopped || !context) return;
     try {
-      const newConstraints = buildAudioConstraints(newDeviceId, dsp);
+      currentDeviceId = newDeviceId || currentDeviceId;
+      const newConstraints = buildAudioConstraints(currentDeviceId, { ...activeDsp, ...currentHardwareDsp });
       const newStream = await navigator.mediaDevices.getUserMedia(newConstraints);
       const newSource = context.createMediaStreamSource(newStream);
 
@@ -576,6 +535,62 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
       source = newSource;
     } catch (err) {
       console.error('Failed to hot-swap audio device:', err);
+    }
+  };
+
+  /**
+   * In-place hardware and Web Audio DSP filter update without audio pipeline recreation
+   */
+  const updateDspConstraints = async (newDsp: AudioDspOptions) => {
+    if (stopped || !context) return;
+    activeDsp = { ...activeDsp, ...newDsp };
+
+    // 1. Send updated noise suppression config directly into audio worklet
+    node.port.postMessage({
+      type: 'SET_DSP',
+      noiseSuppression: Boolean(newDsp.noiseSuppression),
+      suppressionLevel: newDsp.noiseSuppressionLevel || 'aggressive',
+      sensitivity: newDsp.noiseSuppressionSensitivity ?? 1.0,
+    });
+
+    // 2. Adjust Dynamics Compressor
+    if (compressor) {
+      const isAgc = Boolean(newDsp.autoGainControl);
+      const threshold = isAgc ? -24 : 0;
+      const ratio = isAgc ? 6 : 1;
+      const knee = isAgc ? 30 : 0;
+      try {
+        compressor.threshold.setTargetAtTime(threshold, context.currentTime, 0.03);
+        compressor.ratio.setTargetAtTime(ratio, context.currentTime, 0.03);
+        compressor.knee.setTargetAtTime(knee, context.currentTime, 0.03);
+      } catch {
+        compressor.threshold.value = threshold;
+        compressor.ratio.value = ratio;
+        compressor.knee.value = knee;
+      }
+    }
+
+    if (newDsp.digitalGain !== undefined) {
+      setGain(newDsp.digitalGain);
+    }
+
+    if (newDsp.isHeadphoneMonitoring !== undefined || newDsp.monitorVolume !== undefined) {
+      setMonitor(Boolean(newDsp.isHeadphoneMonitoring), newDsp.monitorVolume);
+    }
+
+    // 3. Hardware OS audio driver update (switches cleanly between AUVoiceIO and AUHAL)
+    const hardwareChanged =
+      Boolean(newDsp.echoCancellation) !== currentHardwareDsp.echoCancellation ||
+      Boolean(newDsp.noiseSuppression) !== currentHardwareDsp.noiseSuppression ||
+      Boolean(newDsp.autoGainControl) !== currentHardwareDsp.autoGainControl;
+
+    if (hardwareChanged) {
+      currentHardwareDsp = {
+        echoCancellation: Boolean(newDsp.echoCancellation),
+        noiseSuppression: Boolean(newDsp.noiseSuppression),
+        autoGainControl: Boolean(newDsp.autoGainControl),
+      };
+      await switchDevice(currentDeviceId);
     }
   };
 
