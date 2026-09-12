@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
-import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHandle } from '../services/audio-capture';
+import { startAudioCapture, toPcm16Buffer, STT_SAMPLE_RATE, type AudioCaptureHandle, type AudioDspOptions } from '../services/audio-capture';
 import type { AudioInputDevice, BibleSearchResult, Scene, SttState, SttStatus, VerseDetection, WordStudyEntry, LocalModelStatus, LocalModelChoice } from '../types';
 import { WordStudyCard } from './WordStudyCard';
 import { type, fontWeight, numeric } from '../styles/type';
@@ -10,6 +10,7 @@ import { CustomDropdown } from './CustomDropdown';
 import { AppleToggle } from './AppleToggle';
 import { PanelSplitter } from './PanelSplitter';
 import { SongDeck } from './song/SongDeck';
+import { AudioDspPopover } from './AudioDspPopover';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { detectSongs, type SongDetection } from '../utils/song-detection';
 import { useI18n } from '../../i18n/useI18n';
@@ -77,6 +78,24 @@ export function LiveScripturePanel() {
     setPrimaryWidth(next);
     localStorage.setItem('bsp_livePrimaryWidth', String(next));
   };
+
+  const [audioDsp, setAudioDsp] = useState<AudioDspOptions>(() => {
+    try {
+      const saved = localStorage.getItem('bsp_audio_dsp');
+      return saved ? JSON.parse(saved) : { echoCancellation: false, noiseSuppression: false, autoGainControl: false, digitalGain: 1.0 };
+    } catch {
+      return { echoCancellation: false, noiseSuppression: false, autoGainControl: false, digitalGain: 1.0 };
+    }
+  });
+  const [dspPopoverOpen, setDspPopoverOpen] = useState(false);
+  const fxBtnRef = useRef<HTMLButtonElement>(null);
+
+  const isDspActive = Boolean(
+    audioDsp.echoCancellation ||
+    audioDsp.noiseSuppression ||
+    audioDsp.autoGainControl ||
+    (typeof audioDsp.digitalGain === 'number' && Math.abs(audioDsp.digitalGain - 1.0) > 0.05)
+  );
 
   const captureRef = useRef<AudioCaptureHandle | null>(null);
   const candidateStabilityRef = useRef<{
@@ -453,7 +472,7 @@ export function LiveScripturePanel() {
     setLive({ meter: { level: 0, peak: 0, isMonitoring: false } });
   }
 
-  async function startLive() {
+  async function startLive(dspOverride?: AudioDspOptions) {
     window.BSP?.settings?.get().then((res) => {
       if (res?.ok && res.settings.sermonLanguage) {
         sermonLanguageRef.current = res.settings.sermonLanguage;
@@ -490,8 +509,10 @@ export function LiveScripturePanel() {
     }
 
     try {
+      const activeDsp = dspOverride || audioDsp;
       captureRef.current = await startAudioCapture({
         deviceId: live.selectedInputId || undefined,
+        dsp: activeDsp,
         onLevel: (level) => {
           const peak = Math.max(level, useAppStore.getState().liveScripture.meter.peak * 0.94);
           setLive({ meter: { level, peak, isMonitoring: true } });
@@ -517,6 +538,30 @@ export function LiveScripturePanel() {
       if (engine === 'deepgram') window.BSP?.stt?.stop();
     }
   }
+
+  const handleDspChange = (next: AudioDspOptions) => {
+    setAudioDsp(next);
+    try {
+      localStorage.setItem('bsp_audio_dsp', JSON.stringify(next));
+    } catch {}
+
+    if (captureRef.current) {
+      if (next.digitalGain !== undefined) {
+        captureRef.current.setGain(next.digitalGain);
+      }
+      // If hardware/browser DSP constraints changed while active, restart capture to rebind MediaStreamConstraints
+      if (
+        next.echoCancellation !== audioDsp.echoCancellation ||
+        next.noiseSuppression !== audioDsp.noiseSuppression ||
+        next.autoGainControl !== audioDsp.autoGainControl
+      ) {
+        if (live.isActive) {
+          teardownCapture();
+          startLive(next);
+        }
+      }
+    }
+  };
 
   function stopLive() {
     teardownCapture();
@@ -917,7 +962,7 @@ export function LiveScripturePanel() {
           </button>
         ) : (
           <button
-            onClick={startLive}
+            onClick={() => startLive()}
             disabled={deepgramUnavailable}
             style={{
               display: 'inline-flex',
@@ -974,7 +1019,54 @@ export function LiveScripturePanel() {
         </button>
 
         {/* Level and state read as one status cluster */}
-        <div style={styles.statusCluster}>
+        <div style={{ ...styles.statusCluster, position: 'relative' }}>
+          <button
+            ref={fxBtnRef}
+            type="button"
+            onClick={() => setDspPopoverOpen(!dspPopoverOpen)}
+            style={{
+              position: 'relative',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              height: 24,
+              padding: '0 7px',
+              background: (isDspActive || dspPopoverOpen) ? 'var(--accent-primary, #6366f1)' : 'var(--chrome-control)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 5,
+              color: (isDspActive || dspPopoverOpen) ? '#ffffff' : 'var(--text-primary)',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+            }}
+            title="Audio DSP, Noise Suppression & Preamp Gain settings"
+          >
+            <span>FX</span>
+            {isDspActive && (
+              <span
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: '50%',
+                  background: '#4ade80',
+                  boxShadow: '0 0 4px #4ade80',
+                }}
+              />
+            )}
+          </button>
+
+          <AudioDspPopover
+            isOpen={dspPopoverOpen}
+            onClose={() => setDspPopoverOpen(false)}
+            dsp={audioDsp}
+            onChangeDsp={handleDspChange}
+            anchorEl={fxBtnRef.current}
+          />
+
           <div style={styles.meter} aria-label="Mic meter">
             <div style={{ ...styles.meterFill, width: `${Math.round(live.meter.level * 100)}%` }} />
             <div style={{ ...styles.meterPeak, left: `${Math.round(live.meter.peak * 100)}%` }} />

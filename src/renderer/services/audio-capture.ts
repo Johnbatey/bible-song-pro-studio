@@ -30,13 +30,22 @@ class CaptureProcessor extends AudioWorkletProcessor {
 registerProcessor('bsp-capture', CaptureProcessor);
 `;
 
+export interface AudioDspOptions {
+  echoCancellation?: boolean;
+  noiseSuppression?: boolean;
+  autoGainControl?: boolean;
+  digitalGain?: number;
+}
+
 export interface AudioCaptureHandle {
   stop: () => void;
   context: AudioContext;
+  setGain: (gain: number) => void;
 }
 
 export interface AudioCaptureOptions {
   deviceId?: string;
+  dsp?: AudioDspOptions;
   /** 16 kHz mono float frames, ~64ms each. */
   onAudio: (frames: Float32Array) => void;
   /** 0..1 RMS-ish level for the meter. */
@@ -65,29 +74,30 @@ export function toPcm16Buffer(frames: Float32Array): ArrayBuffer {
  * measurably hurts recognition accuracy.
  */
 export async function startAudioCapture(options: AudioCaptureOptions): Promise<AudioCaptureHandle> {
-  const constraints: MediaStreamConstraints = {
-    audio: options.deviceId
-      ? {
-          deviceId: { exact: options.deviceId },
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: 1,
-        }
-      : {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: 1,
-        },
+  const dsp = options.dsp || {};
+  const audioConstraints: MediaTrackConstraints = {
+    echoCancellation: dsp.echoCancellation ?? false,
+    noiseSuppression: dsp.noiseSuppression ?? false,
+    autoGainControl: dsp.autoGainControl ?? false,
+    channelCount: 1,
   };
+
+  if (options.deviceId) {
+    audioConstraints.deviceId = { exact: options.deviceId };
+  }
 
   let stream: MediaStream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
   } catch {
-    // Fallback to basic audio constraints if exact constraints fail
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Fallback to basic audio constraints if exact device/DSP constraints fail
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: dsp.echoCancellation ?? false,
+        noiseSuppression: dsp.noiseSuppression ?? false,
+        autoGainControl: dsp.autoGainControl ?? false,
+      },
+    });
   }
   const context = new AudioContext({ sampleRate: STT_SAMPLE_RATE });
 
@@ -105,6 +115,12 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
   }
 
   const source = context.createMediaStreamSource(stream);
+
+  // Real-time software preamp gain node for adjusting levels cleanly
+  const gainNode = context.createGain();
+  const initialGain = typeof dsp.digitalGain === 'number' ? Math.max(0.1, Math.min(10, dsp.digitalGain)) : 1.0;
+  gainNode.gain.value = initialGain;
+
   const node = new AudioWorkletNode(context, 'bsp-capture');
 
   node.port.onmessage = (event) => {
@@ -117,7 +133,9 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     }
   };
 
-  source.connect(node);
+  source.connect(gainNode);
+  gainNode.connect(node);
+
   // Worklets need a downstream connection to be pulled; a zero-gain sink keeps the
   // graph running without routing the mic to the speakers.
   const sink = context.createGain();
@@ -130,10 +148,22 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     if (stopped) return;
     stopped = true;
     node.port.onmessage = null;
-    try { source.disconnect(); node.disconnect(); sink.disconnect(); } catch { /* already torn down */ }
+    try {
+      source.disconnect();
+      gainNode.disconnect();
+      node.disconnect();
+      sink.disconnect();
+    } catch { /* already torn down */ }
     stream.getTracks().forEach((track) => track.stop());
     context.close().catch(() => {});
   };
 
-  return { stop, context };
+  const setGain = (newGain: number) => {
+    if (stopped || !gainNode) return;
+    const clamped = Math.max(0.1, Math.min(10, newGain));
+    gainNode.gain.value = clamped;
+  };
+
+  return { stop, context, setGain };
 }
+
