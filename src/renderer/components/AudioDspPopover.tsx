@@ -13,7 +13,37 @@ interface AudioDspPopoverProps {
   meter?: AudioMeterState;
 }
 
-const POPOVER_WIDTH = 300;
+interface SleekSliderProps {
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (val: number) => void;
+  accentColor?: string;
+  style?: React.CSSProperties;
+}
+
+function SleekSlider({ min, max, step, value, onChange, accentColor = '#6366f1', style }: SleekSliderProps) {
+  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(parseFloat(e.target.value))}
+      className="bsp-sleek-slider"
+      style={{
+        ...style,
+        background: `linear-gradient(to right, ${accentColor} 0%, ${accentColor} ${pct}%, rgba(255, 255, 255, 0.12) ${pct}%, rgba(255, 255, 255, 0.12) 100%)`,
+      }}
+    />
+  );
+}
+
+const POPOVER_WIDTH = 295;
 
 export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, meter }: AudioDspPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -107,6 +137,38 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
         backdropFilter: 'blur(20px)',
       }}
     >
+      <style>{`
+        .bsp-sleek-slider {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 100%;
+          height: 3.5px;
+          border-radius: 999px;
+          outline: none;
+          cursor: pointer;
+          margin: 4px 0;
+          transition: opacity 0.15s ease;
+        }
+        .bsp-sleek-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 11px;
+          height: 11px;
+          border-radius: 50%;
+          background: #ffffff;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.25);
+          cursor: pointer;
+          transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .bsp-sleek-slider:hover::-webkit-slider-thumb {
+          transform: scale(1.2);
+          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.35);
+        }
+        .bsp-sleek-slider:active::-webkit-slider-thumb {
+          transform: scale(1.08);
+        }
+      `}</style>
+
       {/* Header */}
       <div
         style={{
@@ -185,24 +247,18 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
 
         {dsp.isHeadphoneMonitoring && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-dim, #888)', minWidth: 26 }}>Vol</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={dsp.monitorVolume ?? 1.0}
-              onChange={(e) => {
-                const vol = parseFloat(e.target.value);
-                onChangeDsp({ ...dsp, monitorVolume: vol });
-              }}
-              style={{
-                flex: 1,
-                accentColor: '#4ade80',
-                cursor: 'pointer',
-              }}
-            />
-            <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 10, minWidth: 28, textAlign: 'right', color: 'var(--text-dim, #888)' }}>
+            <span style={{ fontSize: 9.5, color: 'var(--text-dim, #888)', minWidth: 24 }}>Vol</span>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+              <SleekSlider
+                min={0}
+                max={1}
+                step={0.05}
+                value={dsp.monitorVolume ?? 1.0}
+                onChange={(vol) => onChangeDsp({ ...dsp, monitorVolume: vol })}
+                accentColor="#4ade80"
+              />
+            </div>
+            <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 9.5, minWidth: 28, textAlign: 'right', color: 'var(--text-dim, #888)' }}>
               {Math.round((dsp.monitorVolume ?? 1.0) * 100)}%
             </span>
           </div>
@@ -317,7 +373,7 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
                     cursor: 'pointer',
                     transition: 'all 0.1s ease',
                   }}
-                  title="Natural studio expander (-22 dB room reduction, best for singing)"
+                  title="Natural studio expander (-20 dB room reduction, best for singing)"
                 >
                   Studio
                 </button>
@@ -343,24 +399,18 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
               </div>
 
               {/* Sensitivity Slider */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <span style={{ fontSize: 9.5, color: 'var(--text-dim, #888)', minWidth: 54 }}>Sensitivity</span>
-                <input
-                  type="range"
-                  min="0.3"
-                  max="2.5"
-                  step="0.1"
-                  value={sensitivity}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    onChangeDsp({ ...dsp, noiseSuppressionSensitivity: val });
-                  }}
-                  style={{
-                    flex: 1,
-                    accentColor: 'var(--accent-primary, #6366f1)',
-                    cursor: 'pointer',
-                  }}
-                />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                <span style={{ fontSize: 9.5, color: 'var(--text-dim, #888)', minWidth: 52 }}>Sensitivity</span>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                  <SleekSlider
+                    min={0.3}
+                    max={2.5}
+                    step={0.1}
+                    value={sensitivity}
+                    onChange={(val) => onChangeDsp({ ...dsp, noiseSuppressionSensitivity: val })}
+                    accentColor="var(--accent-primary, #6366f1)"
+                  />
+                </div>
                 <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 9.5, minWidth: 26, textAlign: 'right', color: 'var(--text-dim, #888)' }}>
                   {sensitivity === 1.0 ? 'Auto' : `${sensitivity.toFixed(1)}x`}
                 </span>
@@ -407,7 +457,7 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
           <span
             style={{
               fontVariantNumeric: 'tabular-nums',
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: 600,
               color: currentGain > 1.05 ? 'var(--tally-preview, #4ade80)' : currentGain < 0.95 ? 'var(--tally-hold, #facc15)' : 'var(--text-dim, #888)',
             }}
@@ -417,22 +467,16 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input
-            type="range"
-            min="0.3"
-            max="3.5"
-            step="0.05"
-            value={currentGain}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              onChangeDsp({ ...dsp, digitalGain: val });
-            }}
-            style={{
-              flex: 1,
-              accentColor: 'var(--accent-primary, #6366f1)',
-              cursor: 'pointer',
-            }}
-          />
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+            <SleekSlider
+              min={0.3}
+              max={3.5}
+              step={0.05}
+              value={currentGain}
+              onChange={(val) => onChangeDsp({ ...dsp, digitalGain: val })}
+              accentColor="var(--accent-primary, #6366f1)"
+            />
+          </div>
           {Math.abs(currentGain - 1.0) > 0.05 && (
             <button
               type="button"
@@ -441,7 +485,7 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
                 background: 'var(--chrome-control, rgba(255, 255, 255, 0.1))',
                 border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
                 color: 'var(--text-primary, #fff)',
-                fontSize: 9.5,
+                fontSize: 9,
                 fontWeight: 600,
                 padding: '2px 5px',
                 borderRadius: 4,
