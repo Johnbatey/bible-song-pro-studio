@@ -13,7 +13,7 @@ interface AudioDspPopoverProps {
   meter?: AudioMeterState;
 }
 
-const POPOVER_WIDTH = 290;
+const POPOVER_WIDTH = 300;
 
 export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, meter }: AudioDspPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -169,10 +169,10 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
               <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
             </svg>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 11.5, color: dsp.isHeadphoneMonitoring ? '#4ade80' : 'inherit' }}>
+              <div style={{ fontWeight: 600, fontSize: 11.5, color: dsp.isHeadphoneMonitoring ? '#4ade80' : 'inherit', whiteSpace: 'nowrap' }}>
                 Headphone Monitor
               </div>
-              <div style={{ fontSize: 9.5, color: 'var(--text-dim, #888)' }}>
+              <div style={{ fontSize: 9.5, color: 'var(--text-dim, #888)', whiteSpace: 'nowrap' }}>
                 {dsp.isHeadphoneMonitoring ? 'Listening to post-DSP audio live' : 'Monitor muted'}
               </div>
             </div>
@@ -185,7 +185,7 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
 
         {dsp.isHeadphoneMonitoring && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-dim, #888)', minWidth: 32 }}>Vol</span>
+            <span style={{ fontSize: 10, color: 'var(--text-dim, #888)', minWidth: 26 }}>Vol</span>
             <input
               type="range"
               min="0"
@@ -221,36 +221,62 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
             transition: 'all 0.15s ease',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>Noise Suppression</span>
-                {isNoiseSuppressed && (
-                  <span
-                    style={{
-                      fontSize: 9,
-                      padding: '1px 5px',
-                      borderRadius: 3,
-                      fontWeight: 700,
-                      background: isVoiceActive ? 'rgba(74, 222, 128, 0.2)' : 'rgba(239, 68, 68, 0.15)',
-                      color: isVoiceActive ? '#4ade80' : '#f87171',
-                      border: `1px solid ${isVoiceActive ? 'rgba(74, 222, 128, 0.4)' : 'rgba(239, 68, 68, 0.3)'}`,
-                      letterSpacing: '0.02em',
-                      transition: 'all 0.1s ease',
-                    }}
-                  >
-                    {isVoiceActive ? '🟢 VOICE ACTIVE' : `🔇 GATED (${Math.round(20 * Math.log10(Math.max(0.0001, gateGain)))} dB)`}
-                  </span>
-                )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 11.5, whiteSpace: 'nowrap' }}>
+                Noise Suppression
               </div>
-              <div style={{ fontSize: 9.5, color: 'var(--text-dim, #888)', marginTop: 1 }}>
-                {isNoiseSuppressed ? 'Adaptive multi-band spectral room gate' : 'Cuts background fan, hum & room noise'}
+              <div style={{ fontSize: 9.5, color: 'var(--text-dim, #888)', marginTop: 1, whiteSpace: 'nowrap' }}>
+                Adaptive spectral room gate
               </div>
             </div>
-            <AppleToggle
-              checked={isNoiseSuppressed}
-              onChange={(checked) => onChangeDsp({ ...dsp, noiseSuppression: checked })}
-            />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {isNoiseSuppressed && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3.5,
+                    fontSize: 8.5,
+                    lineHeight: 1,
+                    padding: '2.5px 5.5px',
+                    borderRadius: 3.5,
+                    fontWeight: 700,
+                    whiteSpace: 'nowrap',
+                    background: isVoiceActive ? 'rgba(74, 222, 128, 0.16)' : 'rgba(239, 68, 68, 0.14)',
+                    color: isVoiceActive ? '#4ade80' : '#f87171',
+                    border: `1px solid ${isVoiceActive ? 'rgba(74, 222, 128, 0.35)' : 'rgba(239, 68, 68, 0.3)'}`,
+                    letterSpacing: '0.02em',
+                    fontVariantNumeric: 'tabular-nums',
+                    transition: 'all 0.1s ease',
+                  }}
+                >
+                  {isVoiceActive ? (
+                    <>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                      </svg>
+                      <span>VOICE</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <line x1="23" y1="9" x2="17" y2="15" />
+                        <line x1="17" y1="9" x2="23" y2="15" />
+                      </svg>
+                      <span>GATED ({Math.round(20 * Math.log10(Math.max(0.0001, gateGain)))} dB)</span>
+                    </>
+                  )}
+                </span>
+              )}
+              <AppleToggle
+                checked={isNoiseSuppressed}
+                onChange={(checked) => onChangeDsp({ ...dsp, noiseSuppression: checked })}
+              />
+            </div>
           </div>
 
           {isNoiseSuppressed && (
@@ -438,9 +464,19 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
           lineHeight: 1.35,
           borderTop: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
           paddingTop: 6,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 5,
         }}
       >
-        💡 <strong>Pro Tip:</strong> Select <strong>Meet / Zoom</strong> to actively eliminate fan, AC, and room noise with sub-millisecond voice attack.
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1, color: 'var(--accent-primary, #6366f1)' }}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+        <div>
+          <strong>Pro Tip:</strong> Select <strong>Meet / Zoom</strong> to actively eliminate fan, AC, and room noise with sub-millisecond voice attack.
+        </div>
       </div>
     </div>,
     document.body
