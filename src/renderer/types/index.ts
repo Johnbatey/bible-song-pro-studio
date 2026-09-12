@@ -641,6 +641,10 @@ export interface AudioInputDevice {
 export interface AudioMeterState {
   level: number;
   peak: number;
+  levelL?: number;
+  levelR?: number;
+  peakL?: number;
+  peakR?: number;
   isMonitoring: boolean;
 }
 

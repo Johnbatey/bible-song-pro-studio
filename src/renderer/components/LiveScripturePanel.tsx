@@ -469,7 +469,17 @@ export function LiveScripturePanel() {
     captureRef.current = null;
     localBufferRef.current = [];
     localSamplesRef.current = 0;
-    setLive({ meter: { level: 0, peak: 0, isMonitoring: false } });
+    setLive({
+      meter: {
+        level: 0,
+        peak: 0,
+        levelL: 0,
+        levelR: 0,
+        peakL: 0,
+        peakR: 0,
+        isMonitoring: false,
+      },
+    });
   }
 
   async function startLive(dspOverride?: AudioDspOptions) {
@@ -513,9 +523,22 @@ export function LiveScripturePanel() {
       captureRef.current = await startAudioCapture({
         deviceId: live.selectedInputId || undefined,
         dsp: activeDsp,
-        onLevel: (level) => {
-          const peak = Math.max(level, useAppStore.getState().liveScripture.meter.peak * 0.94);
-          setLive({ meter: { level, peak, isMonitoring: true } });
+        onLevel: (levels) => {
+          const prev = useAppStore.getState().liveScripture.meter;
+          const peak = Math.max(levels.level, (prev.peak || 0) * 0.94);
+          const peakL = Math.max(levels.levelL, (prev.peakL ?? prev.peak ?? 0) * 0.94);
+          const peakR = Math.max(levels.levelR, (prev.peakR ?? prev.peak ?? 0) * 0.94);
+          setLive({
+            meter: {
+              level: levels.level,
+              peak,
+              levelL: levels.levelL,
+              levelR: levels.levelR,
+              peakL,
+              peakR,
+              isMonitoring: true,
+            },
+          });
         },
         onAudio: (frames) => {
           if (engine === 'deepgram') {
@@ -1102,9 +1125,42 @@ export function LiveScripturePanel() {
             anchorEl={fxBtnRef.current}
           />
 
-          <div style={styles.meter} aria-label="Mic meter">
-            <div style={{ ...styles.meterFill, width: `${Math.round(live.meter.level * 100)}%` }} />
-            <div style={{ ...styles.meterPeak, left: `${Math.round(live.meter.peak * 100)}%` }} />
+          {/* Dual L & R Stereo VU Meter */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              gap: 2,
+              width: 96,
+              height: 16,
+              padding: '2px 4px',
+              background: 'var(--chrome-control)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 4,
+              boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.25)',
+              flexShrink: 0,
+            }}
+            aria-label="Mic stereo meter"
+            title={`Left: ${Math.round((live.meter.levelL ?? live.meter.level) * 100)}% | Right: ${Math.round((live.meter.levelR ?? live.meter.level) * 100)}%`}
+          >
+            {/* Left Channel */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, height: 4.5 }}>
+              <span style={{ fontSize: 7.5, fontWeight: 700, color: 'var(--text-dim)', width: 6, lineHeight: 1, userSelect: 'none' }}>L</span>
+              <div style={{ position: 'relative', flex: 1, height: '100%', background: 'rgba(255, 255, 255, 0.06)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.round((live.meter.levelL ?? live.meter.level) * 100)}%`, background: 'linear-gradient(90deg, #22c55e 0%, #eab308 75%, #ef4444 100%)', borderRadius: 2, transition: 'width 80ms linear' }} />
+                <div style={{ position: 'absolute', top: 0, left: `${Math.round((live.meter.peakL ?? live.meter.peak) * 100)}%`, width: 1.5, height: '100%', background: '#ffffff', transition: 'left 120ms ease-out' }} />
+              </div>
+            </div>
+
+            {/* Right Channel */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, height: 4.5 }}>
+              <span style={{ fontSize: 7.5, fontWeight: 700, color: 'var(--text-dim)', width: 6, lineHeight: 1, userSelect: 'none' }}>R</span>
+              <div style={{ position: 'relative', flex: 1, height: '100%', background: 'rgba(255, 255, 255, 0.06)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.round((live.meter.levelR ?? live.meter.level) * 100)}%`, background: 'linear-gradient(90deg, #22c55e 0%, #eab308 75%, #ef4444 100%)', borderRadius: 2, transition: 'width 80ms linear' }} />
+                <div style={{ position: 'absolute', top: 0, left: `${Math.round((live.meter.peakR ?? live.meter.peak) * 100)}%`, width: 1.5, height: '100%', background: '#ffffff', transition: 'left 120ms ease-out' }} />
+              </div>
+            </div>
           </div>
 
           <span style={{ ...type.caption, color: statusColor, fontWeight: fontWeight.semibold, whiteSpace: 'nowrap' }}>

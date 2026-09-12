@@ -2,8 +2,9 @@ export const STT_SAMPLE_RATE = 16000;
 
 /**
  * Runs on the audio thread at native audio context sample rate (44.1k, 48k, etc).
- * Performs precision linear downsampling to 16 kHz for the speech-to-text pipeline,
- * while leaving the main Web Audio graph and headphone monitor at pristine full broadcast fidelity.
+ * Calculates precision dual-channel RMS for L & R stereo VU metering,
+ * downsamples primary channel to 16 kHz for the speech-to-text pipeline,
+ * and leaves the headphone monitor at pristine full broadcast fidelity with active DSP.
  */
 const WORKLET_SOURCE = `
 class CaptureProcessor extends AudioWorkletProcessor {
@@ -21,31 +22,41 @@ class CaptureProcessor extends AudioWorkletProcessor {
     const input = inputs[0];
     if (!input || input.length === 0) return true;
 
-    // Take primary channel directly to prevent destructive mono phase cancellation
-    const channel = input[0];
-    if (!channel || channel.length === 0) return true;
+    const chL = input[0];
+    const chR = input[1] || input[0];
+    const isStereo = Boolean(input[1]);
 
+    // Measure precision RMS levels on high-res signal for Left and Right channels
+    let sumL = 0;
+    let sumR = 0;
+    const len = chL.length;
+    for (let i = 0; i < len; i++) {
+      sumL += chL[i] * chL[i];
+      sumR += chR[i] * chR[i];
+    }
+    const rmsL = Math.min(1, Math.sqrt(sumL / len) * 3);
+    const rmsR = Math.min(1, Math.sqrt(sumR / len) * 3);
+
+    // Resample down to 16kHz for STT worklet output
     if (Math.abs(sampleRate - this.targetRate) < 1) {
-      // Already 16 kHz
-      for (let i = 0; i < channel.length; i++) {
-        this.buffer[this.offset++] = channel[i];
+      for (let i = 0; i < len; i++) {
+        this.buffer[this.offset++] = chL[i];
         if (this.offset === this.chunkSize) {
           const out = this.buffer.slice(0);
-          this.port.postMessage(out, [out.buffer]);
+          this.port.postMessage({ frames: out, rmsL, rmsR, isStereo }, [out.buffer]);
           this.offset = 0;
         }
       }
     } else {
-      // Precision linear resampler from native hardware rate (44.1k/48k/96k) down to 16kHz
       const ratio = this.resampleRatio;
-      for (let i = 0; i < channel.length; i++) {
-        const current = channel[i];
+      for (let i = 0; i < len; i++) {
+        const current = chL[i];
         while (this.resamplePhase < 1.0) {
           const interp = this.lastSample + this.resamplePhase * (current - this.lastSample);
           this.buffer[this.offset++] = interp;
           if (this.offset === this.chunkSize) {
             const out = this.buffer.slice(0);
-            this.port.postMessage(out, [out.buffer]);
+            this.port.postMessage({ frames: out, rmsL, rmsR, isStereo }, [out.buffer]);
             this.offset = 0;
           }
           this.resamplePhase += ratio;
@@ -69,6 +80,13 @@ export interface AudioDspOptions {
   monitorVolume?: number;
 }
 
+export interface AudioLevels {
+  level: number;
+  levelL: number;
+  levelR: number;
+  isStereo: boolean;
+}
+
 export interface AudioCaptureHandle {
   stop: () => void;
   context: AudioContext;
@@ -83,8 +101,8 @@ export interface AudioCaptureOptions {
   dsp?: AudioDspOptions;
   /** 16 kHz mono float frames, ~64ms each. */
   onAudio: (frames: Float32Array) => void;
-  /** 0..1 RMS-ish level for the meter. */
-  onLevel?: (level: number) => void;
+  /** Dual-channel RMS levels for stereo VU metering. */
+  onLevel?: (levels: AudioLevels) => void;
   onError?: (error: Error) => void;
 }
 
@@ -130,8 +148,8 @@ function buildAudioConstraints(deviceId?: string, dsp: AudioDspOptions = {}): Me
 
 /**
  * Opens the microphone and streams audio at native studio broadcast quality.
- * The internal graph runs at full 44.1k/48k resolution, while the AudioWorklet
- * downsamples to 16 kHz specifically for the speech recognizer.
+ * The internal graph runs at full 44.1k/48k resolution with active DSP,
+ * while the AudioWorklet downsamples to 16 kHz specifically for the speech recognizer.
  */
 export async function startAudioCapture(options: AudioCaptureOptions): Promise<AudioCaptureHandle> {
   const dsp = options.dsp || {};
@@ -151,7 +169,7 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     });
   }
 
-  // Native sample rate AudioContext (44.1kHz or 48kHz for pristine, studio-quality sound)
+  // Native sample rate AudioContext (44.1kHz or 48kHz for pristine studio-quality sound)
   const context = new AudioContext();
 
   const blobUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'application/javascript' }));
@@ -182,7 +200,7 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
   compressor.release.setValueAtTime(0.25, context.currentTime);
   compressor.threshold.setValueAtTime(dsp.autoGainControl ? -24 : 0, context.currentTime);
 
-  // 4. Dedicated Headphone Monitor Gain Node (Pristine uncolored direct output)
+  // 4. Dedicated Headphone Monitor Gain Node (Connected POST-DSP so filters are heard live)
   const monitorGainNode = context.createGain();
   const initialMonitorVolume = typeof dsp.monitorVolume === 'number' ? Math.max(0, Math.min(1, dsp.monitorVolume)) : 1.0;
   monitorGainNode.gain.setValueAtTime(dsp.isHeadphoneMonitoring ? initialMonitorVolume : 0, context.currentTime);
@@ -191,24 +209,29 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
   const node = new AudioWorkletNode(context, 'bsp-capture');
 
   node.port.onmessage = (event) => {
-    const frames = event.data as Float32Array;
-    options.onAudio(frames);
-    if (options.onLevel) {
-      let sum = 0;
-      for (let i = 0; i < frames.length; i++) sum += frames[i] * frames[i];
-      options.onLevel(Math.min(1, Math.sqrt(sum / frames.length) * 3));
+    const data = event.data;
+    if (data && data.frames) {
+      options.onAudio(data.frames);
+      if (options.onLevel) {
+        const levelL = data.rmsL ?? 0;
+        const levelR = data.rmsR ?? levelL;
+        const level = Math.max(levelL, levelR);
+        options.onLevel({ level, levelL, levelR, isStereo: Boolean(data.isStereo) });
+      }
+    } else if (data instanceof Float32Array) {
+      options.onAudio(data);
     }
   };
 
   // Connect Audio Processing Graph:
   // source -> gainNode -> hpFilter -> compressor -> node (STT Worklet)
-  // source -> gainNode -> monitorGainNode -> destination (Headphone direct monitor at full 48k fidelity)
+  //                                  compressor -> monitorGainNode -> destination (Headphones hearing full DSP live!)
   source.connect(gainNode);
   gainNode.connect(hpFilter);
   hpFilter.connect(compressor);
   compressor.connect(node);
 
-  gainNode.connect(monitorGainNode);
+  compressor.connect(monitorGainNode);
   monitorGainNode.connect(context.destination);
 
   // Worklets need a downstream connection to be pulled; a zero-gain sink keeps the
