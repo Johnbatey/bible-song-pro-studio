@@ -35,12 +35,16 @@ export interface AudioDspOptions {
   noiseSuppression?: boolean;
   autoGainControl?: boolean;
   digitalGain?: number;
+  isHeadphoneMonitoring?: boolean;
+  monitorVolume?: number;
 }
 
 export interface AudioCaptureHandle {
   stop: () => void;
   context: AudioContext;
   setGain: (gain: number) => void;
+  setMonitor: (enabled: boolean, volume?: number) => void;
+  updateDspConstraints: (dsp: AudioDspOptions) => Promise<void>;
 }
 
 export interface AudioCaptureOptions {
@@ -116,10 +120,15 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
 
   const source = context.createMediaStreamSource(stream);
 
-  // Real-time software preamp gain node for adjusting levels cleanly
+  // Real-time software preamp gain node with smooth DAW-style automation (de-zippering)
   const gainNode = context.createGain();
   const initialGain = typeof dsp.digitalGain === 'number' ? Math.max(0.1, Math.min(10, dsp.digitalGain)) : 1.0;
-  gainNode.gain.value = initialGain;
+  gainNode.gain.setValueAtTime(initialGain, context.currentTime);
+
+  // Dedicated Headphone Monitor Gain Node
+  const monitorGainNode = context.createGain();
+  const initialMonitorVolume = typeof dsp.monitorVolume === 'number' ? Math.max(0, Math.min(1, dsp.monitorVolume)) : 1.0;
+  monitorGainNode.gain.setValueAtTime(dsp.isHeadphoneMonitoring ? initialMonitorVolume : 0, context.currentTime);
 
   const node = new AudioWorkletNode(context, 'bsp-capture');
 
@@ -133,11 +142,14 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     }
   };
 
+  // Signal graph: source -> gainNode -> node (worklet) & monitorGainNode -> speakers
   source.connect(gainNode);
   gainNode.connect(node);
+  gainNode.connect(monitorGainNode);
+  monitorGainNode.connect(context.destination);
 
   // Worklets need a downstream connection to be pulled; a zero-gain sink keeps the
-  // graph running without routing the mic to the speakers.
+  // worklet graph active even when headphone monitor is muted.
   const sink = context.createGain();
   sink.gain.value = 0;
   node.connect(sink);
@@ -151,6 +163,7 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     try {
       source.disconnect();
       gainNode.disconnect();
+      monitorGainNode.disconnect();
       node.disconnect();
       sink.disconnect();
     } catch { /* already torn down */ }
@@ -158,12 +171,51 @@ export async function startAudioCapture(options: AudioCaptureOptions): Promise<A
     context.close().catch(() => {});
   };
 
+  /**
+   * Smooth clickless gain change using a 20ms exponential time constant
+   */
   const setGain = (newGain: number) => {
-    if (stopped || !gainNode) return;
+    if (stopped || !gainNode || !context) return;
     const clamped = Math.max(0.1, Math.min(10, newGain));
-    gainNode.gain.value = clamped;
+    try {
+      gainNode.gain.setTargetAtTime(clamped, context.currentTime, 0.02);
+    } catch {
+      gainNode.gain.value = clamped;
+    }
   };
 
-  return { stop, context, setGain };
+  /**
+   * Smooth clickless monitor toggle or volume adjustment
+   */
+  const setMonitor = (enabled: boolean, volume = 1.0) => {
+    if (stopped || !monitorGainNode || !context) return;
+    const targetVolume = enabled ? Math.max(0, Math.min(1, volume)) : 0;
+    try {
+      monitorGainNode.gain.setTargetAtTime(targetVolume, context.currentTime, 0.02);
+    } catch {
+      monitorGainNode.gain.value = targetVolume;
+    }
+  };
+
+  /**
+   * In-place hardware DSP constraint update without audio pipeline recreation
+   */
+  const updateDspConstraints = async (newDsp: AudioDspOptions) => {
+    if (stopped || !stream) return;
+    const track = stream.getAudioTracks()[0];
+    if (track && typeof track.applyConstraints === 'function') {
+      try {
+        await track.applyConstraints({
+          echoCancellation: newDsp.echoCancellation ?? false,
+          noiseSuppression: newDsp.noiseSuppression ?? false,
+          autoGainControl: newDsp.autoGainControl ?? false,
+        });
+      } catch (err) {
+        console.warn('Could not apply DSP track constraints in-place:', err);
+      }
+    }
+  };
+
+  return { stop, context, setGain, setMonitor, updateDspConstraints };
 }
 

@@ -549,18 +549,23 @@ export function LiveScripturePanel() {
       if (next.digitalGain !== undefined) {
         captureRef.current.setGain(next.digitalGain);
       }
-      // If hardware/browser DSP constraints changed while active, restart capture to rebind MediaStreamConstraints
+      if (next.isHeadphoneMonitoring !== undefined || next.monitorVolume !== undefined) {
+        captureRef.current.setMonitor(Boolean(next.isHeadphoneMonitoring), next.monitorVolume ?? 1.0);
+      }
+      // Apply browser/hardware DSP constraint updates live in-place without restart or mute!
       if (
         next.echoCancellation !== audioDsp.echoCancellation ||
         next.noiseSuppression !== audioDsp.noiseSuppression ||
         next.autoGainControl !== audioDsp.autoGainControl
       ) {
-        if (live.isActive) {
-          teardownCapture();
-          startLive(next);
-        }
+        captureRef.current.updateDspConstraints(next);
       }
     }
+  };
+
+  const handleToggleMonitor = () => {
+    const nextState = !audioDsp.isHeadphoneMonitoring;
+    handleDspChange({ ...audioDsp, isHeadphoneMonitoring: nextState });
   };
 
   function stopLive() {
@@ -1057,6 +1062,36 @@ export function LiveScripturePanel() {
                 }}
               />
             )}
+          </button>
+
+          {/* Headphone Monitor Quick Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleMonitor}
+            style={{
+              position: 'relative',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: 24,
+              padding: '0 6px',
+              background: audioDsp.isHeadphoneMonitoring ? 'var(--tally-preview, #4ade80)' : 'var(--chrome-control)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 5,
+              color: audioDsp.isHeadphoneMonitoring ? '#000000' : 'var(--text-primary)',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+            }}
+            title={audioDsp.isHeadphoneMonitoring ? 'Headphone monitoring ACTIVE (Click to mute)' : 'Listen to mic input (Headphone Monitor)'}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+              <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+            </svg>
           </button>
 
           <AudioDspPopover

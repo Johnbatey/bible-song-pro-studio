@@ -11,7 +11,7 @@ interface AudioDspPopoverProps {
   anchorEl: HTMLElement | null;
 }
 
-const POPOVER_WIDTH = 260;
+const POPOVER_WIDTH = 270;
 
 export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }: AudioDspPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -20,7 +20,7 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }:
   const measure = useCallback(() => {
     if (!anchorEl) return;
     const anchor = anchorEl.getBoundingClientRect();
-    const estimatedHeight = 310;
+    const estimatedHeight = 360;
 
     // Check if there's enough space below the button, otherwise display above
     const spaceBelow = window.innerHeight - anchor.bottom;
@@ -142,6 +142,64 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl }:
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
+      </div>
+
+      {/* Headphone Monitor Section */}
+      <div
+        style={{
+          background: dsp.isHeadphoneMonitoring ? 'rgba(74, 222, 128, 0.08)' : 'var(--bg-card, rgba(255, 255, 255, 0.04))',
+          padding: '8px 10px',
+          borderRadius: 6,
+          border: `1px solid ${dsp.isHeadphoneMonitoring ? 'rgba(74, 222, 128, 0.35)' : 'var(--border-subtle, rgba(255, 255, 255, 0.06))'}`,
+          marginBottom: 10,
+          transition: 'all 0.15s ease',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: dsp.isHeadphoneMonitoring ? 6 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={dsp.isHeadphoneMonitoring ? '#4ade80' : 'currentColor'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+              <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+            </svg>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 11.5, color: dsp.isHeadphoneMonitoring ? '#4ade80' : 'inherit' }}>
+                Headphone Monitor
+              </div>
+              <div style={{ fontSize: 9.5, color: 'var(--text-dim, #888)' }}>
+                {dsp.isHeadphoneMonitoring ? 'Listening to mic input live' : 'Monitor muted'}
+              </div>
+            </div>
+          </div>
+          <AppleToggle
+            checked={Boolean(dsp.isHeadphoneMonitoring)}
+            onChange={(checked) => onChangeDsp({ ...dsp, isHeadphoneMonitoring: checked })}
+          />
+        </div>
+
+        {dsp.isHeadphoneMonitoring && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-dim, #888)', minWidth: 32 }}>Vol</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={dsp.monitorVolume ?? 1.0}
+              onChange={(e) => {
+                const vol = parseFloat(e.target.value);
+                onChangeDsp({ ...dsp, monitorVolume: vol });
+              }}
+              style={{
+                flex: 1,
+                accentColor: '#4ade80',
+                cursor: 'pointer',
+              }}
+            />
+            <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 10, minWidth: 28, textAlign: 'right', color: 'var(--text-dim, #888)' }}>
+              {Math.round((dsp.monitorVolume ?? 1.0) * 100)}%
+            </span>
+          </div>
+        )}
       </div>
 
       {/* DSP Toggles */}
