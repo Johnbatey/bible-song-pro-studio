@@ -725,7 +725,7 @@ export function SettingsModal() {
                   <div>
                     <div style={modalStyles.rowTitle}>{t('settings.system.updatesTitle')}</div>
                     <div style={modalStyles.rowSub}>
-                      {t('settings.system.appVersion', { version: appVersion || '3.3.0' })}{updateStatusText ? ` • ${updateStatusText}` : ''}
+                      {t('settings.system.appVersion', { version: appVersion || '3.4.0' })}{updateStatusText ? ` • ${updateStatusText}` : ''}
                     </div>
                   </div>
                   <button

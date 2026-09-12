@@ -1547,7 +1547,7 @@ app.whenReady().then(async () => {
       const timer = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(url, {
         headers: {
-          'User-Agent': 'BibleSongProStudio/3.3.0 (https://github.com/Johnbatey/bible-song-pro-studio)',
+          'User-Agent': 'BibleSongProStudio/3.4.0 (https://github.com/Johnbatey/bible-song-pro-studio)',
         },
         signal: controller.signal,
       });
