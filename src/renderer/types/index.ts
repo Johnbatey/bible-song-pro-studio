@@ -158,7 +158,7 @@ export interface StandbyMedia {
 }
 
 export interface SlideBackground {
-  type: 'color' | 'gradient' | 'image' | 'video';
+  type: 'color' | 'gradient' | 'image' | 'video' | 'transparent';
   value: string;
   overlayColor?: string;
   overlayOpacity?: number;
@@ -587,6 +587,8 @@ export type OperatingMode = 'studio' | 'basic';
 export interface DisplayState {
   mode: OperatingMode;
   outputMode: 'fullscreen' | 'lowerThird';
+  bibleOutputMode?: 'fullscreen' | 'lowerThird';
+  songOutputMode?: 'fullscreen' | 'lowerThird';
   outputStatus: {
     isOpen: boolean;
     url: string;

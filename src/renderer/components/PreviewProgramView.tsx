@@ -4,6 +4,7 @@ import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
 import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { resolveBgVideoLoop } from '../utils/background';
 import { ensureTheme } from '../utils/defaultTheme';
+import { resolveEffectiveOutputMode } from '../utils/outputMode';
 import { ProgramSurface } from './display/ProgramSurface';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { type, fontWeight } from '../styles/type';
@@ -33,7 +34,11 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
   const mode = useAppStore((s) => s.display.mode);
   const setMode = useAppStore((s) => s.setMode);
   const outputMode = useAppStore((s) => s.display.outputMode);
+  const bibleOutputMode = useAppStore((s) => s.display.bibleOutputMode);
+  const songOutputMode = useAppStore((s) => s.display.songOutputMode);
   const setOutputMode = useAppStore((s) => s.setOutputMode);
+  const setBibleOutputMode = useAppStore((s) => s.setBibleOutputMode);
+  const setSongOutputMode = useAppStore((s) => s.setSongOutputMode);
   const rawTheme = useAppStore((s) => s.activeTheme);
   const activeTheme = useMemo(() => ensureTheme(rawTheme), [rawTheme]);
   const activeAlert = useAppStore((s) => s.activeAlert);
@@ -87,6 +92,22 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
   const hasPendingTake = isStudio && Boolean(previewScene) && currentScene?.id !== previewScene?.id;
   const zoomLabel = `${Math.round(zoom * 100)}%`;
   const outputScale = stageSize.itemWidth / 1920;
+
+  const activeCategoryScene = previewScene || currentScene;
+  const activeEffectiveMode = useMemo(
+    () => resolveEffectiveOutputMode(activeCategoryScene, { outputMode, bibleOutputMode, songOutputMode }),
+    [activeCategoryScene, outputMode, bibleOutputMode, songOutputMode],
+  );
+
+  const handleOutputModeToggle = (targetMode: 'fullscreen' | 'lowerThird') => {
+    if (activeCategoryScene?.type === 'bible') {
+      setBibleOutputMode(targetMode);
+    } else if (activeCategoryScene?.type === 'song') {
+      setSongOutputMode(targetMode);
+    } else {
+      setOutputMode(targetMode);
+    }
+  };
 
   const markInteracting = useCallback(() => {
     setIsInteracting(true);
@@ -288,16 +309,16 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
 
             <BlockSegment>
               <BlockButton
-                active={outputMode === 'fullscreen'}
-                onClick={() => setOutputMode('fullscreen')}
-                title="Fullscreen Output Mode (FS)"
+                active={activeEffectiveMode === 'fullscreen'}
+                onClick={() => handleOutputModeToggle('fullscreen')}
+                title={`Fullscreen Output Mode (FS)${activeCategoryScene?.type ? ` [${activeCategoryScene.type}]` : ''}`}
               >
                 FS
               </BlockButton>
               <BlockButton
-                active={outputMode === 'lowerThird'}
-                onClick={() => setOutputMode('lowerThird')}
-                title="Lower Third Output Mode (LT)"
+                active={activeEffectiveMode === 'lowerThird'}
+                onClick={() => handleOutputModeToggle('lowerThird')}
+                title={`Lower Third Output Mode (LT)${activeCategoryScene?.type ? ` [${activeCategoryScene.type}]` : ''}`}
               >
                 LT
               </BlockButton>

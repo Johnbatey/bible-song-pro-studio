@@ -53,6 +53,8 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
   const linesPerSlide = useAppStore((s) => s.songLinesPerSlide);
   const setLinesPerSlide = useAppStore((s) => s.setSongLinesPerSlide);
   const doubleClickToGoLive = useAppStore((s) => s.doubleClickToGoLive);
+  const songOutputMode = useAppStore((s) => s.display.songOutputMode || 'fullscreen');
+  const setSongOutputMode = useAppStore((s) => s.setSongOutputMode);
 
   // Workspace Mode: 'buttons' (slide grid) or 'text' (lyrics editor)
   const [workspaceMode, setWorkspaceMode] = useState<'buttons' | 'text'>('buttons');
@@ -110,17 +112,26 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
       const transStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.translation || ''}`).join('\n\n');
       setTranslationTextDraft(transStr);
     } else {
-      // Same song: only sync if not actively typing
-      if (!isTypingPrimaryRef.current) {
+      // Same song: NEVER overwrite active text drafts if in text editing mode or if actively typing
+      if (workspaceMode !== 'text' && !isTypingPrimaryRef.current) {
         const primaryStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.text || ''}`).join('\n\n');
         setPrimaryTextDraft(primaryStr);
       }
-      if (!isTypingTransRef.current) {
+      if (workspaceMode !== 'text' && !isTypingTransRef.current) {
         const transStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.translation || ''}`).join('\n\n');
         setTranslationTextDraft(transStr);
       }
     }
-  }, [song?.id, song?.slides, song?.title, song?.author, song?.artist, song?.key, song?.ccli, song?.copyright]);
+  }, [song?.id, song?.slides, song?.title, song?.author, song?.artist, song?.key, song?.ccli, song?.copyright, workspaceMode]);
+
+  // Clean up any pending timers on unmount
+  useEffect(() => {
+    return () => {
+      if (primaryDebounceTimer.current) clearTimeout(primaryDebounceTimer.current);
+      if (transDebounceTimer.current) clearTimeout(transDebounceTimer.current);
+      if (metaDebounceTimer.current) clearTimeout(metaDebounceTimer.current);
+    };
+  }, []);
 
   const slides = song ? getFormattedSlides(song, linesPerSlide) : [];
   const includeCredits = showSongCredits && linesPerSlide === 'auto';
@@ -240,26 +251,47 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
     send(slides[next], { direct: true });
   }
 
+  function handleModeChange(mode: 'buttons' | 'text') {
+    if (mode === 'text' && song) {
+      const primaryStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.text || ''}`).join('\n\n');
+      setPrimaryTextDraft(primaryStr);
+      const transStr = song.slides.map((s) => `[${s.label || 'Verse'}]\n${s.translation || ''}`).join('\n\n');
+      setTranslationTextDraft(transStr);
+    } else if (mode === 'buttons' && song) {
+      if (primaryDebounceTimer.current) {
+        clearTimeout(primaryDebounceTimer.current);
+      }
+      commitPrimaryText(primaryTextDraft);
+      if (transDebounceTimer.current) {
+        clearTimeout(transDebounceTimer.current);
+      }
+      commitTranslationText(translationTextDraft);
+    }
+    setWorkspaceMode(mode);
+  }
+
   // Parse structured text ([Verse 1]\n...) into SongSlides
   function parseSectionsFromText(rawText: string): Array<{ label: string; text: string }> {
     const lines = rawText.split('\n');
     const sections: Array<{ label: string; text: string }> = [];
     let currentLabel = 'Verse 1';
     let currentLines: string[] = [];
+    let hasHeader = false;
 
     for (const line of lines) {
       const match = line.trim().match(/^\[([^\]]+)\]$/);
       if (match) {
-        if (currentLines.length > 0 || sections.length > 0) {
+        if (hasHeader || currentLines.length > 0) {
           sections.push({ label: currentLabel, text: currentLines.join('\n').trim() });
           currentLines = [];
         }
         currentLabel = match[1].trim();
+        hasHeader = true;
       } else {
         currentLines.push(line);
       }
     }
-    if (currentLines.length > 0 || sections.length === 0) {
+    if (hasHeader || currentLines.length > 0 || sections.length === 0) {
       sections.push({ label: currentLabel, text: currentLines.join('\n').trim() });
     }
     return sections;
@@ -285,9 +317,11 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
     isTypingPrimaryRef.current = true;
     if (primaryDebounceTimer.current) clearTimeout(primaryDebounceTimer.current);
     primaryDebounceTimer.current = setTimeout(() => {
-      isTypingPrimaryRef.current = false;
       commitPrimaryText(text);
-    }, 450);
+      setTimeout(() => {
+        isTypingPrimaryRef.current = false;
+      }, 400);
+    }, 600);
   }
 
   function commitTranslationText(text: string) {
@@ -308,9 +342,11 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
     isTypingTransRef.current = true;
     if (transDebounceTimer.current) clearTimeout(transDebounceTimer.current);
     transDebounceTimer.current = setTimeout(() => {
-      isTypingTransRef.current = false;
       commitTranslationText(text);
-    }, 450);
+      setTimeout(() => {
+        isTypingTransRef.current = false;
+      }, 400);
+    }, 600);
   }
 
   function handleSaveMetadata(patch: Partial<Song>) {
@@ -371,17 +407,35 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
             <BlockSegment>
               <BlockButton
                 active={workspaceMode === 'text'}
-                onClick={() => setWorkspaceMode('text')}
+                onClick={() => handleModeChange('text')}
                 title="Switch to full text editor view"
               >
                 Text
               </BlockButton>
               <BlockButton
                 active={workspaceMode === 'buttons'}
-                onClick={() => setWorkspaceMode('buttons')}
+                onClick={() => handleModeChange('buttons')}
                 title="Switch to slide cards button view"
               >
                 Buttons
+              </BlockButton>
+            </BlockSegment>
+
+            {/* Song FS / LT Output Mode Switcher */}
+            <BlockSegment>
+              <BlockButton
+                active={songOutputMode === 'fullscreen'}
+                onClick={() => setSongOutputMode('fullscreen')}
+                title="Song Fullscreen Output Mode (FS)"
+              >
+                FS
+              </BlockButton>
+              <BlockButton
+                active={songOutputMode === 'lowerThird'}
+                onClick={() => setSongOutputMode('lowerThird')}
+                title="Song Lower Third Output Mode (LT)"
+              >
+                LT
               </BlockButton>
             </BlockSegment>
 
@@ -514,7 +568,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                   value={primaryTextDraft}
                   onChange={(e) => handleSavePrimaryText(e.target.value)}
                   onBlur={() => {
-                    isTypingPrimaryRef.current = false;
+                    if (primaryDebounceTimer.current) clearTimeout(primaryDebounceTimer.current);
                     commitPrimaryText(primaryTextDraft);
                   }}
                   placeholder="[Verse 1]&#10;Enter primary lyrics here..."
@@ -601,7 +655,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                     value={translationTextDraft}
                     onChange={(e) => handleSaveTranslationText(e.target.value)}
                     onBlur={() => {
-                      isTypingTransRef.current = false;
+                      if (transDebounceTimer.current) clearTimeout(transDebounceTimer.current);
                       commitTranslationText(translationTextDraft);
                     }}
                     placeholder="PLEASE SELECT TWO DISTINCT LANGUAGES OR ENTER TRANSLATED LYRICS"

@@ -10,12 +10,20 @@ import { useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { resolveBgVideoLoop } from '../utils/background';
 import { ensureTheme } from '../utils/defaultTheme';
+import { resolveEffectiveOutputMode } from '../utils/outputMode';
 import type { ProgramSurfaceState } from '../components/display/ProgramSurface';
 
 /** What the audience is seeing now. */
 export function useProgramSurfaceState(): ProgramSurfaceState {
   const scene = useAppStore((s) => s.display.currentScene);
-  const outputMode = useAppStore((s) => s.display.outputMode);
+  const rawOutputMode = useAppStore((s) => s.display.outputMode);
+  const bibleOutputMode = useAppStore((s) => s.display.bibleOutputMode);
+  const songOutputMode = useAppStore((s) => s.display.songOutputMode);
+  const outputMode = resolveEffectiveOutputMode(scene, {
+    outputMode: rawOutputMode,
+    bibleOutputMode,
+    songOutputMode,
+  });
   const rawTheme = useAppStore((s) => s.activeTheme);
   const theme = useMemo(() => ensureTheme(rawTheme), [rawTheme]);
   const activeAlert = useAppStore((s) => s.activeAlert);

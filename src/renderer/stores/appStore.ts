@@ -120,6 +120,8 @@ interface AppState {
   /** Studio: send what's in preview to the audience. */
   takeToProgram: (transition?: boolean) => void;
   setOutputMode: (mode: 'fullscreen' | 'lowerThird') => void;
+  setBibleOutputMode: (mode: 'fullscreen' | 'lowerThird') => void;
+  setSongOutputMode: (mode: 'fullscreen' | 'lowerThird') => void;
   setOutputStatus: (status: Partial<DisplayState['outputStatus']>) => void;
   setCurrentScene: (scene: Scene | null) => void;
   setPreviewScene: (scene: Scene | null) => void;
@@ -303,6 +305,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   display: {
     mode: 'basic',
     outputMode: 'fullscreen',
+    bibleOutputMode: 'fullscreen',
+    songOutputMode: 'fullscreen',
     outputStatus: {
       isOpen: false,
       url: '',
@@ -319,7 +323,38 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   },
 
   setMode: (mode) => set((s) => ({ display: { ...s.display, mode } })),
-  setOutputMode: (outputMode) => set((s) => ({ display: { ...s.display, outputMode } })),
+  setBibleOutputMode: (bibleOutputMode) =>
+    set((s) => ({
+      display: {
+        ...s.display,
+        bibleOutputMode,
+        outputMode: s.display.currentScene?.type === 'bible' || s.display.previewScene?.type === 'bible'
+          ? bibleOutputMode
+          : s.display.outputMode,
+      },
+    })),
+  setSongOutputMode: (songOutputMode) =>
+    set((s) => ({
+      display: {
+        ...s.display,
+        songOutputMode,
+        outputMode: s.display.currentScene?.type === 'song' || s.display.previewScene?.type === 'song'
+          ? songOutputMode
+          : s.display.outputMode,
+      },
+    })),
+  setOutputMode: (outputMode) =>
+    set((s) => {
+      const activeType = s.display.previewScene?.type || s.display.currentScene?.type;
+      return {
+        display: {
+          ...s.display,
+          outputMode,
+          ...(activeType === 'bible' ? { bibleOutputMode: outputMode } : {}),
+          ...(activeType === 'song' ? { songOutputMode: outputMode } : {}),
+        },
+      };
+    }),
   setOutputStatus: (status) => set((s) => ({ display: { ...s.display, outputStatus: { ...s.display.outputStatus, ...status } } })),
   setCurrentScene: (scene) => set((s) => ({ display: { ...s.display, currentScene: scene } })),
   setPreviewScene: (scene) => set((s) => ({ display: { ...s.display, previewScene: scene } })),
@@ -796,6 +831,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     isWorkspaceLocked: state.isWorkspaceLocked,
     doubleClickToGoLive: state.doubleClickToGoLive,
     outputMode: state.display.outputMode,
+    bibleOutputMode: state.display.bibleOutputMode ?? 'fullscreen',
+    songOutputMode: state.display.songOutputMode ?? 'fullscreen',
     operatingMode: state.display.mode,
     syncTranscriptWithLive: state.syncTranscriptWithLive,
     liveScripturePrefs: {

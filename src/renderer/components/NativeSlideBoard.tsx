@@ -123,6 +123,7 @@ export function slideElementsFor(slide: Pick<PresentationSlide, 'title' | 'body'
 export function slideBoardBackground(background: SlideBackground | undefined): string {
   const type = background?.type || 'color';
   const value = background?.value;
+  if (value === 'transparent' || value === 'none' || type === 'transparent') return 'transparent';
   if (!value) return '#18181b';
   return type === 'gradient' || type === 'color' ? value : '#18181b';
 }

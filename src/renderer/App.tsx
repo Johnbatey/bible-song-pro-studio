@@ -18,6 +18,7 @@ import { useStoreSync } from './hooks/useStoreSync';
 export { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
 import { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
 import { ensureTheme } from './utils/defaultTheme';
+import { resolveEffectiveOutputMode } from './utils/outputMode';
 import { sanitizeForIpc } from './utils/sanitize-ipc';
 import { setUiLocale as applyI18nLocale } from '../i18n';
 
@@ -77,9 +78,10 @@ export function App() {
     const sendState = () => {
       const state = useAppStore.getState();
       const activeTheme = ensureTheme(state.activeTheme);
+      const effectiveOutputMode = resolveEffectiveOutputMode(state.display.currentScene, state.display);
       window.BSP.display.sendState(sanitizeForIpc({
         scene: state.display.currentScene,
-        outputMode: state.display.outputMode,
+        outputMode: effectiveOutputMode,
         theme: activeTheme,
         /* Only a room announcement travels. Operator notices live in
            `state.notice` and are deliberately absent from this payload. */
@@ -93,8 +95,8 @@ export function App() {
         videoTransport: state.display.videoTransport.target === 'program'
           ? state.display.videoTransport
           : null,
-        ...displayFieldsFor(activeTheme, state.display.outputMode),
-        ...backgroundFieldsFor(state.display.currentScene, activeTheme, state.display.outputMode),
+        ...displayFieldsFor(activeTheme, effectiveOutputMode),
+        ...backgroundFieldsFor(state.display.currentScene, activeTheme, effectiveOutputMode),
       })).then((nextState) => {
         useAppStore.getState().setOutputStatus({
           updatedAt: nextState?.updatedAt || Date.now(),
@@ -106,6 +108,8 @@ export function App() {
       if (
         state.display.currentScene !== prev.display.currentScene ||
         state.display.outputMode !== prev.display.outputMode ||
+        state.display.bibleOutputMode !== prev.display.bibleOutputMode ||
+        state.display.songOutputMode !== prev.display.songOutputMode ||
         state.activeTheme !== prev.activeTheme ||
         state.activeAlert !== prev.activeAlert ||
         state.display.blackout !== prev.display.blackout ||

@@ -7,7 +7,7 @@ export interface CustomSlideTemplate {
   createdAt: number;
   updatedAt: number;
   background?: {
-    type: 'color' | 'gradient' | 'image' | 'video';
+    type: 'color' | 'gradient' | 'image' | 'video' | 'transparent';
     value: string;
     loop?: boolean;
     fit?: 'cover' | 'contain';

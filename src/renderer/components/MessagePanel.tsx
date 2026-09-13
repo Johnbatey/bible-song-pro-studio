@@ -1,18 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { Block } from './Block';
-import { type } from '../styles/type';
+import { type, fontWeight } from '../styles/type';
 import type { Alert, Scene } from '../types';
 
 const STORAGE_KEY_RECENT = 'bsp_recent_announcements';
 const STORAGE_KEY_SAVED_NOTES = 'bsp_announce_saved_notes_list';
 const STORAGE_KEY_ACTIVE_NOTE_ID = 'bsp_announce_active_note_id';
 
-interface SavedNote {
+export interface SavedNote {
   id: string;
   title: string;
   content: string;
   updatedAt: number;
+}
+
+function formatNoteTime(timestamp: number): string {
+  if (!timestamp) return '';
+  const now = new Date();
+  const date = new Date(timestamp);
+  const isToday = now.toDateString() === date.toDateString();
+  
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = yesterday.toDateString() === date.toDateString();
+
+  const timeStr = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (isToday) return `Today, ${timeStr}`;
+  if (isYesterday) return `Yesterday, ${timeStr}`;
+  return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
 }
 
 export function MessagePanel() {
@@ -43,28 +59,48 @@ export function MessagePanel() {
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SAVED_NOTES);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
       // Legacy fallback
       const oldNotes = localStorage.getItem('bsp_announce_service_notes');
       if (oldNotes) {
         return [{ id: 'default', title: 'Service Notes', content: oldNotes, updatedAt: Date.now() }];
       }
-      return [{ id: 'default', title: 'Service Notes', content: '', updatedAt: Date.now() }];
+      return [
+        {
+          id: 'note-welcome',
+          title: 'Welcome & Announcements',
+          content: 'Welcome to our service today!\n\n• First-time guests: Please fill out our connect card at the welcome desk.\n• Wednesday Night Bible Study at 7:00 PM.\n• Youth & Children ministries meet this Friday at 6:30 PM.',
+          updatedAt: Date.now(),
+        },
+      ];
     } catch {
       return [{ id: 'default', title: 'Service Notes', content: '', updatedAt: Date.now() }];
     }
   });
 
   const [activeNoteId, setActiveNoteId] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_KEY_ACTIVE_NOTE_ID) || 'default';
+    return localStorage.getItem(STORAGE_KEY_ACTIVE_NOTE_ID) || 'note-welcome';
   });
 
-  const activeNote = savedNotes.find((n) => n.id === activeNoteId) || savedNotes[0] || { id: 'default', title: 'Service Notes', content: '', updatedAt: Date.now() };
+  const activeNote = useMemo(() => {
+    return savedNotes.find((n) => n.id === activeNoteId) || savedNotes[0] || {
+      id: 'default',
+      title: 'Service Notes',
+      content: '',
+      updatedAt: Date.now(),
+    };
+  }, [savedNotes, activeNoteId]);
+
   const [noteTitle, setNoteTitle] = useState(activeNote.title);
   const [noteContent, setNoteContent] = useState(activeNote.content);
+  const [noteSearch, setNoteSearch] = useState('');
   const [copiedNote, setCopiedNote] = useState(false);
   const [isSavedFlash, setIsSavedFlash] = useState(false);
   const [hoveredNoteId, setHoveredNoteId] = useState<string | null>(null);
+  const [isNotesListOpen, setIsNotesListOpen] = useState(false);
 
   // History state
   const [recentList, setRecentList] = useState<string[]>(() => {
@@ -80,8 +116,10 @@ export function MessagePanel() {
   const [hoveredHistoryIndex, setHoveredHistoryIndex] = useState<number | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const notesDropdownRef = useRef<HTMLDivElement>(null);
+  const saveDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Keep noteTitle and noteContent synced when active note changes
+  // Sync editor fields when switching active note
   useEffect(() => {
     const current = savedNotes.find((n) => n.id === activeNoteId);
     if (current) {
@@ -97,6 +135,48 @@ export function MessagePanel() {
       localStorage.setItem(STORAGE_KEY_ACTIVE_NOTE_ID, activeNoteId);
     } catch {}
   }, [savedNotes, activeNoteId]);
+
+  // Close notes popover on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        isNotesListOpen &&
+        notesDropdownRef.current &&
+        !notesDropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsNotesListOpen(false);
+      }
+    }
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [isNotesListOpen]);
+
+  // Auto-save typing with 300ms debounce
+  const updateActiveNoteContent = (newTitle: string, newContent: string) => {
+    setNoteTitle(newTitle);
+    setNoteContent(newContent);
+
+    if (saveDebounceTimer.current) {
+      clearTimeout(saveDebounceTimer.current);
+    }
+
+    saveDebounceTimer.current = setTimeout(() => {
+      setSavedNotes((prev) => {
+        const exists = prev.some((n) => n.id === activeNoteId);
+        if (exists) {
+          return prev.map((n) =>
+            n.id === activeNoteId
+              ? { ...n, title: newTitle.trim() || 'Untitled Note', content: newContent, updatedAt: Date.now() }
+              : n
+          );
+        }
+        return [
+          ...prev,
+          { id: activeNoteId, title: newTitle.trim() || 'Untitled Note', content: newContent, updatedAt: Date.now() },
+        ];
+      });
+    }, 300);
+  };
 
   useEffect(() => {
     const handleSyncMessage = (e: Event) => {
@@ -209,16 +289,19 @@ export function MessagePanel() {
     });
   };
 
-  const handleAddToQueue = () => {
-    if (!messageText.trim()) return;
-    const fullText = titleText.trim()
-      ? `${titleText.trim()}\n\n${messageText.trim()}`
-      : messageText.trim();
+  const handleAddToQueue = (title?: string, text?: string) => {
+    const targetTitle = title || titleText;
+    const targetText = text || messageText;
+    if (!targetText.trim()) return;
+
+    const fullText = targetTitle.trim()
+      ? `${targetTitle.trim()}\n\n${targetText.trim()}`
+      : targetText.trim();
 
     const alertId = `alert-${Date.now()}`;
     const alertConfig: Alert | undefined = mode === 'slide' ? undefined : {
       id: alertId,
-      text: messageText.trim(),
+      text: targetText.trim(),
       type: alertType,
       position: position,
       speed: speed,
@@ -228,14 +311,14 @@ export function MessagePanel() {
     };
 
     addToQueue({
-      reference: titleText.trim() || 'Announcement',
+      reference: targetTitle.trim() || 'Announcement',
       text: fullText,
       type: mode === 'overlay' ? 'ticker' : 'slide',
       source: 'Manual',
       alertConfig,
       scene: {
         id: `announcement-${Date.now()}`,
-        name: titleText.trim() || 'Announcement',
+        name: targetTitle.trim() || 'Announcement',
         type: 'presentation',
         content: { text: fullText },
       },
@@ -243,7 +326,7 @@ export function MessagePanel() {
 
     pushNotice({
       id: `q-add-${Date.now()}`,
-      text: 'Added to service queue',
+      text: 'Added announcement to service queue',
       type: 'info',
       duration: 3,
       animation: 'slideDown',
@@ -252,17 +335,21 @@ export function MessagePanel() {
 
   // Notes actions
   const handleSaveNote = () => {
+    if (saveDebounceTimer.current) clearTimeout(saveDebounceTimer.current);
     const finalTitle = noteTitle.trim() || 'Service Note';
     setSavedNotes((prev) => {
       const exists = prev.some((n) => n.id === activeNoteId);
       if (exists) {
-        return prev.map((n) => n.id === activeNoteId ? { ...n, title: finalTitle, content: noteContent, updatedAt: Date.now() } : n);
+        return prev.map((n) =>
+          n.id === activeNoteId
+            ? { ...n, title: finalTitle, content: noteContent, updatedAt: Date.now() }
+            : n
+        );
       }
       return [...prev, { id: activeNoteId, title: finalTitle, content: noteContent, updatedAt: Date.now() }];
     });
     setIsSavedFlash(true);
-    setTimeout(() => setIsSavedFlash(false), 1800);
-    pushNotice({ id: `note-save-${Date.now()}`, text: `Saved note "${finalTitle}"`, type: 'info', duration: 2, animation: 'slideDown' });
+    setTimeout(() => setIsSavedFlash(false), 1500);
   };
 
   const handleCreateNewNote = () => {
@@ -273,19 +360,37 @@ export function MessagePanel() {
       content: '',
       updatedAt: Date.now(),
     };
-    setSavedNotes((prev) => [...prev, newNote]);
+    setSavedNotes((prev) => [newNote, ...prev]);
     setActiveNoteId(newId);
     setNoteTitle(newNote.title);
     setNoteContent('');
+    setIsNotesListOpen(false);
     pushNotice({ id: `note-new-${Date.now()}`, text: 'Created new note', type: 'info', duration: 2, animation: 'slideDown' });
+  };
+
+  const handleDuplicateNote = (note: SavedNote, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const newId = `note-${Date.now()}`;
+    const dupNote: SavedNote = {
+      id: newId,
+      title: `${note.title} (Copy)`,
+      content: note.content,
+      updatedAt: Date.now(),
+    };
+    setSavedNotes((prev) => [dupNote, ...prev]);
+    setActiveNoteId(newId);
+    setNoteTitle(dupNote.title);
+    setNoteContent(dupNote.content);
+    pushNotice({ id: `note-dup-${Date.now()}`, text: `Duplicated "${note.title}"`, type: 'info', duration: 2, animation: 'slideDown' });
   };
 
   const handleDeleteNote = (noteId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (savedNotes.length <= 1) {
-      setSavedNotes([{ id: 'default', title: 'Service Notes', content: '', updatedAt: Date.now() }]);
+      const resetNote = { id: 'default', title: 'Service Notes', content: '', updatedAt: Date.now() };
+      setSavedNotes([resetNote]);
       setActiveNoteId('default');
-      setNoteTitle('Service Notes');
+      setNoteTitle(resetNote.title);
       setNoteContent('');
       return;
     }
@@ -297,12 +402,14 @@ export function MessagePanel() {
       setNoteTitle(next.title);
       setNoteContent(next.content);
     }
+    pushNotice({ id: `note-del-${Date.now()}`, text: 'Deleted note', type: 'info', duration: 2, animation: 'slideDown' });
   };
 
-  const handleCopyNotes = async () => {
-    if (!noteContent) return;
+  const handleCopyNotes = async (contentToCopy?: string) => {
+    const text = contentToCopy ?? noteContent;
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(noteContent);
+      await navigator.clipboard.writeText(text);
       setCopiedNote(true);
       pushNotice({ id: `note-copy-${Date.now()}`, text: 'Copied note text to clipboard', type: 'info', duration: 2, animation: 'slideDown' });
       setTimeout(() => setCopiedNote(false), 2000);
@@ -311,13 +418,73 @@ export function MessagePanel() {
     }
   };
 
-  const handleSendNotesToBroadcast = () => {
-    if (!noteContent.trim()) return;
-    setMessageText(noteContent.trim());
-    if (noteTitle.trim()) setTitleText(noteTitle.trim());
+  const handleLoadNoteToLive = (note?: SavedNote) => {
+    const target = note || activeNote;
+    if (!target.content.trim()) {
+      pushNotice({ id: `note-empty-${Date.now()}`, text: 'Note content is empty', type: 'warning', duration: 2, animation: 'slideDown' });
+      return;
+    }
+    setMessageText(target.content.trim());
+    if (target.title.trim()) setTitleText(target.title.trim());
     setViewTab('broadcast');
-    pushNotice({ id: `note-to-bcast-${Date.now()}`, text: 'Transferred note into broadcast editor', type: 'info', duration: 2, animation: 'slideDown' });
+    setIsNotesListOpen(false);
+    pushNotice({ id: `note-to-bcast-${Date.now()}`, text: `Loaded "${target.title}" into broadcast editor`, type: 'info', duration: 2, animation: 'slideDown' });
   };
+
+  const handleQuickProjectNote = (note: SavedNote, direct: boolean = true) => {
+    if (!note.content.trim()) return;
+    const fullText = note.title.trim()
+      ? `${note.title.trim()}\n\n${note.content.trim()}`
+      : note.content.trim();
+
+    const scene: Scene = {
+      id: `announcement-${Date.now()}`,
+      name: note.title.trim() || 'Announcement',
+      type: 'presentation',
+      content: { text: fullText },
+    };
+
+    projectScene(scene, { direct });
+    saveToRecent(note.content);
+    pushNotice({
+      id: `slide-quick-${Date.now()}`,
+      text: direct ? `Projected "${note.title}" Live` : `Cued "${note.title}" in Preview`,
+      type: 'info',
+      duration: 3,
+      animation: 'slideDown',
+    });
+  };
+
+  const handleQuickTickerNote = (note: SavedNote) => {
+    if (!note.content.trim()) return;
+    saveToRecent(note.content);
+    triggerAlert({
+      id: `alert-${Date.now()}`,
+      text: note.content.trim(),
+      type: alertType,
+      position: position,
+      speed: speed,
+      cycles: cycles,
+      duration: cycles > 0 ? cycles * (16 / speed) : 0,
+      animation: 'crawl',
+    });
+    pushNotice({
+      id: `ticker-quick-${Date.now()}`,
+      text: `Broadcasting ticker "${note.title}"`,
+      type: 'info',
+      duration: 3,
+      animation: 'slideDown',
+    });
+  };
+
+  // Filtered notes by search query
+  const filteredNotes = useMemo(() => {
+    if (!noteSearch.trim()) return savedNotes;
+    const q = noteSearch.toLowerCase();
+    return savedNotes.filter(
+      (n) => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q)
+    );
+  }, [savedNotes, noteSearch]);
 
   // History delete actions
   const handleDeleteHistorySingle = (index: number, e: React.MouseEvent) => {
@@ -381,18 +548,18 @@ export function MessagePanel() {
             title="Broadcast Live Announcements & Overlays"
             style={{
               height: 24,
-              padding: '0 5px',
+              padding: '0 6px',
               fontSize: 11,
               fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              background: 'transparent',
+              background: viewTab === 'broadcast' ? 'var(--chrome-control-active)' : 'transparent',
               border: 'none',
               borderRadius: 4,
               color: viewTab === 'broadcast' ? 'var(--tally-preview)' : 'var(--text-secondary)',
               cursor: 'pointer',
-              transition: 'color 0.15s ease',
+              transition: 'all 0.15s ease',
             }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -406,21 +573,21 @@ export function MessagePanel() {
           <button
             type="button"
             onClick={() => setViewTab('notes')}
-            title="Type, name and save private service notes or media team instructions"
+            title="Manage, create, and browse saved service notes and announcements"
             style={{
               height: 24,
-              padding: '0 5px',
+              padding: '0 6px',
               fontSize: 11,
               fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              background: 'transparent',
+              background: viewTab === 'notes' ? 'var(--chrome-control-active)' : 'transparent',
               border: 'none',
               borderRadius: 4,
               color: viewTab === 'notes' ? 'var(--tally-preview)' : 'var(--text-secondary)',
               cursor: 'pointer',
-              transition: 'color 0.15s ease',
+              transition: 'all 0.15s ease',
             }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -429,7 +596,7 @@ export function MessagePanel() {
               <line x1="16" y1="13" x2="8" y2="13" />
               <line x1="16" y1="17" x2="8" y2="17" />
             </svg>
-            <span>Notes</span>
+            <span>Notes ({savedNotes.length})</span>
           </button>
 
           {/* Tab 3: History */}
@@ -439,18 +606,18 @@ export function MessagePanel() {
             title="Recent announcements history"
             style={{
               height: 24,
-              padding: '0 5px',
+              padding: '0 6px',
               fontSize: 11,
               fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              background: 'transparent',
+              background: viewTab === 'history' ? 'var(--chrome-control-active)' : 'transparent',
               border: 'none',
               borderRadius: 4,
               color: viewTab === 'history' ? 'var(--tally-preview)' : 'var(--text-secondary)',
               cursor: 'pointer',
-              transition: 'color 0.15s ease',
+              transition: 'all 0.15s ease',
             }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -460,38 +627,6 @@ export function MessagePanel() {
             <span>History ({recentList.length})</span>
           </button>
 
-          {/* Save Button for Notes View in top chrome */}
-          {viewTab === 'notes' && (
-            <button
-              type="button"
-              onClick={handleSaveNote}
-              title="Save current note"
-              style={{
-                height: 22,
-                padding: '0 6px',
-                fontSize: 10.5,
-                fontWeight: 600,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                background: isSavedFlash ? 'var(--tally-preview, #22c55e)' : 'rgba(34, 197, 94, 0.15)',
-                border: '1px solid rgba(34, 197, 94, 0.4)',
-                borderRadius: 4,
-                color: isSavedFlash ? '#000000' : 'var(--tally-preview, #22c55e)',
-                cursor: 'pointer',
-                marginLeft: 2,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                <polyline points="17 21 17 13 7 13 7 21" />
-                <polyline points="7 3 7 8 15 8" />
-              </svg>
-              <span>{isSavedFlash ? 'Saved' : 'Save'}</span>
-            </button>
-          )}
-
           {/* Clear active overlay if currently on air */}
           {activeAlert?.text && (
             <button
@@ -500,7 +635,7 @@ export function MessagePanel() {
               title="Stop live overlay from screens"
               style={{
                 height: 22,
-                padding: '0 5px',
+                padding: '0 6px',
                 fontSize: 10,
                 fontWeight: 700,
                 display: 'inline-flex',
@@ -552,7 +687,7 @@ export function MessagePanel() {
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="3" width="20" height="18" rx="2" />
-                  <line x1="2" y1="16" x2="22" y2="16" stroke="var(--accent, #FF5500)" strokeWidth="2.5" />
+                  <line x1="2" y1="16" x2="22" y2="16" stroke="currentColor" strokeWidth="2" />
                 </svg>
                 <span>Ticker</span>
               </button>
@@ -583,7 +718,7 @@ export function MessagePanel() {
               </button>
             </div>
 
-            {/* Title / Header Input */}
+            {/* Title / Header Input with Quick Load from Saved Notes */}
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <input
@@ -618,6 +753,41 @@ export function MessagePanel() {
                   <line x1="12" y1="4" x2="12" y2="20" />
                 </svg>
               </div>
+
+              {/* Quick Load from Notes Selector */}
+              {savedNotes.length > 0 && (
+                <select
+                  className="input"
+                  value=""
+                  onChange={(e) => {
+                    const found = savedNotes.find((n) => n.id === e.target.value);
+                    if (found) {
+                      setTitleText(found.title);
+                      setMessageText(found.content);
+                      pushNotice({ id: `note-load-${Date.now()}`, text: `Loaded "${found.title}"`, type: 'info', duration: 2, animation: 'slideDown' });
+                    }
+                  }}
+                  style={{
+                    height: 28,
+                    fontSize: 11,
+                    padding: '0 6px',
+                    maxWidth: 130,
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                  title="Quick insert from saved notes"
+                >
+                  <option value="" disabled>Load Note...</option>
+                  {savedNotes.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.title || 'Untitled Note'}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               {messageText && (
                 <button
@@ -724,12 +894,13 @@ export function MessagePanel() {
                 <>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-secondary"
                     onClick={() => handleSendSlide(true)}
                     style={{
                       flex: 1.3,
-                      background: '#FF5500',
-                      borderColor: '#FF5500',
+                      background: 'var(--bg-elevated)',
+                      borderColor: 'var(--border-accent)',
+                      color: 'var(--text-primary)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -784,7 +955,7 @@ export function MessagePanel() {
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                        <circle cx="12" cy="12" r="3" />
+                        <circle cx="12" cy="3" r="3" />
                       </svg>
                       <span>Preview</span>
                     </button>
@@ -794,12 +965,13 @@ export function MessagePanel() {
                 <>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-secondary"
                     onClick={handleSendOverlay}
                     style={{
                       flex: 1.4,
-                      background: alertType === 'warning' ? '#ef4444' : '#FF5500',
-                      borderColor: 'transparent',
+                      background: alertType === 'warning' ? 'rgba(239, 68, 68, 0.18)' : 'var(--bg-elevated)',
+                      borderColor: alertType === 'warning' ? 'rgba(239, 68, 68, 0.4)' : 'var(--border-accent)',
+                      color: alertType === 'warning' ? '#ff6b6b' : 'var(--text-primary)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -843,7 +1015,7 @@ export function MessagePanel() {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={handleAddToQueue}
+                onClick={() => handleAddToQueue()}
                 title="Add announcement to the service schedule / queue"
                 style={{
                   display: 'flex',
@@ -866,110 +1038,331 @@ export function MessagePanel() {
         )}
 
         {/* ========================================================= */}
-        {/* VIEW 2: SERVICE NOTES TAB WITH SAVED NOTES LIST & NAMING   */}
+        {/* VIEW 2: SERVICE NOTES EDITOR & POPUP SAVED NOTES LIST      */}
         {/* ========================================================= */}
         {viewTab === 'notes' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, height: '100%', minHeight: 0 }}>
-            {/* Notes Selector Bar with + New Note button */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, overflowX: 'auto' }}>
-                {savedNotes.map((note) => {
-                  const isCur = note.id === activeNoteId;
-                  const isHovered = hoveredNoteId === note.id;
-                  return (
-                    <div
-                      key={note.id}
-                      onClick={() => {
-                        handleSaveNote();
-                        setActiveNoteId(note.id);
-                      }}
-                      onMouseEnter={() => setHoveredNoteId(note.id)}
-                      onMouseLeave={() => setHoveredNoteId(null)}
-                      style={{
-                        padding: '3px 8px',
-                        borderRadius: 4,
-                        background: isCur ? 'rgba(34, 197, 94, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-                        border: `1px solid ${isCur ? 'var(--tally-preview, #22c55e)' : 'rgba(255, 255, 255, 0.08)'}`,
-                        color: isCur ? 'var(--tally-preview, #22c55e)' : 'var(--text-secondary)',
-                        fontSize: 11,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span>{note.title || 'Untitled'}</span>
-                      {savedNotes.length > 1 && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 6, position: 'relative' }}>
+            
+            {/* Note Header Bar: Saved Notes Dropdown Trigger, + New Note, Title Input, Auto-save status */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+              
+              {/* Saved Notes Popover Trigger Button */}
+              <div ref={notesDropdownRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsNotesListOpen(!isNotesListOpen)}
+                  title="Browse, search, and manage saved notes"
+                  style={{
+                    height: 28,
+                    padding: '0 8px',
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    background: isNotesListOpen ? 'var(--chrome-control-active)' : 'var(--bg-secondary)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                  <span>Saved Notes</span>
+                  <span style={{ fontSize: 10, opacity: 0.6, background: 'var(--bg-elevated)', padding: '0 4px', borderRadius: 8 }}>
+                    {savedNotes.length}
+                  </span>
+                  <span style={{ fontSize: 8, opacity: 0.7 }}>{isNotesListOpen ? '▲' : '▼'}</span>
+                </button>
+
+                {/* Floating Saved Notes Popover Dropdown Card */}
+                {isNotesListOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: 4,
+                      width: 280,
+                      maxHeight: 340,
+                      background: 'var(--bg-elevated, #1a1919)',
+                      border: '1px solid var(--border-secondary, #333)',
+                      borderRadius: 'var(--radius-md, 6px)',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      padding: 8,
+                      zIndex: 100,
+                    }}
+                  >
+                    {/* Popover Header & Search Box */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: fontWeight.bold, color: 'var(--text-primary)' }}>
+                        Saved Notes List
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCreateNewNote}
+                        title="Create new note"
+                        style={{
+                          height: 20,
+                          padding: '0 6px',
+                          fontSize: 10,
+                          fontWeight: 600,
+                          background: 'var(--chrome-control)',
+                          border: '1px solid var(--border-primary)',
+                          borderRadius: 3,
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        + New
+                      </button>
+                    </div>
+
+                    {/* Search notes filter */}
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        className="input"
+                        value={noteSearch}
+                        onChange={(e) => setNoteSearch(e.target.value)}
+                        placeholder="Filter notes..."
+                        style={{
+                          width: '100%',
+                          height: 24,
+                          fontSize: 10.5,
+                          paddingLeft: 22,
+                          paddingRight: noteSearch ? 20 : 6,
+                        }}
+                      />
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="var(--text-dim)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ position: 'absolute', left: 7, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                      >
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      {noteSearch && (
                         <button
                           type="button"
-                          onClick={(e) => handleDeleteNote(note.id, e)}
-                          title="Delete this note"
+                          onClick={() => setNoteSearch('')}
                           style={{
+                            position: 'absolute',
+                            right: 4,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
                             border: 'none',
                             background: 'transparent',
-                            color: 'inherit',
+                            color: 'var(--text-dim)',
                             cursor: 'pointer',
-                            padding: '0 2px',
                             fontSize: 10,
-                            opacity: isHovered || isCur ? 0.7 : 0,
-                            pointerEvents: isHovered || isCur ? 'auto' : 'none',
+                            padding: '2px 4px',
                           }}
                         >
                           ✕
                         </button>
                       )}
                     </div>
-                  );
-                })}
+
+                    {/* Scrollable Note Items */}
+                    <div
+                      style={{
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                        paddingRight: 2,
+                      }}
+                    >
+                      {filteredNotes.length === 0 ? (
+                        <div style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center', padding: '16px 4px' }}>
+                          No notes found.
+                        </div>
+                      ) : (
+                        filteredNotes.map((note) => {
+                          const isCur = note.id === activeNoteId;
+                          const isHov = hoveredNoteId === note.id;
+                          const snippet = note.content
+                            ? note.content.replace(/\n+/g, ' ').slice(0, 60)
+                            : 'Empty note...';
+
+                          return (
+                            <div
+                              key={note.id}
+                              onClick={() => {
+                                setActiveNoteId(note.id);
+                                setIsNotesListOpen(false);
+                              }}
+                              onMouseEnter={() => setHoveredNoteId(note.id)}
+                              onMouseLeave={() => setHoveredNoteId(null)}
+                              style={{
+                                padding: '5px 7px',
+                                borderRadius: 4,
+                                background: isCur
+                                  ? 'var(--chrome-control-active)'
+                                  : isHov
+                                    ? 'var(--bg-hover)'
+                                    : 'var(--bg-secondary)',
+                                border: `1px solid ${
+                                  isCur ? 'var(--border-accent)' : 'var(--border-primary)'
+                                }`,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 2,
+                                transition: 'all 0.1s ease',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: isCur ? fontWeight.bold : fontWeight.semibold,
+                                    color: isCur ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    flex: 1,
+                                  }}
+                                >
+                                  {note.title || 'Untitled Note'}
+                                </span>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                                  {/* Duplicate */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleDuplicateNote(note, e)}
+                                    title="Duplicate note"
+                                    style={{
+                                      width: 16,
+                                      height: 16,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      color: 'var(--text-dim)',
+                                      cursor: 'pointer',
+                                      padding: 0,
+                                    }}
+                                  >
+                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                    </svg>
+                                  </button>
+
+                                  {/* Delete */}
+                                  {savedNotes.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleDeleteNote(note.id, e)}
+                                      title="Delete note"
+                                      style={{
+                                        width: 16,
+                                        height: 16,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        color: 'var(--tally-fault, #ff6b6b)',
+                                        cursor: 'pointer',
+                                        padding: 0,
+                                      }}
+                                    >
+                                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div style={{ fontSize: 9.5, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {snippet}
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 8.5, color: 'var(--text-dim)', opacity: 0.8 }}>
+                                <span>{formatNoteTime(note.updatedAt)}</span>
+                                <span>{note.content.length}c</span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* Quick + New Button */}
               <button
                 type="button"
                 onClick={handleCreateNewNote}
-                title="Create a new service note"
+                title="Create a new note"
                 style={{
-                  height: 22,
-                  padding: '0 6px',
-                  fontSize: 10.5,
+                  height: 28,
+                  padding: '0 8px',
+                  fontSize: 11.5,
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 3,
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: 4,
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: 'var(--radius-sm)',
                   color: 'var(--text-primary)',
                   cursor: 'pointer',
                   flexShrink: 0,
                 }}
               >
-                <span>+ New</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span>New</span>
               </button>
-            </div>
 
-            {/* Note Title Input */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Note Title Input */}
               <div style={{ position: 'relative', flex: 1 }}>
                 <input
                   type="text"
                   className="input"
                   value={noteTitle}
-                  onChange={(e) => setNoteTitle(e.target.value)}
+                  onChange={(e) => updateActiveNoteContent(e.target.value, noteContent)}
+                  onBlur={handleSaveNote}
                   placeholder="Note Title / Subject..."
                   style={{
                     width: '100%',
-                    height: 26,
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    paddingLeft: 24,
+                    height: 28,
+                    fontSize: 12,
+                    fontWeight: fontWeight.bold,
+                    paddingLeft: 26,
                   }}
                 />
                 <svg
-                  width="11"
-                  height="11"
+                  width="12"
+                  height="12"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="var(--text-dim)"
@@ -983,81 +1376,80 @@ export function MessagePanel() {
                 </svg>
               </div>
 
-              <span style={{ ...type.caption, color: 'var(--text-dim)', fontSize: 10, flexShrink: 0 }}>
-                {noteContent.length} chars
-              </span>
+              {/* Auto-saved indicator with stats */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '0 2px' }}>
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: 'var(--tally-preview, #22c55e)',
+                    boxShadow: '0 0 5px rgba(34, 197, 94, 0.6)',
+                  }}
+                />
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                  {isSavedFlash ? 'Saved!' : 'Auto-saved'}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7, marginLeft: 2, whiteSpace: 'nowrap' }}>
+                  • {noteContent.split(/\s+/).filter(Boolean).length}w
+                </span>
+              </div>
             </div>
 
             {/* Note Content Textarea */}
             <textarea
               className="input"
               value={noteContent}
-              onChange={(e) => setNoteContent(e.target.value)}
-              placeholder="Type rundown notes, announcement details, pastor's instructions, or prayer points to keep for this service..."
+              onChange={(e) => updateActiveNoteContent(noteTitle, e.target.value)}
+              onBlur={handleSaveNote}
+              placeholder="Type rundown notes, announcements, speaker cues, or media instructions for this service..."
               style={{
                 flex: 1,
                 width: '100%',
-                fontSize: 12.5,
-                lineHeight: 1.45,
+                fontSize: 13,
+                lineHeight: 1.5,
                 resize: 'none',
                 fontFamily: 'inherit',
-                padding: '8px 10px',
-                minHeight: 110,
+                padding: '10px 12px',
+                minHeight: 120,
               }}
             />
 
-            {/* Note Bottom Action Bar */}
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* Note Actions Toolbar */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap', paddingTop: 2 }}>
+              {/* Broadcast / Project Slide Button */}
               <button
                 type="button"
-                className="btn btn-primary"
-                onClick={handleSaveNote}
+                className="btn btn-secondary"
+                onClick={() => handleQuickProjectNote(activeNote, true)}
+                title="Project this note as a live presentation slide"
                 style={{
-                  flex: 1,
+                  flex: 1.2,
+                  background: 'var(--bg-elevated)',
+                  borderColor: 'var(--border-accent)',
+                  color: 'var(--text-primary)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 5,
                   height: 30,
-                  fontSize: 12,
-                  background: isSavedFlash ? 'var(--tally-preview, #22c55e)' : '#FF5500',
-                  borderColor: 'transparent',
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                  <polyline points="17 21 17 13 7 13 7 21" />
-                  <polyline points="7 3 7 8 15 8" />
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
-                <span>{isSavedFlash ? 'Saved!' : 'Save Note'}</span>
+                <span>Project Slide</span>
               </button>
 
+              {/* Broadcast Ticker Button */}
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={handleCopyNotes}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 5,
-                  height: 30,
-                  fontSize: 12,
-                }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-                <span>{copiedNote ? 'Copied!' : 'Copy'}</span>
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleSendNotesToBroadcast}
-                title="Send note text to broadcast editor for projection"
+                onClick={() => handleQuickTickerNote(activeNote)}
+                title="Broadcast this note as a crawling lower-third ticker overlay"
                 style={{
                   flex: 1.1,
                   display: 'flex',
@@ -1065,14 +1457,90 @@ export function MessagePanel() {
                   justifyContent: 'center',
                   gap: 5,
                   height: 30,
-                  fontSize: 12,
+                  fontSize: 11.5,
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="18" rx="2" />
+                  <line x1="2" y1="16" x2="22" y2="16" stroke="currentColor" strokeWidth="2" />
                 </svg>
-                <span>Load to Live</span>
+                <span>Ticker</span>
+              </button>
+
+              {/* Load to Live Editor */}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => handleLoadNoteToLive(activeNote)}
+                title="Load note text into the live announcement broadcast editor"
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  height: 30,
+                  fontSize: 11.5,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </svg>
+                <span>Edit in Live</span>
+              </button>
+
+              {/* Add to Queue */}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => handleAddToQueue(noteTitle, noteContent)}
+                title="Add note to service schedule queue"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  height: 30,
+                  padding: '0 10px',
+                  fontSize: 11.5,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span>Queue</span>
+              </button>
+
+              {/* Copy Button (Icon only) */}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => handleCopyNotes()}
+                title={copiedNote ? "Copied note text to clipboard!" : "Copy note text"}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 32,
+                  height: 30,
+                  padding: 0,
+                  flexShrink: 0,
+                }}
+              >
+                {copiedNote ? (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview, #22c55e)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
