@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type, fontSize, fontWeight } from '../styles/type';
-import { DOCKS, getDockTitle, type DockId } from './dock/docks';
+import { DOCKS, DOCK_SECTIONS, getDockTitle, type DockId } from './dock/docks';
 import { toggleDock } from './dock/dockController';
 import { resetDockLayout } from './dock/DockHost';
 import { useI18n } from '../../i18n/useI18n';
@@ -321,54 +321,61 @@ export function TitleBar() {
                 userSelect: 'none',
               }}
             >
-              {DOCKS.map((dock) => {
-                const isPopped = poppedOutDockIds.includes(dock.id);
-                const isOpen = isPopped || openDockIds.includes(dock.id);
-                const title = getDockTitle(dock.id);
-                return (
-                  <button
-                    key={dock.id}
-                    type="button"
-                    className="workspace-menu-item"
-                    onClick={() => {
-                      if (isPopped) {
-                        void window.BSP?.dock?.focusPopout?.(dock.id);
-                      } else {
-                        toggleDock(dock.id as DockId);
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      height: 28,
-                      padding: '0 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      background: 'transparent',
-                      border: 'none',
-                      color: isOpen ? '#38bdf8' : '#e4e4e7',
-                      fontSize: 12,
-                      fontWeight: isOpen ? 500 : 400,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    <span>{title}</span>
-                    {isOpen && (
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
+              {DOCK_SECTIONS.map((section, sectionIdx) => (
+                <div key={section.id}>
+                  {sectionIdx > 0 && (
+                    <div style={{ height: 1, background: 'rgba(255, 255, 255, 0.08)', margin: '6px 0' }} />
+                  )}
+                  {section.docks.map((dock) => {
+                    const isPopped = poppedOutDockIds.includes(dock.id);
+                    const isOpen = isPopped || openDockIds.includes(dock.id);
+                    const title = getDockTitle(dock.id);
+                    return (
+                      <button
+                        key={dock.id}
+                        type="button"
+                        className="workspace-menu-item"
+                        onClick={() => {
+                          if (isPopped) {
+                            void window.BSP?.dock?.focusPopout?.(dock.id);
+                          } else {
+                            toggleDock(dock.id as DockId);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          height: 28,
+                          padding: '0 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: 'transparent',
+                          border: 'none',
+                          color: isOpen ? '#38bdf8' : '#e4e4e7',
+                          fontSize: 12,
+                          fontWeight: isOpen ? 500 : 400,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        <span>{title}</span>
+                        {isOpen && (
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
 
               <div style={{ height: 1, background: 'rgba(255, 255, 255, 0.08)', margin: '6px 0' }} />
 
