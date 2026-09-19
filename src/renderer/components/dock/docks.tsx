@@ -8,7 +8,6 @@ import { SongsPanel } from '../SongsPanel';
 import { LiveScripturePanel } from '../LiveScripturePanel';
 import { MediaPanel } from '../MediaPanel';
 import { PresentationPanel } from '../PresentationPanel';
-import { ThemePanel } from '../ThemePanel';
 import { StagePanel } from '../StagePanel';
 import { MessagePanel } from '../MessagePanel';
 import { ErrorBoundary } from '../ErrorBoundary';
@@ -21,19 +20,11 @@ import { t, dockMessageKey, type MessageKey } from '../../../i18n';
  * tabs from this, DockHost registers it with dockview, and the default layout
  * references these ids.
  *
- * `nav: true` means the dock gets a tab in the title bar. Themes is reachable
- * from its own toolbar button, so it does not need to spend a tab.
+ * `nav: true` means the dock gets a tab in the title bar.
  *
  * `group` is the four questions an operator is ever asking of this window:
  * what am I sending, where does it go, what is the service doing, and what
- * does it look like. Every panel answers exactly one of them, and the order
- * below is the order of the work — you pick something, it goes to a screen,
- * the service runs, and the look is the thing you set once and leave alone.
- *
- * Listed flat, the twelve panels were twelve equal choices with no shape; the
- * only grouping anywhere was a single separator in the native menu splitting
- * "has a tab" from "does not", which is a fact about the chrome rather than
- * about the work.
+ * does it look like.
  */
 export type DockGroup = 'sources' | 'displays' | 'service' | 'looks';
 
@@ -54,15 +45,6 @@ export interface DockDef {
 /* In group order, so this list reads as the taxonomy rather than as the order
    the panels happened to be written in. */
 export const DOCKS = [
-  /* Bible, matching the id.
-     The app is called Bible Song Pro, so its own name already teaches the
-     operator that the two libraries here are Bible and Songs. A panel titled
-     Scripture would make the product name the only place that word appears.
-
-     Scripture is not retired — the two words split by job. Bible is the source
-     you open and browse: this panel, the Bible settings tab, Bible version,
-     Bible book. Scripture is the text once it is detected or on screen: Live
-     Scripture, the Scripture accordion in the theme designer. */
   { id: 'bible', title: 'Bible', nav: true, group: 'sources' },
   { id: 'songs', title: 'Songs', nav: true, group: 'sources' },
   { id: 'presentation', title: 'Pro Slides', nav: true, group: 'sources' },
@@ -76,8 +58,6 @@ export const DOCKS = [
   { id: 'transcript', title: 'Live transcript', nav: false, group: 'service' },
   { id: 'queue', title: 'Queue', nav: false, group: 'service' },
   { id: 'history', title: 'History', nav: false, group: 'service' },
-
-  { id: 'themes', title: 'Themes', nav: false, group: 'looks' },
 ] as const satisfies readonly DockDef[];
 
 export type DockId = (typeof DOCKS)[number]['id'];
@@ -148,5 +128,4 @@ export const DOCK_COMPONENTS: Record<string, React.FunctionComponent<IDockviewPa
   messages: panel('Announce', () => <MessagePanel />, true),
   media: panel('Media', () => <MediaPanel />, true),
   stage: panel('Stage Display', () => <StagePanel />, true),
-  themes: panel('Themes', () => <ThemePanel />, true),
 };
