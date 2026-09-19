@@ -98,10 +98,11 @@ export function StagePanel() {
      because from the desk they are the same decision — the difference between
      "shipped with the app" and "I made this" belongs in the sublabel, not in
      two separate controls. */
+  const PRESET_OPTIONS = useMemo(() => LAYOUT_IDS.map((id) => ({ value: id, label: LAYOUTS[id].name, sublabel: t('stage.preset') })), [t]);
   const layoutOptions = useMemo(() => [
-    ...LAYOUT_IDS.map((id) => ({ value: id, label: LAYOUTS[id].name, sublabel: t('stage.preset') })),
+    ...PRESET_OPTIONS,
     ...library.layouts.map((item) => ({ value: item.id, label: item.name, sublabel: t('stage.saved') })),
-  ], [library.layouts, t]);
+  ], [PRESET_OPTIONS, library.layouts, t]);
 
   /* ── box size — measured from the viewport ── */
   const measureBox = useCallback(() => {
@@ -278,25 +279,11 @@ export function StagePanel() {
           {/* Centre: view scale controls */}
           <div style={styles.footerCentre}>
             <div className="zoombar-pill">
-              <button
-                type="button"
-                onClick={() => setZoomAround(zoom - ZOOM_STEP)}
-                title={t('stage.zoomOut')}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
-              </button>
               <input
                 type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={0.01} value={zoom}
                 onChange={(e) => setZoomAround(Number(e.currentTarget.value))}
                 title={t('stage.zoomScale')}
               />
-              <button
-                type="button"
-                onClick={() => setZoomAround(zoom + ZOOM_STEP)}
-                title={t('stage.zoomIn')}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
-              </button>
               <span className="zoombar-val">{zoomLabel}</span>
               <div className="zoombar-divider" />
               <button
@@ -452,7 +439,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 38, textAlign: 'center', color: 'var(--text-secondary)',
     fontSize: 11, fontWeight: fontWeight.bold,
   },
-  zoomSlider: { width: 88, accentColor: 'var(--chrome-control-active)' },
+  zoomSlider: { width: 88, accentColor: 'var(--accent, #FF5500)' },
   divider: { width: 1, height: 18, background: 'var(--block-line)', margin: '0 2px' },
   viewport: {
     position: 'relative', flex: 1, minWidth: 0, minHeight: 0,

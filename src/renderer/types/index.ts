@@ -1,3 +1,9 @@
+export * from './source';
+export * from './scene';
+export * from './transition';
+export * from './fx';
+export * from './recording';
+
 export interface Scene {
   id: string;
   name: string;
@@ -5,6 +11,7 @@ export interface Scene {
   content: SceneContent;
   background?: Background;
   transition?: Transition;
+  animateBackground?: boolean;
 }
 
 export interface QueueItem {
@@ -231,10 +238,30 @@ export interface Background {
   opacity?: number;
 }
 
+export type FxTransitionType =
+  | 'fade'
+  | 'zoom'
+  | 'slide-up'
+  | 'slide-down'
+  | 'slide-left'
+  | 'slide-right'
+  | 'type'
+  | 'zoom-type'
+  | 'type-words'
+  | 'zoom-type-words'
+  | 'cut';
+
+export interface FxAnimationSettings {
+  transitionType: FxTransitionType;
+  duration: number; // Duration in seconds (0.1 to 5.0)
+  animateBackground: boolean;
+}
+
 export interface Transition {
-  type: 'fade' | 'crossfade' | 'slide' | 'zoom' | 'cut' | 'custom';
+  type: 'fade' | 'crossfade' | 'slide' | 'zoom' | 'cut' | 'custom' | FxTransitionType;
   duration: number;
   easing?: string;
+  animateBackground?: boolean;
 }
 
 export interface Theme {
@@ -245,6 +272,11 @@ export interface Theme {
   slideTheme: SlideTheme;
   bibleOptions?: BibleDisplayOptions;
   songOptions?: SongDisplayOptions;
+  linkBibleSong?: boolean;
+  songFullScreen?: FullScreenTheme;
+  songLowerThird?: LowerThirdTheme;
+  bibleFullScreen?: FullScreenTheme;
+  bibleLowerThird?: LowerThirdTheme;
 }
 
 export interface LowerThirdTheme {
@@ -627,6 +659,9 @@ export interface VideoTransport {
   seekTo: number | null;
   seekNonce: number;
   muted?: boolean;
+  currentTime?: number;
+  sourceId?: string;
+  speed?: number;
 }
 
 /** What the playing surface reports back. Duration is 0 until metadata lands. */
@@ -933,6 +968,7 @@ declare global {
          */
         onResetLayout: (cb: () => void) => () => void;
         popOut: (id: string) => Promise<{ ok: boolean; error?: string }>;
+        closePopout: (id: string) => Promise<{ ok: boolean }>;
         focusPopout: (id: string) => Promise<{ ok: boolean }>;
         listPopouts: () => Promise<string[]>;
         onPopoutsChanged: (cb: (ids: string[]) => void) => () => void;

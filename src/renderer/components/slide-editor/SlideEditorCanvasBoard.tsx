@@ -38,7 +38,8 @@ interface SlideEditorCanvasBoardProps {
   selectedElementId: string | null;
   selectedElementIds?: string[];
   onSelectElement: (id: string | null, additive?: boolean) => void;
-  onUpdateElement: (id: string, updates: Partial<SlideElement>) => void;
+  onUpdateElement: (id: string, updates: Partial<SlideElement>, recordHistory?: boolean) => void;
+  onCommitHistory?: () => void;
   onUpdateSlideText: (title: string, body: string) => void;
   onDuplicateElements?: (ids?: string[]) => void;
   onAddElements?: (newEls: SlideElement[]) => void;
@@ -53,6 +54,7 @@ export function SlideEditorCanvasBoard({
   selectedElementIds,
   onSelectElement,
   onUpdateElement,
+  onCommitHistory,
   onUpdateSlideText,
   onDuplicateElements,
   onAddElements,
@@ -238,13 +240,13 @@ export function SlideEditorCanvasBoard({
             onUpdateElement(item.id, {
               x: Math.max(-50, Math.min(150, Math.round(itemNewX * 10) / 10)),
               y: Math.max(-50, Math.min(150, Math.round(itemNewY * 10) / 10)),
-            });
+            }, false);
           });
         } else {
           onUpdateElement(dragState.elementId, {
             x: Math.max(0, Math.min(100 - dragState.initialW, Math.round(newX * 10) / 10)),
             y: Math.max(0, Math.min(100 - dragState.initialH, Math.round(newY * 10) / 10)),
-          });
+          }, false);
         }
       } else {
         const handle = dragState.handle;
@@ -322,11 +324,18 @@ export function SlideEditorCanvasBoard({
           y: Math.round(ny * 10) / 10,
           width: Math.round(nw * 10) / 10,
           height: Math.round(nh * 10) / 10,
-        });
+        }, false);
       }
     }
 
-    function onPointerUp() {
+    function onPointerUp(e: PointerEvent) {
+      if (dragState) {
+        const dxPx = (e.clientX - dragState.startX) / scale;
+        const dyPx = (e.clientY - dragState.startY) / scale;
+        if (Math.abs(dxPx) > 0.5 || Math.abs(dyPx) > 0.5) {
+          if (onCommitHistory) onCommitHistory();
+        }
+      }
       setDragState(null);
       setSnapGuides({});
     }
@@ -337,7 +346,7 @@ export function SlideEditorCanvasBoard({
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
     };
-  }, [dragState, scale, smartSnap, onUpdateElement]);
+  }, [dragState, scale, smartSnap, onUpdateElement, onCommitHistory]);
 
   /* Calculate canvas-local pixel position from pointer event */
   const getCanvasPoint = (e: React.PointerEvent | PointerEvent) => {
@@ -584,12 +593,13 @@ export function SlideEditorCanvasBoard({
         currNode.h1y = currNode.y - (dragLocalY - currNode.y);
         currPts[newIdx] = currNode;
 
-        onUpdateElement(targetId, { points: currPts });
+        onUpdateElement(targetId, { points: currPts }, false);
       }
 
       function onUpNewHandle() {
         window.removeEventListener('pointermove', onDragNewHandle);
         window.removeEventListener('pointerup', onUpNewHandle);
+        if (onCommitHistory) onCommitHistory();
       }
 
       window.addEventListener('pointermove', onDragNewHandle);
@@ -631,7 +641,7 @@ export function SlideEditorCanvasBoard({
       const el = elements.find((item) => item.id === drawingPencilId);
       if (el && Array.isArray(el.points)) {
         const updatedPts = [...el.points, [pt.x, pt.y]];
-        onUpdateElement(drawingPencilId, { points: updatedPts });
+        onUpdateElement(drawingPencilId, { points: updatedPts }, false);
       }
     }
   };
@@ -691,7 +701,9 @@ export function SlideEditorCanvasBoard({
             height: nh,
             vbW: w,
             vbH: h,
-          });
+          }, true);
+        } else if (onCommitHistory) {
+          onCommitHistory();
         }
       }
       setDrawingPencilId(null);
@@ -768,14 +780,6 @@ export function SlideEditorCanvasBoard({
         }}
       >
         <div className="zoombar-pill">
-          <button
-            type="button"
-            onClick={() => setScale((s) => Math.max(0.2, s - 0.1))}
-            title={t('slideEditor.canvas.zoomOut')}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
-          </button>
-
           <input
             type="range"
             min={0.2}
@@ -785,14 +789,6 @@ export function SlideEditorCanvasBoard({
             onChange={(e) => setScale(parseFloat(e.target.value))}
             title={t('slideEditor.canvas.zoomLevel')}
           />
-
-          <button
-            type="button"
-            onClick={() => setScale((s) => Math.min(2.0, s + 0.1))}
-            title={t('slideEditor.canvas.zoomIn')}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
-          </button>
 
           <span className="zoombar-val">
             {Math.round(scale * 100)}%
@@ -988,11 +984,14 @@ export function SlideEditorCanvasBoard({
                     autoFocus
                     value={el.content}
                     onChange={(evt) => {
-                      onUpdateElement(el.id, { content: evt.target.value });
+                      onUpdateElement(el.id, { content: evt.target.value }, false);
                       if (el.id === 'title-el') onUpdateSlideText(evt.target.value, slide.body);
                       if (el.id === 'body-el') onUpdateSlideText(slide.title, evt.target.value);
                     }}
-                    onBlur={() => setEditingTextId(null)}
+                    onBlur={() => {
+                      setEditingTextId(null);
+                      if (onCommitHistory) onCommitHistory();
+                    }}
                     style={{
                       width: '100%', height: '100%',
                       background: 'transparent', border: 'none', outline: 'none',
@@ -1202,7 +1201,7 @@ export function SlideEditorCanvasBoard({
 
                         ptsCopy[nodeIdx] = currNode;
                         latestPts = ptsCopy;
-                        onUpdateElement(el.id, { points: ptsCopy });
+                        onUpdateElement(el.id, { points: ptsCopy }, false);
                       }
 
                       function onNodeUp() {
@@ -1212,6 +1211,7 @@ export function SlideEditorCanvasBoard({
                         if (upEl && (upEl.closed || activeTool !== 'bezier')) {
                           optimizeBezierBounds({ ...upEl, points: latestPts });
                         }
+                        if (onCommitHistory) onCommitHistory();
                       }
 
                       window.addEventListener('pointermove', onNodeMove);

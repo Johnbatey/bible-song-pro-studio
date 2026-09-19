@@ -328,79 +328,182 @@ select option:hover, select option:focus, select option:checked {
   padding: var(--block-gap);
 }
 
-/* Each group is drawn as a window block, so a dock is visually the same
-   object as a .blk whether or not the panel inside draws its own chrome. */
+/* Each group is drawn as a window block with crisp borders */
 .bsp-dock .dv-groupview {
-  background: var(--block-bg);
-  border: 1px solid var(--block-line);
-  border-radius: var(--block-radius);
+  background: var(--block-bg, #141416);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
   overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Active / Focused Group gets the clean blue border as in Adobe Premiere */
+.bsp-dock .dv-groupview.dv-active-group {
+  border: 1px solid #2563eb;
 }
 
 .bsp-dock .dv-tabs-and-actions-container {
-  border-bottom: 1px solid var(--block-line);
+  background: #121214;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  height: 32px;
 }
 
-/* Dock title bar: name on the left, pop-out and close on the right.
-   A custom tab component does not get dockview's .dv-default-tab class, so the
-   type has to be set here rather than inherited from the theme block. */
+.bsp-dock .dv-tabs-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 2px;
+}
+
+.bsp-dock .dv-tab {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  cursor: pointer;
+  height: 32px;
+}
+
+/* Dock title bar: title on the left, burger button beside it on active tab */
 .dock-tab {
   display: flex;
   align-items: center;
-  gap: 4px;
-  width: 100%;
-  min-width: 0;
   height: 100%;
-  padding: 0 6px 0 10px;
-  font-size: var(--fs-label);
+  padding: 0 10px;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dock-tab__content {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  position: relative;
+  padding: 0 2px;
 }
 
 .dock-tab__title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-family: var(--font-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim, #71717a);
   white-space: nowrap;
-  letter-spacing: var(--ls-caps);
-  text-transform: uppercase;
-  font-weight: var(--fw-semibold);
+  text-transform: none;
+  letter-spacing: 0;
+  transition: color 0.12s ease;
 }
 
-/* Quiet until the dock is hovered — the same rule the queue + follows, so a
-   row of docks reads as titles rather than as a row of buttons. */
-.dock-tab__action {
-  display: flex;
+.dock-tab--active .dock-tab__title,
+.dv-tab.dv-active-tab .dock-tab__title {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.dock-tab--inactive:hover .dock-tab__title,
+.dv-tab:not(.dv-active-tab):hover .dock-tab__title {
+  color: var(--text-secondary, #d4d4d8);
+}
+
+/* Burger SVG Icon (3 parallel horizontal lines) — ONLY on active tab */
+.dock-tab__burger {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  padding: 0;
+  width: 18px;
+  height: 18px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 3px;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--text-secondary, #a1a1aa);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+  padding: 0;
+  margin-left: 1px;
+  transition: all 0.15s ease;
+  opacity: 0.85;
 }
 
-.dv-groupview:hover .dock-tab__action,
-.dv-active-group .dock-tab__action,
-.dock-tab__action:focus-visible {
+.dock-tab__burger:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
   opacity: 1;
 }
 
-.dock-tab__action:hover {
-  background: var(--chrome-control-active);
+/* Active Underline Bar below active tab */
+.dock-tab__active-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ffffff;
+  border-radius: 1px 1px 0 0;
+}
+
+/* Dropdown Menu Backdrop & Card */
+.dock-tab-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background: transparent;
+}
+
+.dock-tab-menu {
+  min-width: 175px;
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: fadeIn 0.1s ease-out;
+}
+
+.dock-tab-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  font-family: var(--font-ui, -apple-system, BlinkMacSystemFont, sans-serif);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-primary, #f4f4f5);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.dock-tab-menu__item:hover {
+  background: var(--accent, #FF5500);
   color: #ffffff;
 }
 
-/* The bar dockview renders above a floating group's tabs IS its move handle,
-   but it ships transparent — invisible, so there is nothing to aim at and the
-   window feels stuck. Give it a surface, a grip and a move cursor. */
+.dock-tab-menu__item--dim {
+  color: var(--text-dim, #a1a1aa);
+}
+
+.dock-tab-menu__icon,
+.dock-tab-menu__shortcut {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.dock-tab-menu__divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 3px 0;
+}
+
+/* Floating titlebar for dragging floating groups */
 .bsp-dock .dv-floating-titlebar {
-  background: var(--chrome-control);
+  background: var(--chrome-control, #1c1c1f);
   border-bottom: 1px solid var(--block-line);
   cursor: move;
   display: flex;
@@ -422,8 +525,6 @@ select option:hover, select option:focus, select option:checked {
   opacity: 0.8;
 }
 
-/* A floating dock is lifted off the layout, so it gets the shadow and a full
-   border rather than sitting flush in the grid. */
 .bsp-dock .dv-floating-overlay-host .dv-groupview,
 .bsp-dock .dv-resize-container .dv-groupview {
   border: 1px solid var(--block-line);
@@ -441,17 +542,76 @@ select option:hover, select option:focus, select option:checked {
   overflow: hidden;
 }
 
-.dock-popout {
-  width: 100%;
-  height: 100%;
+/* Popout Standalone Window Styling */
+.dock-popout-window {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #a8a8ad; /* Light silver/grey macOS wrap bar background */
+  box-sizing: border-box;
+  overflow: hidden;
+  user-select: none;
+}
+
+.dock-popout-top-bar {
+  height: 26px;
+  background: linear-gradient(180deg, #c7c7cc 0%, #a8a8ad 100%);
+  position: relative;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.dock-popout-drag {
+  position: absolute;
+  inset: 0;
+  -webkit-app-region: drag;
+}
+
+.dock-popout-frame {
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary, #0C0B0B);
+  background: #141416;
+  border: 1px solid #2563eb; /* 1px crisp blue border */
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
-.dock-popout > .dock-panel {
+.dock-popout-tab-row {
+  height: 32px;
+  background: #141416;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+
+.dock-popout-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  position: relative;
+  padding: 0 2px;
+  -webkit-app-region: no-drag;
+}
+
+.dock-popout-tab .dock-tab__title {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.dock-popout-body {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #141416;
 }
 
 /* When a panel IS a single block, the group frame is already its border —
@@ -1333,88 +1493,173 @@ select option:hover, select option:focus, select option:checked {
   margin-top: 2px;
 }
 
-/* ── Sleek Zoom Pill Template Control ── */
+/* ── Sleek Minimalist Zoom Control ── */
 .zoombar-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
-  padding: 0 8px;
+  height: 24px;
+  padding: 0 2px;
   box-sizing: border-box;
-  background: rgba(20, 20, 22, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-md);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   font-family: var(--font-ui);
   user-select: none;
-  backdrop-filter: blur(16px);
+  backdrop-filter: none !important;
 }
 
 .zoombar-pill button {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-dim, #8e8e93);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 2px;
-  transition: color 0.15s ease;
+  opacity: 0.8;
+  transition: color 0.12s ease, opacity 0.12s ease;
 }
 
 .zoombar-pill button:hover {
   color: #ffffff;
+  opacity: 1;
 }
 
 .zoombar-pill input[type='range'],
 input[type='range'].slider-standard,
 .chrome-zoom-slider {
-  width: 64px;
-  height: 4px;
-  accent-color: rgba(255, 255, 255, 0.85);
+  -webkit-appearance: none;
+  appearance: none;
+  width: 68px;
+  height: 16px;
+  background: transparent;
   cursor: pointer;
+  outline: none;
+  margin: 0;
+  vertical-align: middle;
+}
+
+.zoombar-pill input[type='range']::-webkit-slider-runnable-track,
+input[type='range'].slider-standard::-webkit-slider-runnable-track,
+.chrome-zoom-slider::-webkit-slider-runnable-track {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.26);
+  border-radius: 1px;
+  border: none;
+}
+
+.zoombar-pill input[type='range']::-webkit-slider-thumb,
+input[type='range'].slider-standard::-webkit-slider-thumb,
+.chrome-zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -5.5px;
+  border-radius: 50%;
+  background: #18181b;
+  border: 2px solid #8e8e93;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.12s ease, background-color 0.12s ease, transform 0.1s ease;
+}
+
+.zoombar-pill input[type='range']:hover::-webkit-slider-thumb,
+input[type='range'].slider-standard:hover::-webkit-slider-thumb,
+.chrome-zoom-slider:hover::-webkit-slider-thumb {
+  border-color: #ffffff;
+  background: #27272a;
+}
+
+.zoombar-pill input[type='range']:active::-webkit-slider-thumb,
+input[type='range'].slider-standard:active::-webkit-slider-thumb,
+.chrome-zoom-slider:active::-webkit-slider-thumb {
+  border-color: #ffffff;
+  background: #ffffff;
+  transform: scale(1.1);
+}
+
+.zoombar-pill input[type='range']::-moz-range-track,
+input[type='range'].slider-standard::-moz-range-track,
+.chrome-zoom-slider::-moz-range-track {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.26);
+  border-radius: 1px;
+  border: none;
+}
+
+.zoombar-pill input[type='range']::-moz-range-thumb,
+input[type='range'].slider-standard::-moz-range-thumb,
+.chrome-zoom-slider::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #18181b;
+  border: 2px solid #8e8e93;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.zoombar-pill input[type='range']:hover::-moz-range-thumb,
+input[type='range'].slider-standard:hover::-moz-range-thumb,
+.chrome-zoom-slider:hover::-moz-range-thumb {
+  border-color: #ffffff;
+  background: #27272a;
+}
+
+input[type='range'].theme-slider,
+.theme-slider {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--bsp-signal, #ff5500);
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  cursor: pointer;
+  outline: none;
 }
 
 .zoombar-val {
-  min-width: 36px;
+  min-width: 32px;
   text-align: center;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-dim, #8e8e93);
 }
 
 .zoombar-divider {
   width: 1px;
-  height: 14px;
-  background: rgba(255, 255, 255, 0.15);
+  height: 12px;
+  background: rgba(255, 255, 255, 0.14);
   margin: 0 2px;
 }
 
 .zoombar-fit {
-  padding: 3px 10px !important;
-  height: 24px !important;
+  padding: 1px 7px !important;
+  height: 20px !important;
   background: transparent !important;
-  border: 1px solid transparent !important;
-  border-radius: var(--radius-sm) !important;
-  color: rgba(255, 255, 255, 0.8) !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 3px !important;
+  color: var(--text-secondary, #d4d4d8) !important;
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
   cursor: pointer !important;
-  transition: all 0.15s ease !important;
+  transition: all 0.12s ease !important;
 }
 
 .zoombar-fit:hover {
   color: #ffffff !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 
 .zoombar-fit:active,
 .zoombar-fit[data-active] {
-  background: rgba(255, 255, 255, 0.2) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.38) !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: none !important;
 }
 
 /* ── LIGHT THEME (BRAND IDENTITY PAPER SURFACE) ───────────────────────────── */
@@ -1465,58 +1710,268 @@ body.light-theme .blk__title {
   color: var(--text-primary);
 }
 
+:root[data-ui-theme="light"] select,
+[data-ui-theme="light"] select,
+body.light-theme select {
+  color-scheme: light;
+}
+
+:root[data-ui-theme="light"] select option,
+:root[data-ui-theme="light"] select optgroup,
+[data-ui-theme="light"] select option,
+[data-ui-theme="light"] select optgroup,
+body.light-theme select option,
+body.light-theme select optgroup {
+  background-color: #FFFFFF !important;
+  color: #171514 !important;
+}
+
+:root[data-ui-theme="light"] select option:hover,
+:root[data-ui-theme="light"] select option:focus,
+:root[data-ui-theme="light"] select option:checked,
+[data-ui-theme="light"] select option:hover,
+[data-ui-theme="light"] select option:focus,
+[data-ui-theme="light"] select option:checked,
+body.light-theme select option:hover,
+body.light-theme select option:focus,
+body.light-theme select option:checked {
+  background-color: var(--chrome-control-active, #E5E1DC) !important;
+  color: var(--accent, #FF5500) !important;
+}
+
+/* ── DOCKVIEW LIGHT THEME OVERRIDES ── */
 [data-ui-theme="light"] .dockview-theme-abyssal,
 body.light-theme .dockview-theme-abyssal {
-  --dv-group-view-background-color: var(--bsp-ground);
-  --dv-tabs-and-actions-container-background-color: var(--bsp-ground);
-  --dv-activegroup-visible-tab-background-color: var(--bsp-surface);
-  --dv-activegroup-visible-tab-color: var(--text-primary);
-  --dv-inactivegroup-visible-tab-background-color: var(--bsp-ground);
-  --dv-inactivegroup-visible-tab-color: var(--text-secondary);
-  --dv-tab-divider-color: var(--border-primary);
-  --dv-separator-border: var(--border-primary);
+  --dv-group-view-background-color: var(--bsp-surface, #FFFFFF);
+  --dv-tabs-and-actions-container-background-color: var(--bsp-raised, #F4F2EF);
+  --dv-activegroup-visible-tab-background-color: transparent;
+  --dv-activegroup-visible-tab-color: var(--text-primary, #171514);
+  --dv-inactivegroup-visible-tab-background-color: transparent;
+  --dv-inactivegroup-visible-tab-color: var(--text-dim, #5E5854);
+  --dv-tab-divider-color: var(--border-primary, rgba(12, 11, 11, 0.12));
+  --dv-separator-border: var(--border-primary, rgba(12, 11, 11, 0.12));
 }
 
+/* Light mode dock background and window containers */
+[data-ui-theme="light"] .bsp-dock,
+body.light-theme .bsp-dock {
+  background: var(--bg-primary, #F4F2EF) !important;
+}
+
+[data-ui-theme="light"] .bsp-dock .dv-groupview,
+body.light-theme .bsp-dock .dv-groupview {
+  background: var(--bsp-surface, #FFFFFF) !important;
+  border: 1px solid var(--border-primary, rgba(12, 11, 11, 0.12)) !important;
+}
+
+[data-ui-theme="light"] .bsp-dock .dv-groupview.dv-active-group,
+body.light-theme .bsp-dock .dv-groupview.dv-active-group {
+  border: 1px solid #2563eb !important;
+}
+
+/* Window Top Bar (Tabs & Action container) in Light Mode */
+[data-ui-theme="light"] .bsp-dock .dv-tabs-and-actions-container,
+body.light-theme .bsp-dock .dv-tabs-and-actions-container {
+  background: var(--bsp-raised, #F4F2EF) !important;
+  border-bottom: 1px solid var(--border-primary, rgba(12, 11, 11, 0.12)) !important;
+}
+
+[data-ui-theme="light"] .bsp-dock .dv-floating-titlebar,
+body.light-theme .bsp-dock .dv-floating-titlebar {
+  background: var(--bsp-raised, #F4F2EF) !important;
+  border-bottom: 1px solid var(--border-primary, rgba(12, 11, 11, 0.12)) !important;
+}
+
+/* Tab title styles in Light Mode */
 [data-ui-theme="light"] .dock-tab__title,
-body.light-theme .dock-tab__title {
-  color: var(--text-primary);
-}
-
+[data-ui-theme="light"] .dock-tab--inactive .dock-tab__title,
 [data-ui-theme="light"] .dv-tab:not(.dv-active-tab) .dock-tab__title,
+body.light-theme .dock-tab__title,
+body.light-theme .dock-tab--inactive .dock-tab__title,
 body.light-theme .dv-tab:not(.dv-active-tab) .dock-tab__title {
-  color: var(--text-secondary);
+  color: var(--text-dim, #5E5854) !important;
+  font-weight: 500 !important;
 }
 
-[data-ui-theme="light"] .dv-tab,
-body.light-theme .dv-tab {
+[data-ui-theme="light"] .dock-tab--inactive:hover .dock-tab__title,
+[data-ui-theme="light"] .dv-tab:not(.dv-active-tab):hover .dock-tab__title,
+body.light-theme .dock-tab--inactive:hover .dock-tab__title,
+body.light-theme .dv-tab:not(.dv-active-tab):hover .dock-tab__title {
+  color: var(--text-primary, #171514) !important;
+}
+
+/* Active tab in Light Mode */
+[data-ui-theme="light"] .dock-tab--active .dock-tab__title,
+[data-ui-theme="light"] .dv-tab.dv-active-tab .dock-tab__title,
+body.light-theme .dock-tab--active .dock-tab__title,
+body.light-theme .dv-tab.dv-active-tab .dock-tab__title {
+  color: var(--text-primary, #171514) !important;
+  font-weight: 700 !important;
+}
+
+/* 3 Parallel Lines Burger Icon in Light Mode */
+[data-ui-theme="light"] .dock-tab__burger,
+body.light-theme .dock-tab__burger {
+  color: var(--text-secondary, #3A3634) !important;
+  opacity: 0.9 !important;
+}
+
+[data-ui-theme="light"] .dock-tab__burger:hover,
+body.light-theme .dock-tab__burger:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: #171514 !important;
+  opacity: 1 !important;
+}
+
+/* Active Tab Underline in Light Mode */
+[data-ui-theme="light"] .dock-tab__active-bar,
+body.light-theme .dock-tab__active-bar {
+  background: var(--text-primary, #171514) !important;
+}
+
+/* Dock Right Actions (chevron, dropdown count, etc.) in Light Mode */
+[data-ui-theme="light"] .bsp-dock .dv-actions-container,
+[data-ui-theme="light"] .bsp-dock .dv-right-actions-container,
+[data-ui-theme="light"] .bsp-dock .dv-tab-action,
+[data-ui-theme="light"] .bsp-dock .dv-default-tab-action,
+body.light-theme .bsp-dock .dv-actions-container,
+body.light-theme .bsp-dock .dv-right-actions-container,
+body.light-theme .bsp-dock .dv-tab-action,
+body.light-theme .bsp-dock .dv-default-tab-action {
+  color: var(--text-secondary, #3A3634) !important;
+}
+
+[data-ui-theme="light"] .bsp-dock .dv-tab-action:hover,
+[data-ui-theme="light"] .bsp-dock .dv-default-tab-action:hover,
+body.light-theme .bsp-dock .dv-tab-action:hover,
+body.light-theme .bsp-dock .dv-default-tab-action:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: var(--text-primary, #171514) !important;
+}
+
+/* Panel Context Menu / Pop up Dropdowns in Light Mode */
+[data-ui-theme="light"] .dock-tab-menu,
+body.light-theme .dock-tab-menu {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(0, 0, 0, 0.14) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-ui-theme="light"] .dock-tab-menu__item,
+body.light-theme .dock-tab-menu__item {
+  color: var(--text-primary, #171514) !important;
+}
+
+[data-ui-theme="light"] .dock-tab-menu__item:hover,
+body.light-theme .dock-tab-menu__item:hover {
+  background: var(--accent, #FF5500) !important;
+  color: #FFFFFF !important;
+}
+
+[data-ui-theme="light"] .dock-tab-menu__item--dim,
+body.light-theme .dock-tab-menu__item--dim {
+  color: var(--text-dim, #71717a) !important;
+}
+
+[data-ui-theme="light"] .dock-tab-menu__item--dim:hover,
+body.light-theme .dock-tab-menu__item--dim:hover {
+  color: #FFFFFF !important;
+}
+
+[data-ui-theme="light"] .dock-tab-menu__divider,
+body.light-theme .dock-tab-menu__divider {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-ui-theme="light"] .dock-tab-menu__icon,
+[data-ui-theme="light"] .dock-tab-menu__shortcut,
+body.light-theme .dock-tab-menu__icon,
+body.light-theme .dock-tab-menu__shortcut {
+  color: inherit !important;
+}
+
+/* Workspace Titlebar Dropdown in Light Mode */
+[data-ui-theme="light"] .workspace-dock-dropdown,
+body.light-theme .workspace-dock-dropdown {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-ui-theme="light"] .workspace-menu-item,
+body.light-theme .workspace-menu-item {
+  color: var(--text-primary, #171514) !important;
+}
+
+[data-ui-theme="light"] .workspace-menu-item:hover,
+body.light-theme .workspace-menu-item:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* TitleBar DOCKS button styling */
+.titlebar-workspace-btn:hover {
+  background: var(--chrome-control, rgba(255, 255, 255, 0.08)) !important;
   color: var(--text-primary) !important;
+}
+
+[data-ui-theme="light"] .titlebar-workspace-btn,
+body.light-theme .titlebar-workspace-btn {
+  color: var(--text-secondary, #3A3634) !important;
+}
+
+[data-ui-theme="light"] .titlebar-workspace-btn:hover,
+body.light-theme .titlebar-workspace-btn:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: var(--text-primary, #171514) !important;
+}
+
+/* General Menu item hover in Light Mode */
+.menu-item:hover {
+  background: var(--bsp-active, rgba(255, 255, 255, 0.08));
+}
+
+[data-ui-theme="light"] .menu-item:hover,
+body.light-theme .menu-item:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
 }
 
 [data-ui-theme="light"] .zoombar-pill,
 body.light-theme .zoombar-pill {
-  background: var(--bsp-surface);
-  border: 1px solid var(--border-primary);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 [data-ui-theme="light"] .zoombar-pill button,
 body.light-theme .zoombar-pill button {
-  color: var(--text-primary);
+  color: var(--text-dim);
 }
 
 [data-ui-theme="light"] .zoombar-pill button:hover,
 body.light-theme .zoombar-pill button:hover {
-  color: var(--accent);
+  color: var(--text-primary);
 }
 
-[data-ui-theme="light"] .zoombar-pill input[type='range'],
-body.light-theme .zoombar-pill input[type='range'] {
-  accent-color: var(--text-primary);
+[data-ui-theme="light"] .zoombar-pill input[type='range']::-webkit-slider-runnable-track,
+body.light-theme .zoombar-pill input[type='range']::-webkit-slider-runnable-track {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+[data-ui-theme="light"] .zoombar-pill input[type='range']::-webkit-slider-thumb,
+body.light-theme .zoombar-pill input[type='range']::-webkit-slider-thumb {
+  background: #ffffff;
+  border: 2px solid #6b7280;
+}
+
+[data-ui-theme="light"] .zoombar-pill input[type='range']:hover::-webkit-slider-thumb,
+body.light-theme .zoombar-pill input[type='range']:hover::-webkit-slider-thumb {
+  border-color: #111827;
+  background: #ffffff;
 }
 
 [data-ui-theme="light"] .zoombar-val,
 body.light-theme .zoombar-val {
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 [data-ui-theme="light"] .zoombar-divider,
@@ -1527,6 +1982,7 @@ body.light-theme .zoombar-divider {
 [data-ui-theme="light"] .zoombar-fit,
 body.light-theme .zoombar-fit {
   color: var(--text-secondary) !important;
+  border-color: var(--border-primary) !important;
 }
 
 [data-ui-theme="light"] .zoombar-fit:hover,
@@ -1756,5 +2212,200 @@ body.light-theme .bgp-num-blue-selected {
   border-color: #1d4ed8 !important;
   box-shadow: 0 0 8px rgba(37, 99, 235, 0.45) !important;
 }
+
+/* ── PREVIEW/PROGRAM HUD CONFIDENCE PILLS ────────────────────────── */
+.pv-hud-pill-live {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #ff7733;
+  background: rgba(255, 85, 0, 0.15);
+  border: 1px solid rgba(255, 85, 0, 0.35);
+  border-radius: 4px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+}
+
+[data-ui-theme="light"] .pv-hud-pill-live,
+body.light-theme .pv-hud-pill-live {
+  color: #c2410c !important;
+  background: rgba(234, 88, 12, 0.12) !important;
+  border-color: rgba(234, 88, 12, 0.35) !important;
+  font-weight: 750 !important;
+}
+
+.pv-hud-pill-next {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: 4px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+}
+
+[data-ui-theme="light"] .pv-hud-pill-next,
+body.light-theme .pv-hud-pill-next {
+  color: #047857 !important;
+  background: rgba(5, 150, 105, 0.12) !important;
+  border-color: rgba(5, 150, 105, 0.35) !important;
+  font-weight: 750 !important;
+}
+
+/* ── BIBLE FAST-VERSION SWITCHER PILLS ────────────────────────────── */
+.bible-fast-version-pill {
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 4px;
+  border: 1px solid var(--border-primary, rgba(255, 255, 255, 0.12));
+  background: var(--chrome-control, rgba(255, 255, 255, 0.05));
+  color: var(--text-secondary, #a1a1aa);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+}
+
+.bible-fast-version-pill:hover:not([data-active="true"]) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary);
+  border-color: var(--border-secondary, rgba(255, 255, 255, 0.2));
+}
+
+.bible-fast-version-pill[data-active="true"] {
+  border: 1px solid #FF5500 !important;
+  background: rgba(255, 85, 0, 0.15) !important;
+  color: #FF5500 !important;
+  font-weight: 750 !important;
+}
+
+[data-ui-theme="light"] .bible-fast-version-pill,
+body.light-theme .bible-fast-version-pill {
+  background: var(--bsp-surface, #FFFFFF) !important;
+  border-color: rgba(0, 0, 0, 0.14) !important;
+  color: var(--text-secondary, #3A3634) !important;
+}
+
+[data-ui-theme="light"] .bible-fast-version-pill:hover:not([data-active="true"]),
+body.light-theme .bible-fast-version-pill:hover:not([data-active="true"]) {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: var(--text-primary, #171514) !important;
+  border-color: rgba(0, 0, 0, 0.24) !important;
+}
+
+[data-ui-theme="light"] .bible-fast-version-pill[data-active="true"],
+body.light-theme .bible-fast-version-pill[data-active="true"] {
+  border-color: #e8541a !important;
+  background: rgba(232, 84, 26, 0.14) !important;
+  color: #c2410c !important;
+}
+
+/* ── KEYBOARD SHORTCUTS MODAL ─────────────────────────────────────── */
+.shortcuts-modal-container {
+  width: 740px;
+  max-width: calc(100vw - 32px);
+  max-height: 88vh;
+  background-color: var(--bg-surface, #1C1A19);
+  border: 1px solid var(--border-primary, #2D2A28);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-ui-theme="light"] .shortcuts-modal-container,
+body.light-theme .shortcuts-modal-container {
+  background-color: #FFFFFF !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.shortcuts-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-primary, #2D2A28);
+  background-color: var(--bg-primary, #111010);
+}
+
+[data-ui-theme="light"] .shortcuts-modal-header,
+body.light-theme .shortcuts-modal-header {
+  background-color: var(--bsp-raised, #F4F2EF) !important;
+  border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.shortcuts-modal-card {
+  background: var(--bg-primary, #111010);
+  border: 1px solid var(--border-primary, #2D2A28);
+  border-radius: 6px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+[data-ui-theme="light"] .shortcuts-modal-card,
+body.light-theme .shortcuts-modal-card {
+  background: #FAF8F5 !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.shortcuts-modal-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+}
+
+[data-ui-theme="light"] .shortcuts-modal-kbd,
+body.light-theme .shortcuts-modal-kbd {
+  background-color: #FFFFFF !important;
+  border-color: rgba(0, 0, 0, 0.18) !important;
+  color: #171514 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+}
+
+.shortcuts-modal-footer {
+  padding: 10px 18px;
+  border-top: 1px solid var(--border-primary, #2D2A28);
+  background-color: var(--bg-primary, #111010);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim, #8A8580);
+}
+
+[data-ui-theme="light"] .shortcuts-modal-footer,
+body.light-theme .shortcuts-modal-footer {
+  background-color: var(--bsp-raised, #F4F2EF) !important;
+  border-top-color: rgba(0, 0, 0, 0.1) !important;
+  color: var(--text-dim, #5E5854) !important;
+}
+
 
 

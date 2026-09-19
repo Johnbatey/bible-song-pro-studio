@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type, fontSize, fontWeight } from '../styles/type';
-import { NAV_DOCK_SECTIONS } from './dock/docks';
-import { getDockTitle, getDockGroupLabel } from './dock/docks';
+import { DOCKS, getDockTitle, type DockId } from './dock/docks';
 import { toggleDock } from './dock/dockController';
+import { resetDockLayout } from './dock/DockHost';
 import { useI18n } from '../../i18n/useI18n';
 
 export function TitleBar() {
@@ -25,6 +25,10 @@ export function TitleBar() {
   const [alertDuration, setAlertDuration] = useState<number>(15);
   const openDockIds = useAppStore((s) => s.openDockIds);
   const poppedOutDockIds = useAppStore((s) => s.poppedOutDockIds);
+
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
+  const workspaceBtnRef = useRef<HTMLButtonElement | null>(null);
 
   /* Blackout lives in the store, not in this component.
    *
@@ -86,6 +90,33 @@ export function TitleBar() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [clearProgram, standbyMedia, notify]);
+
+  // Click-outside and escape listener for Workspace Dropdown
+  useEffect(() => {
+    if (!workspaceMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (
+        workspaceMenuRef.current &&
+        !workspaceMenuRef.current.contains(target) &&
+        workspaceBtnRef.current &&
+        !workspaceBtnRef.current.contains(target)
+      ) {
+        setWorkspaceMenuOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setWorkspaceMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClick);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('mousedown', handleClick);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [workspaceMenuOpen]);
 
   const toggleNdi = async () => {
     if (ndiStatus?.running) {
@@ -221,47 +252,160 @@ export function TitleBar() {
           </span>
         </div>
 
-        {/* Dock visibility — a lit tab means that dock is on screen.
-            Sectioned by a hairline rather than a heading: the groups are worth
-            seeing at a glance, and this bar has no room to name them. The
-            section is in the tooltip for anyone who wants it spelled out. */}
-        <div style={styles.pillContainer}>
-          {NAV_DOCK_SECTIONS.map((section, index) => (
-            <div key={section.id} style={styles.pillGroup}>
-              {index > 0 && <span style={styles.pillDivider} aria-hidden="true" />}
-              {section.docks.map((dock) => {
+        {/* Workspaces & Panels layout button and dropdown menu */}
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 10, ...({ WebkitAppRegion: 'no-drag' } as any) }}>
+          <button
+            ref={workspaceBtnRef}
+            type="button"
+            className="titlebar-workspace-btn"
+            onClick={() => setWorkspaceMenuOpen((v) => !v)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              height: 24,
+              padding: '0 8px',
+              background: workspaceMenuOpen ? 'var(--chrome-control-active, rgba(255, 255, 255, 0.12))' : 'transparent',
+              border: '1px solid',
+              borderColor: workspaceMenuOpen ? 'var(--border-primary, rgba(255, 255, 255, 0.18))' : 'transparent',
+              borderRadius: 4,
+              color: 'var(--text-secondary, #d4d4d8)',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              transition: 'all 0.12s ease',
+            }}
+            title="Docks & Panels layout"
+          >
+            <span style={{ fontSize: 11, fontWeight: 600 }}>
+              DOCKS
+            </span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ opacity: 0.9, flexShrink: 0 }}
+            >
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <line x1="8.5" y1="4" x2="8.5" y2="20" />
+              <circle cx="5.75" cy="8" r="0.8" fill="currentColor" stroke="none" />
+              <circle cx="5.75" cy="12" r="0.8" fill="currentColor" stroke="none" />
+              <circle cx="5.75" cy="16" r="0.8" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+
+          {workspaceMenuOpen && (
+            <div
+              ref={workspaceMenuRef}
+              className="workspace-dock-dropdown"
+              style={{
+                position: 'absolute',
+                top: 28,
+                left: 0,
+                width: 220,
+                maxHeight: 'calc(100vh - 48px)',
+                overflowY: 'auto',
+                background: '#18181b',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: 8,
+                boxShadow: '0 16px 36px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.4)',
+                padding: '6px 0',
+                zIndex: 99999,
+                userSelect: 'none',
+              }}
+            >
+              {DOCKS.map((dock) => {
                 const isPopped = poppedOutDockIds.includes(dock.id);
                 const isOpen = isPopped || openDockIds.includes(dock.id);
                 const title = getDockTitle(dock.id);
-                const groupLabel = getDockGroupLabel(section.id);
                 return (
                   <button
                     key={dock.id}
-                    className="titlebar-pill-btn"
-                    data-active={isOpen ? 'true' : undefined}
-                    style={{
-                      ...styles.pillBtn,
-                      background: isOpen ? 'var(--chrome-control-active)' : 'transparent',
-                      borderColor: isOpen ? 'var(--border-secondary, rgba(255, 255, 255, 0.1))' : 'transparent',
-                      color: isOpen ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      fontWeight: isOpen ? fontWeight.semibold : fontWeight.medium,
-                      boxShadow: isOpen ? '0 1px 2px rgba(0, 0, 0, 0.25)' : 'none',
-                    }}
+                    type="button"
+                    className="workspace-menu-item"
                     onClick={() => {
                       if (isPopped) {
                         void window.BSP?.dock?.focusPopout?.(dock.id);
-                        return;
+                      } else {
+                        toggleDock(dock.id as DockId);
                       }
-                      toggleDock(dock.id);
                     }}
-                    title={`${groupLabel} · ${title}`}
+                    style={{
+                      width: '100%',
+                      height: 28,
+                      padding: '0 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'transparent',
+                      border: 'none',
+                      color: isOpen ? '#38bdf8' : '#e4e4e7',
+                      fontSize: 12,
+                      fontWeight: isOpen ? 500 : 400,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                    }}
                   >
-                    {title}
+                    <span>{title}</span>
+                    {isOpen && (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
                   </button>
                 );
               })}
+
+              <div style={{ height: 1, background: 'rgba(255, 255, 255, 0.08)', margin: '6px 0' }} />
+
+              <button
+                type="button"
+                className="workspace-menu-item"
+                onClick={() => {
+                  setWorkspaceMenuOpen(false);
+                  resetDockLayout();
+                }}
+                style={{
+                  width: '100%',
+                  height: 28,
+                  padding: '0 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-secondary, #a1a1aa)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                  e.currentTarget.style.color = '#ffffff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-secondary, #a1a1aa)';
+                }}
+              >
+                Reset to default layout
+              </button>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -499,6 +643,21 @@ export function TitleBar() {
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+
+          {/* Keyboard Shortcuts Button */}
+          <button
+            className="titlebar-icon-btn"
+            style={styles.toolbarBtn}
+            onClick={() => useAppStore.getState().openShortcuts()}
+            title="Keyboard Shortcuts Cheat Sheet (? / ⌘/ / F1)"
+            aria-label="Keyboard Shortcuts"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
           </button>
 

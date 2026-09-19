@@ -1,10 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from './stores/appStore';
 import { TitleBar } from './components/TitleBar';
 import { UpdateBanner } from './components/UpdateBanner';
 import { DockHost } from './components/dock/DockHost';
 import { SettingsModal } from './components/SettingsModal';
 import { SlideEditorModal } from './components/SlideEditorModal';
+import { ThemeStudioModal } from './components/ThemeStudioModal';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { NoticeStack } from './components/NoticeStack';
 import { WorkspaceBridge } from './components/dock/WorkspaceBridge';
 import { StatusBar } from './components/StatusBar';
@@ -59,6 +62,48 @@ export function App() {
       }
     }
     init();
+  }, []);
+
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const isShortcutsOpen = useAppStore((s) => s.isShortcutsOpen);
+  const closeShortcuts = useAppStore((s) => s.closeShortcuts);
+
+  /* Global Keyboard Shortcuts (Cmd+K for Spotlight, ? / ⌘/ / F1 for Shortcuts Sheet) */
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const isInput = tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable;
+
+      // Spotlight Command Palette (Cmd+K / Ctrl+K)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      // Keyboard Shortcuts Cheat Sheet: '?', 'Shift+/', 'Cmd+/', 'Ctrl+/', 'F1'
+      const isShortcutsKey =
+        e.key === '?' ||
+        e.key === 'F1' ||
+        ((e.metaKey || e.ctrlKey) && (e.key === '/' || e.code === 'Slash' || e.key === '?')) ||
+        (e.shiftKey && (e.key === '/' || e.code === 'Slash'));
+
+      if (isShortcutsKey) {
+        // When typing in an input field, only open shortcuts if modifier (Cmd/Ctrl) or F1 is pressed
+        if (isInput && !(e.metaKey || e.ctrlKey || e.key === 'F1')) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        useAppStore.getState().toggleShortcuts();
+        return;
+      }
+    }
+    // Listen in capture phase so focused panels cannot stop propagation before global shortcuts execute
+    window.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, { capture: true });
   }, []);
 
   /* Cmd+Shift+B and the remote blackout endpoint both land here, so all three
@@ -139,6 +184,9 @@ export function App() {
       <StatusBar />
       <SettingsModal />
       <SlideEditorModal />
+      <ThemeStudioModal />
+      <CommandPaletteModal isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} />
+      <KeyboardShortcutsModal isOpen={isShortcutsOpen} onClose={closeShortcuts} />
       <WorkspaceBridge />
       {/* One notification surface for the whole app. It reads activeAlert and
           the notice list out of the store itself. */}

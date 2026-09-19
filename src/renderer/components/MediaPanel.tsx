@@ -437,6 +437,35 @@ export function MediaPanel() {
               <div
                 key={item.id}
                 className="card card-hover"
+                draggable={!item.missing}
+                onDragStart={(e) => {
+                  if (item.missing) return;
+                  const scene: Scene = {
+                    id: `media-${item.id}-${Date.now()}`,
+                    name: item.name,
+                    type: 'media',
+                    content: { text: '' },
+                    background: {
+                      type: item.type,
+                      mediaUrl: item.url,
+                      mediaType: item.type,
+                      fit: getMediaFit(item),
+                      loop: true,
+                      muted: Boolean(mutedMediaIds[item.id]),
+                      opacity: 1,
+                    },
+                  };
+                  const queuePayload = {
+                    reference: item.name,
+                    text: item.type.toUpperCase(),
+                    type: 'media',
+                    source: 'Manual',
+                    scene,
+                  };
+                  e.dataTransfer.setData('application/bsp-queue-item', JSON.stringify(queuePayload));
+                  e.dataTransfer.setData('text/plain', item.name);
+                  e.dataTransfer.effectAllowed = 'copyMove';
+                }}
                 onMouseEnter={() => setHoveredMediaId(item.id)}
                 onMouseLeave={() => setHoveredMediaId(null)}
                 style={{

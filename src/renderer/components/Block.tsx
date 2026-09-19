@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, forwardRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { DockedContext } from './dock/DockedContext';
 
@@ -95,9 +95,13 @@ interface BlockButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>
 }
 
 /** A chrome-bar control. Active/hover states use Black Chestnut Oak. */
-export function BlockButton({ active, icon, className = '', ...rest }: BlockButtonProps) {
+export const BlockButton = forwardRef<HTMLButtonElement, BlockButtonProps>(function BlockButton(
+  { active, icon, className = '', ...rest },
+  ref
+) {
   return (
     <button
+      ref={ref}
       type="button"
       {...rest}
       className={[
@@ -108,7 +112,7 @@ export function BlockButton({ active, icon, className = '', ...rest }: BlockButt
       ].filter(Boolean).join(' ')}
     />
   );
-}
+});
 
 /** Wrapper for a group of mutually exclusive chrome buttons. */
 export function BlockSegment({ children, className = '' }: { children: ReactNode; className?: string }) {

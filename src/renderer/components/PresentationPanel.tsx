@@ -14,6 +14,8 @@ import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { usePptxImport } from '../hooks/usePptxImport';
 import { Block, BlockButton } from './Block';
 import { TallyBadge } from './TallyBadge';
+import { FxAnimationPopover } from './FxAnimationPopover';
+import { isFocusedDock } from './dock/dockFocus';
 import { useI18n } from '../../i18n/useI18n';
 
 /** Card-shaped view of a deck. */
@@ -195,6 +197,7 @@ export function PresentationPanel() {
   const clearProgram = useAppStore((s) => s.clearProgram);
   const setPreviewScene = useAppStore((s) => s.setPreviewScene);
   const isStudio = useAppStore((s) => s.display.mode) === 'studio';
+  const slideFxSettings = useAppStore((s) => s.slideFxSettings) || { transitionType: 'fade', duration: 0.5, animateBackground: false };
 
   /* Page navigation state: null = Decks List (Page 1), string = Open Project View (Page 2) */
   const [selectedDeckId, setSelectedDeckId] = useState<string | null>(null);
@@ -203,6 +206,8 @@ export function PresentationPanel() {
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_slidesBarPosition');
   const [activeMenu, setActiveMenu] = useState<{ id: string; x: number; y: number; btnRect?: DOMRect } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [isFxPopoverOpen, setIsFxPopoverOpen] = useState(false);
+  const fxButtonRef = useRef<HTMLButtonElement | null>(null);
   const { inputRef, pick: pickPptx, onInputChange, status, clearStatus } = usePptxImport();
 
   /* Auto-close floating context menu on click outside, scroll, resize or escape key */
@@ -381,23 +386,17 @@ export function PresentationPanel() {
     updatePresentationDeck(selectedDeck.id, updatedDeck);
   }
 
-  /* Projects a slide live onto Program / Output display */
-  function handleProjectSlide(slide: PresentationSlide | ParsedSlide, index: number, direct = false) {
-    if (!selectedDeck) return;
-
-    const sceneId = `deck-${selectedDeck.id}-slide-${index}`;
+  /* Builds a presentation Scene for a given slide within a deck */
+  function buildSlideScene(deck: any, slide: PresentationSlide | ParsedSlide, index: number): { scene: Scene; text: string } {
+    const sceneId = `deck-${deck.id}-slide-${index}`;
     let text = '';
     let bg: Scene['background'];
-    /* The slide itself travels with the scene, so the output paints the design
-       rather than a transcript of it. `text` is still filled in below: the
-       stage display, the queue and the session history all read a scene as a
-       line of text, and none of them has a slide to paint. */
     let projection: SlideProjection;
 
     if ('body' in slide) {
       const pSlide = slide as PresentationSlide;
       text = pSlide.body || pSlide.title || pSlide.label || slideLabel(index + 1);
-      projection = projectNativeSlide(pSlide, selectedDeck);
+      projection = projectNativeSlide(pSlide, deck);
       if (pSlide.background) {
         const b = pSlide.background as SlideBackground;
         bg = {
@@ -427,20 +426,35 @@ export function PresentationPanel() {
 
     const scene: Scene = {
       id: sceneId,
-      name: t('pres.sceneName', { deck: selectedDeck.title, num: index + 1 }),
+      name: t('pres.sceneName', { deck: deck.title, num: index + 1 }),
       type: 'presentation',
       content: {
         text,
         slide: projection,
         slideId: String(index),
-        slides: selectedDeck.slides?.map((s: any, idx: number) => ({
+        slides: deck.slides?.map((s: any, idx: number) => ({
           id: s.id || String(idx),
           text: s.body || s.title || s.label || slideLabel(idx + 1),
           notes: s.notes || '',
         })),
       },
       background: bg,
+      transition: {
+        type: slideFxSettings.transitionType,
+        duration: slideFxSettings.duration,
+        animateBackground: slideFxSettings.animateBackground,
+      },
+      animateBackground: slideFxSettings.animateBackground,
     };
+
+    return { scene, text };
+  }
+
+  /* Projects a slide live onto Program / Output display */
+  function handleProjectSlide(slide: PresentationSlide | ParsedSlide, index: number, direct = false) {
+    if (!selectedDeck) return;
+
+    const { scene } = buildSlideScene(selectedDeck, slide, index);
 
     /* A designed slide only paints in fullscreen. Leaving lower-third on would
        show `content.text` (often just the slide title) on the projector while
@@ -462,29 +476,6 @@ export function PresentationPanel() {
     } else {
       projectScene(scene);
     }
-  }
-
-  /* Step through the open deck.
-     Position comes from whichever slide is live, so the buttons follow the
-     deck even when the operator jumped by clicking a card. When nothing of
-     this deck is live yet, stepping starts from where they last stepped.
-
-     Both buttons go through handleProjectSlide, so they obey the mode the
-     same way a click does: Studio stages the slide for Take, Basic puts it
-     straight on screen. Advancing a deck must not be the one control in the
-     app that ignores preview. */
-  const lastStepPos = useRef(0);
-
-  function stepSlide(delta: 1 | -1) {
-    const list = filteredPage2Slides;
-    if (list.length === 0) return;
-    const livePos = list.findIndex((entry) => isSlideLive(entry.index));
-    const from = livePos >= 0 ? livePos : lastStepPos.current;
-    const nextPos = Math.min(list.length - 1, Math.max(0, from + delta));
-    if (livePos >= 0 && nextPos === livePos) return;
-    lastStepPos.current = nextPos;
-    const target = list[nextPos];
-    handleProjectSlide(target.slide, target.index, false);
   }
 
   /* A slide is recognised in a scene two ways: by the id this panel stamps on
@@ -513,14 +504,6 @@ export function PresentationPanel() {
 
   const renderZoomPill = (
     <div className="zoombar-pill" style={{ margin: '0 4px' }}>
-      <button
-        type="button"
-        onClick={() => setCardZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))}
-        title={t('pres.zoomOutThumbnails')}
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
-      </button>
-
       <input
         type="range"
         min={0.5}
@@ -529,16 +512,7 @@ export function PresentationPanel() {
         value={cardZoom}
         onChange={(e) => setCardZoom(parseFloat(e.target.value))}
         title={t('pres.zoomAdjustThumbnails')}
-        style={{ width: 64 }}
       />
-
-      <button
-        type="button"
-        onClick={() => setCardZoom((z) => Math.min(1.8, Math.round((z + 0.1) * 10) / 10))}
-        title={t('pres.zoomInThumbnails')}
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
-      </button>
 
       <span className="zoombar-val">
         {Math.round(cardZoom * 100)}%
@@ -636,6 +610,41 @@ export function PresentationPanel() {
         {t('pres.addSlide')}
       </button>
 
+      {/* Slide Animation FX Button */}
+      <button
+        ref={fxButtonRef}
+        type="button"
+        onClick={() => setIsFxPopoverOpen((v) => !v)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 32,
+          height: 32,
+          padding: 0,
+          borderRadius: 6,
+          background: isFxPopoverOpen ? 'rgba(255, 85, 0, 0.18)' : 'var(--chrome-control, #27272a)',
+          border: isFxPopoverOpen ? '1px solid #FF5500' : '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
+          color: isFxPopoverOpen ? 'var(--accent, #FF5500)' : 'var(--text-secondary, #d4d4d8)',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+          flexShrink: 0,
+        }}
+        title="Slide Animation FX"
+      >
+        <span style={{ fontFamily: "'Georgia', serif", fontStyle: 'italic', fontSize: 15, fontWeight: 900, lineHeight: 1 }}>
+          fx
+        </span>
+      </button>
+
+      <FxAnimationPopover
+        isOpen={isFxPopoverOpen}
+        onClose={() => setIsFxPopoverOpen(false)}
+        anchorRef={fxButtonRef}
+        workspaceLabel="Slides"
+        mode="slides"
+      />
+
       <MoveBarButton
         position={barPosition}
         onMove={moveBar}
@@ -689,18 +698,92 @@ export function PresentationPanel() {
     );
   });
 
+  /* Step through the open deck.
+     Position comes from whichever slide is live or cued, so the controls follow the
+     deck even when the operator jumped by clicking a card. When nothing of
+     this deck is live yet, stepping starts from slide 0. */
+  const lastStepPos = useRef(-1);
+
+  function stepSlide(delta: 1 | -1) {
+    const list = filteredPage2Slides;
+    if (list.length === 0) return;
+    const livePos = list.findIndex((entry) => isSlideLive(entry.index));
+    const cuedPos = list.findIndex((entry) => isSlideCued(entry.index));
+    const currentActivePos = isStudio && cuedPos >= 0 ? cuedPos : (livePos >= 0 ? livePos : lastStepPos.current);
+
+    let nextPos: number;
+    if (currentActivePos < 0) {
+      nextPos = 0;
+    } else {
+      nextPos = Math.min(list.length - 1, Math.max(0, currentActivePos + delta));
+      if (nextPos === currentActivePos) return;
+    }
+    lastStepPos.current = nextPos;
+    const target = list[nextPos];
+    handleProjectSlide(target.slide, target.index, false);
+  }
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const slideCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  /* Forward and backward keyboard navigation for Pro Slides (ArrowRight/ArrowDown/PageDown & ArrowLeft/ArrowUp/PageUp) */
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || !selectedDeck) return;
+      if (!isFocusedDock(containerRef.current)) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) return;
+
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === 'PageDown') {
+        event.preventDefault();
+        stepSlide(1);
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp') {
+        event.preventDefault();
+        stepSlide(-1);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedDeck, filteredPage2Slides, currentScene, previewScene, isStudio, slideFxSettings]);
+
+  /* Follow-Live Auto-Scroll: Keeps the active/cued slide smoothly in view */
+  useEffect(() => {
+    if (!selectedDeck) return;
+    const liveIndex = filteredPage2Slides.findIndex((e) => isSlideLive(e.index));
+    const cuedIndex = filteredPage2Slides.findIndex((e) => isSlideCued(e.index));
+    const targetItem = liveIndex >= 0 ? filteredPage2Slides[liveIndex] : (cuedIndex >= 0 ? filteredPage2Slides[cuedIndex] : null);
+
+    if (targetItem) {
+      const el = slideCardRefs.current.get(targetItem.index);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+    }
+  }, [currentScene, previewScene, selectedDeck, filteredPage2Slides]);
+
   const cardMinW = Math.max(120, Math.round(210 * cardZoom));
   const dynamicGridStyle: React.CSSProperties = {
     ...styles.gridContainer,
     gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinW}px, 1fr))`,
   };
-  const dynamicProjectSlidesGridStyle: React.CSSProperties = {
-    ...styles.projectSlidesGrid,
-    gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinW}px, 1fr))`,
-  };
+  const dynamicProjectSlidesGridStyle: React.CSSProperties = viewMode === 'list'
+    ? {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        padding: '10px 12px',
+        overflowY: 'auto',
+      }
+    : {
+        ...styles.projectSlidesGrid,
+        gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinW}px, 1fr))`,
+      };
 
   return (
-    <div className="blk-col" style={styles.container}>
+    <div ref={containerRef} className="blk-col" style={styles.container}>
       {/* Top Bar */}
       {barPosition === 'top' && (!selectedDeck ? page1Toolbar : page2Toolbar)}
 
@@ -731,6 +814,23 @@ export function PresentationPanel() {
               <div
                 key={item.id}
                 style={styles.card}
+                draggable
+                onDragStart={(e) => {
+                  const deck = presentationDecks.find((d) => d.id === item.id);
+                  if (!deck || !deck.slides || deck.slides.length === 0) return;
+                  const firstSlide = deck.slides[0];
+                  const { scene, text } = buildSlideScene(deck, firstSlide, 0);
+                  const queuePayload = {
+                    reference: deck.title,
+                    text: text || deck.title,
+                    type: 'slide' as const,
+                    source: 'Manual' as const,
+                    scene,
+                    slideId: '0',
+                  };
+                  e.dataTransfer.setData('application/bsp-queue-item', JSON.stringify(queuePayload));
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
                 onClick={() => setSelectedDeckId(item.id)}
                 onDoubleClick={() => handleEditSlide(item.id)}
                 onContextMenu={(e) => {
@@ -818,6 +918,58 @@ export function PresentationPanel() {
                   {t('pres.openEditor')}
                 </span>
               </BlockButton>
+
+              {/* View Mode Toggle (Grid vs Teleprompter List) */}
+              <div style={{ display: 'inline-flex', background: 'var(--chrome-control, rgba(255,255,255,0.06))', borderRadius: 6, padding: 2, border: '1px solid var(--border-primary, rgba(255,255,255,0.1))', marginLeft: 2 }}>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  style={{
+                    padding: '3px 7px',
+                    borderRadius: 4,
+                    border: 'none',
+                    background: viewMode === 'grid' ? 'var(--accent, #FF5500)' : 'transparent',
+                    color: viewMode === 'grid' ? '#ffffff' : 'var(--text-secondary, #a1a1aa)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="Grid View (16:9 Thumbnails)"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7" />
+                    <rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  style={{
+                    padding: '3px 7px',
+                    borderRadius: 4,
+                    border: 'none',
+                    background: viewMode === 'list' ? 'var(--accent, #FF5500)' : 'transparent',
+                    color: viewMode === 'list' ? '#ffffff' : 'var(--text-secondary, #a1a1aa)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title="List View (Teleprompter Reader)"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6" />
+                    <line x1="8" y1="12" x2="21" y2="12" />
+                    <line x1="8" y1="18" x2="21" y2="18" />
+                    <line x1="3" y1="6" x2="3.01" y2="6" />
+                    <line x1="3" y1="12" x2="3.01" y2="12" />
+                    <line x1="3" y1="18" x2="3.01" y2="18" />
+                  </svg>
+                </button>
+              </div>
             </div>
           )}
           bodyStyle={dynamicProjectSlidesGridStyle}
@@ -844,10 +996,134 @@ export function PresentationPanel() {
               ? String(slideBg.value)
               : CARD_BACKGROUNDS[index % CARD_BACKGROUNDS.length];
 
+            if (viewMode === 'list') {
+              return (
+                <div
+                  key={('id' in slide && slide.id) ? slide.id : `slide-${index}`}
+                  ref={(el) => {
+                    if (el) slideCardRefs.current.set(index, el);
+                    else slideCardRefs.current.delete(index);
+                  }}
+                  className={`card card-hover ${live ? 'glass-accent' : ''}`}
+                  draggable
+                  onDragStart={(e) => {
+                    if (!selectedDeck) return;
+                    const { scene, text } = buildSlideScene(selectedDeck, slide, index);
+                    const queuePayload = {
+                      reference: `${selectedDeck.title} - Slide ${index + 1}`,
+                      text: text || `${selectedDeck.title} - Slide ${index + 1}`,
+                      type: 'slide' as const,
+                      source: 'Manual' as const,
+                      scene,
+                      slideId: String(index),
+                    };
+                    e.dataTransfer.setData('application/bsp-queue-item', JSON.stringify(queuePayload));
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    background: live ? 'rgba(255, 85, 0, 0.12)' : cued ? 'rgba(34, 197, 94, 0.08)' : 'var(--block-bg, #161514)',
+                    border: live
+                      ? '1px solid var(--border-accent, #FF5500)'
+                      : cued
+                      ? '1px solid var(--tally-preview, #22c55e)'
+                      : '1px solid var(--block-line, #27272a)',
+                    boxShadow: live ? '0 0 10px rgba(244, 98, 31, 0.3)' : undefined,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    gap: 12,
+                  }}
+                  onClick={() => handleProjectSlide(slide, index, false)}
+                  onDoubleClick={() => handleProjectSlide(slide, index, true)}
+                  title={isStudio ? t('pres.slideTooltipStudio') : t('pres.slideTooltipBasic')}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        background: live ? '#FF5500' : cued ? '#22c55e' : 'rgba(255,255,255,0.06)',
+                        color: (live || cued) ? '#ffffff' : 'var(--text-secondary)',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 650, color: live ? '#FF5500' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {title}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
+                        {subtitle || slideLabel(index + 1)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    {(live || cued) && <TallyBadge state={live ? 'live' : 'cued'} />}
+
+                    {isStudio && (
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        style={styles.miniActionBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleProjectSlide(slide, index, false);
+                        }}
+                      >
+                        {t('pres.stage')}
+                      </button>
+                    )}
+
+                    <button
+                      className={`btn btn-sm ${live ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ ...styles.miniActionBtn, background: live ? '#FF5500' : undefined }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleProjectSlide(slide, index, true);
+                      }}
+                    >
+                      {live ? t('panel.takeDown') : t('panel.goLive')}
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div
                 key={('id' in slide && slide.id) ? slide.id : `slide-${index}`}
+                ref={(el) => {
+                  if (el) slideCardRefs.current.set(index, el);
+                  else slideCardRefs.current.delete(index);
+                }}
                 className={`card card-hover ${live ? 'glass-accent' : ''}`}
+                draggable
+                onDragStart={(e) => {
+                  if (!selectedDeck) return;
+                  const { scene, text } = buildSlideScene(selectedDeck, slide, index);
+                  const queuePayload = {
+                    reference: `${selectedDeck.title} - Slide ${index + 1}`,
+                    text: text || `${selectedDeck.title} - Slide ${index + 1}`,
+                    type: 'slide' as const,
+                    source: 'Manual' as const,
+                    scene,
+                    slideId: String(index),
+                  };
+                  e.dataTransfer.setData('application/bsp-queue-item', JSON.stringify(queuePayload));
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
                 style={{
                   ...styles.projectSlideCard,
                   borderColor: live

@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '../stores/appStore';
 import type { BibleBook, BibleSearchResult, BibleVerse, BibleVersion, Scene, WordStudyEntry } from '../types';
 import { WordStudyCard } from './WordStudyCard';
 import { annotateTextWithStrongsSync } from '../services/lexicon-annotator';
 import { type, fontWeight, numeric } from '../styles/type';
 import { CustomDropdown } from './CustomDropdown';
-import { SlidingSwitch } from './SlidingSwitch';
 import { isFocusedDock } from './dock/dockFocus';
 import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { Block, BlockButton } from './Block';
 import { useI18n } from '../../i18n/useI18n';
+import { BackgroundPicker, BackgroundPopover, getBackgroundFromTheme } from './BackgroundPicker';
+import { FxAnimationPopover } from './FxAnimationPopover';
 import { BibleGridPicker } from './BibleGridPicker';
 
 const FALLBACK_BOOKS = ['Genesis', 'Exodus', 'Psalms', 'Isaiah', 'Matthew', 'Mark', 'Luke', 'John', 'Acts', 'Romans', 'Revelation'];
@@ -227,6 +229,7 @@ interface AnnotatedVerseTextProps {
   showStrongs: boolean;
   enableHoverLookup?: boolean;
   isPinned?: boolean;
+  activeStrongs?: string;
   onHoverStrongs?: (entry: WordStudyEntry | null, event?: React.MouseEvent) => void;
   onContextMenuStrongs?: (entry: WordStudyEntry, event: React.MouseEvent) => void;
   onClickStrongs?: (entry: WordStudyEntry, event: React.MouseEvent) => void;
@@ -238,6 +241,7 @@ function AnnotatedVerseText({
   showStrongs,
   enableHoverLookup = true,
   isPinned,
+  activeStrongs,
   onHoverStrongs,
   onContextMenuStrongs,
   onClickStrongs,
@@ -255,6 +259,7 @@ function AnnotatedVerseText({
     <span>
       {tokens.map((t, idx) => {
         if (!t.strongs) return <span key={idx}>{t.word} </span>;
+        const isActive = Boolean(activeStrongs && t.strongs && activeStrongs === t.strongs.strongs);
         return (
           <span key={idx} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
             <span
@@ -273,12 +278,18 @@ function AnnotatedVerseText({
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                color: '#FF5500',
+                color: isActive ? '#ffffff' : '#FF5500',
+                background: isActive ? '#FF5500' : 'transparent',
+                border: isActive ? '1px solid #FF5500' : '1px solid transparent',
+                borderRadius: 3,
+                padding: '0 3px',
                 cursor: 'pointer',
                 marginLeft: 2,
                 marginRight: 4,
-                opacity: 0.9,
+                opacity: isActive ? 1 : 0.9,
                 userSelect: 'none',
+                boxShadow: isActive ? '0 0 6px rgba(255, 85, 0, 0.6)' : 'none',
+                transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => !isPinned && enableHoverLookup && onHoverStrongs?.(t.strongs!, e)}
               onMouseLeave={() => !isPinned && onHoverStrongs?.(null)}
@@ -291,7 +302,7 @@ function AnnotatedVerseText({
                 e.stopPropagation();
                 onClickStrongs?.(t.strongs!, e);
               }}
-              title={`Click to queue / Double-click to project ${t.strongs.transliteration} (${t.strongs.strongs}) • Right-click to pin lookup`}
+              title={isActive ? `Click to clear ${t.strongs.transliteration} (${t.strongs.strongs}) from display` : `Click to project / toggle ${t.strongs.transliteration} (${t.strongs.strongs}) • Right-click to pin lookup`}
             >
               {t.strongs.strongs}
             </span>
@@ -316,6 +327,18 @@ export function BiblePanel() {
   const setBibleOutputMode = useAppStore((s) => s.setBibleOutputMode);
   const operatingMode = useAppStore((s) => s.display.mode);
   const activeTheme = useAppStore((s) => s.activeTheme);
+  const isThemeFsLtLinked = useAppStore((s) => s.isThemeFsLtLinked);
+  const toggleThemeFsLtLinked = useAppStore((s) => s.toggleThemeFsLtLinked);
+  const setThemeBackground = useAppStore((s) => s.setThemeBackground);
+  const openThemeStudio = useAppStore((s) => s.openThemeStudio);
+  const fxSettings = useAppStore((s) => s.fxSettings);
+
+  const currentBibleEffectiveBackground = useMemo(() => {
+    return getBackgroundFromTheme(activeTheme, bibleOutputMode);
+  }, [activeTheme, bibleOutputMode]);
+
+  const [isFxPopoverOpen, setIsFxPopoverOpen] = useState(false);
+  const fxButtonRef = useRef<HTMLButtonElement>(null);
 
   const [versions, setVersions] = useState<BibleVersion[]>([]);
   const [books, setBooks] = useState<BibleBook[]>([]);
@@ -347,6 +370,8 @@ export function BiblePanel() {
   const { position: topBarPosition, move: moveTopBar } = useBarPosition('bsp_bibleTopBarPosition', 'top');
   const { position: bottomBarPosition, move: moveBottomBar } = useBarPosition('bsp_bibleBottomBarPosition', 'bottom');
   const [showGridPicker, setShowGridPicker] = useState(false);
+  const [showBgPicker, setShowBgPicker] = useState(false);
+  const bgPickerRef = useRef<HTMLButtonElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const searchTimerRef = useRef<number | null>(null);
 
@@ -763,6 +788,7 @@ export function BiblePanel() {
       id: sceneId,
       name: verse.reference,
       type: 'bible',
+      background: undefined,
       content: {
         text: verseText,
         reference: `${verse.reference} (${primaryVer})`,
@@ -776,7 +802,13 @@ export function BiblePanel() {
             }
           : undefined,
       },
-      transition: { type: 'fade', duration: 0.45, easing: 'ease' },
+      transition: {
+        type: fxSettings.transitionType,
+        duration: fxSettings.duration,
+        easing: 'ease',
+        animateBackground: fxSettings.animateBackground,
+      },
+      animateBackground: fxSettings.animateBackground,
     };
     addVerseToHistory(verse);
     projectScene(scene, { direct: opts.direct });
@@ -797,6 +829,14 @@ export function BiblePanel() {
           const singleScene: Scene = {
             ...currentScene,
             id: `bible-${currentScene.content.version || selectedVersion}-${currentScene.name}`,
+            background: undefined,
+            transition: {
+              type: fxSettings.transitionType,
+              duration: fxSettings.duration,
+              easing: 'ease',
+              animateBackground: fxSettings.animateBackground,
+            },
+            animateBackground: fxSettings.animateBackground,
             content: {
               ...currentScene.content,
               secondaryVerse: undefined,
@@ -811,12 +851,22 @@ export function BiblePanel() {
             const dualScene: Scene = {
               ...currentScene,
               id: `bible-${currentScene.content?.version || selectedVersion}-${currentScene.name}-dual-${secVerToUse}`,
+              background: undefined,
+              transition: {
+                type: fxSettings.transitionType,
+                duration: fxSettings.duration,
+                easing: 'ease',
+                animateBackground: fxSettings.animateBackground,
+              },
+              animateBackground: fxSettings.animateBackground,
               content: {
                 ...currentScene.content,
                 secondaryVerse: sec
                   ? {
                       ...sec,
+                      text: sec.text,
                       reference: `${sec.reference || currentScene.name} (${secVerToUse})`,
+                      version: secVerToUse,
                     }
                   : undefined,
               },
@@ -931,13 +981,20 @@ export function BiblePanel() {
       id: sceneId,
       name: refTitle,
       type: 'bible',
+      background: undefined,
       content: {
         text: combinedText,
         reference: `${refTitle} (${primaryVer})`,
         version: primaryVer,
         secondaryVerse: secondaryVerseObj,
       },
-      transition: { type: 'fade', duration: 0.45, easing: 'ease' },
+      transition: {
+        type: fxSettings.transitionType,
+        duration: fxSettings.duration,
+        easing: 'ease',
+        animateBackground: fxSettings.animateBackground,
+      },
+      animateBackground: fxSettings.animateBackground,
     };
 
     addVerseToHistory(first);
@@ -1179,97 +1236,233 @@ export function BiblePanel() {
           <span>{t('bible.books')}</span>
         </button>
 
-        {/* 2. Strong's Lexicon Toggle Button */}
+        {/* 2. Strong's Lexicon Toggle Button (Icon-Only 'S') */}
         <button
-          onClick={() => setShowStrongs((v) => !v)}
+          type="button"
+          onClick={() => {
+            setShowStrongs((prev) => {
+              const next = !prev;
+              if (!next) {
+                if (currentScene?.content?.wordStudy || currentScene?.id?.startsWith('wordstudy-')) {
+                  setCurrentScene(null);
+                }
+                if (previewScene?.content?.wordStudy || previewScene?.id?.startsWith('wordstudy-')) {
+                  setPreviewScene(null);
+                }
+                setPinnedStrongs(null);
+                setHoveredStrongs(null);
+              }
+              return next;
+            });
+          }}
           style={{
             height: 38,
-            padding: '0 12px',
+            width: 38,
+            padding: 0,
             background: showStrongs ? 'rgba(255, 85, 0, 0.15)' : 'var(--chrome-control)',
             border: showStrongs ? '1px solid rgba(255, 85, 0, 0.4)' : '1px solid var(--border-primary)',
             borderRadius: 6,
             color: showStrongs ? '#FF5500' : 'var(--text-secondary)',
-            fontSize: 11,
-            fontWeight: 700,
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: 6,
+            justifyContent: 'center',
             transition: 'all 0.15s ease',
             flexShrink: 0,
           }}
-          title="Toggle inline Strong's concordance numbers"
+          title={showStrongs ? "Strong's Concordance Active (Click to hide)" : "Toggle Strong's Concordance / Lexicon (S)"}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-            <path d="M8 7h8" />
-            <path d="M8 11h6" />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" strokeWidth="1.8" />
+            <path d="M15.5 8.5c-.7-1-1.8-1.5-3.2-1.5-2.2 0-3.3 1.2-3.3 2.8 0 3.3 6.5 2.2 6.5 5.7 0 1.8-1.4 3-3.5 3-1.6 0-2.8-.7-3.6-1.8" strokeWidth="2.4" />
           </svg>
-          <span>Strong</span>
         </button>
 
-        {/* Hover Lookup Toggle Button (subtle, non-distracting) */}
+        {/* Hover Lookup Toggle Button (Icon-Only) */}
         {showStrongs && (
           <button
+            type="button"
             onClick={() => setEnableHoverLookup((v) => !v)}
             style={{
               height: 38,
-              padding: '0 10px',
+              width: 38,
+              padding: 0,
               background: enableHoverLookup ? 'rgba(255, 85, 0, 0.15)' : 'var(--chrome-control)',
               border: enableHoverLookup ? '1px solid rgba(255, 85, 0, 0.4)' : '1px solid var(--border-primary)',
               borderRadius: 6,
               color: enableHoverLookup ? '#FF5500' : 'var(--text-secondary)',
-              fontSize: 11,
-              fontWeight: 700,
               cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
+              justifyContent: 'center',
               transition: 'all 0.15s ease',
               flexShrink: 0,
             }}
-            title={enableHoverLookup ? "Hover lookup active (Click to disable hover popovers; right-click still works)" : "Hover lookup disabled (Right-click still works)"}
+            title={enableHoverLookup ? "Hover Lexicon Lookup Active (Click to disable)" : "Enable Hover Lexicon Lookup (Hover over Strong's numbers to view definition)"}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
-            <span>Hover: {enableHoverLookup ? 'ON' : 'OFF'}</span>
           </button>
         )}
 
-        {/* 3. Single / Dual Switch with Clean Parallel Icons */}
-        <SlidingSwitch
-          value={dualVersion ? 'dual' : 'single'}
-          onChange={(val) => handleDualVersionToggle(val === 'dual')}
-          options={[
-            {
-              value: 'single',
-              label: t('bible.singleVersion'),
-              title: t('bible.singleVersionHint'),
-              icon: (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="4" y="3" width="16" height="18" rx="2" />
-                  <line x1="8" y1="8" x2="16" y2="8" />
-                  <line x1="8" y1="12" x2="16" y2="12" />
-                  <line x1="8" y1="16" x2="12" y2="16" />
-                </svg>
-              ),
-            },
-            {
-              value: 'dual',
-              label: t('bible.dualVersion'),
-              title: t('bible.dualVersionHint'),
-              icon: (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="8" height="18" rx="1.5" />
-                  <rect x="13" y="3" width="8" height="18" rx="1.5" />
-                </svg>
-              ),
-            },
-          ]}
+        {/* 3. Single / Dual Version Toggle Button */}
+        <button
+          type="button"
+          onClick={() => handleDualVersionToggle(!dualVersion)}
+          style={{
+            height: 38,
+            width: 38,
+            padding: 0,
+            background: dualVersion ? 'rgba(255, 85, 0, 0.15)' : 'var(--chrome-control)',
+            border: dualVersion ? '1px solid rgba(255, 85, 0, 0.4)' : '1px solid var(--border-primary)',
+            borderRadius: 6,
+            color: dualVersion ? '#FF5500' : 'var(--text-secondary)',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s ease',
+            flexShrink: 0,
+          }}
+          title={dualVersion ? `${t('bible.dualVersion')} (Click to switch to Single)` : `${t('bible.singleVersion')} (Click to enable Dual Version)`}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="8" height="18" rx="1.5" />
+            <rect x="13" y="3" width="8" height="18" rx="1.5" />
+          </svg>
+        </button>
+
+        {/* 4. Single Background Dropdown Popover Button */}
+        <div style={{ position: 'relative', display: 'inline-flex' }}>
+          <button
+            ref={bgPickerRef}
+            type="button"
+            onClick={() => setShowBgPicker((v) => !v)}
+            style={{
+              height: 38,
+              width: 38,
+              padding: 0,
+              background: showBgPicker ? 'rgba(56, 189, 248, 0.15)' : 'var(--chrome-control)',
+              border: showBgPicker ? '1px solid #38bdf8' : '1px solid var(--border-primary)',
+              borderRadius: 6,
+              color: showBgPicker ? '#38bdf8' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+            }}
+            title="Choose background for Bible displays (Theme, Image, Video, Color, Gradient)"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </button>
+
+          <BackgroundPopover
+            isOpen={showBgPicker}
+            onClose={() => setShowBgPicker(false)}
+            anchorRef={bgPickerRef}
+            value={currentBibleEffectiveBackground}
+            onChange={(bg) => bg && setThemeBackground(bg, bibleOutputMode)}
+            workspaceLabel="Bible"
+            outputMode={bibleOutputMode === 'lowerThird' ? 'LT' : 'FS'}
+            isLinked={isThemeFsLtLinked}
+          />
+        </div>
+
+        {/* 5. Themes Button to open Theme Studio (Icon Only) */}
+        <button
+          type="button"
+          onClick={() =>
+            openThemeStudio({
+              contentMode: 'bible',
+              surfaceTab: bibleOutputMode === 'lowerThird' ? 'lt' : 'full',
+            })
+          }
+          style={{
+            height: 38,
+            width: 38,
+            padding: 0,
+            background: 'var(--chrome-control)',
+            border: '1px solid var(--border-primary)',
+            borderRadius: 6,
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s ease',
+            flexShrink: 0,
+          }}
+          title="Theme Studio"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+          </svg>
+        </button>
+
+        {/* 6. FX Animation Popover Button */}
+        <button
+          ref={fxButtonRef}
+          type="button"
+          onClick={() => setIsFxPopoverOpen((v) => !v)}
+          style={{
+            height: 38,
+            width: 38,
+            padding: 0,
+            background: isFxPopoverOpen ? 'rgba(255, 85, 0, 0.15)' : 'var(--chrome-control)',
+            border: isFxPopoverOpen ? '1px solid #FF5500' : '1px solid var(--border-primary)',
+            borderRadius: 6,
+            color: isFxPopoverOpen ? '#FF5500' : 'var(--text-secondary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s ease',
+            flexShrink: 0,
+          }}
+          title="Animation FX"
+        >
+          <span style={{ fontFamily: "'Georgia', serif", fontStyle: 'italic', fontSize: 16, fontWeight: 900, lineHeight: 1 }}>
+            fx
+          </span>
+        </button>
+
+        <FxAnimationPopover
+          isOpen={isFxPopoverOpen}
+          onClose={() => setIsFxPopoverOpen(false)}
+          anchorRef={fxButtonRef}
+          workspaceLabel="Bible"
         />
+
+        {/* 7. Fast-Version Switcher Pills */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 4 }}>
+          {versionOptions.slice(0, 5).map((v) => {
+            const isActive = selectedVersion === v.id;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                className="bible-fast-version-pill"
+                data-active={isActive || undefined}
+                onClick={() => handleVersionChange(v.id)}
+                title={`Switch to ${v.name} (${v.abbreviation})`}
+              >
+                {v.abbreviation}
+              </button>
+            );
+          })}
+        </div>
 
         <div style={{ flex: 1 }} />
 
@@ -1352,33 +1545,88 @@ export function BiblePanel() {
           </button>
         </div>
 
-        {/* 4. Independent Bible Fullscreen / Lower Third Output Mode Switch */}
-        <SlidingSwitch
-          value={bibleOutputMode}
-          onChange={(val) => setBibleOutputMode(val as 'fullscreen' | 'lowerThird')}
-          options={[
-            {
-              value: 'fullscreen',
-              label: 'FS',
-              title: 'Bible Fullscreen Output Mode (FS)',
-              icon: (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                </svg>
-              ),
-            },
-            {
-              value: 'lowerThird',
-              label: 'LT',
-              title: 'Bible Lower Third Output Mode (LT)',
-              icon: (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="14" width="18" height="7" rx="1.5" />
-                </svg>
-              ),
-            },
-          ]}
-        />
+        {/* 4. Independent Bible Fullscreen / Lower Third Output Mode Switch with Link Toggle */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', height: 38, background: 'var(--chrome-control, #161414)', border: '1px solid var(--border-primary, rgba(255,255,255,0.08))', borderRadius: 6, padding: 3, gap: 3, boxSizing: 'border-box' }}>
+          <button
+            type="button"
+            onClick={() => setBibleOutputMode('fullscreen')}
+            style={{
+              height: 30,
+              padding: '0 10px',
+              fontSize: 11,
+              fontWeight: 700,
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: bibleOutputMode === 'fullscreen' ? 'var(--accent, #FF5500)' : 'transparent',
+              color: bibleOutputMode === 'fullscreen' ? '#ffffff' : 'var(--text-secondary)',
+              transition: 'all 0.15s ease',
+            }}
+            title="Bible Fullscreen Output Mode (FS)"
+          >
+            FS
+          </button>
+
+          {/* Link button between FS and LT */}
+          <button
+            type="button"
+            onClick={() => toggleThemeFsLtLinked(bibleOutputMode === 'lowerThird' ? 'lowerThird' : 'fullscreen')}
+            style={{
+              width: 26,
+              height: 30,
+              padding: 0,
+              border: 'none',
+              borderRadius: 3,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: isThemeFsLtLinked ? 'rgba(255, 85, 0, 0.18)' : 'transparent',
+              color: isThemeFsLtLinked ? 'var(--accent, #FF5500)' : 'var(--text-dim)',
+              transition: 'all 0.15s ease',
+            }}
+            title={isThemeFsLtLinked ? 'Linked: Background changes affect both Fullscreen and Lower Third (click to unlink)' : 'Unlinked: Background changes apply independently to active mode (click to link)'}
+          >
+            {isThemeFsLtLinked ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                <line x1="2" y1="2" x2="22" y2="22" stroke="var(--tally-fault, #ef4444)" strokeWidth="2" />
+              </svg>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setBibleOutputMode('lowerThird')}
+            style={{
+              height: 30,
+              padding: '0 10px',
+              fontSize: 11,
+              fontWeight: 700,
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: bibleOutputMode === 'lowerThird' ? 'var(--accent, #FF5500)' : 'transparent',
+              color: bibleOutputMode === 'lowerThird' ? '#ffffff' : 'var(--text-secondary)',
+              transition: 'all 0.15s ease',
+            }}
+            title="Bible Lower Third Output Mode (LT)"
+          >
+            LT
+          </button>
+        </div>
 
         {/* 5. Move bottom search & output bar arrow */}
         <MoveBarButton
@@ -1444,7 +1692,7 @@ export function BiblePanel() {
             selectedVersion={selectedVersion}
             currentBook={selectedBook}
             currentChapter={chapter}
-            onSelectPassage={async (passage) => {
+            onSelectPassage={async (passage: { book: string; chapter: number; verse: number }) => {
               setSelectedBook(passage.book);
               setChapter(passage.chapter);
               setHighlightedVerse(passage.verse);
@@ -1520,6 +1768,30 @@ export function BiblePanel() {
                   ref={(el) => { verseRefs.current[verse.reference] = el; }}
                   onClick={(e) => handleRowClick(verse, index, e, false)}
                   onDoubleClick={(e) => handleRowClick(verse, index, e, true)}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    const sceneId = bibleSceneId(verse);
+                    const scene: Scene = {
+                      id: sceneId,
+                      name: verse.reference,
+                      type: 'bible',
+                      content: {
+                        text: verse.text,
+                        reference: `${verse.reference} (${verse.version || selectedVersion})`,
+                        version: verse.version || selectedVersion,
+                      },
+                    };
+                    const queuePayload = {
+                      reference: verse.reference,
+                      text: verse.text,
+                      type: 'bible',
+                      source: 'Manual',
+                      scene,
+                    };
+                    e.dataTransfer.setData('application/bsp-queue-item', JSON.stringify(queuePayload));
+                    e.dataTransfer.setData('text/plain', `${verse.reference}: ${verse.text}`);
+                    e.dataTransfer.effectAllowed = 'copyMove';
+                  }}
                   style={{
                     height: showStrongs ? 'auto' : 38,
                     minHeight: 38,
@@ -1583,6 +1855,7 @@ export function BiblePanel() {
                         showStrongs={showStrongs}
                         enableHoverLookup={enableHoverLookup}
                         isPinned={!!pinnedStrongs}
+                        activeStrongs={currentScene?.content?.wordStudy?.strongs || previewScene?.content?.wordStudy?.strongs}
                         onHoverStrongs={(entry, e) => {
                           if (pinnedStrongs || !enableHoverLookup) return;
                           if (entry && e) {
@@ -1598,10 +1871,29 @@ export function BiblePanel() {
                         onClickStrongs={(entry, e) => {
                           e.stopPropagation();
                           const isDoubleClick = e.detail === 2;
+                          const goesLive = isDoubleClick || operatingMode === 'basic';
+                          const activeScene = goesLive ? currentScene : previewScene;
+                          const isAlreadyActive =
+                            activeScene?.content?.wordStudy?.strongs === entry.strongs ||
+                            activeScene?.id === `wordstudy-${entry.strongs}`;
+
+                          if (isAlreadyActive) {
+                            if (goesLive) {
+                              setCurrentScene(null);
+                              setPreviewScene(null);
+                            } else {
+                              setPreviewScene(null);
+                            }
+                            setPinnedStrongs(null);
+                            setHoveredStrongs(null);
+                            return;
+                          }
+
                           const scene: Scene = {
-                            id: `wordstudy-${Date.now()}`,
+                            id: `wordstudy-${entry.strongs}`,
                             name: `Word Study: ${entry.transliteration}`,
                             type: 'bible',
+                            background: undefined,
                             content: {
                               text: `${entry.lemma} (${entry.transliteration} • ${entry.strongs}) — ${entry.gloss}: ${entry.definition}`,
                               reference: `Word Study: ${entry.transliteration} (${entry.strongs})`,
@@ -1694,10 +1986,10 @@ export function BiblePanel() {
               maxHeight: 'calc(100vh - 80px)',
               overflowY: 'auto',
               pointerEvents: isPinned ? 'auto' : 'none',
-              background: 'rgba(20, 20, 26, 0.98)',
-              border: isPinned ? '1px solid #FF5500' : '1px solid rgba(255, 255, 255, 0.15)',
+              background: 'var(--bsp-surface, rgba(20, 20, 26, 0.98))',
+              border: isPinned ? '1px solid var(--accent, #FF5500)' : '1px solid var(--border-primary, rgba(255, 255, 255, 0.15))',
               borderRadius: 14,
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.85)',
+              boxShadow: 'var(--shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.85))',
               backdropFilter: 'blur(20px)',
             }}
           >

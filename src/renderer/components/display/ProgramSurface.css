@@ -3,7 +3,7 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #000;
+  background: transparent;
   color: #fff;
   isolation: isolate;
   container-type: inline-size;
@@ -72,6 +72,212 @@
   }
 }
 
+/* =========================================================================
+   BSP FX Keyframe Animations
+   ========================================================================= */
+@keyframes bsp-anim-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bsp-anim-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bsp-anim-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(35px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bsp-anim-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-35px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bsp-anim-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(45px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bsp-anim-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(-45px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bsp-anim-type {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes bsp-anim-zoom-type {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.type-line {
+  display: block;
+}
+
+.type-word {
+  display: inline-block;
+  white-space: pre;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.hidden-word {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.revealed-word {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* =========================================================================
+   Presentation Slides Industry Standard Transition Keyframes
+   ========================================================================= */
+@keyframes bsp-slide-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bsp-slide-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes bsp-slide-push-in-left {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes bsp-slide-push-out-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+@keyframes bsp-slide-push-in-right {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes bsp-slide-push-out-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes bsp-slide-push-in-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes bsp-slide-push-out-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100%); }
+}
+
+@keyframes bsp-slide-push-in-down {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes bsp-slide-push-out-down {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+@keyframes bsp-slide-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.program-slide-transition-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.program-slide-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  will-change: transform, opacity;
+}
+
+.program-slide-layer.incoming {
+  z-index: 2;
+}
+
+.program-slide-layer.outgoing {
+  z-index: 1;
+}
+
 .program-fullscreen-content {
   position: absolute;
   inset: 0;
@@ -81,14 +287,12 @@
   align-items: center;
   justify-content: center;
   padding: 32px 72px;
-  animation: bsp-crossfade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .program-slide-stage-wrapper {
   position: absolute;
   inset: 0;
   z-index: 2;
-  animation: bsp-crossfade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .program-ref-row {
@@ -160,14 +364,12 @@
   padding: 24px 34px;
   overflow: hidden;
   border-radius: var(--bsp-r-base, 4px);
-  background: linear-gradient(135deg, rgba(10, 18, 32, .94), rgba(37, 52, 78, .94));
-  background-position: center;
-  background-repeat: no-repeat;
+  background: transparent;
   box-shadow: 0 20px 60px rgba(0, 0, 0, .36);
-  animation: bsp-crossfade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.program-lt-media {
+.program-lt-media,
+.program-lt-bg-layer {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -176,7 +378,15 @@
   z-index: 0;
 }
 
-.program-lower-third > :not(.program-lt-media) {
+.program-lt-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.program-lower-third > :not(.program-lt-media):not(.program-lt-bg-layer) {
   position: relative;
   z-index: 1;
 }

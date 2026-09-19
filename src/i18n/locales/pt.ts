@@ -44,7 +44,6 @@ export const pt: MessageCatalog = {
   'dock.transcript': 'Transcrição ao vivo',
   'dock.queue': 'Fila',
   'dock.history': 'Histórico',
-  'dock.scenes': 'Cenas',
   'dock.themes': 'Temas',
   'dock.panel.liveScripture': 'Escritura ao vivo',
   'dock.panel.previewProgram': 'Preview / Program',
@@ -60,7 +59,6 @@ export const pt: MessageCatalog = {
   'status.mic.idle': 'Microfone inativo',
   'status.transcribing': 'A transcrever',
   'status.transcriptionOff': 'Transcrição desligada',
-  'status.scenes': '{count} cenas',
   'status.live': 'Live: {name}',
 
   'settings.cat.system': 'Sistema',
@@ -590,16 +588,6 @@ export const pt: MessageCatalog = {
   'themes.hintFull': 'A editar o visual em ecrã inteiro — cor, imagem ou clipe atrás do versículo.',
   'themes.hintLt': 'A editar só o banner. Uma imagem preenche o lower third, não todo o ecrã.',
   'themes.untitled': 'Tema sem título',
-
-  'scenes.title': 'Cenas',
-  'scenes.new': '+ Nova cena',
-  'scenes.newTitle': 'Criar uma nova cena',
-  'scenes.name': 'Cena {n}',
-  'scenes.empty': 'Ainda não há cenas. Crie a primeira para começar.',
-  'scenes.preview': 'Preview',
-  'scenes.goLive': 'Go Live',
-  'scenes.clickStudio': 'Clique para Preview · duplo clique para Program',
-  'scenes.clickLive': 'Clique para ir ao vivo',
 
   'workspace.saveTitle': 'Guardar esta disposição',
   'workspace.saveAsTitle': 'Guardar como nova disposição',

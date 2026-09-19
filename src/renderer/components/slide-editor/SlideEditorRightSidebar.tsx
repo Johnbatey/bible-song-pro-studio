@@ -1126,10 +1126,10 @@ export function SlideEditorRightSidebar({
                         onClick={() => bgFileInputRef.current?.click()}
                         style={{
                           padding: '8px 12px',
-                          background: '#202024',
-                          border: '1px dashed rgba(255, 255, 255, 0.2)',
+                          background: 'var(--chrome-control)',
+                          border: '1px dashed var(--border-primary)',
                           borderRadius: 6,
-                          color: '#ffffff',
+                          color: 'var(--text-primary)',
                           fontSize: 11,
                           fontWeight: 600,
                           cursor: 'pointer',
@@ -2208,7 +2208,7 @@ export function SlideEditorRightSidebar({
             >
               <IconSparkles size={22} />
             </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
               {t('slideEditor.sidebar.tabAi')}
             </div>
             <div

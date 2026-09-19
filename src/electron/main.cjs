@@ -34,12 +34,24 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-/* On Linux the GPU sandbox can fail (Wayland compositors, VMs, remote
-   desktops, older drivers), killing the process silently before any window
-   appears. Disabling it keeps rendering functional — software fallback is
-   fine for a presentation app — and letting the sandbox try first means
-   machines with working GPU acceleration still get it. */
-if (process.platform === 'linux') {
+// GPU Zero-Copy & Hardware Acceleration for 60fps Zero-Latency Camera Capture across all OSes
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-native-gpu-memory-buffers');
+
+if (process.platform === 'darwin') {
+  // macOS (Apple Silicon & Intel): Metal IOSurface zero-copy & hardware overlays
+  app.commandLine.appendSwitch('enable-hardware-overlays', 'single-fullscreen,underlay');
+  app.commandLine.appendSwitch('enable-features', 'CanvasOopRasterization');
+} else if (process.platform === 'win32') {
+  // Windows (Intel, AMD, NVIDIA): Direct3D 11 hardware decoding & prevent window occlusion throttle
+  app.commandLine.appendSwitch('enable-hardware-overlays', 'single-fullscreen,underlay');
+  app.commandLine.appendSwitch('enable-features', 'D3D11VideoDecoder,CanvasOopRasterization');
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+} else if (process.platform === 'linux') {
+  // Linux (X11 & Wayland): VA-API hardware video decode acceleration & GPU sandbox stability fallback
+  app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,CanvasOopRasterization,VaapiIgnoreDriverChecks');
   app.commandLine.appendSwitch('disable-gpu-sandbox');
 }
 
@@ -97,6 +109,7 @@ const { createObsService } = require('./obs-service.cjs');
 const { listenWithFallback } = require('./listen-with-fallback.cjs');
 const lexiconService = require('./lexicon-service.cjs');
 const { stripHugeDataUrls } = require('./strip-data-urls.cjs');
+const { initRecordingsService } = require('./recordings-service.cjs');
 let setMenuLocale = () => {};
 let mt = (k, fallback) => fallback || k;
 try {
@@ -166,16 +179,18 @@ const DOCK_DEFS = [
   null,
   /* Service — what is running right now. */
   { id: 'live' },
+  { id: 'messages' },
   { id: 'transcript' },
   { id: 'queue' },
   { id: 'history' },
   null,
   /* Looks — how all of it is dressed. */
-  { id: 'scenes' },
+  { id: 'sources' },
+  { id: 'audiomixer' },
+  { id: 'promixer' },
   { id: 'themes' },
 ];
 
-/**
 /**
  * What the renderer last told us about saved arrangements. Held here because
  * the Menu is rebuilt from scratch on every sync and both halves — the Dock
@@ -715,7 +730,6 @@ function createSplashWindow() {
     backgroundColor: '#0C0B0B',
     center: true,
     show: true,
-    skipTaskbar: true,
     webPreferences: { nodeIntegration: false, contextIsolation: true }
   });
   /* The splash has no preload and no node access, so the version is passed in
@@ -732,40 +746,14 @@ function createMainWindow({ autoShow = true } = {}) {
   /* backgroundThrottling off here too: the operator's own Program pane plays
      the same clip, and an operator who alt-tabs to their notes and back should
      not find their preview a minute behind the room. */
-  const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 640,
-    minHeight: 480,
-    frame: true,
-    resizable: true,
-    maximizable: true,
-    fullscreenable: true,
-    thickFrame: true,
-    backgroundColor: '#0C0B0B',
-    show: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
-      nodeIntegration: false,
-      contextIsolation: true,
-      webSecurity: true,
-      backgroundThrottling: false
-    }
-  });
+  const win = new BrowserWindow({ width: 1400, height: 900, minWidth: 640, minHeight: 480, frame: true, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0c0e14', show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false } });
   win.setResizable(true);
   win.setMinimumSize(640, 480);
   win.loadURL(isDev ? 'http://localhost:5173' : `file://${path.join(__dirname, '../../dist/index.html')}`);
   if (isDev) win.webContents.openDevTools();
   /* Bring-up passes autoShow:false and shows the window itself, so the
      console cannot appear from behind the splash mid-animation. */
-  if (autoShow) {
-    win.once('ready-to-show', () => {
-      if (win.isMinimized()) win.restore();
-      win.show();
-      try { win.maximize(); } catch (_) {}
-      win.focus();
-    });
-  }
+  if (autoShow) win.once('ready-to-show', () => { win.maximize(); win.show(); win.focus(); });
   return win;
 }
 
@@ -870,8 +858,7 @@ function createDisplayWindow(targetOrBounds, options = {}) {
     targetDisplay = chooseDisplay('auto') || primary;
   }
 
-  const isExternal = Boolean(targetDisplay && (targetDisplay.id !== primary.id || !targetDisplay.internal));
-  const isFullScreen = options.fullscreen !== undefined ? options.fullscreen : isExternal;
+  const isFullScreen = options.fullscreen !== undefined ? options.fullscreen : true;
 
   if (displayWindow && !displayWindow.isDestroyed()) {
     const isCurrentlyFrameless = Boolean(displayWindow.__isFrameless);
@@ -931,7 +918,25 @@ function createDisplayWindow(targetOrBounds, options = {}) {
 
   displayWindow.loadURL(isDev ? 'http://localhost:5173/audience-display.html' : `file://${path.join(__dirname, '../../dist/audience-display.html')}`);
   displayWindow.setMenuBarVisibility(false);
-  displayWindow.webContents.once('did-finish-load', () => {
+
+  // Crash Resilience & Auto-Recovery (OBS Parity: Display never stays down)
+  displayWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('[DisplayWindow] Renderer process crash detected:', details);
+    if (displayWindow && !displayWindow.isDestroyed()) {
+      setTimeout(() => {
+        if (displayWindow && !displayWindow.isDestroyed()) {
+          console.info('[DisplayWindow] Auto-recovering display window after crash...');
+          displayWindow.reload();
+        }
+      }, 250);
+    }
+  });
+
+  displayWindow.webContents.on('unresponsive', () => {
+    console.warn('[DisplayWindow] Window became unresponsive.');
+  });
+
+  displayWindow.webContents.on('did-finish-load', () => {
     broadcastDisplayState();
     if (ndiService && ndiService.status().running) {
       ndiService.setDisplayWindow(displayWindow);
@@ -944,8 +949,7 @@ function createDisplayWindow(targetOrBounds, options = {}) {
 function createStageDisplayWindow(targetDisplay, options = {}) {
   const primary = screen.getPrimaryDisplay();
   const target = targetDisplay || chooseDisplay('auto') || primary;
-  const isExternal = Boolean(target && (target.id !== primary.id || !target.internal));
-  const isFullScreen = options.fullscreen !== undefined ? options.fullscreen : isExternal;
+  const isFullScreen = options.fullscreen !== undefined ? options.fullscreen : true;
   const bounds = isFullScreen ? target.bounds : resizableOutputBounds(target.bounds || screen.getPrimaryDisplay().workArea || screen.getPrimaryDisplay().bounds);
 
   const win = new BrowserWindow({
@@ -981,9 +985,24 @@ function createStageDisplayWindow(targetDisplay, options = {}) {
     broadcastStageWindows();
   });
 
-  win.webContents.once('did-finish-load', () => {
-    win.webContents.send('display:message', { type: 'display:update', state: displayState });
-    if (Object.keys(stageState).length > 0) win.webContents.send('stage:message', stageState);
+  // Crash Resilience & Auto-Recovery (OBS Parity: Stage Display never stays down)
+  win.webContents.on('render-process-gone', (event, details) => {
+    console.error('[StageDisplay] Renderer process crash detected:', details);
+    if (!win.isDestroyed()) {
+      setTimeout(() => {
+        if (!win.isDestroyed()) {
+          console.info('[StageDisplay] Auto-recovering stage display window after crash...');
+          win.reload();
+        }
+      }, 250);
+    }
+  });
+
+  win.webContents.on('did-finish-load', () => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('display:message', { type: 'display:update', state: displayState });
+      if (Object.keys(stageState).length > 0) win.webContents.send('stage:message', stageState);
+    }
   });
 
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
@@ -1099,17 +1118,30 @@ function createDockPopoutWindow(dockId) {
     return { ok: true };
   }
 
+  let x, y;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const mainBounds = mainWindow.getBounds();
+    x = Math.round(mainBounds.x + Math.max(20, (mainBounds.width - 540) / 2));
+    y = Math.round(mainBounds.y + 60);
+  }
+
   const win = new BrowserWindow({
-    width: 760,
-    height: 680,
-    minWidth: 360,
+    width: 520,
+    height: 720,
+    minWidth: 340,
     minHeight: 280,
+    x,
+    y,
     resizable: true,
     maximizable: true,
-    fullscreenable: true,
+    fullscreenable: false,
+    fullscreen: false,
+    alwaysOnTop: true,
     thickFrame: true,
-    backgroundColor: '#0C0B0B',
-    title: mt(`dock.${def.id}`),
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: { x: 12, y: 7 },
+    backgroundColor: '#b8b8bd',
+    title: def.label,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -1118,6 +1150,10 @@ function createDockPopoutWindow(dockId) {
       backgroundThrottling: false,
     },
   });
+
+  if (win.isFullScreen()) win.setFullScreen(false);
+  if (win.isMaximized()) win.unmaximize();
+
   const query = `dock=${encodeURIComponent(id)}`;
   win.loadURL(isDev
     ? `http://localhost:5173/dock-popout.html?${query}`
@@ -1138,7 +1174,7 @@ function createDockPopoutWindow(dockId) {
 }
 
 function createSlideEditorWindow() {
-  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0b0d12', title: mt('window.slideEditor'), webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
+  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0b0d12', title: 'BSP Slide Editor', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
   win.loadURL(isDev ? 'http://localhost:5173/slide-editor/index.html' : `file://${path.join(__dirname, '../../dist/slide-editor/index.html')}`);
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
   return win;
@@ -1151,6 +1187,28 @@ app.whenReady().then(async () => {
       callback(true);
     });
     session.defaultSession.setPermissionCheckHandler(() => true);
+
+    // OBS Studio Browser Source Parity: Strip X-Frame-Options and frame-ancestors CSP
+    // so any external web page, dashboard, timer, church stream, or overlay can be framed cleanly
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      const responseHeaders = { ...details.responseHeaders };
+      delete responseHeaders['x-frame-options'];
+      delete responseHeaders['X-Frame-Options'];
+      delete responseHeaders['frame-options'];
+      delete responseHeaders['Frame-Options'];
+
+      const stripCsp = (headerKey) => {
+        if (responseHeaders[headerKey] && Array.isArray(responseHeaders[headerKey])) {
+          responseHeaders[headerKey] = responseHeaders[headerKey].map((csp) =>
+            csp.replace(/frame-ancestors\s+[^;]+;?/gi, '')
+          );
+        }
+      };
+      stripCsp('content-security-policy');
+      stripCsp('Content-Security-Policy');
+
+      callback({ responseHeaders });
+    });
   }
 
   // Trigger macOS system permission prompts for Microphone and Camera
@@ -1193,6 +1251,7 @@ app.whenReady().then(async () => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('obs:event', event);
     },
   });
+  initRecordingsService(ipcMain, () => mainWindow);
   startHttpServer();
   sessionHistory.startSession('BSP Session');
 
@@ -1228,6 +1287,14 @@ app.whenReady().then(async () => {
     buildAppMenu([...menuOpenIds, ...dockPopoutWindows.keys()]);
   });
   ipcMain.handle('dock:popOut', (_, p) => createDockPopoutWindow(p?.id));
+  ipcMain.handle('dock:closePopout', (_, p) => {
+    const id = String(p?.id || p || '');
+    const win = dockPopoutWindows.get(id);
+    if (win && !win.isDestroyed()) {
+      win.close();
+    }
+    return { ok: true };
+  });
   ipcMain.handle('dock:focusPopout', (_, p) => {
     const win = dockPopoutWindows.get(String(p?.id || ''));
     if (!win || win.isDestroyed()) return { ok: false };
@@ -1292,7 +1359,7 @@ app.whenReady().then(async () => {
     const target = chooseDisplay(displayId);
     if (!target) return { ok: false, error: 'No displays available' };
     activeDisplayId = String(target.id);
-    createDisplayWindow(target, { show: true });
+    createDisplayWindow(target, { show: true, fullscreen: true });
     return { ok: true, displayId: activeDisplayId, label: getDisplayPayload().find((d) => d.id === activeDisplayId)?.label || '' };
   });
   ipcMain.handle('display:toggleFullScreen', () => {
@@ -1333,13 +1400,31 @@ app.whenReady().then(async () => {
     clients: wss ? wss.clients.size : 0,
     updatedAt: displayState.updatedAt || 0,
   }));
-  ipcMain.on('display:message', (_, msg) => { if (msg && msg.type === 'display:update') setDisplayState(msg.state || msg); });
+
+  ipcMain.on('display:message', (event, msg) => {
+    if (!msg) return;
+    if (msg.type === 'display:update') {
+      setDisplayState(msg.state || msg);
+    } else {
+      if (displayWindow && !displayWindow.isDestroyed() && displayWindow.webContents.id !== event.sender.id) {
+        displayWindow.webContents.send('display:message', msg);
+      }
+      for (const win of liveStageWindows()) {
+        if (win && !win.isDestroyed() && win.webContents.id !== event.sender.id) {
+          win.webContents.send('display:message', msg);
+        }
+      }
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.id !== event.sender.id) {
+        mainWindow.webContents.send('display:message', msg);
+      }
+    }
+  });
 
   ipcMain.handle('slide-editor:open', () => { createSlideEditorWindow(); return true; });
   ipcMain.handle('stage-display:open', (_, arg) => {
     const displayId = (arg && typeof arg === 'object') ? arg.displayId : arg;
     const target = chooseDisplay(displayId);
-    createStageDisplayWindow(target);
+    createStageDisplayWindow(target, { fullscreen: true });
     return true;
   });
   /* Closing every stage screen, not just one: the panel's control is a single
@@ -1507,6 +1592,34 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('ndi:status', () => ndiService?.status() || { ok: false });
 
+  ipcMain.handle('desktop:get-sources', async (_e, opts = { types: ['window', 'screen'] }) => {
+    try {
+      const sources = await desktopCapturer.getSources(opts);
+      return sources.map((s) => ({
+        id: s.id,
+        name: s.name,
+        thumbnail: s.thumbnail.toDataURL(),
+        appIcon: s.appIcon ? s.appIcon.toDataURL() : null,
+      }));
+    } catch (err) {
+      console.error('Failed to get desktop capture sources:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle('dialog:open-media-file', async (_e, filters) => {
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Media File',
+      properties: ['openFile'],
+      filters: filters || [
+        { name: 'Media Files', extensions: ['mp4', 'mov', 'webm', 'mkv', 'png', 'jpg', 'jpeg', 'svg', 'mp3', 'wav', 'flac'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+    if (res.canceled || !res.filePaths[0]) return null;
+    return res.filePaths[0];
+  });
+
   // Session history IPC
   ipcMain.handle('session:start', (_, p) => sessionHistory?.startSession(p?.name));
   ipcMain.handle('session:end', () => sessionHistory?.endSession());
@@ -1525,19 +1638,6 @@ app.whenReady().then(async () => {
   ipcMain.handle('song:importText', (_, p) => songImportService?.importText(p?.text, p?.title));
   ipcMain.handle('song:arrangeText', (_, p) => songImportService?.arrangeText(p?.text)
     || { ok: false, error: 'Song import service unavailable' });
-  ipcMain.handle('song:pick', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Import Worship Songs & Databases',
-      properties: ['openFile', 'multiSelections'],
-      filters: [{
-        name: 'Worship Songs & Databases (EasyWorship, OpenLP, OpenLyrics, ChordPro, Text)',
-        extensions: ['db', 'ddb', 'sqlite', 'sqlite3', 'xml', 'pro', 'chordpro', 'chopro', 'txt']
-      }],
-    });
-    if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true, filePaths: [] };
-    return { ok: true, filePaths: result.filePaths };
-  });
-
   ipcMain.handle('song:searchOnline', async (_, p) => {
     const query = String(p?.query || '').trim();
     if (!query) return { ok: true, results: [] };
@@ -1577,8 +1677,21 @@ app.whenReady().then(async () => {
 
       return { ok: true, results };
     } catch (err) {
-      return { ok: false, error: err?.message || 'Failed to search lyrics online', results: [] };
+      console.warn('Online lyrics search failed:', err?.message || err);
+      return { ok: false, error: err?.message || String(err), results: [] };
     }
+  });
+  ipcMain.handle('song:pick', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Worship Songs & Databases',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{
+        name: 'Worship Songs & Databases (EasyWorship, OpenLP, OpenLyrics, ChordPro, Text)',
+        extensions: ['db', 'ddb', 'sqlite', 'sqlite3', 'xml', 'pro', 'chordpro', 'chopro', 'txt']
+      }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true, filePaths: [] };
+    return { ok: true, filePaths: result.filePaths };
   });
 
   // Settings IPC — secrets are write-only from the renderer's point of view
@@ -1684,6 +1797,198 @@ app.whenReady().then(async () => {
     });
     if (result.canceled || result.filePaths.length === 0) return { ok: false, items: [], errors: [], canceled: true };
     return mediaService?.importPaths(result.filePaths) || { ok: false, items: [], errors: [] };
+  });
+  ipcMain.handle('media:pickSingleFile', async (_, options) => {
+    const isImageOnly = options?.type === 'image';
+    const filters = (options?.filters && Array.isArray(options.filters) && options.filters.length > 0)
+      ? options.filters
+      : (isImageOnly
+        ? [
+            { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif'] },
+            { name: 'All Files', extensions: ['*'] },
+          ]
+        : [
+            {
+              name: 'Media Files (Video & Audio)',
+              extensions: ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi', 'mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'wma', 'jpg', 'jpeg', 'png', 'webp'],
+            },
+            { name: '3D LUT Files', extensions: ['cube', 'png', 'look'] },
+            { name: 'Videos', extensions: ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'] },
+            { name: 'Audio', extensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'wma'] },
+            { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif'] },
+            { name: 'All Files', extensions: ['*'] },
+          ]);
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: options?.title || 'Select Media Source File',
+      properties: ['openFile'],
+      filters,
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, canceled: true, filePath: '' };
+    }
+
+    const filePath = result.filePaths[0];
+    let url = filePath;
+    let mediaItem = null;
+    const isLutFile = filePath.toLowerCase().endsWith('.cube') || options?.rawPathOnly;
+
+    if (mediaService && !isLutFile) {
+      const importRes = mediaService.importPaths([filePath]);
+      if (importRes?.items?.[0]) {
+        mediaItem = importRes.items[0];
+        url = mediaItem.url || filePath;
+      }
+    }
+
+    return {
+      ok: true,
+      filePath,
+      url,
+      mediaItem,
+      name: path.basename(filePath),
+    };
+  });
+
+  // Professional 3D LUT Parser (Adobe .cube Format)
+  ipcMain.handle('lut:parseFile', async (_, filePath) => {
+    try {
+      if (!filePath || typeof filePath !== 'string') {
+        return { ok: false, error: 'Invalid path' };
+      }
+      let targetPath = filePath;
+      if (targetPath.startsWith('file://')) {
+        try {
+          const { fileURLToPath } = require('url');
+          targetPath = fileURLToPath(targetPath);
+        } catch {}
+      }
+      targetPath = path.normalize(targetPath);
+      const content = await fs.promises.readFile(targetPath, 'utf8');
+      const lines = content.split(/\r?\n/);
+      let size = null;
+      const data = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line || line.startsWith('#')) continue;
+        if (line.startsWith('LUT_3D_SIZE')) {
+          size = parseInt(line.split(/\s+/)[1], 10);
+          continue;
+        }
+        if (line.startsWith('DOMAIN_MIN') || line.startsWith('DOMAIN_MAX') || line.startsWith('TITLE')) continue;
+        if (size !== null) {
+          const parts = line.split(/\s+/);
+          if (parts.length >= 3) {
+            data.push([parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2])]);
+          }
+        }
+      }
+
+      if (!size || data.length < size * size * size) {
+        return { ok: false, error: 'Incomplete or malformed .cube file' };
+      }
+
+      // 4x4 Least-Squares Solver for (R, G, B, 1) -> (R', G', B')
+      const solveLstSq = (A, b) => {
+        const AtA = [
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+        ];
+        const Atb = [0, 0, 0, 0];
+        const N = A.length;
+        for (let i = 0; i < N; i++) {
+          const row = A[i];
+          const val = b[i];
+          for (let r = 0; r < 4; r++) {
+            Atb[r] += row[r] * val;
+            for (let c = 0; c < 4; c++) {
+              AtA[r][c] += row[r] * row[c];
+            }
+          }
+        }
+        const M = AtA.map((r, i) => [...r, Atb[i]]);
+        for (let i = 0; i < 4; i++) {
+          let maxRow = i;
+          for (let k = i + 1; k < 4; k++) {
+            if (Math.abs(M[k][i]) > Math.abs(M[maxRow][i])) maxRow = k;
+          }
+          const tmp = M[i]; M[i] = M[maxRow]; M[maxRow] = tmp;
+          const pivot = M[i][i];
+          if (Math.abs(pivot) < 1e-8) continue;
+          for (let j = i; j <= 4; j++) M[i][j] /= pivot;
+          for (let k = 0; k < 4; k++) {
+            if (k !== i) {
+              const factor = M[k][i];
+              for (let j = i; j <= 4; j++) M[k][j] -= factor * M[i][j];
+            }
+          }
+        }
+        return [M[0][4], M[1][4], M[2][4], M[3][4]];
+      };
+
+      const A = [];
+      const bR = [];
+      const bG = [];
+      const bB = [];
+      const sampleSteps = Math.min(size, 8);
+      for (let b = 0; b < sampleSteps; b++) {
+        for (let g = 0; g < sampleSteps; g++) {
+          for (let r = 0; r < sampleSteps; r++) {
+            const rIn = r / (sampleSteps - 1);
+            const gIn = g / (sampleSteps - 1);
+            const bIn = b / (sampleSteps - 1);
+            const ir = Math.round(rIn * (size - 1));
+            const ig = Math.round(gIn * (size - 1));
+            const ib = Math.round(bIn * (size - 1));
+            const idx = ir + ig * size + ib * size * size;
+            const out = data[idx] || [rIn, gIn, bIn];
+            A.push([rIn, gIn, bIn, 1.0]);
+            bR.push(out[0]);
+            bG.push(out[1]);
+            bB.push(out[2]);
+          }
+        }
+      }
+
+      const solR = solveLstSq(A, bR);
+      const solG = solveLstSq(A, bG);
+      const solB = solveLstSq(A, bB);
+
+      // Neutral Tone Curve along neutral axis
+      const curveSteps = 16;
+      const tableR = [];
+      const tableG = [];
+      const tableB = [];
+      for (let s = 0; s <= curveSteps; s++) {
+        const t = s / curveSteps;
+        const idxInSize = Math.round(t * (size - 1));
+        const idx = idxInSize + idxInSize * size + idxInSize * size * size;
+        const pt = data[idx] || [t, t, t];
+        tableR.push(Math.max(0, Math.min(1, pt[0])).toFixed(3));
+        tableG.push(Math.max(0, Math.min(1, pt[1])).toFixed(3));
+        tableB.push(Math.max(0, Math.min(1, pt[2])).toFixed(3));
+      }
+
+      return {
+        ok: true,
+        size,
+        matrix: [
+          solR[0], solR[1], solR[2], 0, solR[3],
+          solG[0], solG[1], solG[2], 0, solG[3],
+          solB[0], solB[1], solB[2], 0, solB[3],
+          0,       0,       0,       1, 0,
+        ],
+        tableR: tableR.join(' '),
+        tableG: tableG.join(' '),
+        tableB: tableB.join(' '),
+        name: path.basename(filePath),
+      };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
   });
 
   /* Presentation packages. An imported deck keeps only its source path — a
@@ -1923,40 +2228,21 @@ app.whenReady().then(async () => {
     if (handedOver) return;
     handedOver = true;
 
-    // 1. Remove splash window first so focus cleanly transfers to main window
+    // 1. Show and focus main application window first
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.maximize();
+      mainWindow.focus();
+    }
+
+    // 2. Safely remove splash window without blocking focus
     if (splash && !splash.isDestroyed()) {
       try {
         splash.setAlwaysOnTop(false);
-        splash.hide();
         splash.destroy();
       } catch (_) {}
     }
     splash = null;
-
-    // 2. Restore, show and focus main application window
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      try {
-        if (mainWindow.isMinimized()) mainWindow.restore();
-        mainWindow.show();
-        if (!mainWindow.isMaximized() && !mainWindow.isFullScreen()) {
-          try { mainWindow.maximize(); } catch (_) {}
-        }
-        mainWindow.focus();
-      } catch (err) {
-        console.error('Failed to show mainWindow in handOver:', err);
-      }
-    }
-
-    // 3. Fallback tick to guarantee window visibility across OS window managers (Windows DWM / macOS / Linux X11/Wayland)
-    setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        try {
-          if (mainWindow.isMinimized()) mainWindow.restore();
-          if (!mainWindow.isVisible()) mainWindow.show();
-          mainWindow.focus();
-        } catch (_) {}
-      }
-    }, 150);
   };
   const handOverAfterFloor = () => {
     setTimeout(handOver, Math.max(0, SPLASH_FLOOR_MS - (Date.now() - splashUpAt)));
@@ -2005,14 +2291,4 @@ app.on('web-contents-created', (_evt, contents) => {
 
 app.on('window-all-closed', () => { appStoreService?.flush(); deepgramService?.destroy(); ndiService?.destroy(); sessionHistory?.endSession(); if (process.platform !== 'darwin') app.quit(); });
 app.on('will-quit', () => { appStoreService?.flush(); deepgramService?.destroy(); globalShortcut.unregisterAll(); ndiService?.destroy(); sessionHistory?.endSession(); });
-app.on('activate', () => {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    mainWindow = createMainWindow({ autoShow: true });
-  } else {
-    try {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    } catch (_) {}
-  }
-});
+app.on('activate', () => { if (!mainWindow) mainWindow = createMainWindow(); });

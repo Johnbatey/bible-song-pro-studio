@@ -62,7 +62,7 @@ export function backgroundFieldsFor(scene: Scene | null, theme: Theme | null, ou
     bgVideo: '' as string,
     bgCustomImage: '' as string,
     bgFill: '' as string,
-    bgFit: bg?.fit || (scene?.type === 'media' ? 'contain' : (!bg ? themeFs?.backgroundFit : undefined)) || 'contain',
+    bgFit: bg?.fit || (!bg ? themeFs?.backgroundFit : undefined) || 'cover',
     bgOpacity: typeof bg?.opacity === 'number' ? bg.opacity : 1,
     bgVideoLoop: resolveBgVideoLoop(bg, theme),
   };
@@ -82,6 +82,8 @@ export function backgroundFieldsFor(scene: Scene | null, theme: Theme | null, ou
       fields.bgVideo = themeFs.backgroundMediaUrl;
     } else if (themeFs?.backgroundMediaType === 'image' && themeFs.backgroundMediaUrl) {
       fields.bgCustomImage = themeFs.backgroundMediaUrl;
+    } else if (themeFs?.backgroundType === 'transparent' || themeFs?.background === 'transparent' || themeFs?.backgroundColor === 'transparent') {
+      fields.bgFill = 'transparent';
     } else {
       fields.bgFill = themeFs?.background || themeFs?.backgroundColor || '#0c0e14';
     }

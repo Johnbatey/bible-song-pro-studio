@@ -1,5 +1,6 @@
-import type { Alert, Scene, FullScreenTheme, LowerThirdTheme, Theme, VideoTransport, AppSettings, Background } from '../../types';
-import { memo, useEffect, useRef } from 'react';
+import type { Alert, Scene, SourceDocument, FullScreenTheme, LowerThirdTheme, Theme, VideoTransport, AppSettings, Background } from '../../types';
+import type { SceneTransitionType } from '../../types/transition';
+import { memo, useEffect, useRef, useState, useMemo, Fragment } from 'react';
 import type React from 'react';
 import { SlideStage } from './SlideStage';
 import { attachAudioOutputSink } from '../../utils/audio-output';
@@ -9,9 +10,387 @@ import './ProgramSurface.css';
 
 export { assetUrl };
 
+export interface TypedWordTextProps {
+  text: string;
+  duration: number; // in seconds
+  style?: React.CSSProperties;
+  className?: string;
+  textAlign?: 'left' | 'center' | 'right';
+}
+
+export function TypedWordText({ text, duration, style, className, textAlign }: TypedWordTextProps) {
+  const [visibleCount, setVisibleCount] = useState(0);
+
+  const lines = useMemo(() => {
+    if (!text) return [];
+    return text.replace(/<br\s*\/?>/gi, '\n').split('\n').map((line) => {
+      const parts = line.split(/(\s+)/);
+      return parts.map((part) => ({
+        text: part,
+        isSpace: /^\s+$/.test(part),
+      }));
+    });
+  }, [text]);
+
+  const totalWords = useMemo(() => {
+    let count = 0;
+    lines.forEach((line) => {
+      line.forEach((part) => {
+        if (!part.isSpace && part.text.length > 0) count++;
+      });
+    });
+    return count;
+  }, [lines]);
+
+  useEffect(() => {
+    if (totalWords === 0) {
+      setVisibleCount(0);
+      return;
+    }
+    const durationMs = Math.max(100, (duration || 0.8) * 1000);
+    const startTime = performance.now();
+    let rafId: number;
+
+    const tick = (now: number) => {
+      const elapsed = Math.max(0, now - startTime);
+      const progress = Math.min(1, elapsed / durationMs);
+      const count = Math.ceil(progress * totalWords);
+      setVisibleCount(count);
+      if (progress < 1) {
+        rafId = requestAnimationFrame(tick);
+      }
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [text, duration, totalWords]);
+
+  let currentWordIdx = 0;
+
+  return (
+    <div className={`typed-words-wrapper ${className || ''}`} style={{ width: '100%', textAlign, ...style }}>
+      {lines.map((line, lineIdx) => (
+        <div key={lineIdx} className="type-line" style={{ display: 'block', margin: 0, lineHeight: 'inherit', textAlign }}>
+          {line.map((part, partIdx) => {
+            if (part.isSpace) {
+              return <Fragment key={partIdx}>{part.text}</Fragment>;
+            }
+            const wordIdx = currentWordIdx++;
+            const isRevealed = wordIdx < visibleCount;
+            return (
+              <span
+                key={partIdx}
+                className={`type-word ${isRevealed ? 'revealed-word' : 'hidden-word'}`}
+                style={{
+                  display: 'inline-block',
+                  whiteSpace: 'pre',
+                  opacity: isRevealed ? 1 : 0,
+                  visibility: isRevealed ? 'visible' : 'hidden',
+                  transition: 'opacity 0.22s ease',
+                }}
+              >
+                {part.text}
+              </span>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export interface SlideTransitionContainerProps {
+  currentSlide: any;
+  sceneId: string;
+  transition?: { type?: string; duration?: number; animateBackground?: boolean } | null;
+  defaultDuration?: number;
+}
+
+export function SlideTransitionContainer({
+  currentSlide,
+  sceneId,
+  transition,
+  defaultDuration = 0.5,
+}: SlideTransitionContainerProps) {
+  const [activeSlide, setActiveSlide] = useState<{ id: string; projection: any }>({
+    id: sceneId,
+    projection: currentSlide,
+  });
+  const [outgoingSlide, setOutgoingSlide] = useState<{
+    id: string;
+    projection: any;
+    transitionType: string;
+    durationSec: number;
+  } | null>(null);
+
+  const prevSceneIdRef = useRef<string | null>(sceneId);
+  const prevSlideRef = useRef<any>(currentSlide);
+
+  useEffect(() => {
+    if (sceneId !== prevSceneIdRef.current) {
+      const type = transition?.type || "fade";
+      const durationSec =
+        typeof transition?.duration === "number" && transition.duration > 0
+          ? transition.duration
+          : defaultDuration;
+
+      if (type === "cut" || !prevSlideRef.current) {
+        setActiveSlide({ id: sceneId, projection: currentSlide });
+        setOutgoingSlide(null);
+      } else {
+        setOutgoingSlide({
+          id: prevSceneIdRef.current || "prev-slide",
+          projection: prevSlideRef.current,
+          transitionType: type,
+          durationSec,
+        });
+        setActiveSlide({ id: sceneId, projection: currentSlide });
+
+        const timer = setTimeout(() => {
+          setOutgoingSlide(null);
+        }, Math.max(100, Math.round(durationSec * 1000) + 40));
+
+        prevSceneIdRef.current = sceneId;
+        prevSlideRef.current = currentSlide;
+        return () => clearTimeout(timer);
+      }
+
+      prevSceneIdRef.current = sceneId;
+      prevSlideRef.current = currentSlide;
+    } else {
+      setActiveSlide({ id: sceneId, projection: currentSlide });
+      prevSlideRef.current = currentSlide;
+    }
+  }, [sceneId, currentSlide, transition, defaultDuration]);
+
+  const transType = outgoingSlide ? outgoingSlide.transitionType : (transition?.type || "fade");
+  const durSec = outgoingSlide ? outgoingSlide.durationSec : (typeof transition?.duration === "number" ? transition.duration : defaultDuration);
+  const timing = `${durSec}s cubic-bezier(0.16, 1, 0.3, 1) both`;
+
+  let incomingAnim = "none";
+  let outgoingAnim = "none";
+
+  if (outgoingSlide) {
+    switch (transType) {
+      case "fade":
+        incomingAnim = `bsp-slide-fade-in ${durSec}s ease-in-out both`;
+        outgoingAnim = "none";
+        break;
+      case "slide-left":
+      case "push-left":
+        incomingAnim = `bsp-slide-push-in-left ${timing}`;
+        outgoingAnim = `bsp-slide-push-out-left ${timing}`;
+        break;
+      case "slide-right":
+      case "push-right":
+        incomingAnim = `bsp-slide-push-in-right ${timing}`;
+        outgoingAnim = `bsp-slide-push-out-right ${timing}`;
+        break;
+      case "slide-up":
+      case "push-up":
+        incomingAnim = `bsp-slide-push-in-up ${timing}`;
+        outgoingAnim = `bsp-slide-push-out-up ${timing}`;
+        break;
+      case "slide-down":
+      case "push-down":
+        incomingAnim = `bsp-slide-push-in-down ${timing}`;
+        outgoingAnim = `bsp-slide-push-out-down ${timing}`;
+        break;
+      case "zoom":
+        incomingAnim = `bsp-slide-zoom-in ${timing}`;
+        outgoingAnim = "none";
+        break;
+      default:
+        incomingAnim = `bsp-slide-fade-in ${durSec}s ease-in-out both`;
+        outgoingAnim = "none";
+        break;
+    }
+  }
+
+  return (
+    <div className="program-slide-transition-container">
+      {outgoingSlide && (
+        <div
+          key={`out-${outgoingSlide.id}`}
+          className="program-slide-layer outgoing"
+          style={{ animation: outgoingAnim }}
+        >
+          <SlideStage projection={outgoingSlide.projection} className="program-slide-stage" />
+        </div>
+      )}
+
+      <div
+        key={`in-${activeSlide.id}`}
+        className="program-slide-layer incoming"
+        style={{ animation: outgoingSlide ? incomingAnim : "none" }}
+      >
+        <SlideStage projection={activeSlide.projection} className="program-slide-stage" />
+      </div>
+    </div>
+  );
+}
+
+
+function getTransitionStyle(
+  type: SceneTransitionType | string,
+  progress: number,
+): { incoming: React.CSSProperties; outgoing?: React.CSSProperties } {
+  switch (type) {
+    case 'cut':
+      return {
+        incoming: { opacity: 1 },
+        outgoing: { opacity: 0 },
+      };
+    case 'fade':
+    case 'crossfade':
+      return {
+        incoming: { opacity: progress },
+        outgoing: { opacity: 1 - progress },
+      };
+    case 'slide-left':
+      return {
+        incoming: { transform: `translateX(${(1 - progress) * 100}%)` },
+        outgoing: { transform: `translateX(${-progress * 100}%)` },
+      };
+    case 'slide-right':
+      return {
+        incoming: { transform: `translateX(${-(1 - progress) * 100}%)` },
+        outgoing: { transform: `translateX(${progress * 100}%)` },
+      };
+    case 'slide-up':
+      return {
+        incoming: { transform: `translateY(${(1 - progress) * 100}%)` },
+        outgoing: { transform: `translateY(${progress * -100}%)` },
+      };
+    case 'slide-down':
+      return {
+        incoming: { transform: `translateY(${(1 - progress) * -100}%)` },
+        outgoing: { transform: `translateY(${progress * 100}%)` },
+      };
+    case 'push-left':
+      return {
+        incoming: { transform: `translateX(${(1 - progress) * 100}%)` },
+        outgoing: { transform: `translateX(${progress * -100}%)` },
+      };
+    case 'push-right':
+      return {
+        incoming: { transform: `translateX(${(1 - progress) * -100}%)` },
+        outgoing: { transform: `translateX(${progress * 100}%)` },
+      };
+    case 'zoom-in':
+      return {
+        incoming: {
+          transform: `scale(${0.8 + progress * 0.2})`,
+          opacity: progress,
+        },
+        outgoing: {
+          transform: `scale(${1 + progress * 0.2})`,
+          opacity: 1 - progress,
+        },
+      };
+    case 'zoom-out':
+      return {
+        incoming: {
+          opacity: progress,
+          transform: `scale(${1.5 - progress * 0.5})`,
+          transformOrigin: 'center center',
+          mixBlendMode: 'plus-lighter',
+        },
+        outgoing: {
+          opacity: 1 - progress,
+        },
+      };
+    case 'luma-wipe':
+      return {
+        incoming: {
+          opacity: progress,
+          mixBlendMode: 'plus-lighter',
+        },
+        outgoing: {
+          opacity: 1 - progress,
+        },
+      };
+    default:
+      return {
+        incoming: {
+          opacity: progress,
+          mixBlendMode: 'plus-lighter',
+        },
+        outgoing: {
+          opacity: 1 - progress,
+        },
+      };
+  }
+}
+
+export function resolveFxAnimation(
+  transition?: { type?: string; duration?: number; animateBackground?: boolean } | null,
+  sceneAnimateBg?: boolean,
+  stateAnimateBg?: boolean
+) {
+  const type = transition?.type || 'fade';
+  const durationSec = typeof transition?.duration === 'number' && transition.duration > 0 ? transition.duration : 0.4;
+  const animateBg = transition?.animateBackground ?? sceneAnimateBg ?? stateAnimateBg ?? false;
+
+  if (type === 'cut') {
+    return {
+      name: 'none',
+      durationSec: 0,
+      duration: '0s',
+      css: 'none',
+      animateBg: false,
+      isWordType: false,
+    };
+  }
+
+  if (type === 'type-words') {
+    return {
+      name: 'type-words',
+      durationSec,
+      duration: `${durationSec}s`,
+      css: 'none',
+      animateBg,
+      isWordType: true,
+    };
+  }
+
+  if (type === 'zoom-type-words') {
+    return {
+      name: 'zoom-type-words',
+      durationSec,
+      duration: `${durationSec}s`,
+      css: `bsp-anim-zoom ${durationSec}s cubic-bezier(0.16, 1, 0.3, 1) both`,
+      animateBg,
+      isWordType: true,
+    };
+  }
+
+  let animName = 'bsp-anim-fade';
+  if (type === 'zoom') animName = 'bsp-anim-zoom';
+  else if (type === 'slide-up') animName = 'bsp-anim-slide-up';
+  else if (type === 'slide-down') animName = 'bsp-anim-slide-down';
+  else if (type === 'slide-left') animName = 'bsp-anim-slide-left';
+  else if (type === 'slide-right') animName = 'bsp-anim-slide-right';
+  else if (type === 'type') animName = 'bsp-anim-type';
+  else if (type === 'zoom-type') animName = 'bsp-anim-zoom-type';
+
+  return {
+    name: animName,
+    durationSec,
+    duration: `${durationSec}s`,
+    css: `${animName} ${durationSec}s cubic-bezier(0.16, 1, 0.3, 1) both`,
+    animateBg,
+    isWordType: false,
+  };
+}
+
 export interface ProgramSurfaceState {
   scene?: Scene | null;
-  outputMode?: 'fullscreen' | 'lowerThird';
+    sources?: Record<string, SourceDocument>;
+  transition?: { active: boolean; type: string; progress: number } | null;
+  animateBackground?: boolean;
+  fxAnimation?: { transitionType: string; duration: number; animateBackground: boolean };
+    outputMode?: 'fullscreen' | 'lowerThird';
   theme?: Theme | null;
   activeAlert?: Alert | null;
   transcription?: string;
@@ -51,6 +430,7 @@ interface ProgramSurfaceProps {
   preview?: boolean;
   assetBaseUrl?: string;
   className?: string;
+  isExternalDisplay?: boolean;
   /** Reports this surface's video clock back to whoever is driving it. Only
       the one pane the transport is pointed at should pass this — every
       surface playing its own copy would otherwise fight over the readout. */
@@ -86,18 +466,40 @@ function referenceFontSize(state: ProgramSurfaceState, preview: boolean) {
   return '28px';
 }
 
+export function resolveEffectiveTheme(theme: Theme | null | undefined, sceneType?: string): Theme | undefined {
+  if (!theme) return undefined;
+  if (theme.linkBibleSong === false) {
+    if (sceneType === 'song') {
+      return {
+        ...theme,
+        fullScreen: theme.songFullScreen || theme.fullScreen,
+        lowerThird: theme.songLowerThird || theme.lowerThird,
+      };
+    }
+    if (sceneType === 'bible') {
+      return {
+        ...theme,
+        fullScreen: theme.bibleFullScreen || theme.fullScreen,
+        lowerThird: theme.bibleLowerThird || theme.lowerThird,
+      };
+    }
+  }
+  return theme;
+}
+
 function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lowerThird', assetBaseUrl?: string): React.CSSProperties {
   if (mode === 'lowerThird') {
     return { backgroundColor: 'transparent', backgroundImage: 'none' };
   }
-  if (!state.scene) {
-    return { backgroundColor: '#000000', backgroundImage: 'none' };
+  const activeTheme = resolveEffectiveTheme(state.theme, state.scene?.type);
+  if (!state.scene && !activeTheme) {
+    return { backgroundColor: 'transparent', backgroundImage: 'none' };
   }
   const rawFit = state.bgFit || state.scene?.background?.fit || (state.scene?.type === 'media' ? 'contain' : 'cover');
   const fit = rawFit === 'fill' ? '100% 100%' : rawFit;
   const opacity = typeof state.bgOpacity === 'number' ? state.bgOpacity : 1;
   const style: React.CSSProperties = {
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
     backgroundSize: fit,
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
@@ -107,9 +509,14 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
   if (state.bgCustomImage) {
     style.backgroundImage = `url("${assetUrl(state.bgCustomImage, assetBaseUrl).replace(/"/g, '%22')}")`;
   } else if (state.bgFill) {
-    if (state.bgFill === 'transparent') style.backgroundColor = 'transparent';
-    else if (state.bgFill.includes('gradient')) style.backgroundImage = state.bgFill;
-    else style.backgroundColor = state.bgFill;
+    if (state.bgFill === 'transparent') {
+      style.backgroundColor = 'transparent';
+      style.backgroundImage = 'none';
+    } else if (state.bgFill.includes('gradient')) {
+      style.backgroundImage = state.bgFill;
+    } else {
+      style.backgroundColor = state.bgFill;
+    }
   } else {
     /* The scene's own background wins over the theme's.
      *
@@ -128,41 +535,64 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
     const bg = state.scene?.background;
     const sceneImage = bg?.type === 'image' && bg.mediaUrl;
     const sceneGradient = bg?.type === 'gradient' && bg.gradient;
-    const sceneSolid = bg?.type === 'solid' && bg.color;
+    const sceneSolid = (bg?.type === 'solid' || (bg?.type as string) === 'color') && bg?.color;
     const sceneTransparent = bg?.type === 'transparent';
-    const themeFs = state.theme?.fullScreen;
+    const themeFs = activeTheme?.fullScreen;
 
-    if (sceneImage) {
+    if (sceneImage && bg?.mediaUrl) {
       style.backgroundImage = `url("${assetUrl(bg.mediaUrl as string, assetBaseUrl).replace(/"/g, '%22')}")`;
-    } else if (sceneGradient) {
+      if (typeof bg.opacity === 'number') {
+        style.opacity = bg.opacity;
+      }
+    } else if (sceneGradient && bg?.gradient) {
       style.backgroundImage = bg.gradient as string;
-    } else if (sceneSolid) {
+      if (typeof bg.opacity === 'number') {
+        style.opacity = bg.opacity;
+      }
+    } else if (sceneSolid && bg?.color) {
       style.backgroundColor = bg.color as string;
+      if (typeof bg.opacity === 'number') {
+        style.opacity = bg.opacity;
+      }
     } else if (sceneTransparent) {
       style.backgroundColor = 'transparent';
+      style.backgroundImage = 'none';
       /* A video scene paints no colour here — videoSource() supplies the frame
          and a fill underneath it would only show during the load. */
-    } else if (bg?.type === 'video' && bg.mediaUrl) {
+    } else if (bg?.type === 'video' && bg?.mediaUrl) {
       style.backgroundColor = '#000';
-      /* No scene background, so the theme's is the ground. Its media outranks
-         its colour for the same reason a scene's does: a still or a clip is the
-         more specific thing the operator chose, and a theme carries a
-         backgroundColor whether or not anybody picked one. */
     } else if (themeFs?.backgroundMediaType === 'image' && themeFs.backgroundMediaUrl) {
       style.backgroundImage = `url("${assetUrl(themeFs.backgroundMediaUrl, assetBaseUrl).replace(/"/g, '%22')}")`;
       if (themeFs.backgroundFit) {
         style.backgroundSize = themeFs.backgroundFit === 'fill' ? '100% 100%' : themeFs.backgroundFit;
       }
+      if (typeof themeFs.backgroundOpacity === 'number') {
+        style.opacity = themeFs.backgroundOpacity;
+      }
     } else if (themeFs?.backgroundMediaType === 'video' && themeFs.backgroundMediaUrl) {
-      /* videoSource() supplies the frame; a fill under it would only show
-         during the load. */
       style.backgroundColor = '#000';
+      if (typeof themeFs.backgroundOpacity === 'number') {
+        style.opacity = themeFs.backgroundOpacity;
+      }
+    } else if (themeFs?.backgroundType === 'transparent' || themeFs?.background === 'transparent' || themeFs?.backgroundColor === 'transparent') {
+      style.backgroundColor = 'transparent';
+      style.backgroundImage = 'none';
+      if (typeof themeFs?.backgroundOpacity === 'number') {
+        style.opacity = themeFs.backgroundOpacity;
+      }
     } else if (themeFs?.background) {
-      if (themeFs.background === 'transparent') style.backgroundColor = 'transparent';
-      else if (themeFs.background.includes('gradient')) style.backgroundImage = themeFs.background;
+      if (themeFs.background.includes('gradient')) style.backgroundImage = themeFs.background;
       else style.backgroundColor = themeFs.background;
+      if (typeof themeFs.backgroundOpacity === 'number') {
+        style.opacity = themeFs.backgroundOpacity;
+      }
     } else if (themeFs?.backgroundColor) {
       style.backgroundColor = themeFs.backgroundColor;
+      if (typeof themeFs.backgroundOpacity === 'number') {
+        style.opacity = themeFs.backgroundOpacity;
+      }
+    } else {
+      style.backgroundColor = '#000000';
     }
   }
 
@@ -170,40 +600,41 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
 }
 
 function lowerThirdBandStyle(lt: LowerThirdTheme | undefined, sceneBg?: Background, assetBaseUrl?: string): React.CSSProperties {
+  let style: React.CSSProperties = {};
   if (sceneBg && sceneBg.type && (sceneBg.type as string) !== 'theme') {
     if (sceneBg.type === 'solid' || (sceneBg.type as string) === 'color') {
-      return {
+      style = {
         backgroundColor: sceneBg.color || '#000000',
         backgroundImage: 'none',
       };
-    }
-    if (sceneBg.type === 'gradient' && sceneBg.gradient) {
-      return {
+    } else if (sceneBg.type === 'gradient' && sceneBg.gradient) {
+      style = {
         backgroundImage: sceneBg.gradient,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       };
-    }
-    if (sceneBg.type === 'image' && sceneBg.mediaUrl) {
+    } else if (sceneBg.type === 'image' && sceneBg.mediaUrl) {
       const mediaUrl = assetUrl(sceneBg.mediaUrl, assetBaseUrl);
       const fit = sceneBg.fit === 'fill' ? '100% 100%' : (sceneBg.fit || 'cover');
-      return {
+      style = {
         backgroundColor: '#000000',
         backgroundImage: `url("${mediaUrl.replace(/"/g, '%22')}")`,
         backgroundSize: fit,
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
       };
-    }
-    if (sceneBg.type === 'video' && sceneBg.mediaUrl) {
-      return {
+    } else if (sceneBg.type === 'video' && sceneBg.mediaUrl) {
+      style = {
         backgroundColor: '#000000',
         backgroundImage: 'none',
       };
+    } else if (sceneBg.type === 'transparent') {
+      style = { background: 'transparent', backgroundColor: 'transparent', backgroundImage: 'none' };
     }
-    if (sceneBg.type === 'transparent') {
-      return { background: 'transparent' };
+    if (typeof sceneBg.opacity === 'number') {
+      style.opacity = sceneBg.opacity;
     }
+    return style;
   }
 
   const mediaUrl = lt?.backgroundMediaUrl ? assetUrl(lt.backgroundMediaUrl, assetBaseUrl) : '';
@@ -212,35 +643,54 @@ function lowerThirdBandStyle(lt: LowerThirdTheme | undefined, sceneBg?: Backgrou
   const fit = lt?.backgroundFit === 'fill' ? '100% 100%' : (lt?.backgroundFit || 'cover');
 
   if (hasImage) {
-    return {
-      backgroundColor: '#000',
+    style = {
+      backgroundColor: '#000000',
       backgroundImage: `url("${mediaUrl.replace(/"/g, '%22')}")`,
       backgroundSize: fit,
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
     };
+  } else if (hasVideo) {
+    style = { backgroundColor: '#000000', backgroundImage: 'none' };
+  } else if (lt?.backgroundType === 'transparent' || lt?.background === 'transparent' || lt?.backgroundColor === 'transparent') {
+    style = { background: 'transparent', backgroundColor: 'transparent', backgroundImage: 'none' };
+  } else if (lt?.background) {
+    if (lt.background.includes('gradient')) style = { backgroundImage: lt.background, backgroundSize: 'cover', backgroundPosition: 'center' };
+    else style = { backgroundColor: lt.background };
+  } else if (lt?.backgroundColor) {
+    style = { backgroundColor: lt.backgroundColor };
+  } else {
+    style = { background: 'linear-gradient(135deg, rgba(10, 18, 32, .94), rgba(37, 52, 78, .94))' };
   }
 
-  if (hasVideo) {
-    return { backgroundColor: '#000', backgroundImage: 'none' };
+  if (typeof lt?.backgroundOpacity === 'number') {
+    style.opacity = lt.backgroundOpacity;
   }
 
-  return { background: lt?.background || undefined };
+  return style;
 }
 
-function lowerThirdBandMedia(lt: LowerThirdTheme | undefined, sceneBg?: Background, assetBaseUrl?: string) {
+function lowerThirdBandMedia(
+  lt: LowerThirdTheme | undefined,
+  sceneBg?: Background,
+  assetBaseUrl?: string,
+  animateBg?: boolean,
+  animCss?: string
+) {
+  const animStyle = animateBg ? { animation: animCss } : { animation: 'none' };
   if (sceneBg && sceneBg.type === 'video' && sceneBg.mediaUrl) {
     const mediaUrl = assetUrl(sceneBg.mediaUrl, assetBaseUrl);
     const fit = sceneBg.fit === 'contain' ? 'contain' : sceneBg.fit === 'fill' ? 'fill' : 'cover';
     return (
       <video
+        key={animateBg ? `${sceneBg.mediaUrl}-lt-video` : 'static-lt-video'}
         className="program-lt-media"
         src={mediaUrl}
         autoPlay
         muted
         loop={sceneBg.loop !== false}
         playsInline
-        style={{ objectFit: fit }}
+        style={{ objectFit: fit, opacity: typeof sceneBg.opacity === 'number' ? sceneBg.opacity : 1, ...animStyle }}
       />
     );
   }
@@ -254,13 +704,14 @@ function lowerThirdBandMedia(lt: LowerThirdTheme | undefined, sceneBg?: Backgrou
   const fit = lt.backgroundFit === 'contain' ? 'contain' : lt.backgroundFit === 'fill' ? 'fill' : 'cover';
   return (
     <video
+      key={animateBg ? `${mediaUrl}-lt-video` : 'static-lt-video'}
       className="program-lt-media"
       src={mediaUrl}
       autoPlay
       muted
       loop={lt.backgroundLoop !== false}
       playsInline
-      style={{ objectFit: fit }}
+      style={{ objectFit: fit, opacity: typeof lt?.backgroundOpacity === 'number' ? lt.backgroundOpacity : 1, ...animStyle }}
     />
   );
 }
@@ -290,7 +741,8 @@ function videoSource(state: ProgramSurfaceState, assetBaseUrl?: string) {
      <video> below keeps its DOM node: the loop plays unbroken across takes and
      slide advances for as long as the theme holds. */
   if (!bg) {
-    const themeFs = state.theme?.fullScreen;
+    const activeTheme = resolveEffectiveTheme(state.theme, state.scene?.type);
+    const themeFs = activeTheme?.fullScreen;
     if (themeFs?.backgroundMediaType === 'video' && themeFs.backgroundMediaUrl) {
       return assetUrl(themeFs.backgroundMediaUrl, assetBaseUrl);
     }
@@ -366,7 +818,8 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   ]);
 
   const mode = state.outputMode || state.mode || 'fullscreen';
-  const themeSection = mode === 'lowerThird' ? state.theme?.lowerThird : state.theme?.fullScreen;
+  const activeTheme = resolveEffectiveTheme(state.theme, scene?.type);
+  const themeSection = mode === 'lowerThird' ? activeTheme?.lowerThird : activeTheme?.fullScreen;
   const content = contentFromScene(scene);
   const secondaryVerse = content?.secondaryVerse;
   const isCompare = Boolean(secondaryVerse?.text);
@@ -374,7 +827,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   const primaryVersionTag = content?.version ? content.version.split('/')[0] : '';
   const secondaryVersionTag = secondaryVerse?.version || (content?.version && content.version.includes('/') ? content.version.split('/')[1] : '');
 
-  const bibleOptions = state.theme?.bibleOptions;
+  const bibleOptions = activeTheme?.bibleOptions;
   const showVersion = state.showTranslation !== undefined ? state.showTranslation : (bibleOptions?.showVersion !== false);
   const refOptions = {
     showVersion,
@@ -402,7 +855,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   const syncRefColor = themeSection?.syncRefColor;
   const referenceColor = syncRefColor
     ? fontColor
-    : (state.referenceColor || themeSection?.referenceColor || state.theme?.lowerThird?.accentColor || defaultTheme.referenceColor);
+    : (state.referenceColor || themeSection?.referenceColor || activeTheme?.lowerThird?.accentColor || defaultTheme.referenceColor);
 
   const shadowEnabled = themeSection?.textShadowEnabled;
   const shadowLevel = themeSection?.textShadowLevel || 'medium';
@@ -420,9 +873,9 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     color: fontColor,
     textAlign,
     textShadow: shadowCss,
-    lineHeight: mode === 'fullscreen' ? state.theme?.fullScreen?.lineHeight : undefined,
+    lineHeight: mode === 'fullscreen' ? activeTheme?.fullScreen?.lineHeight : undefined,
   };
-  const themeRefFontSize = mode === 'lowerThird' ? state.theme?.lowerThird?.referenceFontSize : state.theme?.fullScreen?.referenceFontSize;
+  const themeRefFontSize = mode === 'lowerThird' ? activeTheme?.lowerThird?.referenceFontSize : activeTheme?.fullScreen?.referenceFontSize;
   const refStyle: React.CSSProperties = {
     fontFamily,
     fontSize: referenceFontSize({ ...state, referenceFontSize: state.referenceFontSize ?? themeRefFontSize ?? 0 }, preview),
@@ -430,15 +883,22 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     fontWeight,
     textShadow: shadowCss,
   };
-  const fsOffsetX = state.theme?.fullScreen?.offsetX || 0;
-  const fsOffsetY = state.theme?.fullScreen?.offsetY || 0;
+  const fxAnim = resolveFxAnimation(
+    scene?.transition || state.fxAnimation || (state as any).transitionConfig,
+    scene?.animateBackground,
+    state.animateBackground
+  );
+
+  const fsOffsetX = activeTheme?.fullScreen?.offsetX || 0;
+  const fsOffsetY = activeTheme?.fullScreen?.offsetY || 0;
   const fullscreenStyle: React.CSSProperties = {
-    justifyContent: fullscreenJustify(state.theme?.fullScreen?.verticalAlign),
+    justifyContent: fullscreenJustify(activeTheme?.fullScreen?.verticalAlign),
     textAlign,
     transform: [
       fsOffsetX ? `translateX(${fsOffsetX}px)` : '',
       fsOffsetY ? `translateY(${fsOffsetY}px)` : '',
     ].filter(Boolean).join(' ') || undefined,
+    animation: fxAnim.css,
   };
   const refRowStyle: React.CSSProperties = {
     justifyContent: alignmentJustify(textAlign),
@@ -446,9 +906,9 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     width: '100%',
   };
 
-  const ltOffsetX = state.theme?.lowerThird?.offsetX || 0;
-  const ltOffsetY = state.theme?.lowerThird?.offsetY || 0;
-  const ltWidth = state.theme?.lowerThird?.width ?? 75;
+  const ltOffsetX = activeTheme?.lowerThird?.offsetX || 0;
+  const ltOffsetY = activeTheme?.lowerThird?.offsetY || 0;
+  const ltWidth = activeTheme?.lowerThird?.width ?? 75;
   const ltTransform = [
     ltWidth ? 'translateX(-50%)' : '',
     ltOffsetX ? `translateX(${ltOffsetX}px)` : '',
@@ -456,12 +916,25 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   ].filter(Boolean).join(' ') || undefined;
 
   const dualTextAlign = state.dualVersionTextAlign || 'left';
+  const transStyle = state.transition?.active
+    ? getTransitionStyle(state.transition.type, state.transition.progress)
+    : null;
 
   return (
     <div className={`program-surface ${mode === 'lowerThird' ? 'program-surface-lt' : 'program-surface-full'} ${preview ? 'program-surface-preview' : ''} ${className}`}>
-      {mode === 'fullscreen' && showStageBackground && <div className="program-surface-bg" style={backgroundStyle(state, mode, assetBaseUrl)} />}
+      {mode === 'fullscreen' && showStageBackground && (
+        <div
+          key={fxAnim.animateBg ? (scene?.id ? `${scene.id}-fs-bg` : 'fs-bg') : 'static-fs-bg'}
+          className="program-surface-bg"
+          style={{
+            ...backgroundStyle(state, mode, assetBaseUrl),
+            ...(fxAnim.animateBg ? { animation: fxAnim.css } : { animation: 'none' }),
+          }}
+        />
+      )}
       {mode === 'fullscreen' && showStageBackground && video && (
         <video
+          key={fxAnim.animateBg ? (scene?.id ? `${scene.id}-fs-video` : 'fs-video') : 'static-fs-video'}
           ref={videoRef}
           className="program-surface-video"
           src={video}
@@ -492,7 +965,8 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
               ? 'contain'
               : (state.bgFit || state.scene?.background?.fit || (state.scene?.type === 'media' ? 'contain' : 'cover')) === 'fill'
               ? 'fill'
-              : 'cover'
+              : 'cover',
+            ...(fxAnim.animateBg ? { animation: fxAnim.css } : { animation: 'none' }),
           }}
         />
       )}
@@ -532,67 +1006,99 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
 
       {scene && mode === 'lowerThird' && !content?.wordStudy && (
         <div
-          key={scene?.id || 'lt'}
           className="program-lower-third"
           style={{
-            ...lowerThirdBandStyle(state.theme?.lowerThird, scene?.background, assetBaseUrl),
-            borderRadius: state.theme?.lowerThird?.borderRadius,
+            borderRadius: activeTheme?.lowerThird?.borderRadius,
             width: ltWidth ? `${ltWidth}%` : undefined,
             left: ltWidth ? '50%' : undefined,
             right: ltWidth ? 'auto' : undefined,
             transform: ltTransform,
             textAlign: isCompare ? dualTextAlign : textAlign,
+            background: 'transparent',
+            padding: activeTheme?.lowerThird?.padding ? `${activeTheme.lowerThird.padding}px` : undefined,
           }}
         >
-          {lowerThirdBandMedia(state.theme?.lowerThird, scene?.background, assetBaseUrl)}
-          {isCompare ? (
-            <div
-              className="program-compare-lt"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '2cqw',
-                width: '100%',
-                alignItems: 'start',
-                textAlign: dualTextAlign,
-              }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', borderRight: '1px solid rgba(255,255,255,0.18)', paddingRight: '1.5cqw' }}>
-                {showReference && primaryRef && (
-                  <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign: dualTextAlign }}>
-                    {primaryRef}
-                  </div>
-                )}
-                <div className="program-lt-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{content?.text || ''}</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', paddingLeft: '0.5cqw' }}>
-                {showReference && secondaryRef && (
-                  <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign: dualTextAlign }}>
-                    {secondaryRef}
-                  </div>
-                )}
-                <div className="program-lt-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{secondaryVerse?.text || ''}</div>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="program-lt-text" style={textStyle}>
-                {content?.text?.includes('\n\n') ? (
-                  content.text.split(/\n\n+/).map((para, i) => (
-                    <div key={i} className="program-text-paragraph">{para}</div>
-                  ))
-                ) : (
-                  content?.text || ''
-                )}
-              </div>
-              {showReference && formattedRef && (
-                <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign }}>
-                  {formattedRef}
+          <div
+            key={fxAnim.animateBg ? (scene?.id ? `${scene.id}-lt-bg` : 'lt-bg') : 'static-lt-bg'}
+            className="program-lt-bg-layer"
+            style={{
+              borderRadius: activeTheme?.lowerThird?.borderRadius,
+              ...lowerThirdBandStyle(activeTheme?.lowerThird, scene?.background, assetBaseUrl),
+              ...(fxAnim.animateBg ? { animation: fxAnim.css } : { animation: 'none' }),
+            }}
+          />
+          {lowerThirdBandMedia(activeTheme?.lowerThird, scene?.background, assetBaseUrl, fxAnim.animateBg, fxAnim.css)}
+          <div
+            key={scene?.id ? `${scene.id}-lt-content` : 'lt-content'}
+            className="program-lt-content"
+            style={{
+              animation: fxAnim.css,
+              width: '100%',
+              position: 'relative',
+              zIndex: 1,
+            }}
+          >
+            {isCompare ? (
+              <div
+                className="program-compare-lt"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '2cqw',
+                  width: '100%',
+                  alignItems: 'start',
+                  textAlign: dualTextAlign,
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', borderRight: '1px solid rgba(255,255,255,0.18)', paddingRight: '1.5cqw' }}>
+                  {showReference && primaryRef && (
+                    <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign: dualTextAlign }}>
+                      {primaryRef}
+                    </div>
+                  )}
+                  {fxAnim.isWordType ? (
+                    <TypedWordText text={content?.text || ''} duration={fxAnim.durationSec} style={{ ...textStyle, textAlign: dualTextAlign }} textAlign={dualTextAlign} />
+                  ) : (
+                    <div className="program-lt-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{content?.text || ''}</div>
+                  )}
                 </div>
-              )}
-              {songCredit(scene) && <div className="program-song-credit" style={{ textAlign }}>{songCredit(scene)}</div>}
-            </>
-          )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', paddingLeft: '0.5cqw' }}>
+                  {showReference && secondaryRef && (
+                    <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign: dualTextAlign }}>
+                      {secondaryRef}
+                    </div>
+                  )}
+                  {fxAnim.isWordType ? (
+                    <TypedWordText text={secondaryVerse?.text || ''} duration={fxAnim.durationSec} style={{ ...textStyle, textAlign: dualTextAlign }} textAlign={dualTextAlign} />
+                  ) : (
+                    <div className="program-lt-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{secondaryVerse?.text || ''}</div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                {fxAnim.isWordType ? (
+                  <TypedWordText text={content?.text || ''} duration={fxAnim.durationSec} style={textStyle} textAlign={textAlign} />
+                ) : (
+                  <div className="program-lt-text" style={textStyle}>
+                    {content?.text?.includes('\n\n') ? (
+                      content.text.split(/\n\n+/).map((para, i) => (
+                        <div key={i} className="program-text-paragraph">{para}</div>
+                      ))
+                    ) : (
+                      content?.text || ''
+                    )}
+                  </div>
+                )}
+                {showReference && formattedRef && (
+                  <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign }}>
+                    {formattedRef}
+                  </div>
+                )}
+                {songCredit(scene) && <div className="program-song-credit" style={{ textAlign }}>{songCredit(scene)}</div>}
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -776,13 +1282,15 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           sits this one out. Lower third keeps the text — a whole slide crammed
           into a strap across the bottom is nobody's intent. */}
       {scene && mode === 'fullscreen' && content?.slide && !content?.wordStudy && (
-        <div key={scene?.id || 'slide'} className="program-slide-stage-wrapper">
-          <SlideStage projection={content.slide} className="program-slide-stage" />
-        </div>
+        <SlideTransitionContainer
+          currentSlide={content.slide}
+          sceneId={scene?.id || 'slide'}
+          transition={scene?.transition || state.fxAnimation}
+        />
       )}
 
       {scene && mode === 'fullscreen' && !content?.slide && !content?.wordStudy && (
-        <div key={scene?.id || 'fs'} className="program-fullscreen-content" style={fullscreenStyle}>
+        <div key={scene?.id ? `${scene.id}-fs-content` : 'fs-content'} className="program-fullscreen-content" style={fullscreenStyle}>
           {content?.html ? (
             <div className="program-slide-html" dangerouslySetInnerHTML={{ __html: content.html }} />
           ) : isCompare ? (
@@ -791,14 +1299,22 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
                 <div className="program-ref-row" style={{ ...refRowStyle, justifyContent: alignmentJustify(dualTextAlign), textAlign: dualTextAlign }}>
                   {showReference && primaryRef && <span style={{ ...refStyle, textAlign: dualTextAlign }}>{primaryRef}</span>}
                 </div>
-                <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{content?.text || ''}</div>
+                {fxAnim.isWordType ? (
+                  <TypedWordText text={content?.text || ''} duration={fxAnim.durationSec} style={{ ...textStyle, textAlign: dualTextAlign }} textAlign={dualTextAlign} />
+                ) : (
+                  <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{content?.text || ''}</div>
+                )}
               </div>
               <div className="program-compare-divider" />
               <div className="program-compare-pane" style={{ textAlign: dualTextAlign }}>
                 <div className="program-ref-row" style={{ ...refRowStyle, justifyContent: alignmentJustify(dualTextAlign), textAlign: dualTextAlign }}>
                   {showReference && secondaryRef && <span style={{ ...refStyle, textAlign: dualTextAlign }}>{secondaryRef}</span>}
                 </div>
-                <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{secondaryVerse?.text || ''}</div>
+                {fxAnim.isWordType ? (
+                  <TypedWordText text={secondaryVerse?.text || ''} duration={fxAnim.durationSec} style={{ ...textStyle, textAlign: dualTextAlign }} textAlign={dualTextAlign} />
+                ) : (
+                  <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{secondaryVerse?.text || ''}</div>
+                )}
               </div>
             </div>
           ) : (
@@ -808,17 +1324,21 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
                   <span style={refStyle}>{formattedRef}</span>
                 </div>
               )}
-              <div className="program-main-text" style={textStyle}>
-                {content?.text?.includes('\n\n') ? (
-                  content.text.split(/\n\n+/).map((para, i) => (
-                    <div key={i} className="program-text-paragraph">
-                      {para}
-                    </div>
-                  ))
-                ) : (
-                  content?.text || ''
-                )}
-              </div>
+              {fxAnim.isWordType ? (
+                <TypedWordText text={content?.text || ''} duration={fxAnim.durationSec} style={textStyle} textAlign={textAlign} />
+              ) : (
+                <div className="program-main-text" style={textStyle}>
+                  {content?.text?.includes('\n\n') ? (
+                    content.text.split(/\n\n+/).map((para, i) => (
+                      <div key={i} className="program-text-paragraph">
+                        {para}
+                      </div>
+                    ))
+                  ) : (
+                    content?.text || ''
+                  )}
+                </div>
+              )}
               {songCredit(scene) && <div className="program-song-credit">{songCredit(scene)}</div>}
             </>
           )}

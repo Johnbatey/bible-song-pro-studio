@@ -963,7 +963,7 @@ export function SlideEditorLeftRail({
                     >
                       <span
                         onClick={() => onApplyTemplate(tpl.id)}
-                        style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}
+                        style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}
                       >
                         {tpl.name}
                       </span>
@@ -1307,18 +1307,18 @@ export function SlideEditorLeftRail({
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: 360,
-              background: 'var(--bg-secondary, #1a1919)',
+              width: 380,
+              background: 'var(--bsp-surface, #1a1919)',
               border: '1px solid var(--border-primary, #333)',
               borderRadius: 8,
-              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.8)',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
               padding: 20,
               display: 'flex',
               flexDirection: 'column',
               gap: 14,
             }}
           >
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#ffffff' }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
               {t('slideEditor.modal.saveTemplateTitle')}
             </h3>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -1335,11 +1335,11 @@ export function SlideEditorLeftRail({
               }}
               placeholder={t('slideEditor.modal.templateNamePlaceholder')}
               style={{
-                background: 'var(--bg-primary, #111)',
+                background: 'var(--chrome-control, #111)',
                 border: '1px solid var(--border-primary, #444)',
                 borderRadius: 5,
                 padding: '8px 12px',
-                color: '#fff',
+                color: 'var(--text-primary)',
                 fontSize: 13,
                 outline: 'none',
               }}
@@ -1389,7 +1389,7 @@ export function SlideEditorLeftRail({
             position: 'fixed',
             inset: 0,
             zIndex: 100030,
-            background: 'rgba(0, 0, 0, 0.75)',
+            background: 'rgba(0, 0, 0, 0.5)',
             backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
@@ -1401,17 +1401,17 @@ export function SlideEditorLeftRail({
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 360,
-              background: 'var(--bg-secondary, #1a1919)',
+              background: 'var(--bsp-surface, #1a1919)',
               border: '1px solid var(--border-primary, #333)',
               borderRadius: 8,
-              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.8)',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
               padding: 20,
               display: 'flex',
               flexDirection: 'column',
               gap: 14,
             }}
           >
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#ffffff' }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
               {t('slideEditor.modal.renameTemplateTitle')}
             </h3>
             <input
@@ -1425,11 +1425,11 @@ export function SlideEditorLeftRail({
               }}
               placeholder={t('slideEditor.modal.templateNamePlaceholder')}
               style={{
-                background: 'var(--bg-primary, #111)',
+                background: 'var(--chrome-control, #111)',
                 border: '1px solid var(--border-primary, #444)',
                 borderRadius: 5,
                 padding: '8px 12px',
-                color: '#fff',
+                color: 'var(--text-primary)',
                 fontSize: 13,
                 outline: 'none',
               }}

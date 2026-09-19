@@ -82,25 +82,25 @@ export function SetlistManagerModal({
           width: '100%',
           maxWidth: 620,
           maxHeight: '85vh',
-          backgroundColor: '#161619',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
+          backgroundColor: 'var(--bsp-surface, #161619)',
+          border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.14))',
           borderRadius: 12,
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.75)',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.4)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          color: '#ffffff',
+          color: 'var(--text-primary, #ffffff)',
         }}
       >
         {/* Header */}
         <div
           style={{
             padding: '16px 20px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            borderBottom: '1px solid var(--border-primary, rgba(255, 255, 255, 0.08))',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: '#1a1a1e',
+            backgroundColor: 'var(--bsp-raised, #1a1a1e)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -121,7 +121,7 @@ export function SetlistManagerModal({
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
                 Service Setlists & Schedules
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-dim, #888)' }}>
@@ -144,7 +144,7 @@ export function SetlistManagerModal({
               alignItems: 'center',
               justifyContent: 'center',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.backgroundColor = 'var(--chrome-control)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-dim, #888)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -158,8 +158,8 @@ export function SetlistManagerModal({
         <div
           style={{
             padding: '14px 20px',
-            backgroundColor: '#121214',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            backgroundColor: 'var(--bsp-ground, #121214)',
+            borderBottom: '1px solid var(--border-primary, rgba(255, 255, 255, 0.08))',
             display: 'flex',
             flexDirection: 'column',
             gap: 10,
@@ -176,10 +176,10 @@ export function SetlistManagerModal({
                 height: 36,
                 padding: '0 12px',
                 fontSize: 13,
-                backgroundColor: '#1f1f24',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backgroundColor: 'var(--bsp-surface, #1f1f24)',
+                border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
                 borderRadius: 6,
-                color: '#fff',
+                color: 'var(--text-primary, #fff)',
                 outline: 'none',
               }}
             />
@@ -191,7 +191,7 @@ export function SetlistManagerModal({
                 padding: '0 16px',
                 fontSize: 13,
                 fontWeight: 600,
-                backgroundColor: activeQueue.length > 0 ? 'var(--accent, #FF5500)' : '#2a2a30',
+                backgroundColor: activeQueue.length > 0 ? 'var(--accent, #FF5500)' : 'var(--chrome-control, #2a2a30)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 6,
@@ -224,10 +224,10 @@ export function SetlistManagerModal({
                   padding: '0 10px',
                   fontSize: 11.5,
                   fontWeight: 600,
-                  backgroundColor: '#24242a',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backgroundColor: 'var(--chrome-control, #24242a)',
+                  border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
                   borderRadius: 5,
-                  color: '#fff',
+                  color: 'var(--text-primary, #fff)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -252,10 +252,10 @@ export function SetlistManagerModal({
                   padding: '0 10px',
                   fontSize: 11.5,
                   fontWeight: 600,
-                  backgroundColor: '#24242a',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backgroundColor: 'var(--chrome-control, #24242a)',
+                  border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
                   borderRadius: 5,
-                  color: activeQueue.length > 0 ? '#fff' : 'var(--text-dim, #666)',
+                  color: activeQueue.length > 0 ? 'var(--text-primary, #fff)' : 'var(--text-dim, #666)',
                   cursor: activeQueue.length > 0 ? 'pointer' : 'default',
                   display: 'flex',
                   alignItems: 'center',
@@ -284,10 +284,10 @@ export function SetlistManagerModal({
                   height: 28,
                   padding: '0 8px',
                   fontSize: 11,
-                  backgroundColor: '#1f1f24',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backgroundColor: 'var(--bsp-surface, #1f1f24)',
+                  border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.1))',
                   borderRadius: 5,
-                  color: '#fff',
+                  color: 'var(--text-primary, #fff)',
                 }}
               />
             )}
@@ -331,7 +331,7 @@ export function SetlistManagerModal({
                   width: 48,
                   height: 48,
                   borderRadius: 12,
-                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  backgroundColor: 'var(--chrome-control, rgba(255, 255, 255, 0.04))',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -342,10 +342,10 @@ export function SetlistManagerModal({
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
               </div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#ccc' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #ccc)' }}>
                 {savedSetlists.length === 0 ? 'No Saved Setlists Yet' : 'No Setlists Match Search'}
               </div>
-              <div style={{ fontSize: 12, maxWidth: 360, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12, maxWidth: 360, lineHeight: 1.5, color: 'var(--text-dim)' }}>
                 {savedSetlists.length === 0
                   ? 'Add your hymns, scriptures, media clips, and sermon points to the Queue, then type a name above to save your service schedule.'
                   : 'Try searching with a different name or clear the search query.'}
@@ -357,8 +357,8 @@ export function SetlistManagerModal({
                 key={setlist.id}
                 style={{
                   padding: '12px 14px',
-                  backgroundColor: '#1c1c21',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  backgroundColor: 'var(--bsp-raised, #1c1c21)',
+                  border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.1))',
                   borderRadius: 8,
                   display: 'flex',
                   flexDirection: 'column',
@@ -370,7 +370,7 @@ export function SetlistManagerModal({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary, #fff)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {setlist.name}
                       </span>
                       <span
@@ -427,10 +427,10 @@ export function SetlistManagerModal({
                         padding: '0 10px',
                         fontSize: 11.5,
                         fontWeight: 600,
-                        backgroundColor: '#282830',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        backgroundColor: 'var(--chrome-control, #282830)',
+                        border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
                         borderRadius: 5,
-                        color: '#ddd',
+                        color: 'var(--text-primary, #ddd)',
                         cursor: 'pointer',
                       }}
                       title="Append items to bottom of active queue"
@@ -445,8 +445,8 @@ export function SetlistManagerModal({
                         height: 28,
                         width: 28,
                         padding: 0,
-                        backgroundColor: '#282830',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        backgroundColor: 'var(--chrome-control, #282830)',
+                        border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
                         borderRadius: 5,
                         color: 'var(--text-dim, #aaa)',
                         cursor: 'pointer',
@@ -470,8 +470,8 @@ export function SetlistManagerModal({
                         height: 28,
                         width: 28,
                         padding: 0,
-                        backgroundColor: '#282830',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        backgroundColor: 'var(--chrome-control, #282830)',
+                        border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
                         borderRadius: 5,
                         color: 'var(--text-dim, #888)',
                         cursor: 'pointer',
@@ -498,11 +498,11 @@ export function SetlistManagerModal({
                       key={item.id || idx}
                       style={{
                         fontSize: 10.5,
-                        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        backgroundColor: 'var(--bsp-surface, rgba(255, 255, 255, 0.06))',
+                        border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.08))',
                         borderRadius: 4,
                         padding: '2px 6px',
-                        color: '#ccc',
+                        color: 'var(--text-secondary, #ccc)',
                         maxWidth: 160,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -528,8 +528,8 @@ export function SetlistManagerModal({
         <div
           style={{
             padding: '12px 20px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            backgroundColor: '#1a1a1e',
+            borderTop: '1px solid var(--border-primary, rgba(255, 255, 255, 0.08))',
+            backgroundColor: 'var(--bsp-raised, #1a1a1e)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -546,10 +546,10 @@ export function SetlistManagerModal({
               padding: '0 16px',
               fontSize: 12,
               fontWeight: 600,
-              backgroundColor: '#2a2a30',
-              border: '1px solid rgba(255, 255, 255, 0.14)',
+              backgroundColor: 'var(--chrome-control, #2a2a30)',
+              border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.14))',
               borderRadius: 6,
-              color: '#fff',
+              color: 'var(--text-primary, #fff)',
               cursor: 'pointer',
             }}
           >

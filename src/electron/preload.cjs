@@ -180,6 +180,7 @@ contextBridge.exposeInMainWorld('BSP', {
   media: {
     list: () => ipcRenderer.invoke('media:list'),
     pick: () => ipcRenderer.invoke('media:pick'),
+    pickSingleFile: (options) => ipcRenderer.invoke('media:pickSingleFile', options),
     import: (paths) => ipcRenderer.invoke('media:import', { paths }),
     importOptimized: (filePath) => ipcRenderer.invoke('media:importOptimized', { path: filePath }),
     remove: (id) => ipcRenderer.invoke('media:remove', { id }),
@@ -195,6 +196,10 @@ contextBridge.exposeInMainWorld('BSP', {
     pathForFile: (file) => {
       try { return webUtils.getPathForFile(file); } catch { return ''; }
     },
+  },
+
+  lut: {
+    parseFile: (filePath) => ipcRenderer.invoke('lut:parseFile', filePath),
   },
 
   deck: {
@@ -236,6 +241,7 @@ contextBridge.exposeInMainWorld('BSP', {
       return () => ipcRenderer.removeListener('dock:resetLayout', handler);
     },
     popOut: (id) => ipcRenderer.invoke('dock:popOut', { id }),
+    closePopout: (id) => ipcRenderer.invoke('dock:closePopout', { id }),
     focusPopout: (id) => ipcRenderer.invoke('dock:focusPopout', { id }),
     listPopouts: () => ipcRenderer.invoke('dock:listPopouts'),
     onPopoutsChanged: (cb) => {
@@ -314,5 +320,20 @@ contextBridge.exposeInMainWorld('BSP', {
   },
   updates: {
     check: () => ipcRenderer.invoke('app:checkForUpdates'),
+  },
+  recordings: {
+    getDir: () => ipcRenderer.invoke('recordings:get-dir'),
+    chooseDir: () => ipcRenderer.invoke('recordings:choose-dir'),
+    openFolder: (dir) => ipcRenderer.invoke('recordings:open-folder', dir),
+    startVideo: (cfg) => ipcRenderer.invoke('recordings:start-video', cfg),
+    stopVideo: () => ipcRenderer.invoke('recordings:stop-video'),
+    startAudio: (cfg) => ipcRenderer.invoke('recordings:start-audio', cfg),
+    stopAudio: () => ipcRenderer.invoke('recordings:stop-audio'),
+  },
+  desktop: {
+    getSources: (opts) => ipcRenderer.invoke('desktop:get-sources', opts),
+  },
+  dialog: {
+    openMediaFile: (filters) => ipcRenderer.invoke('dialog:open-media-file', filters),
   },
 });

@@ -284,6 +284,8 @@ export function SettingsModal() {
   const standbyMedia = useAppStore((s) => s.standbyMedia);
   const setStandbyMedia = useAppStore((s) => s.setStandbyMedia);
   const platform = useAppStore((s) => s.platform);
+  const showSongCredits = useAppStore((s) => s.showSongCredits);
+  const setShowSongCredits = useAppStore((s) => s.setShowSongCredits);
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(activeCategoryValue || 'scripture');
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -867,7 +869,18 @@ export function SettingsModal() {
                    Song Library panel. */}
             {activeCategory === 'songs' && (
               <div>
-                <div style={modalStyles.sectionIntro}>
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Display Song Credits</div>
+                    <div style={modalStyles.rowSub}>Show Author, CCLI, and Copyright credits at the bottom of song display output</div>
+                  </div>
+                  <AppleToggle
+                    checked={showSongCredits}
+                    onChange={setShowSongCredits}
+                  />
+                </div>
+
+                <div style={{ ...modalStyles.sectionIntro, marginTop: 16 }}>
                   <div style={modalStyles.rowTitle}>{t('settings.songs.packsTitle')}</div>
                   <div style={modalStyles.rowSub}>{t('settings.songs.packsSub')}</div>
                 </div>
@@ -1909,8 +1922,8 @@ const modalStyles: Record<string, React.CSSProperties> = {
     maxHeight: 'calc(100vh - 48px)',
     background: 'var(--settings-panel)',
     border: '1px solid var(--settings-line)',
-    borderRadius: 6,
-    boxShadow: '0 24px 80px rgba(0, 0, 0, 0.8)',
+    borderRadius: 8,
+    boxShadow: '0 24px 80px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06)',
     display: 'flex',
     overflow: 'hidden',
   },

@@ -3,10 +3,13 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import type {
   Scene, Theme, Song, BibleVersion, BibleVerse,
   DisplayState, AIProvider, TranscriptionState, Alert, LiveScriptureState, AudioInputDevice,
-  OperatingMode, QueueItem, PresentationDeck, Workspace, StandbyMedia
+  OperatingMode, QueueItem, PresentationDeck, Workspace, StandbyMedia, Background,
+  FxAnimationSettings
 } from '../types';
 import { createDefaultTheme } from '../utils/defaultTheme';
+import { parseBackgroundInfo } from '../utils/background';
 import { sanitizeForIpc } from '../utils/sanitize-ipc';
+import { mediaGenlock } from '../utils/mediaGenlock';
 import { setUiLocale as applyUiLocale, isUiLocale, detectUiLocale, type UiLocale } from '../../i18n';
 
 /**
@@ -131,7 +134,11 @@ interface AppState {
   setBlackout: (v?: boolean) => void;
   setVideoPlaying: (playing: boolean) => void;
   seekVideo: (seconds: number) => void;
-  setVideoTransportTarget: (target: 'program' | 'preview' | null) => void;
+  restartVideo: () => void;
+  stepVideo: (deltaSeconds: number) => void;
+  stopVideo: () => void;
+  setVideoSpeed: (speed: number) => void;
+  setVideoTransportTarget: (target: 'program' | 'preview' | null, sourceId?: string) => void;
   reportVideoClock: (clock: { currentTime: number; duration: number }) => void;
   setVideoLoop: (loop: boolean) => void;
   setVideoMuted: (muted: boolean) => void;
@@ -147,10 +154,32 @@ interface AppState {
   updateScene: (id: string, updates: Partial<Scene>) => void;
   reorderScenes: (from: number, to: number) => void;
 
-  // Themes
+  // FX Animation
+  fxSettings: FxAnimationSettings;
+  setFxSettings: (settings: Partial<FxAnimationSettings> | ((prev: FxAnimationSettings) => Partial<FxAnimationSettings>)) => void;
+  slideFxSettings: FxAnimationSettings;
+  setSlideFxSettings: (settings: Partial<FxAnimationSettings> | ((prev: FxAnimationSettings) => Partial<FxAnimationSettings>)) => void;
+
+  // Themes & Bible Ground
+  bibleBackground?: Background;
+  setBibleBackground: (bg?: Background) => void;
+  isThemeFsLtLinked: boolean;
+  setIsThemeFsLtLinked: (linked: boolean, activeMode?: 'fullscreen' | 'lowerThird') => void;
+  toggleThemeFsLtLinked: (activeMode?: 'fullscreen' | 'lowerThird') => void;
+  setThemeBackground: (bg: Background, mode: 'fullscreen' | 'lowerThird') => void;
+  isThemeStudioOpen: boolean;
+  themeStudioInitialOptions?: {
+    contentMode?: 'bible' | 'song';
+    surfaceTab?: 'full' | 'lt';
+  } | null;
+  openThemeStudio: (options?: { contentMode?: 'bible' | 'song'; surfaceTab?: 'full' | 'lt' }) => void;
+  closeThemeStudio: () => void;
+
   themes: Theme[];
   activeTheme: Theme | null;
+  liveTheme?: Theme | null;
   setActiveTheme: (theme: Theme | null) => void;
+  commitThemeToLive: () => void;
   addTheme: (theme: Theme) => void;
   updateTheme: (id: string, updates: Partial<Theme>) => void;
   removeTheme: (id: string) => void;
@@ -189,6 +218,7 @@ interface AppState {
   // Queue
   queue: QueueItem[];
   addToQueue: (item: Omit<QueueItem, 'id' | 'timestamp'>) => void;
+  insertIntoQueue: (item: Omit<QueueItem, 'id' | 'timestamp'>, atIndex?: number) => void;
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
   setQueue: (items: QueueItem[]) => void;
@@ -207,58 +237,24 @@ interface AppState {
   setSyncTranscriptWithLive: (enabled: boolean) => void;
 
   // Alerts
-  /**
-   * Two channels, deliberately separate.
-   *
-   * `activeAlert` is an announcement for the ROOM — the Alerts button's nursery
-   * call, a lost-child notice. It travels to every audience surface.
-   *
-   * `notice` is for the OPERATOR — "Imported 1 file", "NDI stream live", "URL
-   * copied". It stays in this window. These shared one slot, so every routine
-   * confirmation the operator triggered was also thrown across the projector
-   * and the NDI feed mid-service.
-   */
   alerts: Alert[];
   activeAlert: Alert | null;
   triggerAlert: (alert: Alert) => void;
   dismissAlert: () => void;
-  /**
-   * Operator notices, newest last. A list rather than a slot because two
-   * imports a second apart are two things that happened, and the second
-   * silently replacing the first is how an operator misses a failure.
-   */
   notices: Alert[];
   /** Post an operator notice. Never leaves this window. */
   notify: (notice: Alert) => void;
   dismissNotice: (id: string) => void;
 
   // UI State
-  /**
-   * Which docks are currently open. Mirrored out of dockview so the title bar
-   * tabs can light up; the layout tree itself lives in localStorage, not here.
-   */
   openDockIds: string[];
-  /** Docks currently living in their own OS window. */
   poppedOutDockIds: string[];
   setPoppedOutDockIds: (ids: string[]) => void;
   setOpenDockIds: (ids: string[]) => void;
 
-  /**
-   * Named dock arrangements.
-   *
-   * The *live* tree stays in localStorage under `bsp_dockLayout` — it is
-   * per-machine scratch, rewritten on every splitter drag, and has no business
-   * in the synced state file. These are the deliberate ones: saved on purpose,
-   * named, and worth carrying to another machine.
-   *
-   * `activeWorkspaceId` is null for the shipped default arrangement, which is
-   * not a Workspace record because it is generated in code rather than stored.
-   */
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
-  /** Stores a captured layout under a new name and makes it active. Returns it. */
   saveWorkspace: (name: string, layout: unknown) => Workspace;
-  /** Overwrites an existing workspace's layout, leaving its name and id alone. */
   updateWorkspace: (id: string, layout: unknown) => void;
   renameWorkspace: (id: string, name: string) => void;
   deleteWorkspace: (id: string) => void;
@@ -270,6 +266,11 @@ interface AppState {
   activeSettingsCategory: string;
   openSettings: (category?: string) => void;
   closeSettings: () => void;
+
+  isShortcutsOpen: boolean;
+  openShortcuts: () => void;
+  closeShortcuts: () => void;
+  toggleShortcuts: () => void;
 
   isSlideEditorOpen: boolean;
   activePresentationId: string | null;
@@ -322,7 +323,10 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     blackout: false,
   },
 
-  setMode: (mode) => set((s) => ({ display: { ...s.display, mode } })),
+  setMode: (mode) => set((s) => ({
+    display: { ...s.display, mode },
+    liveTheme: mode === 'basic' ? (s.activeTheme ? { ...s.activeTheme } : null) : (s.liveTheme || s.activeTheme),
+  })),
   setBibleOutputMode: (bibleOutputMode) =>
     set((s) => ({
       display: {
@@ -363,19 +367,28 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   setBlackout: (v) =>
     set((s) => ({ display: { ...s.display, blackout: v === undefined ? !s.display.blackout : v } })),
 
-  /* ── Video transport ──────────────────────────────────────────────────
-     The operator drives a video background from the Media panel; the surface
-     playing it reports its clock back here. Commands go one way, the clock
-     comes the other, and neither writes the other's field. */
-  setVideoPlaying: (playing) =>
-    set((s) => ({ display: { ...s.display, videoTransport: { ...s.display.videoTransport, playing } } })),
-  seekVideo: (seconds) =>
+  /* ── Video transport ────────────────────────────────────────────────── */
+  setVideoPlaying: (playing) => {
+    const transport = get().display.videoTransport;
+    const sourceId = transport.sourceId || (transport.target === 'program' ? 'program-bg-video' : 'program-bg-video');
+    mediaGenlock.broadcastCommand(
+      sourceId,
+      playing ? 'play' : 'pause',
+      { playing, currentTime: get().display.videoClock.currentTime }
+    );
+    set((s) => ({ display: { ...s.display, videoTransport: { ...s.display.videoTransport, playing } } }));
+  },
+  seekVideo: (seconds) => {
+    const transport = get().display.videoTransport;
+    const sourceId = transport.sourceId || (transport.target === 'program' ? 'program-bg-video' : 'program-bg-video');
+    mediaGenlock.broadcastCommand(
+      sourceId,
+      'seek',
+      { currentTime: seconds, playing: transport.playing }
+    );
     set((s) => ({
       display: {
         ...s.display,
-        /* The clock is moved here as well as sent, so the scrubber lands
-           where it was dropped instead of snapping back for the frame or two
-           before the surface reports its new position. */
         videoClock: { ...s.display.videoClock, currentTime: seconds },
         videoTransport: {
           ...s.display.videoTransport,
@@ -383,24 +396,87 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
           seekNonce: s.display.videoTransport.seekNonce + 1,
         },
       },
-    })),
-  setVideoTransportTarget: (target) =>
+    }));
+  },
+  restartVideo: () => {
+    const transport = get().display.videoTransport;
+    const sourceId = transport.sourceId || (transport.target === 'program' ? 'program-bg-video' : 'program-bg-video');
+    mediaGenlock.broadcastCommand(
+      sourceId,
+      'restart',
+      { currentTime: 0, playing: true }
+    );
+    set((s) => ({
+      display: {
+        ...s.display,
+        videoClock: { ...s.display.videoClock, currentTime: 0 },
+        videoTransport: {
+          ...s.display.videoTransport,
+          playing: true,
+          seekTo: 0,
+          seekNonce: s.display.videoTransport.seekNonce + 1,
+        },
+      },
+    }));
+  },
+  stepVideo: (deltaSeconds) => {
+    const clock = get().display.videoClock;
+    const dur = clock.duration || 0;
+    const target = Math.max(0, Math.min(dur > 0 ? dur : Infinity, clock.currentTime + deltaSeconds));
+    get().seekVideo(target);
+  },
+  stopVideo: () => {
+    const transport = get().display.videoTransport;
+    const sourceId = transport.sourceId || (transport.target === 'program' ? 'program-bg-video' : 'program-bg-video');
+    mediaGenlock.broadcastCommand(
+      sourceId,
+      'stop',
+      { currentTime: 0, playing: false }
+    );
+    set((s) => ({
+      display: {
+        ...s.display,
+        videoClock: { ...s.display.videoClock, currentTime: 0 },
+        videoTransport: {
+          ...s.display.videoTransport,
+          playing: false,
+          seekTo: 0,
+          seekNonce: s.display.videoTransport.seekNonce + 1,
+        },
+      },
+    }));
+  },
+  setVideoSpeed: (speed) => {
+    const transport = get().display.videoTransport;
+    const sourceId = transport.sourceId || (transport.target === 'program' ? 'program-bg-video' : 'program-bg-video');
+    mediaGenlock.broadcastCommand(
+      sourceId,
+      'speed',
+      { playbackRate: speed }
+    );
+    set((s) => ({
+      display: {
+        ...s.display,
+        videoTransport: {
+          ...s.display.videoTransport,
+          speed,
+        },
+      },
+    }));
+  },
+  setVideoTransportTarget: (target, sourceId) =>
     set((s) => {
-      if (s.display.videoTransport.target === target) return s;
+      if (s.display.videoTransport.target === target && s.display.videoTransport.sourceId === sourceId) return s;
       const scene = target === 'program' ? s.display.currentScene : target === 'preview' ? s.display.previewScene : null;
       const initialMuted = Boolean(scene?.background?.muted);
       return {
         display: {
           ...s.display,
           videoClock: { currentTime: 0, duration: 0 },
-          videoTransport: { target, playing: true, seekTo: null, seekNonce: 0, muted: initialMuted },
+          videoTransport: { target, sourceId, playing: true, seekTo: null, seekNonce: 0, muted: initialMuted },
         },
       };
     }),
-  /* Loop lives on the scene, not the transport: it is a property of the clip
-     the operator chose, it is what every surface already reads, and it has to
-     survive the scene being re-fired later. Written to the live copy and to
-     the saved one so the two do not disagree. */
   setVideoLoop: (loop) =>
     set((s) => {
       const target = s.display.videoTransport.target;
@@ -414,7 +490,6 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         scenes: s.scenes.map((sc) => (sc.id === next.id ? next : sc)),
       };
     }),
-
   setVideoMuted: (muted) =>
     set((s) => {
       const target = s.display.videoTransport.target;
@@ -453,6 +528,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         previewScene: scene,
         isTransitioning: false,
       },
+      liveTheme: s.activeTheme ? { ...s.activeTheme } : null,
     }));
   },
 
@@ -480,6 +556,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       // Straight to the audience. Preview follows so the two panes agree.
       set((s) => ({
         display: { ...s.display, currentScene: scene, previewScene: scene, isTransitioning: false },
+        liveTheme: s.activeTheme ? { ...s.activeTheme } : null,
       }));
       return;
     }
@@ -491,6 +568,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     const { display } = get();
     const scene = display.previewScene;
     if (!scene) return;
+    set((s) => ({ liveTheme: s.activeTheme ? { ...s.activeTheme } : null }));
     if (transition) get().transitionToScene(scene);
     else get().cutToScene(scene);
   },
@@ -503,6 +581,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         previewScene: scene,
         isTransitioning: true,
       },
+      liveTheme: s.activeTheme ? { ...s.activeTheme } : null,
     }));
     setTimeout(() => {
       set((s) => ({
@@ -529,9 +608,244 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       return { scenes };
     }),
 
+  bibleBackground: (() => {
+    try {
+      const saved = localStorage.getItem('bsp_bible_background');
+      return saved ? JSON.parse(saved) : undefined;
+    } catch {
+      return undefined;
+    }
+  })(),
+  setBibleBackground: (bibleBackground) => {
+    try {
+      if (bibleBackground) localStorage.setItem('bsp_bible_background', JSON.stringify(bibleBackground));
+      else localStorage.removeItem('bsp_bible_background');
+    } catch {}
+    set((s) => {
+      const updates: Partial<AppState> = { bibleBackground };
+      if (s.display.currentScene?.type === 'bible') {
+        updates.display = {
+          ...s.display,
+          currentScene: {
+            ...s.display.currentScene,
+            background: bibleBackground,
+          },
+        };
+      }
+      return updates;
+    });
+  },
+  isThemeFsLtLinked: true,
+  setIsThemeFsLtLinked: (linked, activeMode) => {
+    if (!linked) {
+      set({ isThemeFsLtLinked: false });
+      return;
+    }
+    useAppStore.getState().toggleThemeFsLtLinked(activeMode);
+  },
+  toggleThemeFsLtLinked: (activeMode) => {
+    set((s) => {
+      const nextLinked = !s.isThemeFsLtLinked;
+      if (!nextLinked) {
+        return { isThemeFsLtLinked: false };
+      }
+
+      // Transitioning to linked:
+      // Match the other mode's background to that of the active mode!
+      const currentMode = activeMode || (s.display.outputMode === 'lowerThird' || s.display.bibleOutputMode === 'lowerThird' ? 'lowerThird' : 'fullscreen');
+
+      const theme = s.activeTheme ? { ...s.activeTheme } : createDefaultTheme();
+      const lt = { ...theme.lowerThird };
+
+      if (currentMode === 'fullscreen') {
+        // Copy Fullscreen background settings to Lower-Third
+        const fs = theme.fullScreen;
+        lt.background = fs.background || '';
+        lt.backgroundColor = fs.backgroundColor || '#000000';
+        lt.backgroundType = fs.backgroundType;
+        lt.backgroundMediaUrl = fs.backgroundMediaUrl;
+        lt.backgroundMediaType = fs.backgroundMediaType;
+        lt.backgroundFit = fs.backgroundFit;
+        lt.backgroundLoop = fs.backgroundLoop;
+        lt.backgroundOpacity = typeof fs.backgroundOpacity === 'number' ? fs.backgroundOpacity : 0.95;
+        lt.savedSolidColor = fs.savedSolidColor;
+        lt.savedGradientStart = fs.savedGradientStart;
+        lt.savedGradientEnd = fs.savedGradientEnd;
+        lt.savedGradientDir = fs.savedGradientDir;
+        theme.lowerThird = lt;
+      } else {
+        // Copy Lower-Third background settings to Fullscreen
+        const fs = { ...theme.fullScreen };
+        fs.background = lt.background;
+        fs.backgroundColor = lt.backgroundColor;
+        fs.backgroundType = lt.backgroundType;
+        fs.backgroundMediaUrl = lt.backgroundMediaUrl;
+        fs.backgroundMediaType = lt.backgroundMediaType;
+        fs.backgroundFit = lt.backgroundFit;
+        fs.backgroundLoop = lt.backgroundLoop;
+        fs.backgroundOpacity = lt.backgroundOpacity;
+        fs.savedSolidColor = lt.savedSolidColor;
+        fs.savedGradientStart = lt.savedGradientStart;
+        fs.savedGradientEnd = lt.savedGradientEnd;
+        fs.savedGradientDir = lt.savedGradientDir;
+        theme.fullScreen = fs;
+      }
+
+      const updatedThemes = s.themes.some((t) => t.id === theme.id)
+        ? s.themes.map((t) => (t.id === theme.id ? theme : t))
+        : [...s.themes, theme];
+
+      return {
+        isThemeFsLtLinked: true,
+        activeTheme: theme,
+        liveTheme: s.display.mode === 'studio' ? s.liveTheme : theme,
+        themes: updatedThemes,
+      };
+    });
+  },
+
+  setThemeBackground: (bg: Background, mode: 'fullscreen' | 'lowerThird') => {
+    set((s) => {
+      const isStudio = s.display.mode === 'studio';
+      const theme: Theme = s.activeTheme ? { ...s.activeTheme } : createDefaultTheme();
+      const currentLive = s.liveTheme || (s.activeTheme ? { ...s.activeTheme } : createDefaultTheme());
+      const liveTheme = isStudio ? currentLive : theme;
+      const isLinked = s.isThemeFsLtLinked !== false;
+
+      const convertBgToSurface = (existingSurface: any, newBg: Background) => {
+        let backgroundType: string = newBg.type || 'solid';
+        let background: string = existingSurface?.background || '';
+        let backgroundColor: string = existingSurface?.backgroundColor || '';
+        let backgroundMediaUrl: string = existingSurface?.backgroundMediaUrl || '';
+        let backgroundMediaType: 'image' | 'video' | undefined = existingSurface?.backgroundMediaType;
+
+        if (newBg.type === 'transparent') {
+          backgroundType = 'transparent';
+          background = 'transparent';
+          backgroundColor = 'transparent';
+          backgroundMediaUrl = '';
+          backgroundMediaType = undefined;
+        } else if (newBg.type === 'solid' || (newBg.type as string) === 'color') {
+          backgroundType = 'solid';
+          const color = newBg.color && newBg.color !== 'transparent' ? newBg.color : (existingSurface?.backgroundColor && existingSurface.backgroundColor !== 'transparent' ? existingSurface.backgroundColor : '#0f172a');
+          background = color;
+          backgroundColor = color;
+          backgroundMediaUrl = '';
+          backgroundMediaType = undefined;
+        } else if (newBg.type === 'gradient') {
+          backgroundType = 'gradient';
+          const grad = newBg.gradient && newBg.gradient !== 'transparent' ? newBg.gradient : (existingSurface?.background && existingSurface.background.includes('gradient') ? existingSurface.background : 'linear-gradient(135deg, #0f172a, #312e81)');
+          background = grad;
+          backgroundColor = (grad ? parseBackgroundInfo(grad, undefined).start : undefined) || '#0f172a';
+          backgroundMediaUrl = '';
+          backgroundMediaType = undefined;
+        } else if (newBg.type === 'image') {
+          backgroundType = 'image';
+          backgroundMediaType = 'image';
+          backgroundMediaUrl = newBg.mediaUrl || existingSurface?.backgroundMediaUrl || '';
+          background = '';
+          backgroundColor = '#000000';
+        } else if (newBg.type === 'video') {
+          backgroundType = 'video';
+          backgroundMediaType = 'video';
+          backgroundMediaUrl = newBg.mediaUrl || existingSurface?.backgroundMediaUrl || '';
+          background = '';
+          backgroundColor = '#000000';
+        }
+
+        return {
+          ...existingSurface,
+          backgroundType,
+          background,
+          backgroundColor,
+          backgroundMediaUrl,
+          backgroundMediaType,
+          backgroundFit: newBg.fit || existingSurface?.backgroundFit || 'cover',
+          backgroundLoop: newBg.loop !== false,
+          backgroundOpacity: typeof newBg.opacity === 'number' ? newBg.opacity : (existingSurface?.backgroundOpacity ?? 1),
+        };
+      };
+
+      if (isLinked) {
+        theme.fullScreen = convertBgToSurface(theme.fullScreen, bg);
+        theme.lowerThird = convertBgToSurface(theme.lowerThird, bg);
+      } else if (mode === 'lowerThird') {
+        theme.lowerThird = convertBgToSurface(theme.lowerThird, bg);
+      } else {
+        theme.fullScreen = convertBgToSurface(theme.fullScreen, bg);
+      }
+
+      const updatedThemes = s.themes.map((t) => (t.id === theme.id ? theme : t));
+
+      let displayUpdates = s.display;
+      if (!isStudio && s.display.currentScene && (s.display.currentScene.type === 'song' || s.display.currentScene.type === 'bible')) {
+        if (s.display.currentScene.background) {
+          displayUpdates = {
+            ...displayUpdates,
+            currentScene: {
+              ...s.display.currentScene,
+              background: undefined,
+            },
+          };
+        }
+      }
+      if (s.display.previewScene && (s.display.previewScene.type === 'song' || s.display.previewScene.type === 'bible')) {
+        if (s.display.previewScene.background) {
+          displayUpdates = {
+            ...displayUpdates,
+            previewScene: {
+              ...s.display.previewScene,
+              background: undefined,
+            },
+          };
+        }
+      }
+
+      const cleanedSongs = s.songs.map((so) => so.background ? { ...so, background: undefined } : so);
+
+      return {
+        activeTheme: theme,
+        liveTheme: isStudio ? liveTheme : theme,
+        themes: updatedThemes.length > 0 ? updatedThemes : [theme],
+        display: displayUpdates,
+        songs: cleanedSongs,
+      };
+    });
+  },
+
+  isThemeStudioOpen: false,
+  themeStudioInitialOptions: null,
+  openThemeStudio: (options) => set({ isThemeStudioOpen: true, themeStudioInitialOptions: options || null }),
+  closeThemeStudio: () => set({ isThemeStudioOpen: false, themeStudioInitialOptions: null }),
+
+  fxSettings: {
+    transitionType: 'fade',
+    duration: 0.8,
+    animateBackground: false,
+  },
+  setFxSettings: (settings) =>
+    set((s) => ({
+      fxSettings: typeof settings === 'function' ? { ...s.fxSettings, ...settings(s.fxSettings) } : { ...s.fxSettings, ...settings },
+    })),
+
+  slideFxSettings: {
+    transitionType: 'fade',
+    duration: 0.5,
+    animateBackground: false,
+  },
+  setSlideFxSettings: (settings) =>
+    set((s) => ({
+      slideFxSettings: typeof settings === 'function' ? { ...s.slideFxSettings, ...settings(s.slideFxSettings) } : { ...s.slideFxSettings, ...settings },
+    })),
+
   themes: [],
   activeTheme: createDefaultTheme(),
-  setActiveTheme: (theme) => set({ activeTheme: theme }),
+  liveTheme: createDefaultTheme(),
+  commitThemeToLive: () => set((s) => ({ liveTheme: s.activeTheme ? { ...s.activeTheme } : null })),
+  setActiveTheme: (theme) => set((s) => ({
+    activeTheme: theme,
+    liveTheme: s.display.mode === 'basic' ? (theme ? { ...theme } : null) : (s.liveTheme || s.activeTheme),
+  })),
   addTheme: (theme) => set((s) => ({ themes: [...s.themes, theme] })),
   updateTheme: (id, updates) =>
     set((s) => {
@@ -540,7 +854,38 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         ? s.themes.map((t) => (t.id === id ? { ...t, ...updates } : t))
         : [...s.themes, { id, ...updates } as Theme];
       const updatedActive = s.activeTheme?.id === id ? { ...s.activeTheme, ...updates } : s.activeTheme;
-      return { themes: updatedThemes, activeTheme: updatedActive };
+      const isStudio = s.display.mode === 'studio';
+
+      let displayUpdates = s.display;
+      if (!isStudio && s.display.currentScene && (s.display.currentScene.type === 'song' || s.display.currentScene.type === 'bible')) {
+        if (s.display.currentScene.background) {
+          displayUpdates = {
+            ...displayUpdates,
+            currentScene: {
+              ...s.display.currentScene,
+              background: undefined,
+            },
+          };
+        }
+      }
+      if (s.display.previewScene && (s.display.previewScene.type === 'song' || s.display.previewScene.type === 'bible')) {
+        if (s.display.previewScene.background) {
+          displayUpdates = {
+            ...displayUpdates,
+            previewScene: {
+              ...s.display.previewScene,
+              background: undefined,
+            },
+          };
+        }
+      }
+
+      return {
+        themes: updatedThemes,
+        activeTheme: updatedActive,
+        liveTheme: isStudio ? s.liveTheme : updatedActive,
+        display: displayUpdates,
+      };
     }),
   removeTheme: (id) => set((s) => ({ themes: s.themes.filter((t) => t.id !== id) })),
 
@@ -593,6 +938,21 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
           },
         ],
       };
+    }),
+  insertIntoQueue: (item, atIndex) =>
+    set((s) => {
+      const newItem: QueueItem = {
+        ...item,
+        id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: Date.now(),
+      };
+      const updated = [...s.queue];
+      if (atIndex !== undefined && atIndex >= 0 && atIndex <= updated.length) {
+        updated.splice(atIndex, 0, newItem);
+      } else {
+        updated.push(newItem);
+      }
+      return { queue: updated };
     }),
   removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
   clearQueue: () => set({ queue: [] }),
@@ -694,8 +1054,6 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   notices: [],
   notify: (notice) =>
     set((s) => ({
-      /* Capped. A stack deep enough to cover the workspace has stopped being a
-         notification and become an obstruction; the oldest goes. */
       notices: [...s.notices.filter((n) => n.id !== notice.id), notice].slice(-4),
     })),
   dismissNotice: (id) => set((s) => ({ notices: s.notices.filter((n) => n.id !== id) })),
@@ -708,8 +1066,6 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       : { poppedOutDockIds: ids }
   )),
   setOpenDockIds: (ids) => set((s) => (
-    // dockview fires layout changes constantly while dragging; only push a new
-    // array when the set of open docks actually differs.
     s.openDockIds.length === ids.length && ids.every((id, i) => s.openDockIds[i] === id)
       ? s
       : { openDockIds: ids }
@@ -739,8 +1095,6 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   deleteWorkspace: (id) =>
     set((s) => ({
       workspaces: s.workspaces.filter((w) => w.id !== id),
-      // Deleting what you are standing on drops you back to the default, which
-      // always exists — never to a dangling id the menu would tick nothing for.
       activeWorkspaceId: s.activeWorkspaceId === id ? null : s.activeWorkspaceId,
     })),
   setActiveWorkspace: (activeWorkspaceId) => set({ activeWorkspaceId }),
@@ -753,6 +1107,11 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   activeSettingsCategory: 'output',
   openSettings: (category) => set((s) => ({ isSettingsOpen: true, activeSettingsCategory: category || s.activeSettingsCategory || 'output' })),
   closeSettings: () => set({ isSettingsOpen: false }),
+
+  isShortcutsOpen: false,
+  openShortcuts: () => set({ isShortcutsOpen: true }),
+  closeShortcuts: () => set({ isShortcutsOpen: false }),
+  toggleShortcuts: () => set((s) => ({ isShortcutsOpen: !s.isShortcutsOpen })),
 
   isSlideEditorOpen: false,
   activePresentationId: null,
@@ -778,8 +1137,16 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   themeTransitionTarget: 'light',
   setUIThemeMode: (uiThemeMode) => {
     document.documentElement.setAttribute('data-ui-theme', uiThemeMode);
-    if (uiThemeMode === 'light') document.body.classList.add('light-theme');
-    else document.body.classList.remove('light-theme');
+    if (uiThemeMode === 'light') {
+      document.documentElement.setAttribute('data-bsp-surface', 'paper');
+      document.body.classList.add('light-theme');
+    } else {
+      document.documentElement.removeAttribute('data-bsp-surface');
+      document.body.classList.remove('light-theme');
+    }
+    try {
+      localStorage.setItem('bsp_theme_mode', uiThemeMode);
+    } catch {}
     set({ uiThemeMode });
   },
   toggleUIThemeMode: () => {
@@ -810,10 +1177,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   name: 'bsp-app-state',
   version: 1,
   storage: createJSONStorage(() => bspStorage),
-  // See unpinSceneMedia below — applied in `merge`.
 
-  // Only library content and user preferences survive a restart. Live display state
-  // (current/preview scene, output status, active alert, meter) is deliberately transient.
   partialize: (state) => ({
     scenes: state.scenes.map(sceneWithoutSlide),
     presentationDecks: state.presentationDecks,
@@ -845,24 +1209,51 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       syncBibleOnDetection: state.liveScripture.syncBibleOnDetection ?? true,
     },
     uiLocale: state.uiLocale,
+    uiThemeMode: state.uiThemeMode,
+    fxSettings: state.fxSettings,
+    slideFxSettings: state.slideFxSettings,
   }),
 
   onRehydrateStorage: () => (state) => {
     if (state?.uiLocale && isUiLocale(state.uiLocale)) {
       applyUiLocale(state.uiLocale);
     }
+    if (state?.uiThemeMode) {
+      document.documentElement.setAttribute('data-ui-theme', state.uiThemeMode);
+      if (state.uiThemeMode === 'light') {
+        document.documentElement.setAttribute('data-bsp-surface', 'paper');
+        document.body.classList.add('light-theme');
+      } else {
+        document.documentElement.removeAttribute('data-bsp-surface');
+        document.body.classList.remove('light-theme');
+      }
+      try {
+        localStorage.setItem('bsp_theme_mode', state.uiThemeMode);
+      } catch {}
+    }
   },
 
-  // Custom merge: the persisted shape is flattened (outputMode, liveScripturePrefs), so a
-  // shallow spread would clobber `display` and `liveScripture` with partial objects.
   merge: (persisted, current) => {
     try {
       if (!persisted || typeof persisted !== 'object') {
         return current;
       }
       const saved = persisted as Partial<PersistedState>;
+      const nextTheme = saved.uiThemeMode === 'light' ? 'light' : (saved.uiThemeMode === 'dark' ? 'dark' : current.uiThemeMode);
+      document.documentElement.setAttribute('data-ui-theme', nextTheme);
+      if (nextTheme === 'light') {
+        document.documentElement.setAttribute('data-bsp-surface', 'paper');
+        document.body.classList.add('light-theme');
+      } else {
+        document.documentElement.removeAttribute('data-bsp-surface');
+        document.body.classList.remove('light-theme');
+      }
+      try {
+        localStorage.setItem('bsp_theme_mode', nextTheme);
+      } catch {}
       return {
         ...current,
+        uiThemeMode: nextTheme,
         scenes: (Array.isArray(saved.scenes) ? unpinSceneMedia(saved.scenes) : null) ?? current.scenes,
         presentationDecks: Array.isArray(saved.presentationDecks) ? saved.presentationDecks : current.presentationDecks,
         songLinesPerSlide: (typeof saved.songLinesPerSlide === 'number' || saved.songLinesPerSlide === 'auto') ? saved.songLinesPerSlide : current.songLinesPerSlide,
@@ -882,8 +1273,8 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         display: {
           ...current.display,
           outputMode: saved.outputMode ?? current.display.outputMode,
-          // Older builds stored 'program' | 'preview' | 'simple'. 'simple' was the
-          // program-only workflow, so it maps to basic; everything else to studio.
+          bibleOutputMode: saved.bibleOutputMode ?? current.display.bibleOutputMode ?? 'fullscreen',
+          songOutputMode: saved.songOutputMode ?? current.display.songOutputMode ?? 'fullscreen',
           mode: saved.operatingMode === 'basic' || saved.operatingMode === 'simple'
             ? 'basic'
             : saved.operatingMode === 'studio' ? 'studio' : current.display.mode,
@@ -893,6 +1284,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
           ...(saved.liveScripturePrefs && typeof saved.liveScripturePrefs === 'object' ? saved.liveScripturePrefs : {})
         },
         uiLocale: isUiLocale(saved.uiLocale) ? saved.uiLocale : current.uiLocale,
+        fxSettings: saved.fxSettings && typeof saved.fxSettings === 'object'
+          ? { ...current.fxSettings, ...saved.fxSettings }
+          : current.fxSettings,
+        slideFxSettings: saved.slideFxSettings && typeof saved.slideFxSettings === 'object'
+          ? { ...current.slideFxSettings, ...saved.slideFxSettings }
+          : current.slideFxSettings,
       };
     } catch (err) {
       console.warn('[appStore] Exception in merge persisted state; recovering with defaults:', err);
@@ -918,7 +1315,8 @@ interface PersistedState {
   isWorkspaceLocked?: boolean;
   doubleClickToGoLive?: boolean;
   outputMode: DisplayState['outputMode'];
-  /** 'simple' only appears in state written by pre-studio/basic builds. */
+  bibleOutputMode?: DisplayState['outputMode'];
+  songOutputMode?: DisplayState['outputMode'];
   operatingMode: OperatingMode | 'simple' | 'program' | 'preview';
   syncTranscriptWithLive?: boolean;
   liveScripturePrefs: Pick<
@@ -926,4 +1324,7 @@ interface PersistedState {
     'detectionMode' | 'provider' | 'selectedInputId' | 'autoProject' | 'autoVersionSwitch' | 'autoProjectQuoted' | 'syncBibleOnDetection'
   >;
   uiLocale?: UiLocale;
+  uiThemeMode?: 'dark' | 'light';
+  fxSettings?: FxAnimationSettings;
+  slideFxSettings?: FxAnimationSettings;
 }

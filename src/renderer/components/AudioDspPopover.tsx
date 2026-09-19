@@ -128,10 +128,10 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
         top: coords.top,
         left: coords.left,
         width: POPOVER_WIDTH,
-        background: 'var(--bg-secondary, #18191f)',
-        border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.15))',
+        background: 'var(--bsp-surface, #1C1A19)',
+        border: '1px solid var(--bsp-edge, #2D2A28)',
         borderRadius: 8,
-        boxShadow: '0 14px 36px rgba(0, 0, 0, 0.65), 0 2px 10px rgba(0, 0, 0, 0.4)',
+        boxShadow: '0 16px 44px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06)',
         padding: '12px 14px',
         zIndex: 99999,
         color: 'var(--text-primary, #ffffff)',
@@ -197,15 +197,26 @@ export function AudioDspPopover({ isOpen, onClose, dsp, onChangeDsp, anchorEl, m
           type="button"
           onClick={onClose}
           style={{
-            background: 'none',
-            border: 'none',
-            padding: 2,
-            cursor: 'pointer',
-            color: 'var(--text-dim, #888)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            width: 22,
+            height: 22,
             borderRadius: 4,
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--text-dim, #888)',
+            cursor: 'pointer',
+            padding: 0,
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.color = '#ffffff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = 'var(--text-dim, #888)';
           }}
           title="Close"
         >

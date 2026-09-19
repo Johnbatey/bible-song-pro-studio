@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
+import type { Scene } from '../types';
 import { useProgramSurfaceState } from '../hooks/useProgramSurfaceState';
 import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { resolveBgVideoLoop } from '../utils/background';
@@ -8,6 +9,26 @@ import { resolveEffectiveOutputMode } from '../utils/outputMode';
 import { ProgramSurface } from './display/ProgramSurface';
 import { Block, BlockButton, BlockSegment } from './Block';
 import { type, fontWeight } from '../styles/type';
+
+function getSceneDescription(scene: Scene | null | undefined): string {
+  if (!scene) return '';
+  if (scene.name && scene.name.trim().length > 0) {
+    return scene.name;
+  }
+  if (scene.content?.reference) {
+    return scene.content.reference;
+  }
+  if (scene.type === 'bible') {
+    return 'Scripture';
+  }
+  if (scene.type === 'song') {
+    return scene.content?.text ? scene.content.text.split('\n')[0] : 'Song';
+  }
+  if (scene.type === 'presentation') {
+    return 'Presentation';
+  }
+  return scene.type.toUpperCase();
+}
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
@@ -124,129 +145,91 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
     setZoom((current) => Math.abs(current - nextZoom) < 0.001 ? current : nextZoom);
   }, [markInteracting]);
 
-  const measureStage = useCallback(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const viewportRect = viewport.getBoundingClientRect();
-    const columns = isStudio ? 2 : 1;
-    const totalGap = isStudio ? STAGE_GAP : 0;
-    const availableWidth = Math.max(240, viewportRect.width - STAGE_SAFE_PAD);
-    const availableHeight = Math.max(160, viewportRect.height - STAGE_SAFE_PAD - STAGE_LABEL_HEIGHT);
-    const itemHeight = Math.max(
-      120,
-      Math.min(availableHeight, (availableWidth - totalGap) / columns / STAGE_ASPECT),
-    );
-    const itemWidth = Math.round(itemHeight * STAGE_ASPECT);
-    const next = {
-      itemWidth,
-      width: itemWidth * columns + totalGap,
-      height: Math.round(STAGE_LABEL_HEIGHT + itemHeight),
-    };
+  const fitToViewport = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const { clientWidth: w, clientHeight: h } = el;
+    if (w <= 0 || h <= 0) return;
+    const availW = Math.max(160, w - STAGE_SAFE_PAD);
+    const availH = Math.max(120, h - STAGE_SAFE_PAD);
+    const zoomW = availW / stageSize.width;
+    const zoomH = availH / stageSize.height;
+    const fitZoom = clampZoom(Math.min(zoomW, zoomH));
+    zoomRef.current = fitZoom;
+    markInteracting();
+    setZoom(fitZoom);
+    setPan({ x: 0, y: 0 });
+  }, [stageSize, markInteracting]);
 
-    setStageSize((current) => {
-      if (
-        Math.abs(current.width - next.width) < 1 &&
-        Math.abs(current.height - next.height) < 1 &&
-        Math.abs(current.itemWidth - next.itemWidth) < 1
-      ) {
-        return current;
+  /* Recompute stageSize from container width and studio mode */
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width: w, height: h } = entry.contentRect;
+        if (w <= 0 || h <= 0) continue;
+        const availableHeight = Math.max(120, h - STAGE_SAFE_PAD);
+        if (isStudio) {
+          /* Two displays side by side */
+          const maxItemWidth = (w - STAGE_SAFE_PAD - STAGE_GAP) / 2;
+          const maxItemHeight = availableHeight - STAGE_LABEL_HEIGHT;
+          const itemWidthByHeight = maxItemHeight * STAGE_ASPECT;
+          const itemWidth = Math.max(160, Math.min(maxItemWidth, itemWidthByHeight));
+          const itemHeight = itemWidth / STAGE_ASPECT;
+          const totalWidth = itemWidth * 2 + STAGE_GAP;
+          const totalHeight = itemHeight + STAGE_LABEL_HEIGHT;
+          setStageSize({ width: Math.round(totalWidth), height: Math.round(totalHeight), itemWidth: Math.round(itemWidth) });
+        } else {
+          /* Single display */
+          const maxItemWidth = w - STAGE_SAFE_PAD;
+          const maxItemHeight = availableHeight - STAGE_LABEL_HEIGHT;
+          const itemWidthByHeight = maxItemHeight * STAGE_ASPECT;
+          const itemWidth = Math.max(200, Math.min(maxItemWidth, itemWidthByHeight));
+          const itemHeight = itemWidth / STAGE_ASPECT;
+          setStageSize({ width: Math.round(itemWidth), height: Math.round(itemHeight + STAGE_LABEL_HEIGHT), itemWidth: Math.round(itemWidth) });
+        }
       }
-      return next;
     });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [isStudio]);
 
+  const setZoomAround = useCallback((next: number) => {
+    updateZoom(next);
+  }, [updateZoom]);
+
   const fitStage = useCallback(() => {
-    measureStage();
-    updateZoom(1);
-    setPan((current) => current.x === 0 && current.y === 0 ? current : { x: 0, y: 0 });
-  }, [measureStage, updateZoom]);
+    fitToViewport();
+  }, [fitToViewport]);
 
-  useLayoutEffect(() => {
-    let frame = 0;
-    const scheduleMeasure = () => {
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(measureStage);
-    };
-    scheduleMeasure();
-    const viewport = viewportRef.current;
-    const observer = viewport && typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(scheduleMeasure)
-      : null;
-    if (viewport && observer) observer.observe(viewport);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      observer?.disconnect();
-    };
-  }, [isStudio, measureStage]);
-
-  useLayoutEffect(() => {
-    updateZoom(1);
-    setPan({ x: 0, y: 0 });
-    measureStage();
-  }, [isStudio, measureStage, updateZoom]);
-
-  const setZoomAround = useCallback((next: number, clientX?: number, clientY?: number) => {
-    const viewport = viewportRef.current;
-    const nextZoom = clampZoom(next);
-    if (!viewport || clientX === undefined || clientY === undefined) {
-      updateZoom(nextZoom);
-      return;
-    }
-    const rect = viewport.getBoundingClientRect();
-    const focusX = clientX - rect.left - rect.width / 2 - pan.x;
-    const focusY = clientY - rect.top - rect.height / 2 - pan.y;
-    const currentZoom = zoomRef.current || zoom;
-    const ratio = nextZoom / currentZoom;
-    setPan({
-      x: pan.x + focusX * (1 - ratio),
-      y: pan.y + focusY * (1 - ratio),
-    });
-    updateZoom(nextZoom);
-  }, [pan, updateZoom, zoom]);
-
-  useLayoutEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-
-    const onNativeWheel = (event: WheelEvent) => {
-      if ((event.target as HTMLElement | null)?.closest('button,input')) return;
-      event.preventDefault();
-
-      if (event.ctrlKey || event.metaKey || event.altKey) {
-        const delta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-        setZoomAround(zoomRef.current + delta, event.clientX, event.clientY);
-        return;
-      }
-
+  function onWheel(event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey) {
+      const delta = -event.deltaY * 0.005;
+      setZoomAround(zoom + delta);
+    } else {
       markInteracting();
       setPan((current) => ({
         x: current.x - event.deltaX,
         y: current.y - event.deltaY,
       }));
-    };
-
-    viewport.addEventListener('wheel', onNativeWheel, { passive: false });
-    return () => viewport.removeEventListener('wheel', onNativeWheel);
-  }, [setZoomAround, markInteracting]);
-
-  function onWheel(event: React.WheelEvent<HTMLDivElement>) {
-    if (event.defaultPrevented) return;
-    if (event.ctrlKey || event.metaKey || event.altKey) {
-      const delta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-      setZoomAround(zoom + delta, event.clientX, event.clientY);
-      return;
     }
-    setPan((current) => ({
-      x: current.x - event.deltaX,
-      y: current.y - event.deltaY,
-    }));
   }
 
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0 || (event.target as HTMLElement).closest('button,input')) return;
-    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: pan.x, y: pan.y };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('[data-no-pan="true"]')) return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: pan.x,
+      y: pan.y,
+    };
     setIsPanning(true);
+    markInteracting();
+    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -325,13 +308,6 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
             </BlockSegment>
 
             <div className="zoombar-pill">
-              <button
-                type="button"
-                onClick={() => setZoomAround(zoom - ZOOM_STEP)}
-                title="Zoom out"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/></svg>
-              </button>
               <input
                 type="range"
                 min={ZOOM_MIN}
@@ -343,21 +319,11 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
               />
               <button
                 type="button"
-                onClick={() => setZoomAround(zoom + ZOOM_STEP)}
-                title="Zoom in"
+                className="zoombar-label"
+                onClick={() => setZoom(1)}
+                title="Reset zoom to 100%"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="7" y1="11" x2="15" y2="11"/><line x1="11" y1="7" x2="11" y2="15"/></svg>
-              </button>
-              <span className="zoombar-val">{zoomLabel}</span>
-              <div className="zoombar-divider" />
-              <button
-                type="button"
-                className="zoombar-fit"
-                data-active={zoom === 1 || undefined}
-                onClick={fitStage}
-                title="Fit preview/program to view"
-              >
-                Fit
+                {Math.round(zoom * 100)}%
               </button>
             </div>
           </div>
@@ -394,7 +360,17 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                   five states and yellow is not one of them. */}
               <div style={styles.label}>
                 <span style={{ ...styles.dot, background: 'var(--tally-preview)' }} />
-                Preview{hasPendingTake ? ' · ready to take' : ''}
+                <span>Preview{hasPendingTake ? ' · ready to take' : ''}</span>
+                {previewScene && (
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, maxWidth: '55%', overflow: 'hidden' }}>
+                    <span
+                      className="pv-hud-pill-next"
+                      title={`Next Up: ${getSceneDescription(previewScene)}`}
+                    >
+                      Next: {getSceneDescription(previewScene)}
+                    </span>
+                  </div>
+                )}
               </div>
               <div style={{
                 ...styles.displayBox,
@@ -406,7 +382,8 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
               }}>
                 <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
                   <ProgramSurface
-                    preview
+                    className="program-pane-surface"
+                    preview={false}
                     state={previewSurfaceState}
                     assetBaseUrl={assetBaseUrl}
                     onVideoClock={videoTarget === 'preview' ? reportVideoClock : undefined}
@@ -423,7 +400,19 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
                 is on screen. */}
             <div style={styles.label}>
               <span style={{ ...styles.dot, background: 'var(--tally-program)' }} />
-              Program{!isStudio ? ' · live' : ''}
+              <span>Program{!isStudio ? ' · live' : ''}</span>
+              {currentScene && (
+                <span
+                  className="pv-hud-pill-live"
+                  title={`On Air: ${getSceneDescription(currentScene)}`}
+                  style={{
+                    marginLeft: 'auto',
+                    maxWidth: '50%',
+                  }}
+                >
+                  Live: {getSceneDescription(currentScene)}
+                </span>
+              )}
             </div>
             <div style={{
               ...styles.displayBox,
@@ -434,7 +423,8 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
             }}>
               <div style={{ ...styles.outputFrame, transform: `scale(${outputScale})` }}>
                 <ProgramSurface
-                  preview
+                  className="program-pane-surface"
+                  preview={false}
                   state={programSurfaceState}
                   assetBaseUrl={assetBaseUrl}
                   onVideoClock={videoTarget === 'program' ? reportVideoClock : undefined}
@@ -523,11 +513,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 12,
     alignItems: 'stretch',
     transformOrigin: 'center center',
-    /* will-change is applied only while panning or zooming — see isInteracting.
-       Holding it permanently pins the raster scale and blurs the output as you
-       zoom in; never using it repaints the whole subtree on every gesture
-       frame. Toggling gives the compositor the gesture and a fresh raster once
-       the view settles. */
   },
   previewCol: {
     flex: '0 0 auto',
@@ -535,7 +520,6 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'center',
   },
   programColSolo: {
     flex: '0 0 auto',
@@ -543,7 +527,6 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'center',
   },
   label: {
     display: 'flex',
@@ -562,7 +545,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative',
     width: '100%',
     aspectRatio: '16/9',
-    borderRadius: 6,
+    borderRadius: 0,
     overflow: 'hidden',
     background: '#000',
     border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -598,21 +581,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--block-active)',
     color: 'var(--text-primary)',
     cursor: 'pointer',
-    ...type.label,
-    fontWeight: fontWeight.bold,
-  },
-  zoomValue: {
-    width: 38,
-    textAlign: 'center',
-    color: 'var(--text-secondary)',
-    ...type.label,
-    fontWeight: fontWeight.bold,
-  },
-  zoomSlider: {
-    width: 92,
-    /* Tinting the track with the accent made the loudest thing in the footer a
-       zoom control. Left to the native dark rendering — grey track, white
-       thumb — it recedes and orange goes back to meaning live. */
-    accentColor: 'var(--chrome-control-active)',
+    fontWeight: fontWeight.semibold,
   },
 };

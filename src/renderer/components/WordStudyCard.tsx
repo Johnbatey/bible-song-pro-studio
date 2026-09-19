@@ -59,6 +59,9 @@ function IconMonitor() {
 
 export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
   const projectScene = useAppStore((s) => s.projectScene);
+  const currentScene = useAppStore((s) => s.display.currentScene);
+  const setCurrentScene = useAppStore((s) => s.setCurrentScene);
+  const setPreviewScene = useAppStore((s) => s.setPreviewScene);
   const [currentEntry, setCurrentEntry] = useState<WordStudyEntry>(entry);
   const [history, setHistory] = useState<WordStudyEntry[]>([]);
 
@@ -95,9 +98,18 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
     setCurrentEntry(prevEntry);
   };
 
+  const isProjected =
+    currentScene?.content?.wordStudy?.strongs === currentEntry.strongs ||
+    currentScene?.id === `wordstudy-${currentEntry.strongs}`;
+
   const handleProject = () => {
+    if (isProjected) {
+      setCurrentScene(null);
+      setPreviewScene(null);
+      return;
+    }
     const scene: Scene = {
-      id: `wordstudy-${Date.now()}`,
+      id: `wordstudy-${currentEntry.strongs}`,
       name: `Word Study: ${currentEntry.transliteration}`,
       type: 'bible',
       content: {
@@ -156,13 +168,13 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
   return (
     <div
       style={{
-        background: 'rgba(20, 20, 23, 0.98)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
+        background: 'var(--bsp-surface, rgba(20, 20, 23, 0.98))',
+        border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.12))',
         borderRadius: 12,
         padding: '16px 20px',
-        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+        boxShadow: 'var(--shadow-lg, 0 12px 40px rgba(0, 0, 0, 0.6))',
         backdropFilter: 'blur(16px)',
-        color: '#ffffff',
+        color: 'var(--text-primary, #ffffff)',
         fontFamily: 'var(--font-ui)',
         display: 'flex',
         flexDirection: 'column',
@@ -178,7 +190,7 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
               style={{
                 fontSize: 30,
                 fontWeight: 700,
-                color: '#FF5500',
+                color: 'var(--accent, #FF5500)',
                 fontFamily: currentEntry.language === 'Hebrew' ? 'serif' : 'inherit',
                 lineHeight: 1.1,
               }}
@@ -195,14 +207,14 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
                 padding: '2px 8px',
                 borderRadius: 4,
                 background: 'rgba(255, 85, 0, 0.15)',
-                color: '#FF5500',
+                color: 'var(--accent, #FF5500)',
                 border: '1px solid rgba(255, 85, 0, 0.3)',
               }}
             >
               {currentEntry.strongs} ({currentEntry.language})
             </span>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#ffffff' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #ffffff)' }}>
             {currentEntry.gloss}
           </div>
         </div>
@@ -241,13 +253,13 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
         </div>
         <div
           style={{
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'var(--bsp-raised, rgba(255, 255, 255, 0.04))',
+            border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.08))',
             borderRadius: 8,
             padding: '10px 14px',
             fontSize: 13,
             fontStyle: 'italic',
-            color: '#e4e4e7',
+            color: 'var(--text-primary, #e4e4e7)',
           }}
         >
           {renderFormattedText(etymologyText)}
@@ -273,7 +285,7 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
           style={{
             fontSize: 13,
             lineHeight: 1.55,
-            color: '#f4f4f5',
+            color: 'var(--text-primary, #f4f4f5)',
             fontFamily: 'serif',
             letterSpacing: '0.01em',
           }}
@@ -289,7 +301,7 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
             fontSize: 11,
             fontWeight: 700,
             letterSpacing: '0.08em',
-            color: '#FF5500',
+            color: 'var(--accent, #FF5500)',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
@@ -299,12 +311,12 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
         </div>
         <div
           style={{
-            background: 'rgba(255, 85, 0, 0.05)',
-            border: '1px solid rgba(255, 85, 0, 0.18)',
+            background: 'var(--accent-dim, rgba(255, 85, 0, 0.05))',
+            border: '1px solid var(--border-accent, rgba(255, 85, 0, 0.18))',
             borderRadius: 8,
             padding: '10px 14px',
             fontSize: 13,
-            color: '#e4e4e7',
+            color: 'var(--text-primary, #e4e4e7)',
           }}
         >
           {renderFormattedText(kjvUsageText)}
@@ -318,9 +330,9 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
             onClick={handleBack}
             style={{
               padding: '6px 12px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: '#ffffff',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              background: 'var(--chrome-control, rgba(255, 255, 255, 0.1))',
+              color: 'var(--text-primary, #ffffff)',
+              border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.15))',
               borderRadius: 6,
               fontSize: 12,
               fontWeight: 600,
@@ -337,7 +349,7 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
           onClick={handleProject}
           style={{
             padding: '6px 14px',
-            background: '#FF5500',
+            background: isProjected ? 'rgba(239, 68, 68, 0.9)' : 'var(--accent, #FF5500)',
             color: '#ffffff',
             border: 'none',
             borderRadius: 6,
@@ -347,9 +359,10 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
             display: 'flex',
             alignItems: 'center',
             gap: 6,
+            transition: 'background 0.15s ease',
           }}
         >
-          <IconMonitor /> Project Word Study
+          <IconMonitor /> {isProjected ? 'Clear From Display' : 'Project Word Study'}
         </button>
       </div>
     </div>

@@ -60,6 +60,7 @@ export function QueuePanel() {
   const removeFromQueue = useAppStore((s) => s.removeFromQueue);
   const clearQueue = useAppStore((s) => s.clearQueue);
   const setQueue = useAppStore((s) => s.setQueue);
+  const insertIntoQueue = useAppStore((s) => s.insertIntoQueue);
   const reorderQueue = useAppStore((s) => s.reorderQueue);
   const projectScene = useAppStore((s) => s.projectScene);
   const clearProgram = useAppStore((s) => s.clearProgram);
@@ -81,6 +82,11 @@ export function QueuePanel() {
   });
   const [showSetlistModal, setShowSetlistModal] = useState(false);
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+  const emptyParts = t('queue.empty', { plus: '+' }).split('+');
+
+  // External HTML5 drag-and-drop state
+  const [externalDropIndex, setExternalDropIndex] = useState<number | null>(null);
+  const [isExternalDragActive, setIsExternalDragActive] = useState(false);
 
   // Pointer-based fluid drag state
   const [dragState, setDragState] = useState<{
@@ -290,13 +296,92 @@ export function QueuePanel() {
     }
   };
 
-  const emptyParts = t('queue.empty').split('{plus}');
+  // HTML5 Drag-and-Drop handlers for external items (Songs, Bible, Media, Slides)
+  const handleExternalDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('application/bsp-queue-item') && !e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsExternalDragActive(true);
+
+    const container = listContainerRef.current;
+    if (!container || queue.length === 0) {
+      setExternalDropIndex(0);
+      return;
+    }
+
+    const rows = Array.from(container.querySelectorAll('[data-queue-row]')) as HTMLElement[];
+    const clientY = e.clientY;
+    let newDropIndex = queue.length;
+
+    for (let i = 0; i < rows.length; i++) {
+      const rect = rows[i].getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (clientY < midY) {
+        newDropIndex = i;
+        break;
+      }
+    }
+    setExternalDropIndex(newDropIndex);
+  };
+
+  const handleExternalDragEnter = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('application/bsp-queue-item') || e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setIsExternalDragActive(true);
+    }
+  };
+
+  const handleExternalDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsExternalDragActive(false);
+    setExternalDropIndex(null);
+  };
+
+  const handleExternalDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const dropIdx = externalDropIndex !== null ? externalDropIndex : queue.length;
+    setIsExternalDragActive(false);
+    setExternalDropIndex(null);
+
+    const rawJson = e.dataTransfer.getData('application/bsp-queue-item');
+    if (rawJson) {
+      try {
+        const payload = JSON.parse(rawJson);
+        if (payload && payload.scene) {
+          insertIntoQueue(payload, dropIdx);
+          pushNotice({
+            id: `queue-add-${Date.now()}`,
+            text: `Added "${payload.reference || payload.scene.name || 'Item'}" to Queue`,
+            type: 'info',
+            duration: 3,
+            animation: 'slideDown',
+          });
+        }
+      } catch (err) {
+        console.error('Failed to parse dropped queue item:', err);
+      }
+    }
+  };
+
+  const renderDropIndicator = () => (
+    <div
+      style={{
+        height: 3,
+        margin: '2px 0',
+        borderRadius: 2,
+        background: 'var(--accent, #FF5500)',
+        boxShadow: '0 0 10px var(--accent, #FF5500)',
+        transition: 'all 0.15s ease',
+      }}
+    />
+  );
 
   return (
     <Block
       className="blk-fill"
       title={t('queue.title')}
-      subtitle={queue.length > 0 ? `${queue.length}` : undefined}      tools={
+      subtitle={queue.length > 0 ? `${queue.length}` : undefined}
+      tools={
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {/* Setlists Modal Trigger Button */}
           <BlockButton
@@ -346,13 +431,47 @@ export function QueuePanel() {
         onImportFile={handleImportFile}
       />
       {queue.length === 0 ? (
-        <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '24px 16px', textAlign: 'center' }}>
-          {emptyParts[0]}
-          <strong style={{ color: 'var(--accent, #FF5500)' }}>+</strong>
-          {emptyParts[1] || ''}
+        <div
+          onDragOver={handleExternalDragOver}
+          onDragEnter={handleExternalDragEnter}
+          onDragLeave={handleExternalDragLeave}
+          onDrop={handleExternalDrop}
+          style={{
+            color: 'var(--text-dim)',
+            fontSize: 12,
+            padding: '28px 16px',
+            textAlign: 'center',
+            border: isExternalDragActive ? '2px dashed var(--accent, #FF5500)' : '2px dashed transparent',
+            background: isExternalDragActive ? 'rgba(255, 85, 0, 0.08)' : 'transparent',
+            borderRadius: 8,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          {isExternalDragActive ? (
+            <span style={{ color: 'var(--accent, #FF5500)', fontWeight: 600 }}>Drop item here to add to Queue</span>
+          ) : (
+            <>
+              {emptyParts[0]}
+              <strong style={{ color: 'var(--accent, #FF5500)' }}>+</strong>
+              {emptyParts[1] || ''}
+            </>
+          )}
         </div>
       ) : (
-        <div ref={listContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '2px 0' }}>
+        <div
+          ref={listContainerRef}
+          onDragOver={handleExternalDragOver}
+          onDragEnter={handleExternalDragEnter}
+          onDragLeave={handleExternalDragLeave}
+          onDrop={handleExternalDrop}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            padding: '2px 0',
+            minHeight: '100%',
+          }}
+        >
           {queue.map((item, index) => {
             const isAlertItem = item.type === 'ticker' || item.type === 'nursery' || Boolean(item.alertConfig);
             const isLive = isAlertItem
@@ -492,15 +611,17 @@ export function QueuePanel() {
             };
 
             return (
-              <div
-                key={item.id}
-                ref={(el) => { rowRefs.current[item.scene.id] = el; }}
-                onPointerDown={handlePointerDown}
-                onMouseEnter={() => setHoveredItemId(item.id)}
-                onMouseLeave={() => setHoveredItemId(null)}
-                onDoubleClick={() => {
-                  handleTakeLive();
-                }}
+              <React.Fragment key={item.id}>
+                {externalDropIndex === index && renderDropIndicator()}
+                <div
+                  data-queue-row
+                  ref={(el) => { rowRefs.current[item.scene.id] = el; }}
+                  onPointerDown={handlePointerDown}
+                  onMouseEnter={() => setHoveredItemId(item.id)}
+                  onMouseLeave={() => setHoveredItemId(null)}
+                  onDoubleClick={() => {
+                    handleTakeLive();
+                  }}
                 style={{
                   padding: '9px 12px',
                   background: isLive
@@ -570,11 +691,16 @@ export function QueuePanel() {
                     <span style={{ textTransform: 'capitalize', flexShrink: 0 }}>
                       {item.type} {item.source ? `· ${item.source}` : ''}
                     </span>
-                    {item.text && (
+                    {item.text != null && (
                       <>
                         <span style={{ opacity: 0.4 }}>·</span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
-                          {item.text.replace(/\s+/g, ' ').trim()}
+                          {(typeof item.text === 'string'
+                            ? item.text
+                            : typeof item.text === 'object' && (item.text as any)?.text
+                            ? String((item.text as any).text)
+                            : String(item.text)
+                          ).replace(/\s+/g, ' ').trim()}
                         </span>
                       </>
                     )}
@@ -706,8 +832,10 @@ export function QueuePanel() {
                   </button>
                 </div>
               </div>
-            );
-          })}
+            </React.Fragment>
+          );
+        })}
+          {externalDropIndex === queue.length && renderDropIndicator()}
         </div>
       )}
     </Block>

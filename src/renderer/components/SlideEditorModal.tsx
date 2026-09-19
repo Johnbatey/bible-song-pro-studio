@@ -110,8 +110,17 @@ export function SlideEditorModal() {
     };
   });
 
-  const [history, setHistory] = useState<PresentationDeck[]>([]);
-  const [historyPointer, setHistoryPointer] = useState(-1);
+  const [history, setHistory] = useState<PresentationDeck[]>(() => [deck]);
+  const [historyPointer, setHistoryPointer] = useState(0);
+  const deckRef = useRef<PresentationDeck>(deck);
+  const historyRef = useRef<PresentationDeck[]>([deck]);
+  const historyPointerRef = useRef(0);
+
+  useEffect(() => {
+    historyRef.current = history;
+    historyPointerRef.current = historyPointer;
+    deckRef.current = deck;
+  }, [history, historyPointer, deck]);
 
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
@@ -239,21 +248,15 @@ export function SlideEditorModal() {
   const activeSlideElements = slideElementsFor(activeSlide);
   const selectedElement = activeSlideElements.find((el) => el.id === selectedElementId) || null;
 
-  const historyRef = useRef<PresentationDeck[]>([]);
-  const historyPointerRef = useRef(-1);
-
-  useEffect(() => {
-    historyRef.current = history;
-    historyPointerRef.current = historyPointer;
-  }, [history, historyPointer]);
-
   const handleUndo = useCallback(() => {
     const p = historyPointerRef.current;
     const h = historyRef.current;
     if (p > 0) {
       const prev = h[p - 1];
+      historyPointerRef.current = p - 1;
       setHistoryPointer(p - 1);
       setDeck(prev);
+      deckRef.current = prev;
     }
   }, []);
 
@@ -262,10 +265,109 @@ export function SlideEditorModal() {
     const h = historyRef.current;
     if (p < h.length - 1 && p >= 0) {
       const next = h[p + 1];
+      historyPointerRef.current = p + 1;
       setHistoryPointer(p + 1);
       setDeck(next);
+      deckRef.current = next;
     }
   }, []);
+
+  // Push new deck state into history stack
+  const updateDeckState = useCallback((updater: (prev: PresentationDeck) => PresentationDeck, recordHistory = true) => {
+    setDeck((prev) => {
+      const next = updater(prev);
+      deckRef.current = next;
+      if (recordHistory) {
+        setHistory((h) => {
+          const p = historyPointerRef.current;
+          const newHistory = h.slice(0, p + 1);
+          newHistory.push(next);
+          historyRef.current = newHistory;
+          historyPointerRef.current = newHistory.length - 1;
+          setHistoryPointer(newHistory.length - 1);
+          return newHistory;
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  const commitHistorySnapshot = useCallback(() => {
+    const currentDeck = deckRef.current;
+    setHistory((h) => {
+      const p = historyPointerRef.current;
+      if (p >= 0 && h[p] === currentDeck) return h;
+      const newHistory = h.slice(0, p + 1);
+      newHistory.push(currentDeck);
+      historyRef.current = newHistory;
+      historyPointerRef.current = newHistory.length - 1;
+      setHistoryPointer(newHistory.length - 1);
+      return newHistory;
+    });
+  }, []);
+
+  const handleUpdateSlide = useCallback((updates: Partial<PresentationSlide>, recordHistory = true) => {
+    updateDeckState((prev) => {
+      const currentSlides = prev.slides.length > 0 ? prev.slides : slides;
+      const updatedSlides = currentSlides.map((s, idx) => (idx === activeSlideIndex ? { ...s, ...updates } : s));
+      return { ...prev, slides: updatedSlides };
+    }, recordHistory);
+  }, [activeSlideIndex, slides, updateDeckState]);
+
+  const handleSelectElement = useCallback((id: string | null, additive = false) => {
+    if (id === null) {
+      setSelectedElementIds([]);
+      return;
+    }
+    if (additive) {
+      setSelectedElementIds((prev) =>
+        prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      );
+    } else {
+      setSelectedElementIds([id]);
+    }
+  }, []);
+
+  const handleUpdateSlideElements = useCallback((elements: SlideElement[], recordHistory = true) => {
+    handleUpdateSlide({ elements }, recordHistory);
+  }, [handleUpdateSlide]);
+
+  const handleUpdateElement = useCallback((elementId: string, updates: Partial<SlideElement>, recordHistory = true) => {
+    updateDeckState((prev) => {
+      const currentSlides = prev.slides.length > 0 ? prev.slides : slides;
+      const targetSlide = currentSlides[activeSlideIndex] || currentSlides[0];
+      const currentElements = slideElementsFor(targetSlide);
+      const updatedElements = currentElements.map((el) => (el.id === elementId ? { ...el, ...updates } : el));
+      const updatedSlides = currentSlides.map((s, idx) => (idx === activeSlideIndex ? { ...s, elements: updatedElements } : s));
+      return { ...prev, slides: updatedSlides };
+    }, recordHistory);
+  }, [activeSlideIndex, slides, updateDeckState]);
+
+  const handleDeleteElement = useCallback((elementId: string) => {
+    const updatedElements = activeSlideElements.filter((el) => !selectedElementIds.includes(el.id) && el.id !== elementId);
+    handleUpdateSlideElements(updatedElements);
+    setSelectedElementIds([]);
+  }, [activeSlideElements, selectedElementIds, handleUpdateSlideElements]);
+
+  const handleDuplicateElements = useCallback((idsToDuplicate?: string[]) => {
+    const targetIds = idsToDuplicate || selectedElementIds;
+    if (!targetIds.length) return;
+    const targets = activeSlideElements.filter((el) => targetIds.includes(el.id));
+    if (!targets.length) return;
+
+    const now = Date.now();
+    const maxZ = Math.max(0, ...activeSlideElements.map((e) => e.zIndex || 1));
+    const duplicates: SlideElement[] = targets.map((target, idx) => ({
+      ...target,
+      id: `el-${now}-${idx}`,
+      x: Math.min(90, target.x + 3),
+      y: Math.min(90, target.y + 3),
+      zIndex: maxZ + 1 + idx,
+    }));
+
+    handleUpdateSlideElements([...activeSlideElements, ...duplicates]);
+    setSelectedElementIds(duplicates.map((d) => d.id));
+  }, [activeSlideElements, selectedElementIds, handleUpdateSlideElements]);
 
   // Tool Selection Handlers
   const handleSelectTool = useCallback((tool: ActiveTool | string) => {
@@ -689,18 +791,6 @@ export function SlideEditorModal() {
       }
     }
   }, [isSlideEditorOpen, activePresentationId, presentationDecks, scenes]);
-
-  // Push new deck state into history stack
-  const updateDeckState = (updater: (prev: PresentationDeck) => PresentationDeck) => {
-    setDeck((prev) => {
-      const next = updater(prev);
-      const newHistory = history.slice(0, historyPointer + 1);
-      newHistory.push(next);
-      setHistory(newHistory);
-      setHistoryPointer(newHistory.length - 1);
-      return next;
-    });
-  };
 
   // Import File Handler (PPTX, PDF, JSON, TXT, MD, Images)
   const handleImportFile = async (file: File) => {
@@ -1278,60 +1368,6 @@ export function SlideEditorModal() {
     });
   }
 
-  function handleUpdateSlide(updates: Partial<PresentationSlide>) {
-    const updatedSlides = slides.map((s, idx) => (idx === activeSlideIndex ? { ...s, ...updates } : s));
-    updateDeckState((prev) => ({ ...prev, slides: updatedSlides }));
-  }
-
-  function handleSelectElement(id: string | null, additive = false) {
-    if (id === null) {
-      setSelectedElementIds([]);
-      return;
-    }
-    if (additive) {
-      setSelectedElementIds((prev) =>
-        prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-      );
-    } else {
-      setSelectedElementIds([id]);
-    }
-  }
-
-  function handleUpdateSlideElements(elements: SlideElement[]) {
-    handleUpdateSlide({ elements });
-  }
-
-  function handleUpdateElement(elementId: string, updates: Partial<SlideElement>) {
-    const updatedElements = activeSlideElements.map((el) => (el.id === elementId ? { ...el, ...updates } : el));
-    handleUpdateSlideElements(updatedElements);
-  }
-
-  function handleDeleteElement(elementId: string) {
-    const updatedElements = activeSlideElements.filter((el) => !selectedElementIds.includes(el.id) && el.id !== elementId);
-    handleUpdateSlideElements(updatedElements);
-    setSelectedElementIds([]);
-  }
-
-  function handleDuplicateElements(idsToDuplicate?: string[]) {
-    const targetIds = idsToDuplicate || selectedElementIds;
-    if (!targetIds.length) return;
-    const targets = activeSlideElements.filter((el) => targetIds.includes(el.id));
-    if (!targets.length) return;
-
-    const now = Date.now();
-    const maxZ = Math.max(0, ...activeSlideElements.map((e) => e.zIndex || 1));
-    const duplicates: SlideElement[] = targets.map((target, idx) => ({
-      ...target,
-      id: `el-${now}-${idx}`,
-      x: Math.min(90, target.x + 3),
-      y: Math.min(90, target.y + 3),
-      zIndex: maxZ + 1 + idx,
-    }));
-
-    handleUpdateSlideElements([...activeSlideElements, ...duplicates]);
-    setSelectedElementIds(duplicates.map((d) => d.id));
-  }
-
   function handleSaveToDeck() {
     addPresentationDeck(isPptxDeck ? deckWithPptxEdits() : deck);
     closeSlideEditor();
@@ -1371,11 +1407,11 @@ export function SlideEditorModal() {
         position: 'fixed',
         inset: 0,
         zIndex: 99999,
-        background: 'var(--bg-primary, #111010)',
+        background: 'var(--bsp-ground, #111010)',
         display: 'flex',
         flexDirection: 'column',
         fontFamily: 'var(--font-ui)',
-        color: '#ffffff',
+        color: 'var(--text-primary, #ffffff)',
       }}
     >
       {/* Top Header */}
@@ -1451,6 +1487,7 @@ export function SlideEditorModal() {
           selectedElementIds={selectedElementIds}
           onSelectElement={handleSelectElement}
           onUpdateElement={handleUpdateElement}
+          onCommitHistory={commitHistorySnapshot}
           onUpdateSlideText={(title, body) => handleUpdateSlide({ title, body })}
           onDuplicateElements={handleDuplicateElements}
           onAddElements={(newEls) => handleUpdateSlideElements([...activeSlideElements, ...newEls])}

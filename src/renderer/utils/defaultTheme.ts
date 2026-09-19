@@ -120,5 +120,10 @@ export function ensureTheme(theme: Theme | null | undefined): Theme {
       showCategoryName: theme.songOptions?.showCategoryName ?? def.songOptions!.showCategoryName,
       displayBySections: theme.songOptions?.displayBySections ?? def.songOptions!.displayBySections,
     },
+    linkBibleSong: theme.linkBibleSong ?? true,
+    songFullScreen: theme.songFullScreen,
+    songLowerThird: theme.songLowerThird,
+    bibleFullScreen: theme.bibleFullScreen,
+    bibleLowerThird: theme.bibleLowerThird,
   };
 }

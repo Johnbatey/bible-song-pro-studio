@@ -109,6 +109,36 @@ export function StageDesigner() {
   const dirty = !!baseline && !layoutsEqual(baseline, layout);
   const isUnsaved = !sourceId;
 
+  useEffect(() => {
+    const syncTheme = () => {
+      try {
+        let mode = localStorage.getItem('bsp_theme_mode');
+        if (!mode) {
+          const stored = localStorage.getItem('bsp-app-state') || localStorage.getItem('bsp_state') || localStorage.getItem('bsp-settings');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed?.state?.uiThemeMode) mode = parsed.state.uiThemeMode;
+            else if (parsed?.uiThemeMode) mode = parsed.uiThemeMode;
+          }
+        }
+        if (!mode) mode = 'dark';
+        document.documentElement.setAttribute('data-ui-theme', mode);
+        if (mode === 'light') {
+          document.documentElement.setAttribute('data-bsp-surface', 'paper');
+          document.body.classList.add('light-theme');
+        } else {
+          document.documentElement.removeAttribute('data-bsp-surface');
+          document.body.classList.remove('light-theme');
+        }
+      } catch {
+        // fallback
+      }
+    };
+    syncTheme();
+    window.addEventListener('storage', syncTheme);
+    return () => window.removeEventListener('storage', syncTheme);
+  }, []);
+
   /* ---- what the canvas renders under the overlay -------------------------- */
   /* Nothing live means nothing to design against, so the sample steps in on
      its own. The operator can also force it on to check a layout against a

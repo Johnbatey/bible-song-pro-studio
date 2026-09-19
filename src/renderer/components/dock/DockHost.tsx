@@ -243,6 +243,48 @@ export function DockHost() {
       if (panel.title !== title) panel.api.setTitle(title);
     }
 
+    api.onUnhandledDragOver((e) => {
+      const nativeEvent = e.nativeEvent as DragEvent;
+      const types = nativeEvent?.dataTransfer?.types;
+      const isDockDrag = types ? Array.from(types).includes('application/bsp-dock-id') : false;
+      if (isDockDrag) {
+        e.accept();
+      }
+    });
+
+    api.onDidDrop((event) => {
+      const nativeEvent = event.nativeEvent as DragEvent;
+      const dockId = nativeEvent?.dataTransfer?.getData('application/bsp-dock-id') as DockId | undefined;
+
+      if (!dockId || !DOCKS.some((d) => d.id === dockId)) return;
+
+      const existing = api.getPanel(dockId);
+      if (!existing) {
+        const dir =
+          event.position === 'top'
+            ? 'above'
+            : event.position === 'bottom'
+              ? 'below'
+              : event.position === 'left'
+                ? 'left'
+                : event.position === 'right'
+                  ? 'right'
+                  : 'within';
+        api.addPanel({
+          id: dockId,
+          component: dockId,
+          title: getDockTitle(dockId),
+          position: event.group ? { referenceGroup: event.group, direction: dir } : undefined,
+        });
+      } else if (event.group) {
+        existing.api.moveTo({ group: event.group, position: event.position === 'center' ? undefined : event.position });
+      }
+
+      if (window.BSP?.dock?.closePopout) {
+        void window.BSP.dock.closePopout(dockId);
+      }
+    });
+
     syncOpenDocks(api);
   }, [syncOpenDocks]);
 

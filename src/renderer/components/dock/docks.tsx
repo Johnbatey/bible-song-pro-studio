@@ -7,7 +7,6 @@ import { BiblePanel } from '../BiblePanel';
 import { SongsPanel } from '../SongsPanel';
 import { LiveScripturePanel } from '../LiveScripturePanel';
 import { MediaPanel } from '../MediaPanel';
-import { ScenePanel } from '../ScenePanel';
 import { PresentationPanel } from '../PresentationPanel';
 import { ThemePanel } from '../ThemePanel';
 import { StagePanel } from '../StagePanel';
@@ -22,9 +21,8 @@ import { t, dockMessageKey, type MessageKey } from '../../../i18n';
  * tabs from this, DockHost registers it with dockview, and the default layout
  * references these ids.
  *
- * `nav: true` means the dock gets a tab in the title bar. Scenes is reachable
- * from the Studio toggle instead, and Themes from its own toolbar button, so
- * neither needs to spend a tab.
+ * `nav: true` means the dock gets a tab in the title bar. Themes is reachable
+ * from its own toolbar button, so it does not need to spend a tab.
  *
  * `group` is the four questions an operator is ever asking of this window:
  * what am I sending, where does it go, what is the service doing, and what
@@ -79,7 +77,6 @@ export const DOCKS = [
   { id: 'queue', title: 'Queue', nav: false, group: 'service' },
   { id: 'history', title: 'History', nav: false, group: 'service' },
 
-  { id: 'scenes', title: 'Scenes', nav: false, group: 'looks' },
   { id: 'themes', title: 'Themes', nav: false, group: 'looks' },
 ] as const satisfies readonly DockDef[];
 
@@ -151,6 +148,5 @@ export const DOCK_COMPONENTS: Record<string, React.FunctionComponent<IDockviewPa
   messages: panel('Announce', () => <MessagePanel />, true),
   media: panel('Media', () => <MediaPanel />, true),
   stage: panel('Stage Display', () => <StagePanel />, true),
-  scenes: panel('Scenes', () => <ScenePanel />, true),
   themes: panel('Themes', () => <ThemePanel />, true),
 };

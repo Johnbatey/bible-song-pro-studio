@@ -35,6 +35,148 @@
   overflow: hidden;
 }
 
+:root[data-ui-theme="light"] .dz-app,
+[data-ui-theme="light"] .dz-app,
+body.light-theme .dz-app {
+  --dz-bg: var(--bsp-ground, #F4F2EF);
+  --dz-panel: var(--bsp-surface, #FFFFFF);
+  --dz-raised: var(--bsp-raised, #F4F2EF);
+  --dz-line: var(--border-primary, rgba(12, 11, 11, 0.12));
+  --dz-line-strong: rgba(12, 11, 11, 0.22);
+  --dz-text: var(--text-primary, #171514);
+  --dz-dim: var(--text-secondary, #3A3634);
+  --dz-faint: var(--text-dim, #5E5854);
+}
+
+:root[data-ui-theme="light"] .dz-app input[type='text'],
+:root[data-ui-theme="light"] .dz-app input[type='number'],
+:root[data-ui-theme="light"] .dz-app select,
+body.light-theme .dz-app input[type='text'],
+body.light-theme .dz-app input[type='number'],
+body.light-theme .dz-app select {
+  background: var(--chrome-control, #EFECE6);
+  color: var(--text-primary, #171514);
+  border-color: var(--border-primary, rgba(12, 11, 11, 0.14));
+}
+
+:root[data-ui-theme="light"] .dz-segmented,
+body.light-theme .dz-segmented {
+  background: var(--chrome-control, #EFECE6);
+  border-color: var(--border-primary, rgba(12, 11, 11, 0.14));
+}
+
+:root[data-ui-theme="light"] .dz-segmented button[data-active],
+body.light-theme .dz-segmented button[data-active] {
+  background: var(--accent, #FF5500);
+  color: #fff;
+}
+
+:root[data-ui-theme="light"] .dz-layer:hover,
+body.light-theme .dz-layer:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-ui-theme="light"] .dz-viewport,
+body.light-theme .dz-viewport {
+  background-color: var(--bsp-ground, #F4F2EF);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.06) 1px, transparent 1px);
+}
+
+:root[data-ui-theme="light"] .dz-floatbar-card,
+body.light-theme .dz-floatbar-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-ui-theme="light"] .dz-floatbar-label,
+body.light-theme .dz-floatbar-label {
+  color: var(--text-secondary, #3A3634);
+  text-shadow: none;
+}
+
+:root[data-ui-theme="light"] .dz-floatbar-sep,
+body.light-theme .dz-floatbar-sep {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+:root[data-ui-theme="light"] .dz-floatbar-swatch,
+:root[data-ui-theme="light"] .dz-menu-trigger,
+body.light-theme .dz-floatbar-swatch,
+body.light-theme .dz-menu-trigger {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: var(--text-primary, #171514);
+}
+
+:root[data-ui-theme="light"] .dz-floatbar-swatch:hover,
+:root[data-ui-theme="light"] .dz-menu-trigger:hover,
+body.light-theme .dz-floatbar-swatch:hover,
+body.light-theme .dz-menu-trigger:hover {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+:root[data-ui-theme="light"] .dz-menu-panel,
+body.light-theme .dz-menu-panel {
+  background: var(--bsp-surface, #FFFFFF);
+  border: 1px solid var(--border-primary, rgba(0, 0, 0, 0.15));
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.15);
+}
+
+:root[data-ui-theme="light"] .dz-menu-item:hover,
+:root[data-ui-theme="light"] .dz-menu-check:hover,
+body.light-theme .dz-menu-item:hover,
+body.light-theme .dz-menu-check:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-ui-theme="light"] .zoombar-pill,
+:root[data-ui-theme="light"] .dz-zoombar-pill,
+body.light-theme .zoombar-pill,
+body.light-theme .dz-zoombar-pill {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-ui-theme="light"] .zoombar-pill button,
+:root[data-ui-theme="light"] .dz-zoombar-pill button,
+body.light-theme .zoombar-pill button,
+body.light-theme .dz-zoombar-pill button {
+  color: var(--text-primary, #171514);
+}
+
+:root[data-ui-theme="light"] .zoombar-val,
+:root[data-ui-theme="light"] .dz-zoom,
+body.light-theme .zoombar-val,
+body.light-theme .dz-zoom {
+  color: var(--text-primary, #171514);
+}
+
+:root[data-ui-theme="light"] .zoombar-divider,
+:root[data-ui-theme="light"] .dz-zoom-divider,
+body.light-theme .zoombar-divider,
+body.light-theme .dz-zoom-divider {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+:root[data-ui-theme="light"] .zoombar-fit,
+:root[data-ui-theme="light"] .dz-zoombar-fit,
+body.light-theme .zoombar-fit,
+body.light-theme .dz-zoombar-fit {
+  color: var(--text-secondary, #3A3634);
+}
+
+:root[data-ui-theme="light"] .zoombar-fit:hover,
+:root[data-ui-theme="light"] .dz-zoombar-fit:hover,
+body.light-theme .zoombar-fit:hover,
+body.light-theme .dz-zoombar-fit:hover {
+  color: var(--text-primary, #171514);
+  background: rgba(0, 0, 0, 0.06);
+}
+
 .dz-app *, .dz-app *::before, .dz-app *::after { box-sizing: border-box; }
 
 /* ---- shared controls ---------------------------------------------------- */

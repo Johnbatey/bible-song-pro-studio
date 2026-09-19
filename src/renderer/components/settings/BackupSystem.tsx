@@ -460,7 +460,7 @@ export function BackupSystem() {
               </button>
               <button
                 onClick={() => setImportSummary(null)}
-                style={{ height: 34, padding: '0 14px', background: '#202024', border: '1px solid #262628', borderRadius: 6, color: '#a1a1aa', fontWeight: 600, cursor: 'pointer' }}
+                style={{ height: 34, padding: '0 14px', background: 'var(--chrome-control, #202024)', border: '1px solid var(--border-primary, #262628)', borderRadius: 6, color: 'var(--text-secondary, #a1a1aa)', fontWeight: 600, cursor: 'pointer' }}
               >
                 {t('common.cancel')}
               </button>
@@ -483,12 +483,12 @@ export function BackupSystem() {
           </svg>
           {t('settings.backup.resetTitle')}
         </div>
-        <div style={{ fontSize: 12, color: '#e0a0a0', lineHeight: 1.5, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary, #e0a0a0)', lineHeight: 1.5, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <div>
             {t('settings.backup.resetWarning')}
             <br />
-            <span style={{ color: '#ffffff', fontWeight: 600 }}>{t('settings.backup.resetEncourage')}</span>
+            <span style={{ color: 'var(--text-primary, #ffffff)', fontWeight: 600 }}>{t('settings.backup.resetEncourage')}</span>
           </div>
         </div>
 
@@ -544,7 +544,7 @@ export function BackupSystem() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.85)',
+            background: 'rgba(0, 0, 0, 0.75)',
             backdropFilter: 'blur(10px)',
             zIndex: 9999,
             display: 'flex',
@@ -555,25 +555,25 @@ export function BackupSystem() {
         >
           <div
             style={{
-              background: '#141416',
+              background: 'var(--bsp-surface, #141416)',
               border: '2px solid #e74c3c',
               borderRadius: 12,
               padding: 24,
               maxWidth: 460,
               width: '100%',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.9)',
-              color: '#ffffff',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+              color: 'var(--text-primary, #ffffff)',
             }}
           >
             <div style={{ fontSize: 18, fontWeight: 800, color: '#e74c3c', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               {t('settings.backup.confirmResetTitle')}
             </div>
-            <div style={{ fontSize: 13, color: '#a1a1aa', lineHeight: 1.5, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary, #a1a1aa)', lineHeight: 1.5, marginBottom: 16 }}>
               {t('settings.backup.confirmResetBody')}
             </div>
 
-            <div style={{ fontSize: 12, color: '#ffffff', fontWeight: 600, marginBottom: 6 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-primary, #ffffff)', fontWeight: 600, marginBottom: 6 }}>
               {t('settings.backup.typeReset')}
             </div>
 
@@ -583,7 +583,7 @@ export function BackupSystem() {
               value={resetInputText}
               onChange={(e) => setResetInputText(e.target.value)}
               placeholder={t('settings.backup.resetPlaceholder')}
-              style={{ width: '100%', height: 38, marginBottom: 16, textAlign: 'center', fontSize: 14, fontWeight: 700, letterSpacing: 2 }}
+              style={{ width: '100%', height: 38, marginBottom: 16, textAlign: 'center', fontSize: 14, fontWeight: 700, letterSpacing: 2, background: 'var(--chrome-control)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)' }}
             />
 
             <div style={{ display: 'flex', gap: 10 }}>
@@ -593,10 +593,10 @@ export function BackupSystem() {
                 style={{
                   flex: 1,
                   height: 40,
-                  background: resetInputText.trim().toUpperCase() === 'RESET' ? '#e74c3c' : '#331a1a',
+                  background: resetInputText.trim().toUpperCase() === 'RESET' ? '#e74c3c' : 'var(--chrome-control, #331a1a)',
                   border: 'none',
                   borderRadius: 6,
-                  color: resetInputText.trim().toUpperCase() === 'RESET' ? '#ffffff' : '#664444',
+                  color: resetInputText.trim().toUpperCase() === 'RESET' ? '#ffffff' : 'var(--text-dim, #664444)',
                   fontWeight: 800,
                   cursor: resetInputText.trim().toUpperCase() === 'RESET' ? 'pointer' : 'not-allowed',
                 }}
@@ -612,10 +612,10 @@ export function BackupSystem() {
                 style={{
                   height: 40,
                   padding: '0 16px',
-                  background: '#202024',
-                  border: '1px solid #262628',
+                  background: 'var(--chrome-control, #202024)',
+                  border: '1px solid var(--border-primary, #262628)',
                   borderRadius: 6,
-                  color: '#ffffff',
+                  color: 'var(--text-primary, #ffffff)',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}

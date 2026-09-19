@@ -4,16 +4,14 @@
    Speaks `Background`, the structured shape a scene carries, so what this
    writes is exactly what ProgramSurface resolves. The theme editor keeps its
    own flat CSS fields and its own controls; what the two share is the media
-   grid and the gradient maths, not this whole component.
-
-   "Theme" is a real option and the default one: clearing a background is what
-   puts a song back under whatever the operator has themed, so it needs to be a
-   choice rather than something you reach by deleting.
+   grid and the gradient maths.
    ========================================================================= */
-import React, { useRef, useState, useEffect, useCallback } from 'react';
-import type { Background, MediaItem } from '../types';
+import React, { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
+import type { Background, MediaItem, Theme } from '../types';
 import { MediaGrid } from './MediaGrid';
-import { type as typeStyles } from '../styles/type';
+import { type as typeStyles, fontWeight } from '../styles/type';
+import { useDraggableModal } from '../hooks/useDraggableModal';
 import {
   gradientCss,
   parseBackgroundInfo,
@@ -22,104 +20,44 @@ import {
   DEFAULT_GRADIENT_END,
 } from '../utils/background';
 
-type Choice = 'theme' | 'image' | 'video' | 'solid' | 'gradient';
+export type Choice = 'transparent' | 'solid' | 'gradient' | 'image' | 'video';
 
-interface ChoiceItem {
-  id: Choice;
-  label: string;
-  icon: React.ReactNode;
-}
-
-const CHOICES: ChoiceItem[] = [
-  {
-    id: 'theme',
-    label: 'Theme',
-    icon: (
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'image',
-    label: 'Image',
-    icon: (
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <polyline points="21 15 16 10 5 21" />
-      </svg>
-    ),
-  },
-  {
-    id: 'video',
-    label: 'Video',
-    icon: (
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="23 7 16 12 23 17 23 7" />
-        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-      </svg>
-    ),
-  },
-  {
-    id: 'solid',
-    label: 'Colour',
-    icon: (
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'gradient',
-    label: 'Gradient',
-    icon: (
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 2a10 10 0 0 0 0 20z" fill="currentColor" opacity="0.4" />
-      </svg>
-    ),
-  },
-];
-
-const PRO_GRADIENT_PRESETS = [
-  { name: 'Midnight', start: '#0a0d18', end: '#1e293b', dir: '135deg' },
-  { name: 'Royal', start: '#0d0b20', end: '#312e81', dir: '135deg' },
-  { name: 'Crimson', start: '#2a0808', end: '#7c2d12', dir: '135deg' },
-  { name: 'Emerald', start: '#022018', end: '#064e3b', dir: '135deg' },
-  { name: 'Charcoal', start: '#09090b', end: '#27272a', dir: '135deg' },
-  { name: 'Ocean', start: '#041f30', end: '#075985', dir: '135deg' },
+export const PRO_GRADIENT_PRESETS = [
+  { name: 'Midnight', start: '#0a0f1d', end: '#1e293b', dir: '135deg' },
+  { name: 'Royal Indigo', start: '#0f0c29', end: '#302b63', dir: '135deg' },
+  { name: 'Crimson Plum', start: '#2b0914', end: '#831843', dir: '135deg' },
+  { name: 'Emerald Deep', start: '#022c22', end: '#065f46', dir: '135deg' },
+  { name: 'Ocean Azure', start: '#082f49', end: '#0284c7', dir: '135deg' },
+  { name: 'Charcoal Zinc', start: '#18181b', end: '#3f3f46', dir: '135deg' },
 ];
 
 const PRO_SOLID_PRESETS = [
   '#000000',
   '#0c0e14',
   '#0B132B',
-  '#1a0f16',
+  '#18181b',
   '#0a1a12',
-  '#1c1c20',
+  '#1a0f16',
 ];
 
-interface BackgroundPickerProps {
+export interface BackgroundPickerProps {
   value: Background | undefined;
   /** `undefined` means "no background of its own" — fall through to the theme. */
   onChange: (next: Background | undefined) => void;
 }
 
 /**
- * Circular Angle Dial (Photoshop / Illustrator style)
+ * Circular Angle Dial (Studio style)
  * Dragging rotates the angle from 0 to 360 degrees.
  */
-function CircularAngleDial({
+export function CircularAngleDial({
   angleDeg,
   isRadial,
   onChangeAngle,
-  onToggleRadial,
 }: {
   angleDeg: number;
   isRadial: boolean;
   onChangeAngle: (deg: number) => void;
-  onToggleRadial: () => void;
 }) {
   const dialRef = useRef<SVGSVGElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -137,7 +75,7 @@ function CircularAngleDial({
     let deg = Math.round((angleRad * 180) / Math.PI);
     if (deg < 0) deg += 360;
 
-    // Optional subtle snap to cardinal & diagonal angles (within 4 degrees)
+    // Subtle snap to cardinal & diagonal angles (within 4 degrees)
     const snapPoints = [0, 45, 90, 135, 180, 225, 270, 315, 360];
     for (const p of snapPoints) {
       if (Math.abs(deg - p) <= 4) {
@@ -170,17 +108,16 @@ function CircularAngleDial({
     }
   };
 
-  // Needle tip position on 32px dial (center 16, radius 11)
+  // Needle tip position on 32px dial (center 16, radius 10)
   const rad = ((angleDeg - 90) * Math.PI) / 180;
-  const needleLength = 10;
+  const needleLength = 9.5;
   const cx = 16;
   const cy = 16;
   const nx = cx + Math.cos(rad) * needleLength;
   const ny = cy + Math.sin(rad) * needleLength;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      {/* Circular interactive dial */}
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
       <div
         style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}
         title={isRadial ? 'Radial gradient active' : `Angle: ${angleDeg}° (drag to rotate)`}
@@ -200,23 +137,30 @@ function CircularAngleDial({
             userSelect: 'none',
           }}
         >
-          {/* Outer ring */}
+          {/* Outer track circle */}
           <circle
             cx="16"
             cy="16"
-            r="14"
-            fill="var(--bg-surface, #18181b)"
-            stroke="var(--border-primary, rgba(255,255,255,0.15))"
-            strokeWidth="1.5"
+            r="14.5"
+            fill="var(--bsp-raised, #1D1B1C)"
+            stroke="var(--border-primary, rgba(255, 255, 255, 0.14))"
+            strokeWidth="1.2"
+          />
+          {/* Inner disc */}
+          <circle
+            cx="16"
+            cy="16"
+            r="11"
+            fill="var(--bsp-booth, #0C0B0B)"
           />
           {/* Cardinal tick marks */}
-          <line x1="16" y1="3" x2="16" y2="5" stroke="var(--text-dim, rgba(255,255,255,0.3))" strokeWidth="1" />
-          <line x1="29" y1="16" x2="27" y2="16" stroke="var(--text-dim, rgba(255,255,255,0.3))" strokeWidth="1" />
-          <line x1="16" y1="29" x2="16" y2="27" stroke="var(--text-dim, rgba(255,255,255,0.3))" strokeWidth="1" />
-          <line x1="3" y1="16" x2="5" y2="16" stroke="var(--text-dim, rgba(255,255,255,0.3))" strokeWidth="1" />
+          <line x1="16" y1="2.5" x2="16" y2="5" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="1" strokeLinecap="round" />
+          <line x1="29.5" y1="16" x2="27" y2="16" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="1" strokeLinecap="round" />
+          <line x1="16" y1="29.5" x2="16" y2="27" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="1" strokeLinecap="round" />
+          <line x1="2.5" y1="16" x2="5" y2="16" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="1" strokeLinecap="round" />
 
           {/* Center pivot dot */}
-          <circle cx="16" cy="16" r="2" fill="var(--text-secondary, #a1a1aa)" />
+          <circle cx="16" cy="16" r="2" fill="var(--text-dim, #a1a1aa)" />
 
           {/* Radial Needle Line */}
           {!isRadial && (
@@ -233,49 +177,69 @@ function CircularAngleDial({
               <circle
                 cx={nx}
                 cy={ny}
-                r="3"
+                r="2.8"
                 fill="var(--accent, #FF5500)"
                 stroke="#ffffff"
-                strokeWidth="0.8"
+                strokeWidth="1"
               />
             </>
           )}
         </svg>
       </div>
-
-      {/* Degree Badge / Readout */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <button
-          type="button"
-          onClick={onToggleRadial}
-          title={isRadial ? 'Switch to Linear gradient' : 'Switch to Radial gradient'}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '2px 6px',
-            fontSize: 10,
-            fontWeight: 700,
-            fontFamily: 'var(--font-ui)',
-            background: isRadial ? 'rgba(255, 85, 0, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-            border: `1px solid ${isRadial ? 'var(--accent, #FF5500)' : 'var(--border-primary, rgba(255,255,255,0.12))'}`,
-            borderRadius: 4,
-            color: isRadial ? 'var(--accent, #FF5500)' : 'var(--text-primary)',
-            cursor: 'pointer',
-          }}
-        >
-          {isRadial ? 'Radial' : `${angleDeg}°`}
-        </button>
-      </div>
     </div>
   );
 }
 
+export function getBackgroundFromTheme(theme: Theme | null, mode: 'fullscreen' | 'lowerThird'): Background {
+  const surface = mode === 'lowerThird' ? theme?.lowerThird : theme?.fullScreen;
+  if (!surface) return { type: 'transparent', color: 'transparent', gradient: 'transparent' };
+
+  if (surface.backgroundType === 'image' || (surface.backgroundMediaType === 'image' && surface.backgroundMediaUrl)) {
+    return {
+      type: 'image',
+      mediaUrl: surface.backgroundMediaUrl || '',
+      mediaType: 'image',
+      fit: surface.backgroundFit || 'cover',
+      opacity: typeof surface.backgroundOpacity === 'number' ? surface.backgroundOpacity : 1,
+    };
+  }
+  if (surface.backgroundType === 'video' || (surface.backgroundMediaType === 'video' && surface.backgroundMediaUrl)) {
+    return {
+      type: 'video',
+      mediaUrl: surface.backgroundMediaUrl || '',
+      mediaType: 'video',
+      fit: surface.backgroundFit || 'cover',
+      loop: surface.backgroundLoop !== false,
+      opacity: typeof surface.backgroundOpacity === 'number' ? surface.backgroundOpacity : 1,
+    };
+  }
+  const bgGradient = (surface as any).backgroundGradient || (surface.backgroundType === 'gradient' ? surface.background : undefined);
+  if (surface.backgroundType === 'gradient' || bgGradient) {
+    return {
+      type: 'gradient',
+      gradient: bgGradient || 'linear-gradient(135deg, #0a0f1d, #1e293b)',
+      opacity: typeof surface.backgroundOpacity === 'number' ? surface.backgroundOpacity : 1,
+    };
+  }
+  if (surface.backgroundType === 'solid' || surface.backgroundColor || surface.background) {
+    const col = surface.backgroundColor || surface.background || '#000000';
+    return {
+      type: 'solid',
+      color: col,
+      opacity: typeof surface.backgroundOpacity === 'number' ? surface.backgroundOpacity : 1,
+    };
+  }
+
+  return { type: 'transparent', color: 'transparent', gradient: 'transparent' };
+}
+
+/**
+ * Clean, Pro-Studio BackgroundPicker Component
+ */
 export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
-  const choice: Choice = value?.type === 'transparent' ? 'theme' : (value?.type ?? 'theme');
+  const choice: Choice = (value?.type as Choice) || (value?.color === 'transparent' || value?.gradient === 'transparent' ? 'transparent' : 'gradient');
   const info = parseBackgroundInfo(value?.gradient, value?.color);
 
-  // Extract numerical degrees from direction or default
   const isRadial = info.dir === 'radial';
   const numericAngle = parseInt(info.dir.replace('deg', ''), 10) || 135;
 
@@ -283,50 +247,107 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
   const endInputRef = useRef<HTMLInputElement | null>(null);
   const solidInputRef = useRef<HTMLInputElement | null>(null);
 
+  const memoryRef = useRef<{
+    solidColor: string;
+    gradient: string;
+    imageUrl: string;
+    imageFit: 'cover' | 'contain' | 'fill';
+    videoUrl: string;
+    videoFit: 'cover' | 'contain' | 'fill';
+    videoLoop: boolean;
+    opacity: number;
+  }>({
+    solidColor: value?.color && value.color !== 'transparent' ? value.color : '#0a0f1d',
+    gradient: value?.gradient && value.gradient !== 'transparent' ? value.gradient : 'linear-gradient(135deg, #0a0f1d, #1e293b)',
+    imageUrl: value?.type === 'image' && value?.mediaUrl ? value.mediaUrl : '',
+    imageFit: value?.fit || 'cover',
+    videoUrl: value?.type === 'video' && value?.mediaUrl ? value.mediaUrl : '',
+    videoFit: value?.fit || 'cover',
+    videoLoop: value?.loop !== false,
+    opacity: typeof value?.opacity === 'number' ? value.opacity : 1,
+  });
+
+  useEffect(() => {
+    if (!value) return;
+    if (value.type === 'solid' && value.color && value.color !== 'transparent') {
+      memoryRef.current.solidColor = value.color;
+    } else if (value.type === 'gradient' && value.gradient && value.gradient !== 'transparent') {
+      memoryRef.current.gradient = value.gradient;
+      if (value.color && value.color !== 'transparent') memoryRef.current.solidColor = value.color;
+    } else if (value.type === 'image' && value.mediaUrl) {
+      memoryRef.current.imageUrl = value.mediaUrl;
+      if (value.fit) memoryRef.current.imageFit = value.fit;
+    } else if (value.type === 'video' && value.mediaUrl) {
+      memoryRef.current.videoUrl = value.mediaUrl;
+      if (value.fit) memoryRef.current.videoFit = value.fit;
+      if (typeof value.loop === 'boolean') memoryRef.current.videoLoop = value.loop;
+    }
+    if (typeof value.opacity === 'number') {
+      memoryRef.current.opacity = value.opacity;
+    }
+  }, [value]);
+
   const setChoice = (next: Choice) => {
     if (next === choice) return;
     switch (next) {
-      case 'theme':
-        onChange(undefined);
+      case 'transparent':
+        onChange({
+          type: 'transparent',
+          color: 'transparent',
+          gradient: 'transparent',
+          opacity: memoryRef.current.opacity,
+        });
         break;
       case 'solid':
         onChange({
           type: 'solid',
-          color: value?.color || info.color || DEFAULT_GROUND,
-          gradient: value?.gradient || gradientCss(info.start, info.end, info.dir),
+          color: memoryRef.current.solidColor,
+          opacity: memoryRef.current.opacity,
         });
         break;
       case 'gradient':
         onChange({
           type: 'gradient',
-          gradient: value?.gradient || gradientCss(info.start || DEFAULT_GRADIENT_START, info.end || DEFAULT_GRADIENT_END, info.dir || '135deg'),
-          color: value?.color || info.color || DEFAULT_GROUND,
+          gradient: memoryRef.current.gradient,
+          color: memoryRef.current.solidColor,
+          opacity: memoryRef.current.opacity,
         });
         break;
       case 'image':
+        onChange({
+          type: 'image',
+          mediaUrl: memoryRef.current.imageUrl,
+          mediaType: 'image',
+          fit: memoryRef.current.imageFit,
+          opacity: memoryRef.current.opacity,
+        });
+        break;
       case 'video':
         onChange({
-          type: next,
-          mediaUrl: value?.mediaUrl || '',
-          mediaType: next,
-          fit: value?.fit || 'cover',
-          loop: value?.loop !== false,
-          opacity: typeof value?.opacity === 'number' ? value.opacity : 1,
-          gradient: value?.gradient,
-          color: value?.color,
+          type: 'video',
+          mediaUrl: memoryRef.current.videoUrl,
+          mediaType: 'video',
+          fit: memoryRef.current.videoFit,
+          loop: memoryRef.current.videoLoop,
+          opacity: memoryRef.current.opacity,
         });
         break;
     }
   };
 
   const pickMedia = (item: MediaItem) => {
+    if (item.type === 'image') {
+      memoryRef.current.imageUrl = item.url;
+    } else if (item.type === 'video') {
+      memoryRef.current.videoUrl = item.url;
+    }
     onChange({
       type: item.type,
       mediaUrl: item.url,
       mediaType: item.type,
-      fit: value?.fit || 'cover',
-      loop: value?.loop !== false,
-      opacity: typeof value?.opacity === 'number' ? value.opacity : 1,
+      fit: (item.type === 'image' ? memoryRef.current.imageFit : memoryRef.current.videoFit) || 'cover',
+      loop: item.type === 'video' ? memoryRef.current.videoLoop : undefined,
+      opacity: memoryRef.current.opacity,
     });
   };
 
@@ -334,7 +355,9 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
     const start = parts.start ?? info.start;
     const end = parts.end ?? info.end;
     const dir = parts.dir ?? info.dir;
-    onChange({ type: 'gradient', gradient: gradientCss(start, end, dir) });
+    const grad = gradientCss(start, end, dir);
+    memoryRef.current.gradient = grad;
+    onChange({ type: 'gradient', gradient: grad, opacity: memoryRef.current.opacity });
   };
 
   const handleSwapGradient = () => {
@@ -345,301 +368,674 @@ export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
     setGradient({ dir: `${deg}deg` });
   };
 
-  const handleToggleRadial = () => {
-    if (isRadial) {
-      setGradient({ dir: '135deg' });
-    } else {
-      setGradient({ dir: 'radial' });
-    }
+  const currentOpacity = typeof value?.opacity === 'number' ? value.opacity : 1;
+
+  const fieldBoxStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    width: '100%',
+  };
+
+  const fieldLabelStyle: React.CSSProperties = {
+    fontSize: 11,
+    fontWeight: fontWeight.bold,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    color: 'var(--text-secondary, #D9D4D2)',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    width: '100%',
+    height: 32,
+    background: 'var(--bsp-raised, #1D1B1C)',
+    border: '1px solid var(--border-primary, #262628)',
+    borderRadius: 6,
+    color: 'var(--text-primary, #ffffff)',
+    fontSize: 12,
+    fontWeight: 500,
+    padding: '0 10px',
+    outline: 'none',
+    cursor: 'pointer',
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-      {/* Sleek Segmented Control Tab Bar with SVG Icons */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          background: 'var(--bg-surface, #141416)',
-          border: '1px solid var(--border-primary, rgba(255,255,255,0.08))',
-          borderRadius: 6,
-          padding: 2,
-          width: '100%',
-          flexShrink: 0,
-        }}
-      >
-        {CHOICES.map((c) => {
-          const isActive = choice === c.id;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setChoice(c.id)}
-              style={{
-                flex: 1,
-                minWidth: 28,
-                height: 24,
-                padding: '0 4px',
-                border: 'none',
-                borderRadius: 4,
-                cursor: 'pointer',
-                background: isActive ? 'var(--accent, #FF5500)' : 'transparent',
-                color: isActive ? '#ffffff' : 'var(--text-secondary)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-                boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.35)' : 'none',
-              }}
-              title={c.label}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0, opacity: isActive ? 1 : 0.75 }}>
-                {c.icon}
-              </span>
-            </button>
-          );
-        })}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
+      {/* Fill Type Dropdown (Studio Standard) */}
+      <div style={fieldBoxStyle}>
+        <span style={fieldLabelStyle}>Fill Type</span>
+        <select
+          style={selectStyle}
+          value={choice}
+          onChange={(e) => setChoice(e.target.value as Choice)}
+        >
+          <option value="solid" style={{ background: '#161414', color: '#fff' }}>Solid Color</option>
+          <option value="gradient" style={{ background: '#161414', color: '#fff' }}>Gradient</option>
+          <option value="image" style={{ background: '#161414', color: '#fff' }}>Image</option>
+          <option value="video" style={{ background: '#161414', color: '#fff' }}>Video</option>
+          <option value="transparent" style={{ background: '#161414', color: '#fff' }}>Alpha</option>
+        </select>
       </div>
 
-      {/* THEME MODE: Minimal notice */}
-      {choice === 'theme' && (
-        <div style={{ ...typeStyles.caption, color: 'var(--text-dim)', fontSize: 10.5, padding: '2px 4px' }}>
-          Follows the active theme, the same as Scripture does.
+      {/* Opacity Slider */}
+      <div style={fieldBoxStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <span style={fieldLabelStyle}>Opacity</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary, #ffffff)', fontFamily: 'ui-monospace, monospace' }}>
+            {Math.round(currentOpacity * 100)}%
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={currentOpacity}
+          onChange={(e) => {
+            const op = parseFloat(e.target.value);
+            memoryRef.current.opacity = op;
+            onChange({ ...value, opacity: op } as Background);
+          }}
+          style={{
+            width: '100%',
+            height: 4,
+            borderRadius: 2,
+            outline: 'none',
+            cursor: 'pointer',
+            background: `linear-gradient(to right, var(--accent, #FF5500) 0%, var(--accent, #FF5500) ${currentOpacity * 100}%, rgba(255, 255, 255, 0.12) ${currentOpacity * 100}%, rgba(255, 255, 255, 0.12) 100%)`,
+          }}
+        />
+      </div>
+
+      {/* ALPHA (TRANSPARENT) MODE */}
+      {choice === 'transparent' && (
+        <div
+          style={{
+            padding: '12px 14px',
+            borderRadius: 6,
+            border: '1px dashed var(--border-primary, rgba(255, 255, 255, 0.16))',
+            background: 'rgba(255, 255, 255, 0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #ffffff)' }}>
+            Alpha / Transparent Pass-Through
+          </div>
+          <div style={{ ...typeStyles.caption, color: 'var(--text-dim, #a1a1aa)', fontSize: 11, lineHeight: 1.4 }}>
+            Background is clear so underlying videos, lower thirds, or camera feeds pass through.
+          </div>
         </div>
       )}
 
-      {/* IMAGE / VIDEO MODE: Compact Media Grid */}
+      {/* IMAGE / VIDEO MODE */}
       {(choice === 'image' || choice === 'video') && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <MediaGrid kind={choice} selectedUrl={value?.mediaUrl || ''} onSelect={pickMedia} />
-          {choice === 'video' && value?.mediaUrl && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, ...typeStyles.caption, color: 'var(--text-secondary)', fontSize: 10.5, cursor: 'pointer', marginTop: 2 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={fieldBoxStyle}>
+            <span style={fieldLabelStyle}>Media Asset</span>
+            <MediaGrid kind={choice} selectedUrl={value?.mediaUrl || ''} onSelect={pickMedia} />
+          </div>
+
+          <div style={fieldBoxStyle}>
+            <span style={fieldLabelStyle}>Fit Mode</span>
+            <div style={{ display: 'flex', background: 'var(--bsp-raised, #1D1B1C)', border: '1px solid var(--border-primary, #262628)', borderRadius: 6, padding: 2, gap: 2 }}>
+              {(['cover', 'contain', 'fill'] as const).map((fitMode) => {
+                const isSelected = (value?.fit || 'cover') === fitMode;
+                return (
+                  <button
+                    key={fitMode}
+                    type="button"
+                    onClick={() => {
+                      if (choice === 'image') memoryRef.current.imageFit = fitMode;
+                      if (choice === 'video') memoryRef.current.videoFit = fitMode;
+                      onChange({ ...value, type: choice, fit: fitMode } as Background);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '5px 8px',
+                      fontSize: 11,
+                      fontWeight: isSelected ? 600 : 500,
+                      color: isSelected ? '#ffffff' : 'var(--text-dim, #a1a1aa)',
+                      background: isSelected ? 'var(--accent, #FF5500)' : 'transparent',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {fitMode === 'fill' ? 'Stretch' : fitMode.charAt(0).toUpperCase() + fitMode.slice(1)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {choice === 'video' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', marginTop: 2 }}>
               <input
                 type="checkbox"
                 checked={value?.loop !== false}
-                onChange={(e) => onChange({ ...value, loop: e.target.checked })}
+                onChange={(e) => {
+                  memoryRef.current.videoLoop = e.target.checked;
+                  onChange({ ...value, loop: e.target.checked } as Background);
+                }}
                 style={{ accentColor: 'var(--accent, #FF5500)', cursor: 'pointer' }}
               />
-              Loop video continuously
+              <span style={{ fontSize: 11.5, color: 'var(--text-primary, #ffffff)' }}>Loop Video Background</span>
             </label>
           )}
         </div>
       )}
 
-      {/* SOLID COLOUR MODE: Compact Swatch + Hex + Pro Palette */}
+      {/* SOLID COLOR MODE */}
       {choice === 'solid' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* Native color trigger */}
-            <div
-              onClick={() => solidInputRef.current?.click()}
-              style={{
-                width: 28,
-                height: 24,
-                borderRadius: 4,
-                border: '1px solid rgba(255,255,255,0.2)',
-                background: value?.color || DEFAULT_GROUND,
-                cursor: 'pointer',
-                flexShrink: 0,
-                boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.3)',
-              }}
-              title="Click to pick colour"
-            />
-            <input
-              ref={solidInputRef}
-              type="color"
-              value={(value?.color || DEFAULT_GROUND).startsWith('#') ? (value?.color || DEFAULT_GROUND) : DEFAULT_GROUND}
-              onChange={(e) => onChange({ type: 'solid', color: e.target.value })}
-              style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
-            />
-            <input
-              type="text"
-              value={value?.color || DEFAULT_GROUND}
-              onChange={(e) => onChange({ type: 'solid', color: e.target.value })}
-              style={{
-                flex: 1,
-                height: 24,
-                padding: '0 6px',
-                fontSize: 11,
-                fontFamily: 'monospace',
-                background: 'var(--bg-surface, #18181b)',
-                border: '1px solid var(--border-primary, rgba(255,255,255,0.12))',
-                borderRadius: 4,
-                color: 'var(--text-primary)',
-                outline: 'none',
-              }}
-            />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={fieldBoxStyle}>
+            <span style={fieldLabelStyle}>Color</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div
+                onClick={() => solidInputRef.current?.click()}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 6,
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  background: value?.color || DEFAULT_GROUND,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3)',
+                  transition: 'transform 0.1s ease',
+                }}
+                title="Click to choose color"
+              />
+              <input
+                ref={solidInputRef}
+                type="color"
+                value={(value?.color || DEFAULT_GROUND).startsWith('#') ? (value?.color || DEFAULT_GROUND) : DEFAULT_GROUND}
+                onChange={(e) => onChange({ type: 'solid', color: e.target.value, opacity: currentOpacity })}
+                style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
+              />
+              <input
+                type="text"
+                value={value?.color || DEFAULT_GROUND}
+                onChange={(e) => onChange({ type: 'solid', color: e.target.value, opacity: currentOpacity })}
+                style={{
+                  flex: 1,
+                  height: 32,
+                  fontFamily: 'ui-monospace, monospace',
+                  fontSize: 11.5,
+                  background: 'var(--bsp-raised, #1D1B1C)',
+                  border: '1px solid var(--border-primary, #262628)',
+                  borderRadius: 6,
+                  color: 'var(--text-primary, #ffffff)',
+                  padding: '0 8px',
+                  outline: 'none',
+                }}
+              />
+            </div>
           </div>
 
-          {/* Quick Curated Dark Theme Swatches */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 9.5, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 }}>
-              Presets:
-            </span>
-            <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-              {PRO_SOLID_PRESETS.map((hex) => (
-                <button
-                  key={hex}
-                  type="button"
-                  onClick={() => onChange({ type: 'solid', color: hex })}
-                  style={{
-                    flex: 1,
-                    height: 16,
-                    borderRadius: 3,
-                    border: (value?.color || DEFAULT_GROUND).toLowerCase() === hex.toLowerCase() ? '1.5px solid var(--accent, #FF5500)' : '1px solid rgba(255,255,255,0.15)',
-                    background: hex,
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
-                  title={hex}
-                />
-              ))}
+          <div style={fieldBoxStyle}>
+            <span style={fieldLabelStyle}>Presets</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+              {PRO_SOLID_PRESETS.map((hex) => {
+                const isSelected = (value?.color || DEFAULT_GROUND).toLowerCase() === hex.toLowerCase();
+                return (
+                  <button
+                    key={hex}
+                    type="button"
+                    onClick={() => onChange({ type: 'solid', color: hex, opacity: currentOpacity })}
+                    style={{
+                      height: 22,
+                      borderRadius: 4,
+                      border: isSelected ? '2px solid var(--accent, #FF5500)' : '1px solid rgba(255,255,255,0.18)',
+                      background: hex,
+                      cursor: 'pointer',
+                      padding: 0,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                      transition: 'transform 0.12s ease',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                    title={hex}
+                  />
+                );
+              })}
             </div>
           </div>
         </div>
       )}
 
-      {/* GRADIENT MODE: Pro Photoshop / Illustrator Style Interactive Gradient Editor */}
+      {/* GRADIENT MODE: Pro Theme Studio Style Interactive Gradient Editor */}
       {choice === 'gradient' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 2 }}>
-          {/* Row 1: Interactive Live Gradient Bar with Color Stop Handles & Swap Button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* Start Color Stop Handle / Swatch */}
-            <div
-              onClick={() => startInputRef.current?.click()}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 4,
-                border: '1px solid rgba(255,255,255,0.25)',
-                background: info.start.startsWith('#') ? info.start : DEFAULT_GRADIENT_START,
-                cursor: 'pointer',
-                flexShrink: 0,
-                boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              title={`Start Colour: ${info.start} (click to change)`}
-            >
-              <input
-                ref={startInputRef}
-                type="color"
-                value={info.start.startsWith('#') ? info.start : DEFAULT_GRADIENT_START}
-                onChange={(e) => setGradient({ start: e.target.value })}
-                style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
-              />
-            </div>
-
-            {/* Live Gradient Preview Strip */}
-            <div
-              style={{
-                flex: 1,
-                height: 22,
-                borderRadius: 4,
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                background: isRadial
-                  ? `radial-gradient(circle, ${info.start}, ${info.end})`
-                  : `linear-gradient(to right, ${info.start}, ${info.end})`,
-                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)',
-                position: 'relative',
-              }}
-              title="Live gradient spectrum (Start -> End)"
-            />
-
-            {/* Swap Button */}
-            <button
-              type="button"
-              onClick={handleSwapGradient}
-              title="Swap Start & End Colours"
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 4,
-                border: '1px solid var(--border-primary, rgba(255,255,255,0.12))',
-                background: 'rgba(255,255,255,0.04)',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                flexShrink: 0,
-                transition: 'all 0.15s ease',
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Gradient Type Dropdown */}
+          <div style={fieldBoxStyle}>
+            <span style={fieldLabelStyle}>Gradient Type</span>
+            <select
+              style={selectStyle}
+              value={isRadial ? 'radial' : 'linear'}
+              onChange={(e) => {
+                if (e.target.value === 'radial') {
+                  setGradient({ dir: 'radial' });
+                } else {
+                  setGradient({ dir: `${numericAngle || 135}deg` });
+                }
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="17 1 21 5 17 9" />
-                <path d="M3 5h18" />
-                <polyline points="7 23 3 19 7 15" />
-                <path d="M21 19H3" />
-              </svg>
-            </button>
+              <option value="linear" style={{ background: '#161414', color: '#fff' }}>Linear Gradient</option>
+              <option value="radial" style={{ background: '#161414', color: '#fff' }}>Radial Gradient (Circular)</option>
+            </select>
+          </div>
 
-            {/* End Color Stop Handle / Swatch */}
-            <div
-              onClick={() => endInputRef.current?.click()}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 4,
-                border: '1px solid rgba(255,255,255,0.25)',
-                background: info.end.startsWith('#') ? info.end : DEFAULT_GRADIENT_END,
-                cursor: 'pointer',
-                flexShrink: 0,
-                boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              title={`End Colour: ${info.end} (click to change)`}
-            >
-              <input
-                ref={endInputRef}
-                type="color"
-                value={info.end.startsWith('#') ? info.end : DEFAULT_GRADIENT_END}
-                onChange={(e) => setGradient({ end: e.target.value })}
-                style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
-              />
+          {/* Color Stops & Spectrum Bar */}
+          <div style={fieldBoxStyle}>
+            <span style={fieldLabelStyle}>Color Stops & Spectrum</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Start Color Swatch */}
+              <div
+                onClick={() => startInputRef.current?.click()}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  background: info.start.startsWith('#') ? info.start : DEFAULT_GRADIENT_START,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.4), 0 2px 5px rgba(0,0,0,0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.12s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.06)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                title={`Start Color: ${info.start} (click to change)`}
+              >
+                <input
+                  ref={startInputRef}
+                  type="color"
+                  value={info.start.startsWith('#') ? info.start : DEFAULT_GRADIENT_START}
+                  onChange={(e) => setGradient({ start: e.target.value })}
+                  style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
+                />
+              </div>
+
+              {/* Live Gradient Preview Strip */}
+              <div
+                style={{
+                  flex: 1,
+                  height: 30,
+                  borderRadius: 6,
+                  border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.16))',
+                  background: isRadial
+                    ? `radial-gradient(circle, ${info.start}, ${info.end})`
+                    : `linear-gradient(to right, ${info.start}, ${info.end})`,
+                  boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.5)',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Live gradient spectrum"
+              >
+                {/* Centered Swap Button */}
+                <button
+                  type="button"
+                  onClick={handleSwapGradient}
+                  title="Swap Start & End Colors"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 4,
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    background: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(8px)',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    transition: 'all 0.15s ease',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--accent, #FF5500)';
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.65)';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="17 1 21 5 17 9" />
+                    <path d="M3 5h18" />
+                    <polyline points="7 23 3 19 7 15" />
+                    <path d="M21 19H3" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* End Color Swatch */}
+              <div
+                onClick={() => endInputRef.current?.click()}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 6,
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  background: info.end.startsWith('#') ? info.end : DEFAULT_GRADIENT_END,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.4), 0 2px 5px rgba(0,0,0,0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.12s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.06)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                title={`End Color: ${info.end} (click to change)`}
+              >
+                <input
+                  ref={endInputRef}
+                  type="color"
+                  value={info.end.startsWith('#') ? info.end : DEFAULT_GRADIENT_END}
+                  onChange={(e) => setGradient({ end: e.target.value })}
+                  style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Row 2: Circular Angle Dial (Photoshop Style) + Pro Gradient Presets */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            {/* Circular Angle Dial */}
-            <CircularAngleDial
-              angleDeg={numericAngle}
-              isRadial={isRadial}
-              onChangeAngle={handleAngleChange}
-              onToggleRadial={handleToggleRadial}
-            />
+          {/* Gradient Angle Controls (Linear Mode) */}
+          {!isRadial && (
+            <div style={fieldBoxStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={fieldLabelStyle}>Gradient Angle</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent, #FF5500)', fontFamily: 'ui-monospace, monospace' }}>
+                  {numericAngle}°
+                </span>
+              </div>
 
-            {/* Pro Gradient Preset Swatches */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end' }}>
-              {PRO_GRADIENT_PRESETS.map((preset) => (
-                <button
-                  key={preset.name}
-                  type="button"
-                  onClick={() => setGradient({ start: preset.start, end: preset.end, dir: preset.dir })}
-                  style={{
-                    width: 20,
-                    height: 18,
-                    borderRadius: 3,
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    background: `linear-gradient(135deg, ${preset.start}, ${preset.end})`,
-                    cursor: 'pointer',
-                    padding: 0,
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                    flexShrink: 0,
-                  }}
-                  title={preset.name}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <CircularAngleDial
+                  angleDeg={numericAngle}
+                  isRadial={isRadial}
+                  onChangeAngle={handleAngleChange}
                 />
-              ))}
+                <input
+                  type="range"
+                  min={0}
+                  max={360}
+                  step={1}
+                  value={numericAngle}
+                  onChange={(e) => handleAngleChange(parseInt(e.target.value, 10))}
+                  style={{
+                    flex: 1,
+                    height: 4,
+                    borderRadius: 2,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    background: `linear-gradient(to right, var(--accent, #FF5500) 0%, var(--accent, #FF5500) ${(numericAngle / 360) * 100}%, rgba(255, 255, 255, 0.12) ${(numericAngle / 360) * 100}%, rgba(255, 255, 255, 0.12) 100%)`,
+                  }}
+                />
+              </div>
+
+              <select
+                style={selectStyle}
+                value={['0', '45', '90', '135', '180', '225', '270', '315'].includes(String(numericAngle)) ? `${numericAngle}deg` : 'custom'}
+                onChange={(e) => {
+                  if (e.target.value !== 'custom') {
+                    setGradient({ dir: e.target.value });
+                  }
+                }}
+              >
+                <option value="0deg" style={{ background: '#161414', color: '#fff' }}>0° (To Top)</option>
+                <option value="45deg" style={{ background: '#161414', color: '#fff' }}>45° (Top Right)</option>
+                <option value="90deg" style={{ background: '#161414', color: '#fff' }}>90° (To Right)</option>
+                <option value="135deg" style={{ background: '#161414', color: '#fff' }}>135° (Bottom Right - Default)</option>
+                <option value="180deg" style={{ background: '#161414', color: '#fff' }}>180° (To Bottom)</option>
+                <option value="225deg" style={{ background: '#161414', color: '#fff' }}>225° (Bottom Left)</option>
+                <option value="270deg" style={{ background: '#161414', color: '#fff' }}>270° (To Left)</option>
+                <option value="315deg" style={{ background: '#161414', color: '#fff' }}>315° (Top Left)</option>
+                {!['0', '45', '90', '135', '180', '225', '270', '315'].includes(String(numericAngle)) && (
+                  <option value="custom" style={{ background: '#161414', color: '#fff' }}>Custom Angle ({numericAngle}°)</option>
+                )}
+              </select>
+            </div>
+          )}
+
+          {/* Curated Studio Gradient Presets */}
+          <div style={fieldBoxStyle}>
+            <span style={fieldLabelStyle}>Presets</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+              {PRO_GRADIENT_PRESETS.map((preset) => {
+                const targetGrad = gradientCss(preset.start, preset.end, isRadial ? 'radial' : preset.dir);
+                const isMatch = value?.gradient === targetGrad;
+
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    title={`${preset.name} (${preset.start} → ${preset.end})`}
+                    onClick={() => {
+                      setGradient({
+                        start: preset.start,
+                        end: preset.end,
+                        dir: isRadial ? 'radial' : preset.dir,
+                      });
+                    }}
+                    style={{
+                      height: 22,
+                      borderRadius: 4,
+                      border: isMatch ? '2px solid var(--accent, #FF5500)' : '1px solid rgba(255, 255, 255, 0.18)',
+                      background: isRadial
+                        ? `radial-gradient(circle, ${preset.start}, ${preset.end})`
+                        : `linear-gradient(135deg, ${preset.start}, ${preset.end})`,
+                      cursor: 'pointer',
+                      padding: 0,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                      transition: 'transform 0.12s ease',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                  />
+                );
+              })}
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+export interface BackgroundPopoverProps {
+  isOpen: boolean;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
+  value: Background | undefined;
+  onChange: (bg: Background | undefined) => void;
+  workspaceLabel?: 'Bible' | 'Songs' | string;
+  outputMode?: 'FS' | 'LT' | string;
+  isLinked?: boolean;
+}
+
+const POPOVER_WIDTH = 320;
+
+/**
+ * Floating Pro-Studio Background Popover Window (Harmonized with Popover Design System)
+ */
+export function BackgroundPopover({
+  isOpen,
+  onClose,
+  anchorRef,
+  value,
+  onChange,
+  workspaceLabel = 'Songs',
+  outputMode = 'FS',
+  isLinked = true,
+}: BackgroundPopoverProps) {
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const { modalStyle, headerProps } = useDraggableModal();
+
+  const updatePosition = useCallback(() => {
+    if (!anchorRef.current) return;
+    const anchor = anchorRef.current.getBoundingClientRect();
+    const estimatedHeight = 350;
+
+    let top: number;
+    if (anchor.top > window.innerHeight / 2) {
+      top = Math.max(12, anchor.top - estimatedHeight - 10);
+    } else {
+      top = Math.min(window.innerHeight - estimatedHeight - 16, anchor.bottom + 8);
+    }
+
+    const left = Math.max(12, Math.min(anchor.left, window.innerWidth - POPOVER_WIDTH - 16));
+    setPos({ top, left });
+  }, [anchorRef]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen, updatePosition]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (popoverRef.current?.contains(target)) return;
+      if (anchorRef.current?.contains(target)) return;
+      onClose();
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose, anchorRef]);
+
+  if (!isOpen || !pos) return null;
+
+  return createPortal(
+    <div
+      ref={popoverRef}
+      style={{
+        position: 'fixed',
+        top: pos.top,
+        left: pos.left,
+        width: POPOVER_WIDTH,
+        maxHeight: `calc(100vh - ${Math.max(20, pos.top)}px - 20px)`,
+        overflowY: 'auto',
+        background: 'var(--bsp-surface, #1C1A19)',
+        border: '1px solid var(--bsp-edge, #2D2A28)',
+        borderRadius: 8,
+        boxShadow: '0 16px 44px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06)',
+        zIndex: 9999,
+        padding: '12px 14px 14px',
+        color: 'var(--text-primary, #ffffff)',
+        backdropFilter: 'blur(20px)',
+        userSelect: 'none',
+        ...modalStyle,
+      }}
+    >
+      {/* Title & Drag Handle Header */}
+      <div
+        {...headerProps}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingBottom: 8,
+          marginBottom: 12,
+          borderBottom: '1px solid var(--border-primary, rgba(255, 255, 255, 0.08))',
+          cursor: 'grab',
+          userSelect: 'none',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary, #ffffff)', letterSpacing: '0.01em' }}>
+            {workspaceLabel} Background
+          </span>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              padding: '1px 6px',
+              borderRadius: 4,
+              background: 'rgba(255, 85, 0, 0.18)',
+              color: 'var(--accent, #FF5500)',
+            }}
+          >
+            {outputMode}
+          </span>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 500,
+              padding: '1px 6px',
+              borderRadius: 4,
+              background: 'rgba(255, 255, 255, 0.06)',
+              color: 'var(--text-dim, #a1a1aa)',
+            }}
+          >
+            {isLinked ? 'Linked' : 'Independent'}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          data-no-drag
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 22,
+            height: 22,
+            borderRadius: 4,
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--text-dim, #a1a1aa)',
+            cursor: 'pointer',
+            fontSize: 12,
+            lineHeight: 1,
+            padding: 0,
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.color = '#ffffff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = 'var(--text-dim, #a1a1aa)';
+          }}
+          title="Close Background Settings"
+        >
+          ✕
+        </button>
+      </div>
+
+      <BackgroundPicker value={value} onChange={onChange} />
+    </div>,
+    document.body
   );
 }

@@ -49,12 +49,15 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
   const operatingMode = useAppStore((s) => s.display.mode);
   const showSongCredits = useAppStore((s) => s.showSongCredits);
   const setShowSongCredits = useAppStore((s) => s.setShowSongCredits);
+  const songOutputMode = useAppStore((s) => s.display.songOutputMode);
+  const setSongOutputMode = useAppStore((s) => s.setSongOutputMode);
+  const isThemeFsLtLinked = useAppStore((s) => s.isThemeFsLtLinked);
+  const toggleThemeFsLtLinked = useAppStore((s) => s.toggleThemeFsLtLinked);
   const addToQueue = useAppStore((s) => s.addToQueue);
   const linesPerSlide = useAppStore((s) => s.songLinesPerSlide);
   const setLinesPerSlide = useAppStore((s) => s.setSongLinesPerSlide);
   const doubleClickToGoLive = useAppStore((s) => s.doubleClickToGoLive);
-  const songOutputMode = useAppStore((s) => s.display.songOutputMode || 'fullscreen');
-  const setSongOutputMode = useAppStore((s) => s.setSongOutputMode);
+  const fxSettings = useAppStore((s) => s.fxSettings);
 
   // Workspace Mode: 'buttons' (slide grid) or 'text' (lyrics editor)
   const [workspaceMode, setWorkspaceMode] = useState<'buttons' | 'text'>('buttons');
@@ -170,7 +173,19 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
       return;
     }
     const sceneTarget = lyricTab === 'translation' ? 'translation' : (song.isBilingual ? 'bilingual' : 'primary');
-    projectScene(buildSongScene(song, slide, { includeCredits, target: sceneTarget }), { direct: opts.direct });
+    projectScene(
+      buildSongScene(song, slide, {
+        includeCredits,
+        target: sceneTarget,
+        transition: {
+          type: fxSettings.transitionType,
+          duration: fxSettings.duration,
+          animateBackground: fxSettings.animateBackground,
+        },
+        animateBackground: fxSettings.animateBackground,
+      }),
+      { direct: opts.direct }
+    );
   }
 
   function handleLinesPerSlideChange(val: number | 'auto') {
@@ -194,7 +209,19 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
           || newSlides.find((s) => curText.includes(s.text.trim()) || s.text.trim().includes(curText))
           || newSlides[0];
         if (matched) {
-          projectScene(buildSongScene(song, matched, { includeCredits: withCredits, target: sceneTarget }), { direct: true });
+          projectScene(
+            buildSongScene(song, matched, {
+              includeCredits: withCredits,
+              target: sceneTarget,
+              transition: {
+                type: fxSettings.transitionType,
+                duration: fxSettings.duration,
+                animateBackground: fxSettings.animateBackground,
+              },
+              animateBackground: fxSettings.animateBackground,
+            }),
+            { direct: true }
+          );
         }
       }
     } else {
@@ -205,7 +232,19 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
           || newSlides.find((s) => refText.includes(s.text.trim()) || s.text.trim().includes(refText))
           || newSlides[0];
         if (matched) {
-          projectScene(buildSongScene(song, matched, { includeCredits: withCredits, target: sceneTarget }), { direct: false });
+          projectScene(
+            buildSongScene(song, matched, {
+              includeCredits: withCredits,
+              target: sceneTarget,
+              transition: {
+                type: fxSettings.transitionType,
+                duration: fxSettings.duration,
+                animateBackground: fxSettings.animateBackground,
+              },
+              animateBackground: fxSettings.animateBackground,
+            }),
+            { direct: false }
+          );
         }
       }
     }
@@ -226,7 +265,19 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
       if (isCurrentActive && currentScene) {
         const activeSlide = slides.find((s) => songSceneId(song, s) === currentScene.id) || slides[0];
         if (activeSlide) {
-          projectScene(buildSongScene(song, activeSlide, { includeCredits: withCredits, target: sceneTarget }), { direct: true });
+          projectScene(
+            buildSongScene(song, activeSlide, {
+              includeCredits: withCredits,
+              target: sceneTarget,
+              transition: {
+                type: fxSettings.transitionType,
+                duration: fxSettings.duration,
+                animateBackground: fxSettings.animateBackground,
+              },
+              animateBackground: fxSettings.animateBackground,
+            }),
+            { direct: true }
+          );
         }
       }
     } else {
@@ -234,7 +285,19 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
         const activeId = previewScene?.id || currentScene?.id;
         const activeSlide = slides.find((s) => songSceneId(song, s) === activeId) || slides[0];
         if (activeSlide) {
-          projectScene(buildSongScene(song, activeSlide, { includeCredits: withCredits, target: sceneTarget }), { direct: false });
+          projectScene(
+            buildSongScene(song, activeSlide, {
+              includeCredits: withCredits,
+              target: sceneTarget,
+              transition: {
+                type: fxSettings.transitionType,
+                duration: fxSettings.duration,
+                animateBackground: fxSettings.animateBackground,
+              },
+              animateBackground: fxSettings.animateBackground,
+            }),
+            { direct: false }
+          );
         }
       }
     }
@@ -421,24 +484,6 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
               </BlockButton>
             </BlockSegment>
 
-            {/* Song FS / LT Output Mode Switcher */}
-            <BlockSegment>
-              <BlockButton
-                active={songOutputMode === 'fullscreen'}
-                onClick={() => setSongOutputMode('fullscreen')}
-                title="Song Fullscreen Output Mode (FS)"
-              >
-                FS
-              </BlockButton>
-              <BlockButton
-                active={songOutputMode === 'lowerThird'}
-                onClick={() => setSongOutputMode('lowerThird')}
-                title="Song Lower Third Output Mode (LT)"
-              >
-                LT
-              </BlockButton>
-            </BlockSegment>
-
             {/* Multi-Tab Lyric Switcher: Primary vs Translation (comes after Text/Buttons) */}
             {song && (
               <div style={deckStyles.tabSegmentContainer}>
@@ -491,29 +536,112 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
             )}
           </div>
         }
-        footer={song ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ ...type.caption, color: 'var(--text-dim)' }}>Lines per slide</span>
-              <BlockSegment>
-                {(['auto', 1, 2, 4, 6] as const).map((val) => (
-                  <BlockButton
-                    key={String(val)}
-                    active={linesPerSlide === val}
-                    onClick={() => handleLinesPerSlideChange(val)}
-                  >
-                    {val === 'auto' ? 'Auto' : String(val)}
-                  </BlockButton>
-                ))}
-              </BlockSegment>
+        footer={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {song && (
+                <BlockSegment>
+                  {(['auto', 1, 2, 4, 6] as const).map((val) => (
+                    <BlockButton
+                      key={String(val)}
+                      active={linesPerSlide === val}
+                      onClick={() => handleLinesPerSlideChange(val)}
+                      title={val === 'auto' ? 'Lines per slide: Auto' : `Lines per slide: ${val}`}
+                    >
+                      {val === 'auto' ? 'Auto' : String(val)}
+                    </BlockButton>
+                  ))}
+                </BlockSegment>
+              )}
             </div>
-            <AppleToggle
-              label="Display credits"
-              checked={showSongCredits}
-              onChange={handleCreditsToggle}
-            />
-          </>
-        ) : undefined}
+
+            {/* Right: Output Mode (FS / Link / LT) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* FS / Link / LT switcher */}
+              <div style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', borderRadius: 6, padding: 2, gap: 2, height: 28, boxSizing: 'border-box' }}>
+                <button
+                  type="button"
+                  onClick={() => setSongOutputMode('fullscreen')}
+                  style={{
+                    height: 22,
+                    padding: '0 10px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: songOutputMode === 'fullscreen' ? 'var(--accent, #FF5500)' : 'transparent',
+                    color: songOutputMode === 'fullscreen' ? '#ffffff' : 'var(--text-secondary)',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Song Fullscreen Output Mode (FS)"
+                >
+                  FS
+                </button>
+
+                {/* Link button between FS and LT */}
+                <button
+                  type="button"
+                  onClick={() => toggleThemeFsLtLinked(songOutputMode === 'lowerThird' ? 'lowerThird' : 'fullscreen')}
+                  style={{
+                    width: 22,
+                    height: 22,
+                    padding: 0,
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: isThemeFsLtLinked ? 'rgba(255, 85, 0, 0.18)' : 'transparent',
+                    color: isThemeFsLtLinked ? 'var(--accent, #FF5500)' : 'var(--text-dim)',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title={isThemeFsLtLinked ? 'Linked: Background changes affect both Fullscreen and Lower Third (click to unlink)' : 'Unlinked: Background changes apply independently to active mode (click to link)'}
+                >
+                  {isThemeFsLtLinked ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                      <line x1="2" y1="2" x2="22" y2="22" stroke="var(--tally-fault, #ef4444)" strokeWidth="2" />
+                    </svg>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSongOutputMode('lowerThird')}
+                  style={{
+                    height: 22,
+                    padding: '0 10px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: songOutputMode === 'lowerThird' ? 'var(--accent, #FF5500)' : 'transparent',
+                    color: songOutputMode === 'lowerThird' ? '#ffffff' : 'var(--text-secondary)',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Song Lower Third Output Mode (LT)"
+                >
+                  LT
+                </button>
+              </div>
+            </div>
+          </div>
+        }
       >
         {!song ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)', ...type.body, textAlign: 'center', padding: 16 }}>
@@ -713,6 +841,23 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                     gap: 6,
                     fontFamily: 'var(--font-ui)',
                     transition: 'all 0.15s ease',
+                  }}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    const scene = buildSongScene(song, slide, { includeCredits, target: lyricTab === 'translation' ? 'translation' : 'primary' });
+                    const queuePayload = {
+                      reference: `${song.title} · ${slide.label}`,
+                      text: displayText,
+                      type: 'song',
+                      source: 'Manual',
+                      scene,
+                      songId: song.id,
+                      slideId: slide.id,
+                      linesPerSlide: linesPerSlide,
+                    };
+                    e.dataTransfer.setData('application/bsp-queue-item', JSON.stringify(queuePayload));
+                    e.dataTransfer.setData('text/plain', `${song.title} - ${slide.label}`);
+                    e.dataTransfer.effectAllowed = 'copyMove';
                   }}
                   onClick={() => {
                     if (doubleClickToGoLive && operatingMode === 'studio') {

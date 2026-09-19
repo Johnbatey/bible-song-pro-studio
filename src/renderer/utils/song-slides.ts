@@ -1,4 +1,4 @@
-import type { Scene, Song, SongSlide } from '../types';
+import type { Scene, Song, SongSlide, Transition } from '../types';
 
 export interface FormattedSlide {
   /** Unique within the returned array — this is position identity, not slide
@@ -79,7 +79,12 @@ export function songSceneId(song: Song, slide: FormattedSlide) {
 export function buildSongScene(
   song: Song,
   slide: FormattedSlide,
-  opts: { includeCredits?: boolean; target?: 'primary' | 'translation' | 'bilingual' } = {}
+  opts: {
+    includeCredits?: boolean;
+    target?: 'primary' | 'translation' | 'bilingual';
+    transition?: Transition;
+    animateBackground?: boolean;
+  } = {}
 ): Scene {
   let projectedText = slide.text;
   const hasTrans = Boolean(slide.translation && slide.translation.trim());
@@ -103,5 +108,7 @@ export function buildSongScene(
         : undefined,
     },
     background: song.background,
+    transition: opts.transition,
+    animateBackground: opts.animateBackground,
   };
 }

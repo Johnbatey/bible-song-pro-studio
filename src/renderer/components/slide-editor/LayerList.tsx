@@ -181,10 +181,10 @@ export function LayerList({
               ...styles.row,
               background: row.selected ? 'rgba(244,98,31,0.18)' : 'transparent',
               borderColor: isDropTarget
-                ? '#FF5500'
+                ? 'var(--accent, #FF5500)'
                 : row.selected
                 ? 'rgba(244,98,31,0.55)'
-                : 'rgba(255,255,255,0.07)',
+                : 'var(--border-primary, rgba(255,255,255,0.07))',
               opacity: dragging ? 0.4 : 1,
             }}
             title={
@@ -212,7 +212,7 @@ export function LayerList({
                 background: 'transparent',
                 border: 'none',
                 borderRadius: 4,
-                color: row.hidden ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.65)',
+                color: row.hidden ? 'var(--text-dim, rgba(255, 255, 255, 0.25))' : 'var(--text-secondary, rgba(255, 255, 255, 0.65))',
                 cursor: onToggleVisible ? 'pointer' : 'default',
                 transition: 'all 0.15s ease',
               }}
@@ -252,7 +252,7 @@ export function LayerList({
                   background: row.locked ? 'rgba(255, 85, 0, 0.2)' : 'transparent',
                   border: row.locked ? '1px solid rgba(255, 85, 0, 0.4)' : 'none',
                   borderRadius: 4,
-                  color: row.locked ? '#FF5500' : 'rgba(255, 255, 255, 0.4)',
+                  color: row.locked ? 'var(--accent, #FF5500)' : 'var(--text-dim, rgba(255, 255, 255, 0.4))',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                 }}
@@ -289,20 +289,20 @@ export function LayerList({
 
 const styles: Record<string, CSSProperties> = {
   list: { display: 'flex', flexDirection: 'column', gap: 3 },
-  empty: { fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 },
+  empty: { fontSize: 12, color: 'var(--text-dim, rgba(255,255,255,0.4))', lineHeight: 1.5 },
   row: {
     display: 'flex',
     alignItems: 'center',
     gap: 7,
     padding: '5px 6px',
-    border: '1px solid rgba(255,255,255,0.07)',
+    border: '1px solid var(--border-primary, rgba(255,255,255,0.07))',
     borderRadius: 5,
     cursor: 'grab',
     userSelect: 'none',
   },
   grip: {
     display: 'flex',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-dim, rgba(255,255,255,0.3))',
     cursor: 'grab',
     flexShrink: 0,
     padding: '0 2px',
@@ -313,13 +313,13 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: 'rgba(255,255,255,0.55)',
+    color: 'var(--text-secondary, rgba(255,255,255,0.55))',
   },
   label: {
     flex: 1,
     minWidth: 0,
     fontSize: 12,
-    color: '#fff',
+    color: 'var(--text-primary, #fff)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -335,7 +335,7 @@ const styles: Record<string, CSSProperties> = {
     background: 'transparent',
     border: 'none',
     borderRadius: 3,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-dim, rgba(255,255,255,0.4))',
     cursor: 'pointer',
   },
 };

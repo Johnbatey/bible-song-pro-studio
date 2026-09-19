@@ -3,26 +3,8 @@ import type { ImportedSong, Song } from '../types';
 
 export const SONG_FILE_ACCEPT = '.xml,.pro,.chordpro,.chopro,.txt,.db,.ddb,.sqlite,.sqlite3';
 
-export function isGenericSongTitle(title?: string): boolean {
-  if (!title) return true;
-  const t = title.trim().toLowerCase();
-  return (
-    t === '' ||
-    t === 'untitled' ||
-    t === 'untitled song' ||
-    t === 'untitled openlp song' ||
-    t === 'untitled easyworship song' ||
-    t.startsWith('imported song')
-  );
-}
-
-export function cleanFileTitle(fileName: string): string {
-  const base = fileName.replace(/\.[^.]+$/, '').trim();
-  return base.replace(/_+/g, ' ').replace(/\s+/g, ' ').trim() || 'Untitled Song';
-}
-
 /** Map the import service's `{ title, verses[] }` shape onto the app's Song type. */
-export function toSong(imported: ImportedSong, fallbackTitle?: string): Song {
+export function toSong(imported: ImportedSong): Song {
   const slides = imported.verses
     .filter((verse) => verse.lines.length > 0)
     .map((verse, index) => ({
@@ -40,14 +22,9 @@ export function toSong(imported: ImportedSong, fallbackTitle?: string): Song {
     .map((name) => byLabel.get(name))
     .filter((id): id is string => Boolean(id));
 
-  let title = imported.title ? imported.title.trim() : '';
-  if (isGenericSongTitle(title)) {
-    title = (fallbackTitle && !isGenericSongTitle(fallbackTitle)) ? fallbackTitle.trim() : (title || 'Untitled Song');
-  }
-
   return {
     id: uuid(),
-    title,
+    title: imported.title || 'Untitled',
     author: imported.author || undefined,
     copyright: imported.copyright || undefined,
     ccli: imported.ccli || undefined,
@@ -77,7 +54,6 @@ export async function importSongFiles(files: File[]): Promise<{ songs: Song[]; e
   for (const file of files) {
     try {
       const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-      const fileTitle = cleanFileTitle(file.name);
       const isDatabase = ext === '.db' || ext === '.ddb' || ext === '.sqlite' || ext === '.sqlite3';
       
       const filePath = window.BSP?.media?.pathForFile?.(file)
@@ -93,7 +69,7 @@ export async function importSongFiles(files: File[]): Promise<{ songs: Song[]; e
         continue;
       } else {
         const text = await readAsText(file);
-        result = await window.BSP?.song?.importText({ text, title: fileTitle });
+        result = await window.BSP?.song?.importText({ text });
       }
 
       if (!result?.ok || !result.songs?.length) {
@@ -101,10 +77,8 @@ export async function importSongFiles(files: File[]): Promise<{ songs: Song[]; e
         continue;
       }
       result.songs.forEach((imported: ImportedSong) => {
-        const song = toSong(imported, fileTitle);
-        if (isGenericSongTitle(song.title)) {
-          song.title = fileTitle || 'Untitled Song';
-        }
+        const song = toSong(imported);
+        if (song.title === 'Untitled') song.title = file.name.replace(/\.[^.]+$/, '');
         if (song.slides.length > 0) songs.push(song);
         else errors.push(`${file.name}: parsed but contained no lyrics`);
       });
@@ -130,18 +104,13 @@ export async function pickAndImportSongs(): Promise<{ songs: Song[]; errors: str
 
   for (const filePath of pickResult.filePaths) {
     try {
-      const fileName = filePath.split(/[/\\]/).pop() || '';
-      const fileTitle = cleanFileTitle(fileName);
       const result = await window.BSP?.song?.importFile({ filePath });
       if (!result?.ok || !result.songs?.length) {
         errors.push(`${filePath}: ${result?.error || 'no songs found'}`);
         continue;
       }
       result.songs.forEach((imported: ImportedSong) => {
-        const song = toSong(imported, fileTitle);
-        if (isGenericSongTitle(song.title)) {
-          song.title = fileTitle || 'Untitled Song';
-        }
+        const song = toSong(imported);
         if (song.slides.length > 0) songs.push(song);
         else errors.push(`${filePath}: parsed but contained no lyrics`);
       });

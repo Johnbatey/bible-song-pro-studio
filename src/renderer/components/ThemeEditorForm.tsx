@@ -1,149 +1,270 @@
-import { useState, type ReactNode } from 'react';
-import { type } from '../styles/type';
-import { AppleToggle } from './AppleToggle';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { MediaGrid } from './MediaGrid';
+import { CircularAngleDial, PRO_GRADIENT_PRESETS } from './BackgroundPicker';
 import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { assetUrl } from '../utils/asset-url';
 import { gradientCss, parseBackgroundInfo } from '../utils/background';
+import { fetchInstalledSystemFonts, type FontOptionItem } from '../utils/system-fonts';
+import './ThemeStudio.css';
 
 export type ThemeSurface = 'full' | 'lt';
 
-const SECTION_HINTS = {
-  text: {
-    full: 'Typeface, size and colour for the verse on a full screen.',
-    lt: 'Typeface, size and colour for the verse on the banner.',
-  },
-  shadow: {
-    full: 'Lift the text off a busy still or clip.',
-    lt: 'Lift the text off the banner fill.',
-  },
-  background: {
-    full: 'What fills the whole 16:9 stage.',
-    lt: 'What fills the banner only. The rest of the screen stays transparent.',
-  },
-  placement: {
-    full: 'Nudge the verse on the stage.',
-    lt: 'Width, corners and position of the banner.',
-  },
-} as const;
+interface StudioSliderProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;
+  displayValue?: string;
+  onChange: (val: number) => void;
+}
 
-function FormSection({
-  title,
-  hint,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  hint: string;
-  open: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}) {
+export function StudioSlider({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  unit = 'px',
+  displayValue,
+  onChange,
+}: StudioSliderProps) {
+  const safeVal = Number.isFinite(value) ? value : min;
+  const percentage = Math.max(0, Math.min(100, ((safeVal - min) / (max - min)) * 100));
+  const sliderBg = `linear-gradient(to right, #10B981 0%, #10B981 ${percentage}%, var(--studio-track-bg, #272B33) ${percentage}%, var(--studio-track-bg, #272B33) 100%)`;
+
   return (
-    <div
-      style={{
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 8,
-        background: 'rgba(255,255,255,0.02)',
-        overflow: 'hidden',
-      }}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          padding: '10px 12px',
-          border: 'none',
-          background: 'transparent',
-          color: 'inherit',
-          cursor: 'pointer',
-          textAlign: 'left',
-        }}
-      >
-        <span>
-          <span className="section-title" style={{ marginBottom: 2 }}>{title}</span>
-          <span style={{ ...type.caption, color: 'var(--text-dim)', display: 'block' }}>{hint}</span>
+    <div className="studio-slider-row">
+      <div className="studio-slider-labels">
+        <span className="studio-slider-name">{label}</span>
+        <span className="studio-slider-value">
+          {displayValue ?? `${safeVal}${unit}`}
         </span>
-        <span
-          aria-hidden
-          style={{
-            ...type.caption,
-            color: 'var(--text-dim)',
-            width: 22,
-            height: 22,
-            borderRadius: 11,
-            border: '1px solid rgba(255,255,255,0.12)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          {open ? '−' : '+'}
-        </span>
-      </button>
-      {open && (
-        <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {children}
-        </div>
-      )}
+      </div>
+      <div className="studio-slider-track-wrap">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={safeVal}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="studio-range-slider"
+          style={{ background: sliderBg }}
+        />
+      </div>
     </div>
   );
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
+interface StudioToggleProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label?: string;
+}
+
+export function StudioToggle({ checked, onChange, label }: StudioToggleProps) {
   return (
-    <label style={{ ...type.label, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>
-      {children}
-    </label>
+    <div className="studio-toggle-row">
+      {label && <span className="studio-slider-name">{label}</span>}
+      <div
+        role="switch"
+        aria-checked={checked}
+        tabIndex={0}
+        onClick={() => onChange(!checked)}
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            onChange(!checked);
+          }
+        }}
+        className={`studio-toggle-switch ${checked ? 'active' : ''}`}
+      >
+        <div className="studio-toggle-thumb" />
+      </div>
+    </div>
+  );
+}
+
+interface StudioColorPickerProps {
+  label: string;
+  value: string;
+  disabled?: boolean;
+  onChange: (color: string) => void;
+}
+
+export function StudioColorPicker({ label, value, disabled = false, onChange }: StudioColorPickerProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const safeVal = value && value.startsWith('#') ? value : '#ffffff';
+
+  return (
+    <div className="studio-field-box">
+      <span className="studio-field-label">{label}</span>
+      <div
+        className="studio-color-picker-btn"
+        onClick={() => !disabled && inputRef.current?.click()}
+        style={{ opacity: disabled ? 0.4 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
+      >
+        <div className="studio-color-swatch" style={{ background: safeVal }} />
+        <span className="studio-color-hex">{safeVal}</span>
+        <input
+          ref={inputRef}
+          type="color"
+          value={safeVal}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function StudioSection({
+  title,
+  open,
+  onToggle,
+  onReset,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  onReset?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="studio-section">
+      <div className="studio-section-header">
+        <button
+          type="button"
+          onClick={onToggle}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: 'none',
+            border: 'none',
+            color: 'inherit',
+            padding: 0,
+            cursor: 'pointer',
+          }}
+        >
+          <span className={`studio-section-chevron ${open ? 'open' : 'closed'}`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </span>
+          <span className="studio-section-title-wrap">{title}</span>
+        </button>
+        <div className="studio-section-actions">
+          {onReset && (
+            <button type="button" onClick={onReset} className="studio-reset-btn">
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+      {open && <div className="studio-section-content">{children}</div>}
+    </div>
   );
 }
 
 /**
- * One surface of a theme — full screen or lower third — grouped so an operator
- * can find type, shadow, fill and placement without scrolling two copies of
- * the same wall of controls.
+ * Redesigned Right Sidebar Theme Inspector.
+ * Clean modern dark styling with high-precision emerald progress sliders,
+ * segmented controls, and collapsible sections.
  */
 export function ThemeEditorForm({
   values,
   onChange,
   surface,
+  contentMode = 'bible',
 }: {
   values: any;
   onChange: (updates: any) => void;
   surface: ThemeSurface;
+  contentMode?: 'bible' | 'song';
 }) {
   const assetBaseUrl = useAssetBaseUrl();
   const previewMedia = values.backgroundMediaUrl
     ? assetUrl(values.backgroundMediaUrl, assetBaseUrl)
     : '';
-  const [open, setOpen] = useState({
-    text: true,
-    shadow: false,
-    background: true,
-    placement: surface === 'lt',
+
+  // Collapsible section state with default Typography open and others closed, persisted in localStorage
+  const [open, setOpen] = useState<{ text: boolean; shadow: boolean; background: boolean; placement: boolean }>(() => {
+    try {
+      const saved = localStorage.getItem('bsp_theme_studio_sections_open');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          text: parsed.text ?? true,
+          shadow: parsed.shadow ?? false,
+          background: parsed.background ?? false,
+          placement: parsed.placement ?? false,
+        };
+      }
+    } catch {}
+    return {
+      text: true,
+      shadow: false,
+      background: false,
+      placement: false,
+    };
   });
 
   const toggle = (key: keyof typeof open) => {
-    setOpen((current) => ({ ...current, [key]: !current[key] }));
+    setOpen((current) => {
+      const next = { ...current, [key]: !current[key] };
+      try {
+        localStorage.setItem('bsp_theme_studio_sections_open', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
-  const safeInt = (val: string, fallback = 0) => {
+  // System & Installed Fonts loading + Recently used fonts (up to 3)
+  const [fontOptions, setFontOptions] = useState<FontOptionItem[]>([]);
+  const [recentFonts, setRecentFonts] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('bsp_recent_fonts');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    fetchInstalledSystemFonts().then((fonts) => {
+      if (mounted) {
+        setFontOptions(fonts);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleFontSelect = (fontName: string) => {
+    onChange({ fontFamily: fontName });
+    try {
+      const raw = localStorage.getItem('bsp_recent_fonts');
+      const list: string[] = raw ? JSON.parse(raw) : [];
+      const updated = [fontName, ...list.filter((f) => f !== fontName)].slice(0, 3);
+      localStorage.setItem('bsp_recent_fonts', JSON.stringify(updated));
+      setRecentFonts(updated);
+    } catch {}
+  };
+
+  const safeInt = (val: string | number, fallback = 0) => {
     if (val === '' || val === undefined || val === null) return 0;
-    const parsed = parseInt(val, 10);
-    return isNaN(parsed) ? 0 : parsed;
+    const parsed = typeof val === 'number' ? val : parseInt(val, 10);
+    return isNaN(parsed) ? fallback : parsed;
   };
 
   const bgInfo = parseBackgroundInfo(values.background, values.backgroundColor);
-  /* Media type wins even before a file is chosen — otherwise picking Image
-     from the dropdown leaves backgroundType on gradient/solid, the select
-     snaps back, and the import grid never appears. */
   const currentBgType =
     values.backgroundMediaType === 'image' || values.backgroundMediaType === 'video'
       ? values.backgroundMediaType
@@ -221,6 +342,12 @@ export function ThemeEditorForm({
     }
   };
 
+  const startInputRef = useRef<HTMLInputElement | null>(null);
+  const endInputRef = useRef<HTMLInputElement | null>(null);
+
+  const isRadial = currentDir === 'radial';
+  const numericAngle = parseInt(currentDir.replace('deg', ''), 10) || 135;
+
   const handleGradientChange = (updates: { start?: string; end?: string; dir?: string }) => {
     const s = updates.start ?? currentStart;
     const e = updates.end ?? currentEnd;
@@ -239,287 +366,330 @@ export function ThemeEditorForm({
     });
   };
 
+  const handleSwapGradient = () => {
+    handleGradientChange({ start: currentEnd, end: currentStart });
+  };
+
+  const handleAngleChange = (deg: number) => {
+    handleGradientChange({ dir: `${deg}deg` });
+  };
+
+  const handleToggleRadial = () => {
+    if (isRadial) {
+      handleGradientChange({ dir: '135deg' });
+    } else {
+      handleGradientChange({ dir: 'radial' });
+    }
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <FormSection
-        title="Text"
-        hint={SECTION_HINTS.text[surface]}
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+      {/* ── SECTION 1: TYPOGRAPHY & TEXT ── */}
+      <StudioSection
+        title="Typography & Text"
         open={open.text}
         onToggle={() => toggle('text')}
+        onReset={() => {
+          onChange({
+            fontFamily: '-apple-system, SF Pro Display, sans-serif',
+            fontSize: surface === 'full' ? 54 : 36,
+            referenceFontSize: surface === 'full' ? 34 : 24,
+            fontWeight: 700,
+            textAlign: 'center',
+            lineHeight: 1.35,
+          });
+        }}
       >
-        <div>
-          <FieldLabel>Font family</FieldLabel>
+        {/* Font Family Dropdown with System & Installed Fonts */}
+        <div className="studio-field-box">
+          <span className="studio-field-label">Font Family</span>
           <select
-            className="input"
-            value={values.fontFamily || ''}
-            onChange={(e) => onChange({ fontFamily: e.target.value })}
+            className="studio-select"
+            value={values.fontFamily || '-apple-system, SF Pro Display, sans-serif'}
+            onChange={(e) => handleFontSelect(e.target.value)}
           >
-            <option value="-apple-system, SF Pro Display, sans-serif">SF Pro Display</option>
-            <option value="Inter, sans-serif">Inter</option>
-            <option value="Georgia, serif">Georgia</option>
-            <option value="'Playfair Display', serif">Playfair Display</option>
-            <option value="'Montserrat', sans-serif">Montserrat</option>
+            {/* 1. Recently Used Fonts (Up to 3) */}
+            {recentFonts.length > 0 && (
+              <optgroup label="── Recently Used ──">
+                {recentFonts.map((rf) => (
+                  <option key={`recent-${rf}`} value={rf}>
+                    {rf}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+
+            {/* 2. Bundled & Google Fonts */}
+            <optgroup label="── Bundled Fonts ──">
+              {(fontOptions.length > 0 ? fontOptions.filter((f) => !f.isSystemFont) : [
+                { value: '-apple-system, SF Pro Display, sans-serif', label: 'SF Pro Display' },
+                { value: 'Inter, sans-serif', label: 'Inter' },
+                { value: 'Poppins, sans-serif', label: 'Poppins' },
+                { value: 'Georgia, serif', label: 'Georgia' },
+                { value: "'Playfair Display', serif", label: 'Playfair Display' },
+                { value: "'Montserrat', sans-serif", label: 'Montserrat' },
+                { value: "'Cinzel', serif", label: 'Cinzel' },
+                { value: "'Roboto', sans-serif", label: 'Roboto' },
+              ]).map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </optgroup>
+
+            {/* 3. Locally Installed System Fonts */}
+            {fontOptions.filter((f) => f.isSystemFont).length > 0 && (
+              <optgroup label="── Installed PC Fonts ──">
+                {fontOptions
+                  .filter((f) => f.isSystemFont)
+                  .map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
           </select>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Size</FieldLabel>
-            <input
-              className="input"
-              type="number"
-              value={values.fontSize === 0 ? '' : (values.fontSize ?? '')}
-              onChange={(e) => onChange({ fontSize: safeInt(e.target.value, 32) })}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Weight</FieldLabel>
-            <select
-              className="input"
-              value={values.fontWeight || 400}
-              onChange={(e) => onChange({ fontWeight: safeInt(e.target.value, 400) })}
-            >
-              <option value="300">Light (300)</option>
-              <option value="400">Regular (400)</option>
-              <option value="500">Medium (500)</option>
-              <option value="600">Semi-Bold (600)</option>
-              <option value="700">Bold (700)</option>
-              <option value="800">Extra Bold (800)</option>
-            </select>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Verse colour</FieldLabel>
-            <input
-              className="input"
-              type="color"
-              value={values.fontColor || '#ffffff'}
-              onChange={(e) => onChange({ fontColor: e.target.value })}
-              style={{ height: 34, padding: 2 }}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Alignment</FieldLabel>
-            <select
-              className="input"
-              value={values.textAlign || 'center'}
-              onChange={(e) => onChange({ textAlign: e.target.value })}
-            >
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </select>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Reference size</FieldLabel>
-            <input
-              className="input"
-              type="number"
-              value={values.referenceFontSize === 0 ? '' : (values.referenceFontSize ?? '')}
-              onChange={(e) => onChange({ referenceFontSize: safeInt(e.target.value, 26) })}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Animation</FieldLabel>
-            <select
-              className="input"
-              value={values.animation || 'fadeIn'}
-              onChange={(e) => onChange({ animation: e.target.value })}
-            >
-              <option value="fadeIn">Fade In</option>
-              <option value="slideInLeft">Slide Left</option>
-              <option value="slideInRight">Slide Right</option>
-              <option value="slideInUp">Slide Up</option>
-              <option value="slideInDown">Slide Down</option>
-              <option value="zoomIn">Zoom In</option>
-              <option value="scaleIn">Scale In</option>
-              <option value="flipIn">Flip In</option>
-              {(values.animation === 'bounceIn' || values.animation === 'elasticIn') && (
-                <option value={values.animation}>
-                  {values.animation === 'bounceIn' ? 'Bounce In' : 'Elastic In'} (retired)
-                </option>
-              )}
-            </select>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Reference colour</FieldLabel>
-            <input
-              className="input"
-              type="color"
-              disabled={Boolean(values.syncRefColor)}
-              value={values.syncRefColor ? (values.fontColor || '#ffffff') : (values.referenceColor || values.savedRefColor || values.accentColor || '#C9A96E')}
-              onChange={(e) => onChange({ referenceColor: e.target.value, savedRefColor: e.target.value, syncRefColor: false })}
-              style={{ height: 34, padding: 2, opacity: values.syncRefColor ? 0.4 : 1, cursor: values.syncRefColor ? 'not-allowed' : 'pointer' }}
-            />
-          </div>
-          <div style={{ flex: 1, paddingBottom: 6 }}>
-            <AppleToggle
-              label="Match verse colour"
-              checked={Boolean(values.syncRefColor)}
-              onChange={(checked) => {
-                const rememberedRefColor = values.referenceColor && values.referenceColor !== values.fontColor
-                  ? values.referenceColor
-                  : (values.savedRefColor || values.accentColor || '#FFCF66');
-                onChange({
-                  syncRefColor: checked,
-                  savedRefColor: rememberedRefColor,
-                  referenceColor: checked ? (values.fontColor || '#ffffff') : rememberedRefColor,
-                });
-              }}
-            />
-          </div>
-        </div>
-      </FormSection>
 
-      <FormSection
-        title="Shadow"
-        hint={SECTION_HINTS.shadow[surface]}
-        open={open.shadow}
-        onToggle={() => toggle('shadow')}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ ...type.label, color: 'var(--text-dim)', fontWeight: 600 }}>Drop shadow</span>
-          <AppleToggle
-            label="On"
-            checked={Boolean(values.textShadowEnabled)}
-            onChange={(checked) => onChange({ textShadowEnabled: checked })}
-          />
+        {/* Font Size Slider */}
+        <StudioSlider
+          label="Font Size"
+          value={values.fontSize ?? (surface === 'full' ? 54 : 36)}
+          min={16}
+          max={120}
+          unit="px"
+          onChange={(val) => onChange({ fontSize: val })}
+        />
+
+        {/* Font Weight Dropdown */}
+        <div className="studio-field-box">
+          <span className="studio-field-label">Font Weight</span>
+          <select
+            className="studio-select"
+            value={values.fontWeight ? String(values.fontWeight) : '700'}
+            onChange={(e) => onChange({ fontWeight: parseInt(e.target.value, 10) || 700 })}
+          >
+            <option value="300">Light</option>
+            <option value="400">Regular</option>
+            <option value="500">Medium</option>
+            <option value="600">Semi Bold</option>
+            <option value="700">Bold</option>
+            <option value="800">Extra Bold</option>
+            <option value="900">Black</option>
+          </select>
         </div>
-        {values.textShadowEnabled && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <div style={{ flex: 1 }}>
-                <FieldLabel>Level</FieldLabel>
-                <select
-                  className="input"
-                  value={values.textShadowLevel || 'medium'}
-                  onChange={(e) => {
-                    const lvl = e.target.value;
-                    const blur = lvl === 'heavy' ? 16 : lvl === 'subtle' ? 4 : 8;
-                    onChange({ textShadowLevel: lvl, textShadowBlur: blur });
+
+        {/* Text Alignment */}
+        <div className="studio-field-box">
+          <span className="studio-field-label">Text Alignment</span>
+          <div className="studio-button-group">
+            {[
+              {
+                val: 'left',
+                label: 'Left',
+                icon: (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="17" y1="10" x2="3" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="17" y1="18" x2="3" y2="18" />
+                  </svg>
+                ),
+              },
+              {
+                val: 'center',
+                label: 'Center',
+                icon: (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="18" y1="10" x2="6" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="18" y1="18" x2="6" y2="18" />
+                  </svg>
+                ),
+              },
+              {
+                val: 'right',
+                label: 'Right',
+                icon: (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="21" y1="10" x2="7" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="21" y1="18" x2="7" y2="18" />
+                  </svg>
+                ),
+              },
+            ].map((al) => (
+              <button
+                key={al.val}
+                type="button"
+                className={`studio-group-btn ${(values.textAlign || 'center') === al.val ? 'active' : ''}`}
+                onClick={() => onChange({ textAlign: al.val })}
+              >
+                {al.icon}
+                <span>{al.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Verse / Text Colour */}
+        <StudioColorPicker
+          label={contentMode === 'song' ? 'Text Colour' : 'Verse Colour'}
+          value={values.fontColor || '#ffffff'}
+          onChange={(col) => onChange({ fontColor: col })}
+        />
+
+        {contentMode === 'bible' && (
+          <>
+            {/* Reference Size Slider */}
+            <StudioSlider
+              label="Reference Size"
+              value={values.referenceFontSize ?? (surface === 'full' ? 34 : 24)}
+              min={12}
+              max={60}
+              unit="px"
+              onChange={(val) => onChange({ referenceFontSize: val })}
+            />
+
+            {/* Reference Colour & Match Verse Toggle */}
+            <div className="studio-grid-2">
+              <StudioColorPicker
+                label="Reference Colour"
+                disabled={Boolean(values.syncRefColor)}
+                value={values.syncRefColor ? (values.fontColor || '#ffffff') : (values.referenceColor || values.savedRefColor || '#FF5500')}
+                onChange={(col) => onChange({ referenceColor: col, savedRefColor: col, syncRefColor: false })}
+              />
+              <div className="studio-field-box" style={{ justifyContent: 'center', height: '100%', paddingBottom: 6 }}>
+                <StudioToggle
+                  label="Match Verse"
+                  checked={Boolean(values.syncRefColor)}
+                  onChange={(checked) => {
+                    const rememberedRefColor = values.referenceColor && values.referenceColor !== values.fontColor
+                      ? values.referenceColor
+                      : (values.savedRefColor || values.accentColor || '#FF5500');
+                    onChange({
+                      syncRefColor: checked,
+                      savedRefColor: rememberedRefColor,
+                      referenceColor: checked ? (values.fontColor || '#ffffff') : rememberedRefColor,
+                    });
                   }}
-                >
-                  <option value="subtle">Subtle</option>
-                  <option value="medium">Medium</option>
-                  <option value="heavy">Heavy</option>
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <FieldLabel>Colour</FieldLabel>
-                <input
-                  className="input"
-                  type="color"
-                  value={values.textShadowColor || '#000000'}
-                  onChange={(e) => onChange({ textShadowColor: e.target.value })}
-                  style={{ height: 34, padding: 2 }}
                 />
               </div>
             </div>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                <FieldLabel>Blur</FieldLabel>
-                <span style={{ ...type.caption, color: 'var(--text-dim)' }}>{values.textShadowBlur ?? 8}px</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="30"
-                value={values.textShadowBlur ?? 8}
-                onChange={(e) => onChange({ textShadowBlur: safeInt(e.target.value, 8) })}
-                style={{ width: '100%' }}
-              />
-            </div>
-          </div>
+          </>
         )}
-      </FormSection>
 
-      <FormSection
+        {surface === 'full' && (
+          <StudioSlider
+            label="Line Height"
+            value={values.lineHeight ?? 1.35}
+            min={1.0}
+            max={2.4}
+            step={0.05}
+            unit="x"
+            displayValue={`${(values.lineHeight ?? 1.35).toFixed(2)}x`}
+            onChange={(val) => onChange({ lineHeight: val })}
+          />
+        )}
+      </StudioSection>
+
+      {/* ── SECTION 2: CUSTOM SHADOW ── */}
+      <StudioSection
+        title="Custom Shadow"
+        open={open.shadow}
+        onToggle={() => toggle('shadow')}
+        onReset={() => {
+          onChange({
+            textShadowEnabled: false,
+            textShadowLevel: 'medium',
+            textShadowBlur: 8,
+            textShadowColor: '#000000',
+          });
+        }}
+      >
+        <StudioToggle
+          label="Enable Drop Shadow"
+          checked={Boolean(values.textShadowEnabled)}
+          onChange={(checked) => onChange({ textShadowEnabled: checked })}
+        />
+
+        {values.textShadowEnabled && (
+          <>
+            {/* Shadow Level Preset */}
+            <div className="studio-field-box">
+              <span className="studio-field-label">Shadow Level</span>
+              <div className="studio-button-group">
+                {[
+                  { val: 'subtle', label: 'Subtle', blur: 4 },
+                  { val: 'medium', label: 'Medium', blur: 8 },
+                  { val: 'heavy', label: 'Heavy', blur: 16 },
+                ].map((lvl) => (
+                  <button
+                    key={lvl.val}
+                    type="button"
+                    className={`studio-group-btn ${(values.textShadowLevel || 'medium') === lvl.val ? 'active' : ''}`}
+                    onClick={() => onChange({ textShadowLevel: lvl.val, textShadowBlur: lvl.blur })}
+                  >
+                    {lvl.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Shadow Blur Slider */}
+            <StudioSlider
+              label="Blur"
+              value={values.textShadowBlur ?? 8}
+              min={0}
+              max={40}
+              unit="px"
+              onChange={(val) => onChange({ textShadowBlur: safeInt(val, 8) })}
+            />
+
+            {/* Shadow Color */}
+            <StudioColorPicker
+              label="Shadow Colour"
+              value={values.textShadowColor || '#000000'}
+              onChange={(col) => onChange({ textShadowColor: col })}
+            />
+          </>
+        )}
+      </StudioSection>
+
+      {/* ── SECTION 3: BACKGROUND & SURFACE ── */}
+      <StudioSection
         title="Background"
-        hint={SECTION_HINTS.background[surface]}
         open={open.background}
         onToggle={() => toggle('background')}
+        onReset={() => {
+          handleBgTypeChange('gradient');
+        }}
       >
-        <div
-          style={{
-            height: 72,
-            borderRadius: 6,
-            border: '1px solid rgba(255,255,255,0.1)',
-            background: values.background || values.backgroundColor || '#0c0e14',
-            backgroundImage: previewMedia && currentBgType === 'image'
-              ? `url("${previewMedia.replace(/"/g, '%22')}")`
-              : undefined,
-            backgroundSize: values.backgroundFit || 'cover',
-            backgroundPosition: 'center',
-            opacity: currentOpacity,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontSize: 11,
-            fontWeight: 600,
-            textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-            overflow: 'hidden',
-            position: 'relative',
-          }}
-        >
-          {previewMedia && currentBgType === 'video' && (
-            <video
-              src={previewMedia}
-              muted
-              playsInline
-              preload="metadata"
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: values.backgroundFit || 'cover' }}
-            />
-          )}
-          <span style={{ position: 'relative', zIndex: 1 }}>
-            {currentBgType === 'image' ? (previewMedia ? 'Image selected' : 'Choose an image')
-              : currentBgType === 'video' ? (previewMedia ? 'Video selected' : 'Choose a video')
-              : currentBgType === 'gradient' ? 'Gradient'
-              : currentBgType === 'transparent' ? 'Transparent'
-              : 'Solid colour'}
-          </span>
+        {/* Fill Type Dropdown */}
+        <div className="studio-field-box">
+          <span className="studio-field-label">Fill Type</span>
+          <select
+            className="studio-select"
+            value={currentBgType || 'solid'}
+            onChange={(e) => handleBgTypeChange(e.target.value)}
+          >
+            <option value="solid">Solid Color</option>
+            <option value="gradient">Gradient</option>
+            <option value="image">Image</option>
+            <option value="video">Video</option>
+            <option value="transparent">Alpha</option>
+          </select>
         </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Fill</FieldLabel>
-            <select
-              className="input"
-              value={currentBgType}
-              onChange={(e) => handleBgTypeChange(e.target.value)}
-            >
-              <option value="solid">Solid colour</option>
-              <option value="gradient">Gradient</option>
-              <option value="image">Image</option>
-              <option value="video">Video</option>
-              <option value="transparent">Transparent</option>
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Opacity ({Math.round(currentOpacity * 100)}%)</FieldLabel>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={currentOpacity}
-              onChange={(e) => onChange({ backgroundOpacity: parseFloat(e.target.value) })}
-              style={{ width: '100%', marginTop: 8 }}
-            />
-          </div>
-        </div>
+        {/* Opacity Slider */}
+        <StudioSlider
+          label="Opacity"
+          value={currentOpacity}
+          min={0}
+          max={1}
+          step={0.05}
+          unit="%"
+          displayValue={`${Math.round(currentOpacity * 100)}%`}
+          onChange={(val) => onChange({ backgroundOpacity: val })}
+        />
 
+        {/* Conditional Controls per Fill Type */}
         {(currentBgType === 'image' || currentBgType === 'video') && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <p style={{ ...type.caption, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
-              {surface === 'lt'
-                ? '1) Import or pick a file below. 2) Click its thumbnail so the banner preview shows it. The rest of the screen stays transparent.'
-                : '1) Import or pick a file below. 2) Click its thumbnail so the 16:9 preview shows it. 3) Make sure this design is the active theme (click its card in Presets).'}
-            </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <MediaGrid
               kind={currentBgType}
               selectedUrl={values.backgroundMediaUrl || ''}
@@ -529,161 +699,346 @@ export function ThemeEditorForm({
                 backgroundFit: values.backgroundFit || 'cover',
               })}
             />
-            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}>
-                <FieldLabel>Fit</FieldLabel>
-                <select
-                  className="input"
-                  value={values.backgroundFit || 'cover'}
-                  onChange={(e) => onChange({ backgroundFit: e.target.value })}
-                >
-                  <option value="cover">Cover</option>
-                  <option value="contain">Contain</option>
-                  <option value="fill">Stretch</option>
-                </select>
-              </div>
-              {currentBgType === 'video' && (
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, ...type.caption, color: 'var(--text-secondary)', paddingBottom: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={values.backgroundLoop !== false}
-                    onChange={(e) => onChange({ backgroundLoop: e.target.checked })}
-                  />
-                  Loop
-                </label>
-              )}
-            </div>
-          </div>
-        )}
-
-        {currentBgType === 'solid' && (
-          <div>
-            <FieldLabel>Colour</FieldLabel>
-            <input
-              className="input"
-              type="color"
-              value={currentSolid.startsWith('#') ? currentSolid : '#0c0e14'}
-              onChange={(e) => onChange({ backgroundColor: e.target.value, background: e.target.value })}
-              style={{ height: 34, padding: 2, width: '100%' }}
-            />
-          </div>
-        )}
-
-        {currentBgType === 'gradient' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div>
-              <FieldLabel>Presets</FieldLabel>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+            <div className="studio-field-box">
+              <span className="studio-field-label">Media Fit</span>
+              <div className="studio-button-group">
                 {[
-                  { name: 'Sapphire', start: '#0f172a', end: '#312e81', dir: '135deg' },
-                  { name: 'Purple', start: '#1a0033', end: '#7b1fa2', dir: '135deg' },
-                  { name: 'Emerald', start: '#001a0a', end: '#178e4c', dir: '135deg' },
-                  { name: 'Crimson', start: '#1b0000', end: '#e65100', dir: '135deg' },
-                  { name: 'Gold', start: '#1a140a', end: '#c9a96e', dir: '135deg' },
-                  { name: 'Midnight', start: '#070913', end: '#0f172a', dir: '180deg' },
-                ].map((p) => (
+                  { val: 'cover', label: 'Cover' },
+                  { val: 'contain', label: 'Contain' },
+                  { val: 'fill', label: 'Stretch' },
+                ].map((fit) => (
                   <button
-                    key={p.name}
+                    key={fit.val}
                     type="button"
-                    className="btn btn-sm btn-secondary"
-                    style={{ fontSize: 10, padding: '3px 6px', background: `linear-gradient(${p.dir}, ${p.start}, ${p.end})`, color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
-                    onClick={() => handleGradientChange({ start: p.start, end: p.end, dir: p.dir })}
+                    className={`studio-group-btn ${(values.backgroundFit || 'cover') === fit.val ? 'active' : ''}`}
+                    onClick={() => onChange({ backgroundFit: fit.val })}
                   >
-                    {p.name}
+                    {fit.label}
                   </button>
                 ))}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <div style={{ flex: 1 }}>
-                <FieldLabel>Start</FieldLabel>
-                <input
-                  className="input"
-                  type="color"
-                  value={currentStart.startsWith('#') ? currentStart : '#0f172a'}
-                  onChange={(e) => handleGradientChange({ start: e.target.value })}
-                  style={{ height: 32, padding: 2 }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <FieldLabel>End</FieldLabel>
-                <input
-                  className="input"
-                  type="color"
-                  value={currentEnd.startsWith('#') ? currentEnd : '#312e81'}
-                  onChange={(e) => handleGradientChange({ end: e.target.value })}
-                  style={{ height: 32, padding: 2 }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <FieldLabel>Direction</FieldLabel>
-                <select
-                  className="input"
-                  value={currentDir}
-                  onChange={(e) => handleGradientChange({ dir: e.target.value })}
+            {currentBgType === 'video' && (
+              <StudioToggle
+                label="Loop Video Background"
+                checked={values.backgroundLoop !== false}
+                onChange={(checked) => onChange({ backgroundLoop: checked })}
+              />
+            )}
+          </div>
+        )}
+
+        {currentBgType === 'solid' && (
+          <StudioColorPicker
+            label="Background Colour"
+            value={currentSolid.startsWith('#') ? currentSolid : '#0c0e14'}
+            onChange={(col) => onChange({ backgroundColor: col, background: col })}
+          />
+        )}
+
+        {currentBgType === 'gradient' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Gradient Type Dropdown */}
+            <div className="studio-field-box">
+              <div className="studio-field-label">Gradient Type</div>
+              <select
+                className="studio-select"
+                value={isRadial ? 'radial' : 'linear'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'radial' && !isRadial) handleToggleRadial();
+                  if (val === 'linear' && isRadial) handleToggleRadial();
+                }}
+              >
+                <option value="linear">Linear Gradient</option>
+                <option value="radial">Radial Gradient (Circular)</option>
+              </select>
+            </div>
+
+            {/* Live Gradient Color Stops & Spectrum Bar */}
+            <div className="studio-field-box">
+              <div className="studio-field-label">Color Stops & Spectrum</div>
+              <div className="studio-gradient-bar-row">
+                {/* Start Color Swatch */}
+                <div
+                  onClick={() => startInputRef.current?.click()}
+                  className="studio-gradient-swatch-chip"
+                  style={{
+                    background: currentStart.startsWith('#') ? currentStart : '#0f172a',
+                  }}
+                  title={`Start Color: ${currentStart}`}
                 >
-                  <option value="135deg">Diagonal</option>
-                  <option value="180deg">Top → bottom</option>
-                  <option value="90deg">Left → right</option>
-                  <option value="45deg">Reverse diagonal</option>
-                  <option value="radial">Radial</option>
+                  <input
+                    ref={startInputRef}
+                    type="color"
+                    value={currentStart.startsWith('#') ? currentStart : '#0f172a'}
+                    onChange={(e) => handleGradientChange({ start: e.target.value })}
+                    style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
+                  />
+                </div>
+
+                {/* Live Gradient Track */}
+                <div
+                  className="studio-gradient-spectrum-track"
+                  style={{
+                    background: isRadial
+                      ? `radial-gradient(circle, ${currentStart}, ${currentEnd})`
+                      : `linear-gradient(to right, ${currentStart}, ${currentEnd})`,
+                  }}
+                />
+
+                {/* Swap Colors Button */}
+                <button
+                  type="button"
+                  onClick={handleSwapGradient}
+                  title="Swap Start & End Colors"
+                  className="studio-gradient-swap-btn"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="17 1 21 5 17 9" />
+                    <path d="M3 5h18" />
+                    <polyline points="7 23 3 19 7 15" />
+                    <path d="M21 19H3" />
+                  </svg>
+                </button>
+
+                {/* End Color Swatch */}
+                <div
+                  onClick={() => endInputRef.current?.click()}
+                  className="studio-gradient-swatch-chip"
+                  style={{
+                    background: currentEnd.startsWith('#') ? currentEnd : '#312e81',
+                  }}
+                  title={`End Color: ${currentEnd}`}
+                >
+                  <input
+                    ref={endInputRef}
+                    type="color"
+                    value={currentEnd.startsWith('#') ? currentEnd : '#312e81'}
+                    onChange={(e) => handleGradientChange({ end: e.target.value })}
+                    style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Gradient Angle (Linear Mode) */}
+            {!isRadial && (
+              <div className="studio-field-box">
+                <div className="studio-slider-labels">
+                  <span className="studio-slider-name">Gradient Angle</span>
+                  <span className="studio-slider-value">{numericAngle}°</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <CircularAngleDial
+                    angleDeg={numericAngle}
+                    isRadial={false}
+                    onChangeAngle={handleAngleChange}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div className="studio-slider-track-wrap">
+                      <input
+                        type="range"
+                        min={0}
+                        max={360}
+                        step={1}
+                        value={numericAngle}
+                        onChange={(e) => handleAngleChange(Number(e.target.value))}
+                        className="studio-range-slider"
+                        style={{
+                          background: `linear-gradient(to right, #10B981 0%, #10B981 ${(numericAngle / 360) * 100}%, var(--studio-track-bg, rgba(255, 255, 255, 0.12)) ${(numericAngle / 360) * 100}%, var(--studio-track-bg, rgba(255, 255, 255, 0.12)) 100%)`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Angle Preset Dropdown */}
+                <select
+                  className="studio-select"
+                  value={[0, 45, 90, 135, 180, 225, 270, 315].includes(numericAngle) ? String(numericAngle) : 'custom'}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v !== 'custom') {
+                      handleAngleChange(Number(v));
+                    }
+                  }}
+                  style={{ marginTop: 4 }}
+                >
+                  <option value="custom" disabled={![0, 45, 90, 135, 180, 225, 270, 315].includes(numericAngle)}>
+                    Custom Angle ({numericAngle}°)
+                  </option>
+                  <option value="0">0° — Top to Bottom</option>
+                  <option value="45">45° — Bottom-Left to Top-Right</option>
+                  <option value="90">90° — Left to Right</option>
+                  <option value="135">135° — Top-Left to Bottom-Right</option>
+                  <option value="180">180° — Bottom to Top</option>
+                  <option value="225">225° — Top-Right to Bottom-Left</option>
+                  <option value="270">270° — Right to Left</option>
+                  <option value="315">315° — Bottom-Right to Top-Left</option>
                 </select>
               </div>
+            )}
+
+            {/* Presets Grid (Full Width 6-Column) */}
+            <div className="studio-field-box">
+              <div className="studio-field-label">Color Presets</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+                {PRO_GRADIENT_PRESETS.map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    title={preset.name}
+                    onClick={() => handleGradientChange({
+                      start: preset.start,
+                      end: preset.end,
+                      dir: isRadial ? 'radial' : preset.dir,
+                    })}
+                    style={{
+                      height: 24,
+                      borderRadius: 5,
+                      border: '1px solid rgba(255, 255, 255, 0.18)',
+                      background: isRadial
+                        ? `radial-gradient(circle, ${preset.start}, ${preset.end})`
+                        : `linear-gradient(135deg, ${preset.start}, ${preset.end})`,
+                      cursor: 'pointer',
+                      transition: 'transform 0.15s ease, border-color 0.15s ease',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.08)';
+                      e.currentTarget.style.borderColor = '#10b981';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.18)';
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         )}
-      </FormSection>
+      </StudioSection>
 
-      <FormSection
-        title="Placement"
-        hint={SECTION_HINTS.placement[surface]}
+      {/* ── SECTION 4: PLACEMENT & GEOMETRY ── */}
+      <StudioSection
+        title="Placement & Geometry"
         open={open.placement}
         onToggle={() => toggle('placement')}
+        onReset={() => {
+          if (surface === 'lt') {
+            onChange({
+              width: 75,
+              borderRadius: 6,
+              padding: 20,
+              position: 'bottom-center',
+              offsetX: 0,
+              offsetY: 0,
+            });
+          } else {
+            onChange({
+              verticalAlign: 'center',
+              offsetX: 0,
+              offsetY: 0,
+            });
+          }
+        }}
       >
-        {surface === 'lt' && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <div style={{ flex: 1 }}>
-              <FieldLabel>Width %</FieldLabel>
-              <input
-                className="input"
-                type="number"
-                max="100"
-                value={values.width === 0 ? '' : (values.width ?? '')}
-                onChange={(e) => onChange({ width: safeInt(e.target.value, 75) })}
-              />
+        {surface === 'lt' ? (
+          <>
+            {/* Lower Third Width Slider */}
+            <StudioSlider
+              label="Banner Width"
+              value={values.width ?? 75}
+              min={20}
+              max={100}
+              unit="%"
+              onChange={(val) => onChange({ width: val })}
+            />
+
+            {/* Lower Third Corner Radius Slider */}
+            <StudioSlider
+              label="Corner Radius"
+              value={values.borderRadius ?? 6}
+              min={0}
+              max={40}
+              unit="px"
+              onChange={(val) => onChange({ borderRadius: val })}
+            />
+
+            {/* Lower Third Padding Slider */}
+            <StudioSlider
+              label="Inner Padding"
+              value={values.padding ?? 20}
+              min={0}
+              max={60}
+              unit="px"
+              onChange={(val) => onChange({ padding: val })}
+            />
+
+            {/* Banner Position */}
+            <div className="studio-field-box">
+              <span className="studio-field-label">Position</span>
+              <div className="studio-button-group">
+                {[
+                  { val: 'bottom-center', label: 'Center' },
+                  { val: 'bottom-left', label: 'Left' },
+                  { val: 'bottom-right', label: 'Right' },
+                ].map((pos) => (
+                  <button
+                    key={pos.val}
+                    type="button"
+                    className={`studio-group-btn ${(values.position || 'bottom-center') === pos.val ? 'active' : ''}`}
+                    onClick={() => onChange({ position: pos.val })}
+                  >
+                    {pos.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <FieldLabel>Corner radius</FieldLabel>
-              <input
-                className="input"
-                type="number"
-                value={values.borderRadius === 0 ? '' : (values.borderRadius ?? '')}
-                onChange={(e) => onChange({ borderRadius: safeInt(e.target.value, 0) })}
-              />
+          </>
+        ) : (
+          <div className="studio-field-box">
+            <span className="studio-field-label">Vertical Alignment</span>
+            <div className="studio-button-group">
+              {[
+                { val: 'top', label: 'Top' },
+                { val: 'center', label: 'Center' },
+                { val: 'bottom', label: 'Bottom' },
+              ].map((v) => (
+                <button
+                  key={v.val}
+                  type="button"
+                  className={`studio-group-btn ${(values.verticalAlign || 'center') === v.val ? 'active' : ''}`}
+                  onClick={() => onChange({ verticalAlign: v.val })}
+                >
+                  {v.label}
+                </button>
+              ))}
             </div>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Offset X (px)</FieldLabel>
-            <input
-              className="input"
-              type="number"
-              value={values.offsetX === 0 ? '' : (values.offsetX ?? '')}
-              onChange={(e) => onChange({ offsetX: safeInt(e.target.value, 0) })}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <FieldLabel>Offset Y (px)</FieldLabel>
-            <input
-              className="input"
-              type="number"
-              value={values.offsetY === 0 ? '' : (values.offsetY ?? '')}
-              onChange={(e) => onChange({ offsetY: safeInt(e.target.value, 0) })}
-            />
-          </div>
-        </div>
-      </FormSection>
+
+        {/* Offset X & Offset Y Sliders */}
+        <StudioSlider
+          label="Offset X"
+          value={values.offsetX ?? 0}
+          min={-200}
+          max={200}
+          unit="px"
+          onChange={(val) => onChange({ offsetX: val })}
+        />
+
+        <StudioSlider
+          label="Offset Y"
+          value={values.offsetY ?? 0}
+          min={-200}
+          max={200}
+          unit="px"
+          onChange={(val) => onChange({ offsetY: val })}
+        />
+      </StudioSection>
     </div>
   );
 }
