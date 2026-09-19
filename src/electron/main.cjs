@@ -97,7 +97,6 @@ const bibleService = require('./bible-service.cjs');
 const { createTranscriptionService } = require('./transcription-service.cjs');
 const { createVerseDetectionService } = require('./verse-detection-service.cjs');
 const { createNdiService, DEFAULT_NDI_NAME } = require('./ndi-service.cjs');
-const { createStreamingService } = require('./streaming-service.cjs');
 const { createSessionHistoryService } = require('./session-history-service.cjs');
 const { createSongImportService } = require('./song-import-service.cjs');
 const { createAppStoreService } = require('./app-store-service.cjs');
@@ -145,7 +144,6 @@ let displayPort = HTTP_PORT_BASE;
 let httpServerError = null;
 let activeDisplayId = null;
 let ndiService = null;
-let streamingService = null;
 let sessionHistory = null;
 let songImportService = null;
 let appStoreService = null;
@@ -434,6 +432,187 @@ function stageAudience() {
   return windows;
 }
 
+const ndiFeedWindows = new Map();
+
+function resolveFeedThemeSection(theme, sceneType, targetMode) {
+  if (!theme) return null;
+  let effTheme = theme;
+  if (theme.linkBibleSong === false) {
+    if (sceneType === 'song') {
+      effTheme = {
+        ...theme,
+        fullScreen: theme.songFullScreen || theme.fullScreen,
+        lowerThird: theme.songLowerThird || theme.lowerThird,
+      };
+    } else if (sceneType === 'bible') {
+      effTheme = {
+        ...theme,
+        fullScreen: theme.bibleFullScreen || theme.fullScreen,
+        lowerThird: theme.bibleLowerThird || theme.lowerThird,
+      };
+    }
+  }
+  return targetMode === 'lowerThird' ? effTheme.lowerThird : effTheme.fullScreen;
+}
+
+function computeFeedBackgroundFields(scene, theme, targetMode) {
+  const bg = scene?.background;
+  const themeFs = theme?.fullScreen;
+  const fields = {
+    bgVideo: '',
+    bgCustomImage: '',
+    bgFill: '',
+    bgFit: bg?.fit || (!bg ? themeFs?.backgroundFit : undefined) || 'cover',
+    bgOpacity: typeof bg?.opacity === 'number' ? bg.opacity : 1,
+    bgVideoLoop: bg ? bg.loop !== false : (themeFs?.backgroundLoop !== false),
+  };
+
+  const applyThemeGround = () => {
+    if (targetMode !== 'fullscreen') {
+      fields.bgFill = 'transparent';
+      return;
+    }
+    if (themeFs?.backgroundMediaType === 'video' && themeFs.backgroundMediaUrl) {
+      fields.bgVideo = themeFs.backgroundMediaUrl;
+    } else if (themeFs?.backgroundMediaType === 'image' && themeFs.backgroundMediaUrl) {
+      fields.bgCustomImage = themeFs.backgroundMediaUrl;
+    } else if (themeFs?.backgroundType === 'transparent' || themeFs?.background === 'transparent' || themeFs?.backgroundColor === 'transparent') {
+      fields.bgFill = 'transparent';
+    } else {
+      fields.bgFill = themeFs?.background || themeFs?.backgroundColor || '#0c0e14';
+    }
+  };
+
+  if (targetMode === 'lowerThird') {
+    fields.bgFill = 'transparent';
+    return fields;
+  }
+
+  if (!bg) {
+    applyThemeGround();
+    return fields;
+  }
+
+  if (bg.type === 'video' && bg.mediaUrl) fields.bgVideo = bg.mediaUrl;
+  else if (bg.type === 'image' && bg.mediaUrl) fields.bgCustomImage = bg.mediaUrl;
+  else if (bg.type === 'gradient' && bg.gradient) fields.bgFill = bg.gradient;
+  else if (bg.type === 'solid' && bg.color) fields.bgFill = bg.color;
+  else if (bg.type === 'transparent') fields.bgFill = 'transparent';
+  else applyThemeGround();
+
+  return fields;
+}
+
+function transformDisplayStateForFeed(baseState, feedConfig) {
+  if (!baseState) return {};
+  const cloned = { ...baseState };
+  const contentFilter = feedConfig.contentFilter || 'all';
+  const renderMode = feedConfig.renderMode || 'follow_program';
+
+  // Content filtering logic
+  const sceneType = cloned.scene?.type || (cloned.displayVerse || cloned.verse ? 'bible' : (cloned.lyrics ? 'song' : ''));
+  const isBible = sceneType === 'bible' || cloned.scene?.id?.startsWith('bible-') || Boolean(cloned.displayVerse || cloned.verse);
+  const isSong = sceneType === 'song' || cloned.scene?.id?.startsWith('song-') || Boolean(cloned.lyrics);
+  const isPres = sceneType === 'presentation' || cloned.scene?.id?.startsWith('slide-') || cloned.scene?.id?.startsWith('pptx-');
+
+  let allowContent = true;
+  if (contentFilter === 'bible_songs') {
+    allowContent = isBible || isSong;
+  } else if (contentFilter === 'bible_only') {
+    allowContent = isBible;
+  } else if (contentFilter === 'song_only') {
+    allowContent = isSong;
+  } else if (contentFilter === 'presentations_only') {
+    allowContent = isPres;
+  }
+
+  if (!allowContent && cloned.scene) {
+    return {
+      ...cloned,
+      scene: null,
+      verse: null,
+      displayVerse: null,
+      lyrics: null,
+      lowerThirdText: null,
+      lowerThirdSub: null,
+      outputMode: renderMode === 'full_screen_only' ? 'fullscreen' : 'lowerThird',
+      mode: renderMode === 'full_screen_only' ? 'fullscreen' : 'lowerThird',
+      bgFill: 'transparent',
+      bgCustomImage: null,
+      bgVideo: null,
+      bgMotion: null,
+    };
+  }
+
+  // Render Mode Overrides
+  if (renderMode === 'lower_third_only' || renderMode === 'full_screen_only') {
+    const targetMode = renderMode === 'lower_third_only' ? 'lowerThird' : 'fullscreen';
+    cloned.outputMode = targetMode;
+    cloned.mode = targetMode;
+
+    const section = resolveFeedThemeSection(cloned.theme, sceneType, targetMode);
+    const fontColor = section?.fontColor || '#ffffff';
+
+    // Strict typography mapping for the forced mode
+    cloned.fontFamily = section?.fontFamily || 'Poppins';
+    cloned.fontSize = section?.fontSize ?? 0;
+    cloned.fontWeight = section?.fontWeight ?? 700;
+    cloned.fontColor = fontColor;
+    cloned.textAlign = section?.textAlign || 'center';
+    cloned.referenceColor = section?.syncRefColor
+      ? fontColor
+      : (section?.referenceColor || cloned.theme?.lowerThird?.accentColor || '#e8541a');
+    cloned.referenceFontSize = section?.referenceFontSize ?? 0;
+    cloned.showReference = true;
+    cloned.showTranslation = cloned.theme?.bibleOptions?.showVersion ?? true;
+
+    // Strict background mapping for the forced mode
+    const bgFields = computeFeedBackgroundFields(cloned.scene, cloned.theme, targetMode);
+    Object.assign(cloned, bgFields);
+  }
+
+  return cloned;
+}
+
+function createNdiFeedWindow(feed) {
+  if (!feed || !feed.id) return null;
+  if (ndiFeedWindows.has(feed.id)) {
+    const existing = ndiFeedWindows.get(feed.id);
+    if (existing && !existing.isDestroyed()) return existing;
+  }
+
+  const win = new BrowserWindow({
+    width: feed.width || 1920,
+    height: feed.height || 1080,
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false,
+    },
+  });
+
+  win.loadURL(isDev ? 'http://localhost:5173/audience-display.html' : `file://${path.join(__dirname, '../../dist/audience-display.html')}`);
+  win.setMenuBarVisibility(false);
+
+  win.webContents.on('did-finish-load', () => {
+    const feedState = transformDisplayStateForFeed(displayState, feed);
+    win.webContents.send('display:message', { type: 'display:update', state: feedState });
+    ndiService?.setFeedWindow(feed.id, win);
+  });
+
+  win.on('closed', () => {
+    ndiFeedWindows.delete(feed.id);
+  });
+
+  ndiFeedWindows.set(feed.id, win);
+  return win;
+}
+
 function broadcastDisplayState() {
   const msg = JSON.stringify({ type: 'display:update', state: displayState });
   if (wss) wss.clients.forEach((c) => { if (c.readyState === 1) c.send(msg); });
@@ -443,6 +622,16 @@ function broadcastDisplayState() {
      does, so it needs the same state — that is the whole point of the stage no
      longer embedding the legacy display page to get it. */
   for (const win of liveStageWindows()) win.webContents.send('display:message', payload);
+
+  // Broadcast transformed state to all dedicated NDI feed windows
+  const configuredFeeds = settingsService?.get('ndiFeeds') || [];
+  for (const [feedId, win] of ndiFeedWindows.entries()) {
+    if (win && !win.isDestroyed()) {
+      const feedConfig = configuredFeeds.find((f) => f.id === feedId) || ndiService?.activeFeeds?.get(feedId) || { id: feedId, contentFilter: 'all', renderMode: 'follow_program' };
+      const feedState = transformDisplayStateForFeed(displayState, feedConfig);
+      win.webContents.send('display:message', { type: 'display:update', state: feedState });
+    }
+  }
 }
 
 function setDisplayState(next) {
@@ -914,10 +1103,8 @@ function createDisplayWindow(targetOrBounds, options = {}) {
 
   displayWindow.loadURL(isDev ? 'http://localhost:5173/audience-display.html' : `file://${path.join(__dirname, '../../dist/audience-display.html')}`);
   displayWindow.setMenuBarVisibility(false);
-  // Audio Isolation: Secondary display/capture surfaces never output duplicate audio to system speakers
-  displayWindow.webContents.setAudioMuted(true);
 
-  // Crash Resilience & Auto-Recovery
+  // Crash Resilience & Auto-Recovery (OBS Parity: Display never stays down)
   displayWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('[DisplayWindow] Renderer process crash detected:', details);
     if (displayWindow && !displayWindow.isDestroyed()) {
@@ -975,7 +1162,6 @@ function createStageDisplayWindow(targetDisplay, options = {}) {
   });
   win.loadURL(isDev ? 'http://localhost:5173/stage-display.html' : `file://${path.join(__dirname, '../../dist/stage-display.html')}`);
   win.setMenuBarVisibility(false);
-  win.webContents.setAudioMuted(true);
 
   stageWindows.add(win);
   broadcastStageWindows();
@@ -1137,8 +1323,6 @@ function createDockPopoutWindow(dockId) {
     fullscreen: false,
     alwaysOnTop: true,
     thickFrame: true,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    trafficLightPosition: { x: 12, y: 7 },
     backgroundColor: '#b8b8bd',
     title: def.label,
     webPreferences: {
@@ -1223,11 +1407,6 @@ app.whenReady().then(async () => {
   transcriptionService = createTranscriptionService({ app });
   verseDetectionService = createVerseDetectionService();
   ndiService = createNdiService();
-  streamingService = createStreamingService({
-    emit: (event) => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('stream:event', event);
-    },
-  });
   sessionHistory = createSessionHistoryService({ app });
   songImportService = createSongImportService();
   appStoreService = createAppStoreService({ app });
@@ -1363,7 +1542,7 @@ app.whenReady().then(async () => {
     const target = chooseDisplay(displayId);
     if (!target) return { ok: false, error: 'No displays available' };
     activeDisplayId = String(target.id);
-    createDisplayWindow(target, { show: true, fullscreen: true });
+    createDisplayWindow(target, { show: true });
     return { ok: true, displayId: activeDisplayId, label: getDisplayPayload().find((d) => d.id === activeDisplayId)?.label || '' };
   });
   ipcMain.handle('display:toggleFullScreen', () => {
@@ -1428,7 +1607,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('stage-display:open', (_, arg) => {
     const displayId = (arg && typeof arg === 'object') ? arg.displayId : arg;
     const target = chooseDisplay(displayId);
-    createStageDisplayWindow(target, { fullscreen: true });
+    createStageDisplayWindow(target, { show: true });
     return true;
   });
   /* Closing every stage screen, not just one: the panel's control is a single
@@ -1573,65 +1752,66 @@ app.whenReady().then(async () => {
 
   // NDI IPC
   ipcMain.handle('ndi:start', async (_, p) => {
-    const r = ndiService?.start(p?.name || DEFAULT_NDI_NAME);
-    if (r?.ok) {
-      if (!displayWindow || displayWindow.isDestroyed()) {
-        const show = Boolean(activeDisplayId);
-        createDisplayWindow(null, { show });
-      }
-      if (displayWindow && !displayWindow.isDestroyed()) {
-        ndiService.setDisplayWindow(displayWindow);
-        ndiService.startCapture(p?.fps || 30, { width: p?.width || 1920, height: p?.height || 1080 });
-      }
-    }
+    const configuredFeeds = settingsService?.get('ndiFeeds') || [];
+    const defaultFeed = configuredFeeds[0] || {
+      id: 'default-ndi-feed',
+      name: p?.name || DEFAULT_NDI_NAME,
+      fps: p?.fps || 30,
+      width: p?.width || 1920,
+      height: p?.height || 1080,
+      contentFilter: 'all',
+      renderMode: 'follow_program',
+    };
+    if (p?.name) defaultFeed.name = p.name;
+    if (p?.fps) defaultFeed.fps = p.fps;
+    if (p?.width) defaultFeed.width = p.width;
+    if (p?.height) defaultFeed.height = p.height;
+
+    const win = createNdiFeedWindow(defaultFeed);
+    const r = ndiService?.startFeed(defaultFeed, win);
     return r || { ok: false, error: 'NDI service unavailable' };
   });
+
   ipcMain.handle('ndi:stop', () => {
-    const r = ndiService?.stop() || { ok: true };
-    const streamActive = Boolean(streamingService?.status()?.running);
-    if (!activeDisplayId && !streamActive && displayWindow && !displayWindow.isDestroyed()) {
-      displayWindow.close();
-      displayWindow = null;
+    const r = ndiService?.stopAll() || { ok: true };
+    for (const win of ndiFeedWindows.values()) {
+      if (win && !win.isDestroyed()) win.close();
     }
+    ndiFeedWindows.clear();
     return r;
   });
+
   ipcMain.handle('ndi:status', () => ndiService?.status() || { ok: false });
 
-  // Direct Live Streaming (RTMP / SRT) IPC
-  ipcMain.handle('stream:start', async (_, p) => {
-    const config = {
-      service: p?.service || settingsService?.get('streamService'),
-      server: p?.server || settingsService?.get('streamServer'),
-      key: typeof p?.key === 'string' ? p.key : settingsService?.get('streamKey'),
-      srtUrl: p?.srtUrl || settingsService?.get('streamSrtUrl'),
-      protocol: p?.protocol || settingsService?.get('streamProtocol'),
-      resolution: p?.resolution || settingsService?.get('streamResolution'),
-      fps: p?.fps || settingsService?.get('streamFps'),
-      bitrate: p?.bitrate || settingsService?.get('streamBitrate'),
-      encoder: p?.encoder || settingsService?.get('streamEncoder'),
-    };
+  ipcMain.handle('ndi:startFeed', async (_, feedConfig) => {
+    if (!feedConfig || !feedConfig.id) return { ok: false, error: 'Invalid feed configuration' };
+    const win = createNdiFeedWindow(feedConfig);
+    const r = ndiService?.startFeed(feedConfig, win);
+    return r || { ok: false, error: 'NDI service unavailable' };
+  });
 
-    if (!displayWindow || displayWindow.isDestroyed()) {
-      const show = Boolean(activeDisplayId);
-      createDisplayWindow(null, { show });
+  ipcMain.handle('ndi:stopFeed', async (_, feedId) => {
+    const r = ndiService?.stopFeed(feedId);
+    const win = ndiFeedWindows.get(feedId);
+    if (win && !win.isDestroyed()) {
+      win.close();
     }
-    if (displayWindow && !displayWindow.isDestroyed()) {
-      streamingService?.setDisplayWindow(displayWindow);
-    }
-    const r = streamingService?.start(config);
-    return r || { ok: false, error: 'Streaming service unavailable' };
+    ndiFeedWindows.delete(feedId);
+    return r || { ok: true };
   });
-  ipcMain.handle('stream:stop', () => {
-    const r = streamingService?.stop() || { ok: true };
-    const ndiActive = Boolean(ndiService?.status()?.running);
-    if (!activeDisplayId && !ndiActive && displayWindow && !displayWindow.isDestroyed()) {
-      displayWindow.close();
-      displayWindow = null;
+
+  ipcMain.handle('ndi:saveFeeds', async (_, feeds) => {
+    if (Array.isArray(feeds)) {
+      settingsService?.set({ ndiFeeds: feeds });
+      return { ok: true };
     }
-    return r;
+    return { ok: false, error: 'Invalid feeds array' };
   });
-  ipcMain.handle('stream:status', () => streamingService?.status() || { ok: false });
-  ipcMain.handle('stream:checkFfmpeg', () => streamingService?.checkFfmpeg() || { available: false });
+
+  ipcMain.handle('ndi:getFeeds', async () => {
+    const feeds = settingsService?.get('ndiFeeds') || [];
+    return { ok: true, feeds };
+  });
 
   ipcMain.handle('desktop:get-sources', async (_e, opts = { types: ['window', 'screen'] }) => {
     try {
@@ -2302,7 +2482,15 @@ app.whenReady().then(async () => {
   /* A hung load must never leave the operator staring at a splash. */
   setTimeout(handOver, SPLASH_CEILING_MS);
 
-  mainWindow.on('closed', () => { mainWindow = null; ndiService?.stop(); if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close(); });
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    ndiService?.stop();
+    for (const win of ndiFeedWindows.values()) {
+      if (win && !win.isDestroyed()) win.close();
+    }
+    ndiFeedWindows.clear();
+    if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
+  });
 
   // Fullscreen events
   mainWindow.on('enter-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', true));
@@ -2330,6 +2518,26 @@ app.on('web-contents-created', (_evt, contents) => {
   });
 });
 
-app.on('window-all-closed', () => { appStoreService?.flush(); deepgramService?.destroy(); ndiService?.destroy(); streamingService?.destroy(); sessionHistory?.endSession(); if (process.platform !== 'darwin') app.quit(); });
-app.on('will-quit', () => { appStoreService?.flush(); deepgramService?.destroy(); globalShortcut.unregisterAll(); ndiService?.destroy(); streamingService?.destroy(); sessionHistory?.endSession(); });
+app.on('window-all-closed', () => {
+  appStoreService?.flush();
+  deepgramService?.destroy();
+  ndiService?.destroy();
+  for (const win of ndiFeedWindows.values()) {
+    if (win && !win.isDestroyed()) win.close();
+  }
+  ndiFeedWindows.clear();
+  sessionHistory?.endSession();
+  if (process.platform !== 'darwin') app.quit();
+});
+app.on('will-quit', () => {
+  appStoreService?.flush();
+  deepgramService?.destroy();
+  globalShortcut.unregisterAll();
+  ndiService?.destroy();
+  for (const win of ndiFeedWindows.values()) {
+    if (win && !win.isDestroyed()) win.close();
+  }
+  ndiFeedWindows.clear();
+  sessionHistory?.endSession();
+});
 app.on('activate', () => { if (!mainWindow) mainWindow = createMainWindow(); });
