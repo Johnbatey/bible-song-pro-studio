@@ -1507,27 +1507,12 @@ export function SettingsModal() {
                             </div>
                           </div>
 
-                          {/* Live Stats & Copy Actions */}
+                          {/* Live Stats */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                             <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-dim)' }}>
                               <span>Frames: <strong style={{ color: 'var(--text-primary)' }}>{feedLive?.framesSent || 0}</strong></span>
                               <span>Receivers: <strong style={{ color: 'var(--text-primary)' }}>{feedLive?.connections || 0}</strong></span>
                               <span>Resolution: <strong style={{ color: 'var(--text-primary)' }}>{feed.width || 1920}×{feed.height || 1080} @ {feed.fps || 30}fps</strong></span>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              <button
-                                style={{ ...modalStyles.actionBtn, padding: '4px 8px', fontSize: 11 }}
-                                onClick={() => navigator.clipboard.writeText(`OBS NDI Source: ${feed.name}`)}
-                              >
-                                Copy OBS Name
-                              </button>
-                              <button
-                                style={{ ...modalStyles.actionBtn, padding: '4px 8px', fontSize: 11 }}
-                                onClick={() => navigator.clipboard.writeText(`vMix NDI Input: ${feed.name}`)}
-                              >
-                                Copy vMix Name
-                              </button>
                             </div>
                           </div>
                         </div>
