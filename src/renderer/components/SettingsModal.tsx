@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { AppleToggle } from './AppleToggle';
-import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, LocalModelStatus, NdiStatus, SermonLanguage, BibleDisplayOptions } from '../types';
+import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, LocalModelStatus, NdiStatus, SermonLanguage, BibleDisplayOptions, NdiOutputFeed, NdiContentFilter, NdiRenderMode, NdiFeedStatus } from '../types';
 import { SongPacks } from './settings/SongPacks';
 import { BackupSystem } from './settings/BackupSystem';
 import { createDefaultTheme } from '../utils/defaultTheme';
@@ -380,19 +380,33 @@ export function SettingsModal() {
   const [inputGain, setInputGain] = useState(0);
   const [voiceCommands, setVoiceCommands] = useState(true);
 
-  // NDI Streaming State
+  // NDI Multi-Feed Streaming State
   const [ndiStatus, setNdiStatus] = useState<NdiStatus | null>(null);
-  /* Matches DEFAULT_NDI_NAME in ndi-service.cjs. Kept as a literal rather than
-     imported because the renderer cannot reach into the main process's modules;
-     if one moves, move the other. */
-  const [ndiName, setNdiName] = useState('Bible Song Pro Studio');
-  const [ndiFps, setNdiFps] = useState<number>(15);
-  const [ndiResWidth, setNdiResWidth] = useState<number>(1280);
-  const [ndiResHeight, setNdiResHeight] = useState<number>(720);
-  const [isNdiLoading, setIsNdiLoading] = useState(false);
+  const [ndiFeeds, setNdiFeeds] = useState<NdiOutputFeed[]>([
+    {
+      id: 'default-ndi-feed',
+      name: 'Bible Song Pro Studio',
+      enabled: false,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      contentFilter: 'all',
+      renderMode: 'follow_program',
+      transparentBg: false,
+    },
+  ]);
+  const [ndiLoadingFeeds, setNdiLoadingFeeds] = useState<Record<string, boolean>>({});
 
   const refreshNdiStatus = useCallback(() => {
     window.BSP?.ndi?.status?.().then((st) => setNdiStatus(st)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    window.BSP?.ndi?.getFeeds?.().then((res) => {
+      if (res?.ok && Array.isArray(res.feeds) && res.feeds.length > 0) {
+        setNdiFeeds(res.feeds);
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -401,20 +415,56 @@ export function SettingsModal() {
     return () => clearInterval(interval);
   }, [refreshNdiStatus]);
 
-  const toggleNdiStream = async () => {
-    setIsNdiLoading(true);
-    if (ndiStatus?.running) {
-      await window.BSP?.ndi?.stop?.();
-    } else {
-      await window.BSP?.ndi?.start?.({
-        name: ndiName,
-        fps: ndiFps,
-        width: ndiResWidth,
-        height: ndiResHeight,
-      });
+  const toggleNdiFeed = async (feed: NdiOutputFeed) => {
+    setNdiLoadingFeeds((prev) => ({ ...prev, [feed.id]: true }));
+    try {
+      const feedStatus = ndiStatus?.feeds?.find((f) => f.id === feed.id);
+      if (feedStatus?.running) {
+        await window.BSP?.ndi?.stopFeed?.(feed.id);
+      } else {
+        await window.BSP?.ndi?.startFeed?.(feed);
+      }
+      refreshNdiStatus();
+    } finally {
+      setNdiLoadingFeeds((prev) => ({ ...prev, [feed.id]: false }));
     }
+  };
+
+  const updateNdiFeed = (feedId: string, patch: Partial<NdiOutputFeed>) => {
+    setNdiFeeds((prev) => {
+      const next = prev.map((f) => (f.id === feedId ? { ...f, ...patch } : f));
+      window.BSP?.ndi?.saveFeeds?.(next);
+      return next;
+    });
+  };
+
+  const addNdiFeed = (preset?: 'lower_third' | 'main') => {
+    const isLT = preset === 'lower_third';
+    const newFeed: NdiOutputFeed = {
+      id: `ndi-feed-${Date.now()}`,
+      name: isLT ? 'Bible Song Pro - Lower Third' : `Bible Song Pro Stream ${ndiFeeds.length + 1}`,
+      enabled: false,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      contentFilter: isLT ? 'bible_songs' : 'all',
+      renderMode: isLT ? 'lower_third_only' : 'follow_program',
+      transparentBg: isLT,
+    };
+    const next = [...ndiFeeds, newFeed];
+    setNdiFeeds(next);
+    window.BSP?.ndi?.saveFeeds?.(next);
+  };
+
+  const deleteNdiFeed = async (feedId: string) => {
+    const feedStatus = ndiStatus?.feeds?.find((f) => f.id === feedId);
+    if (feedStatus?.running) {
+      await window.BSP?.ndi?.stopFeed?.(feedId);
+    }
+    const next = ndiFeeds.filter((f) => f.id !== feedId);
+    setNdiFeeds(next);
+    window.BSP?.ndi?.saveFeeds?.(next);
     refreshNdiStatus();
-    setIsNdiLoading(false);
   };
 
   useEffect(() => {
@@ -1231,73 +1281,267 @@ export function SettingsModal() {
                   )}
                 </div>
 
-                <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 14 }}>
+                {/* NDI Output Streams Management */}
+                <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={modalStyles.rowTitle}>{t('settings.output.ndiTitle')}</div>
-                      <div style={modalStyles.rowSub}>{t('settings.output.ndiSub')}</div>
+                      <div style={modalStyles.rowSub}>
+                        Create &amp; customize independent NDI network streams for OBS, vMix, and broadcast switchers with Lower-Third and Fullscreen mode overrides.
+                      </div>
                     </div>
-                    <AppleToggle
-                      checked={Boolean(ndiStatus?.running)}
-                      onChange={toggleNdiStream}
-                      disabled={isNdiLoading || ndiStatus?.available === false}
-                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        style={{ ...modalStyles.actionBtn, background: 'rgba(59, 130, 246, 0.15)', borderColor: 'rgba(59, 130, 246, 0.35)', color: '#60a5fa' }}
+                        onClick={() => addNdiFeed('lower_third')}
+                        title="Add a dedicated Lower Third stream specifically for OBS / vMix camera overlays"
+                      >
+                        + Add Lower-Third Stream
+                      </button>
+                      <button
+                        style={modalStyles.actionBtn}
+                        onClick={() => addNdiFeed()}
+                      >
+                        + Add Custom NDI Stream
+                      </button>
+                    </div>
                   </div>
 
                   {ndiStatus?.available === false && (
-                    <div style={{ fontSize: 11, color: 'var(--tally-fault)' }}>
+                    <div style={{ fontSize: 12, color: 'var(--tally-fault)', background: 'rgba(239,68,68,0.1)', padding: 10, borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)' }}>
                       {t('settings.output.ndiRuntimeMissing')}
                     </div>
                   )}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, background: 'var(--settings-card)', padding: 12, borderRadius: 6, border: '1px solid var(--settings-line)' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>{t('settings.output.ndiSourceName')}</label>
-                      <input
-                        type="text"
-                        style={{ ...modalStyles.textInput, width: '100%' }}
-                        value={ndiName}
-                        onChange={(e) => setNdiName(e.target.value)}
-                        placeholder="Bible Song Pro Studio"
-                        disabled={ndiStatus?.running}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>{t('settings.output.ndiFps')}</label>
-                      <select
-                        style={{ ...modalStyles.selectInput, width: '100%' }}
-                        value={ndiFps}
-                        onChange={(e) => setNdiFps(Number(e.target.value))}
-                        disabled={ndiStatus?.running}
-                      >
-                        <option value={15}>{t('settings.output.ndiFps15')}</option>
-                        <option value={30}>{t('settings.output.ndiFps30')}</option>
-                        <option value={60}>{t('settings.output.ndiFps60')}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>{t('settings.output.ndiResolution')}</label>
-                      <select
-                        style={{ ...modalStyles.selectInput, width: '100%' }}
-                        value={`${ndiResWidth}x${ndiResHeight}`}
-                        onChange={(e) => {
-                          const [w, h] = e.target.value.split('x').map(Number);
-                          setNdiResWidth(w);
-                          setNdiResHeight(h);
-                        }}
-                        disabled={ndiStatus?.running}
-                      >
-                        <option value="1280x720">{t('settings.output.ndi720p')}</option>
-                        <option value="1920x1080">{t('settings.output.ndi1080p')}</option>
-                      </select>
-                    </div>
+                  {/* Feeds List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {ndiFeeds.map((feed, idx) => {
+                      const feedLive = ndiStatus?.feeds?.find((f) => f.id === feed.id);
+                      const isRunning = Boolean(feedLive?.running);
+                      const isLoading = Boolean(ndiLoadingFeeds[feed.id]);
+
+                      return (
+                        <div
+                          key={feed.id}
+                          style={{
+                            background: isRunning ? 'rgba(59, 130, 246, 0.05)' : 'var(--settings-card)',
+                            border: isRunning ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid var(--settings-line)',
+                            borderRadius: 8,
+                            padding: 16,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 12,
+                            position: 'relative',
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          {/* Feed Header */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: '50%',
+                                  background: isRunning ? '#22c55e' : 'var(--text-dim)',
+                                  boxShadow: isRunning ? '0 0 8px #22c55e' : 'none',
+                                }}
+                              />
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span>{feed.name || `NDI Stream ${idx + 1}`}</span>
+                                  {isRunning && (
+                                    <span style={{ fontSize: 10, background: 'rgba(34,197,94,0.2)', color: '#22c55e', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
+                                      LIVE ({feedLive?.connections || 0} receiver{feedLive?.connections === 1 ? '' : 's'})
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+                                  Mode: <strong style={{ color: feed.renderMode === 'lower_third_only' ? '#38bdf8' : 'var(--text-secondary)' }}>
+                                    {feed.renderMode === 'lower_third_only' ? 'Lower-Third Only (Broadcast Overlay)' : feed.renderMode === 'full_screen_only' ? 'Full Screen Only' : 'Normal (Follow Program)'}
+                                  </strong>
+                                  {' · '}
+                                  Content: <strong style={{ color: 'var(--text-secondary)' }}>
+                                    {feed.contentFilter === 'bible_songs' ? 'Bible & Songs Only' : feed.contentFilter === 'bible_only' ? 'Bible Only' : feed.contentFilter === 'song_only' ? 'Songs Only' : feed.contentFilter === 'presentations_only' ? 'Presentations Only' : 'All Content'}
+                                  </strong>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <AppleToggle
+                                checked={isRunning}
+                                onChange={() => toggleNdiFeed(feed)}
+                                disabled={isLoading || ndiStatus?.available === false}
+                              />
+                              {ndiFeeds.length > 1 && (
+                                <button
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-dim)',
+                                    cursor: 'pointer',
+                                    fontSize: 14,
+                                    padding: '4px 8px',
+                                    borderRadius: 4,
+                                  }}
+                                  onClick={() => deleteNdiFeed(feed.id)}
+                                  title="Delete this NDI stream"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Mode Callout */}
+                          {feed.renderMode === 'lower_third_only' && (
+                            <div
+                              style={{
+                                background: 'rgba(56, 189, 248, 0.08)',
+                                border: '1px solid rgba(56, 189, 248, 0.25)',
+                                borderRadius: 6,
+                                padding: '8px 12px',
+                                fontSize: 11,
+                                color: '#7dd3fc',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                              }}
+                            >
+                              <span>📺</span>
+                              <span>
+                                <strong>OBS / vMix Broadcast Overlay:</strong> Bible &amp; Songs on this NDI stream are always formatted as transparent Lower Thirds with full alpha channel, even if full screen is projected in the sanctuary.
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Feed Settings Grid */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1.2fr 0.8fr 0.8fr', gap: 10 }}>
+                            {/* Stream Name */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>
+                                NDI Stream Name
+                              </label>
+                              <input
+                                type="text"
+                                style={{ ...modalStyles.textInput, width: '100%' }}
+                                value={feed.name}
+                                onChange={(e) => updateNdiFeed(feed.id, { name: e.target.value })}
+                                placeholder="Bible Song Pro Studio"
+                                disabled={isRunning}
+                              />
+                            </div>
+
+                            {/* Render Mode */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>
+                                Render Output Mode
+                              </label>
+                              <select
+                                style={{ ...modalStyles.selectInput, width: '100%' }}
+                                value={feed.renderMode || 'follow_program'}
+                                onChange={(e) => updateNdiFeed(feed.id, { renderMode: e.target.value as NdiRenderMode })}
+                                disabled={isRunning}
+                              >
+                                <option value="follow_program">Normal (Follow Program)</option>
+                                <option value="lower_third_only">Lower Third Only (Overlay)</option>
+                                <option value="full_screen_only">Full Screen Only</option>
+                              </select>
+                            </div>
+
+                            {/* Content Filter */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>
+                                Content Filter
+                              </label>
+                              <select
+                                style={{ ...modalStyles.selectInput, width: '100%' }}
+                                value={feed.contentFilter || 'all'}
+                                onChange={(e) => updateNdiFeed(feed.id, { contentFilter: e.target.value as NdiContentFilter })}
+                                disabled={isRunning}
+                              >
+                                <option value="all">All Content (Bible, Songs, Slides)</option>
+                                <option value="bible_songs">Bible &amp; Songs Only (Clean Stream)</option>
+                                <option value="bible_only">Bible Only</option>
+                                <option value="song_only">Songs Only</option>
+                                <option value="presentations_only">Presentations Only</option>
+                              </select>
+                            </div>
+
+                            {/* FPS */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>
+                                Framerate
+                              </label>
+                              <select
+                                style={{ ...modalStyles.selectInput, width: '100%' }}
+                                value={feed.fps || 30}
+                                onChange={(e) => updateNdiFeed(feed.id, { fps: Number(e.target.value) })}
+                                disabled={isRunning}
+                              >
+                                <option value={15}>15 FPS</option>
+                                <option value={30}>30 FPS</option>
+                                <option value={60}>60 FPS</option>
+                              </select>
+                            </div>
+
+                            {/* Resolution */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>
+                                Resolution
+                              </label>
+                              <select
+                                style={{ ...modalStyles.selectInput, width: '100%' }}
+                                value={`${feed.width || 1920}x${feed.height || 1080}`}
+                                onChange={(e) => {
+                                  const [w, h] = e.target.value.split('x').map(Number);
+                                  updateNdiFeed(feed.id, { width: w, height: h });
+                                }}
+                                disabled={isRunning}
+                              >
+                                <option value="1280x720">720p HD</option>
+                                <option value="1920x1080">1080p FHD</option>
+                                <option value="3840x2160">4K UHD</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Live Stats & Copy Actions */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                            <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-dim)' }}>
+                              <span>Frames: <strong style={{ color: 'var(--text-primary)' }}>{feedLive?.framesSent || 0}</strong></span>
+                              <span>Receivers: <strong style={{ color: 'var(--text-primary)' }}>{feedLive?.connections || 0}</strong></span>
+                              <span>Resolution: <strong style={{ color: 'var(--text-primary)' }}>{feed.width || 1920}×{feed.height || 1080} @ {feed.fps || 30}fps</strong></span>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                style={{ ...modalStyles.actionBtn, padding: '4px 8px', fontSize: 11 }}
+                                onClick={() => navigator.clipboard.writeText(`OBS NDI Source: ${feed.name}`)}
+                              >
+                                Copy OBS Name
+                              </button>
+                              <button
+                                style={{ ...modalStyles.actionBtn, padding: '4px 8px', fontSize: 11 }}
+                                onClick={() => navigator.clipboard.writeText(`vMix NDI Input: ${feed.name}`)}
+                              >
+                                Copy vMix Name
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
+                  {/* Summary bar */}
                   {ndiStatus && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', background: 'var(--settings-card)', border: '1px solid var(--settings-line)', padding: '6px 10px', borderRadius: 6 }}>
-                      <span>{t('settings.output.ndiFramesSent')} <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.framesSent || 0}</strong></span>
-                      <span>{t('settings.output.ndiConnections')} <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.connections || 0}</strong></span>
-                      <span>{t('settings.output.ndiRuntimeLabel')} <strong style={{ color: ndiStatus.available ? 'var(--text-primary)' : 'var(--tally-fault)' }}>{ndiStatus.available ? t('settings.output.ndiSdkLoaded') : t('settings.output.ndiRuntimeMissingShort')}</strong></span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', background: 'var(--settings-card)', border: '1px solid var(--settings-line)', padding: '8px 12px', borderRadius: 6 }}>
+                      <span>Active NDI Feeds: <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.activeFeedCount || 0} of {ndiFeeds.length}</strong></span>
+                      <span>Total Frames Sent: <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.framesSent || 0}</strong></span>
+                      <span>Total Receivers: <strong style={{ color: 'var(--text-primary)' }}>{ndiStatus.connections || 0}</strong></span>
+                      <span>NDI Runtime: <strong style={{ color: ndiStatus.available ? 'var(--text-primary)' : 'var(--tally-fault)' }}>{ndiStatus.available ? 'NDI SDK Loaded & Ready' : 'NDI SDK Missing'}</strong></span>
                     </div>
                   )}
 
@@ -1306,15 +1550,6 @@ export function SettingsModal() {
                       {ndiStatus.lastError}
                     </div>
                   )}
-
-                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                    <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText(`OBS NDI Source: ${ndiName}`)}>
-                      {t('settings.output.copyObs')}
-                    </button>
-                    <button style={modalStyles.actionBtn} onClick={() => navigator.clipboard.writeText(`vMix NDI Input: ${ndiName}`)}>
-                      {t('settings.output.copyVmix')}
-                    </button>
-                  </div>
                 </div>
               </div>
             )}

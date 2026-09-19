@@ -288,6 +288,7 @@ export function App() {
         videoTransport: state.display.videoTransport.target === 'program'
           ? state.display.videoTransport
           : null,
+        fxAnimation: state.fxSettings,
         ...displayFieldsFor(activeTheme, effectiveOutputMode),
         ...backgroundFieldsFor(state.display.currentScene, activeTheme, effectiveOutputMode),
       })).then((nextState) => {
@@ -304,6 +305,7 @@ export function App() {
         state.display.bibleOutputMode !== prev.display.bibleOutputMode ||
         state.display.songOutputMode !== prev.display.songOutputMode ||
         state.activeTheme !== prev.activeTheme ||
+        state.fxSettings !== prev.fxSettings ||
         state.activeAlert !== prev.activeAlert ||
         state.display.blackout !== prev.display.blackout ||
         state.showStandbyBrand !== prev.showStandbyBrand ||

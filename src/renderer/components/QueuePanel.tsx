@@ -488,6 +488,26 @@ export function QueuePanel() {
             const isHovered = hoveredItemId === item.id;
             const isThisDragged = dragState?.draggedIndex === index;
 
+            const projectQueueItem = (direct?: boolean) => {
+              const fx = useAppStore.getState().fxSettings;
+              const sceneToProject = {
+                ...item.scene,
+                transition: item.scene.transition || {
+                  type: fx.transitionType || 'fade',
+                  duration: fx.duration || 0.4,
+                  easing: 'ease',
+                  animateBackground: fx.animateBackground ?? false,
+                },
+                animateBackground: item.scene.animateBackground ?? fx.animateBackground ?? false,
+              };
+              if (direct !== undefined) {
+                projectScene(sceneToProject, { direct });
+              } else {
+                projectScene(sceneToProject);
+              }
+              syncQueueItemToPanel(item);
+            };
+
             const handleTakeLive = () => {
               if (isAlertItem) {
                 if (isLive) {
@@ -500,8 +520,7 @@ export function QueuePanel() {
                 if (isLive) {
                   clearProgram();
                 } else {
-                  projectScene(item.scene, { direct: true });
-                  syncQueueItemToPanel(item);
+                  projectQueueItem(true);
                 }
               }
             };
@@ -537,7 +556,7 @@ export function QueuePanel() {
                 };
               });
 
-              const itemHeight = rects[index]?.height || 54;
+              const itemHeight = rects[index]?.height || 36;
               dragInfoRef.current = {
                 startIndex: index,
                 startY: e.clientY,
@@ -599,8 +618,7 @@ export function QueuePanel() {
                     if (isLive) {
                       clearProgram();
                     } else {
-                      projectScene(item.scene);
-                      syncQueueItemToPanel(item);
+                      projectQueueItem();
                     }
                   }
                 }
@@ -623,7 +641,8 @@ export function QueuePanel() {
                     handleTakeLive();
                   }}
                 style={{
-                  padding: '9px 12px',
+                  padding: '6px 10px',
+                  minHeight: 34,
                   background: isLive
                     ? 'var(--accent-dim, rgba(255, 85, 0, 0.12))'
                     : isPreview
@@ -639,7 +658,7 @@ export function QueuePanel() {
                   borderRadius: 6,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 10,
+                  gap: 8,
                   cursor: 'default',
                   userSelect: 'none',
                   position: 'relative',
@@ -677,34 +696,14 @@ export function QueuePanel() {
                   </svg>
                 </div>
 
-                {/* Left Meta Group (Title + Subtitle Snippet on 2 lines) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
-                    <span style={{ color: isLive ? 'var(--accent, #FF5500)' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
-                      {renderTypeIcon(item.type)}
-                    </span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: isLive ? 'var(--accent, #FF5500)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
-                      {item.reference}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ textTransform: 'capitalize', flexShrink: 0 }}>
-                      {item.type} {item.source ? `· ${item.source}` : ''}
-                    </span>
-                    {item.text != null && (
-                      <>
-                        <span style={{ opacity: 0.4 }}>·</span>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
-                          {(typeof item.text === 'string'
-                            ? item.text
-                            : typeof item.text === 'object' && (item.text as any)?.text
-                            ? String((item.text as any).text)
-                            : String(item.text)
-                          ).replace(/\s+/g, ' ').trim()}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                {/* Left Meta Group (Type Icon + Reference Title) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                  <span style={{ color: isLive ? 'var(--accent, #FF5500)' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                    {renderTypeIcon(item.type)}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: isLive ? 'var(--accent, #FF5500)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
+                    {item.reference}
+                  </span>
                 </div>
 
                 {/* Right Action Icons & Up/Down Reorder */}

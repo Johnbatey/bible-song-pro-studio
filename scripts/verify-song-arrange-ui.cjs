@@ -74,7 +74,7 @@ const PAGE_HELPERS = `
      order plus the caret — so it is never an exact text match. */
   window.__clickStartsWith = (sel, text) => {
     const el = [...document.querySelectorAll(sel)]
-      .find((e) => (e.textContent || '').trim().startsWith(text));
+      .find((e) => (e.textContent || '').trim().startsWith(text) || (e.getAttribute('title') || '').includes(text) || (e.getAttribute('aria-label') || '').includes(text));
     if (!el) return false;
     el.click();
     return true;
@@ -128,6 +128,9 @@ async function main() {
     'display:getStatus': { ok: true },
     'display:sendState': { ok: true },
     'ndi:status': { ok: true, running: false },
+    'ndi:getFeeds': { ok: true, feeds: [] },
+    'dock:listPopouts': { ok: true, popouts: [] },
+    'app:checkForUpdates': { ok: true, updateAvailable: false },
     'session:list': { ok: true, sessions: [] },
     'session:status': { ok: true },
     'stage:getState': {},

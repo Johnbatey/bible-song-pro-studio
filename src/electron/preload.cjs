@@ -101,6 +101,10 @@ contextBridge.exposeInMainWorld('BSP', {
     start: (payload) => ipcRenderer.invoke('ndi:start', payload),
     stop: () => ipcRenderer.invoke('ndi:stop'),
     status: () => ipcRenderer.invoke('ndi:status'),
+    startFeed: (feed) => ipcRenderer.invoke('ndi:startFeed', feed),
+    stopFeed: (feedId) => ipcRenderer.invoke('ndi:stopFeed', feedId),
+    saveFeeds: (feeds) => ipcRenderer.invoke('ndi:saveFeeds', feeds),
+    getFeeds: () => ipcRenderer.invoke('ndi:getFeeds'),
   },
 
   session: {

@@ -38,6 +38,7 @@ export function useProgramSurfaceState(): ProgramSurfaceState {
      transport would answer play and seek meant for a different clip. */
   const videoTransport = useAppStore((s) =>
     s.display.videoTransport.target === 'program' ? s.display.videoTransport : null);
+  const fxSettings = useAppStore((s) => s.fxSettings);
 
   /* A stable identity, so a zoom or pan tick in whichever pane hosts this does
      not re-render the memoised surface underneath it. */
@@ -45,10 +46,12 @@ export function useProgramSurfaceState(): ProgramSurfaceState {
     () => ({
       scene, outputMode, theme, activeAlert, transcription, videoTransport,
       blackout, showStandbyBrand, standbyMedia,
+      fxAnimation: fxSettings,
+      animateBackground: fxSettings?.animateBackground,
       /* Read here as well as in App's sendState, or the operator's own panes
          loop a clip the audience window has stopped looping. */
       bgVideoLoop: resolveBgVideoLoop(scene?.background, theme),
     }),
-    [scene, outputMode, theme, activeAlert, transcription, videoTransport, blackout, showStandbyBrand, standbyMedia],
+    [scene, outputMode, theme, activeAlert, transcription, videoTransport, blackout, showStandbyBrand, standbyMedia, fxSettings],
   );
 }

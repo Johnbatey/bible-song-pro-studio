@@ -485,6 +485,8 @@ export interface AppSettings {
   audioMasterVolume?: number;
   /** Mix down panned stereo tracks to Mono PA output. */
   audioMonoMixdown?: boolean;
+  /** Configured NDI output streams (e.g. Lower-Third OBS, Main Program). */
+  ndiFeeds?: NdiOutputFeed[];
 }
 
 /** 'auto' lets Whisper detect the language per utterance. */
@@ -504,6 +506,7 @@ export interface AppSettingsPatch {
   audioCueDeviceId?: string;
   audioMasterVolume?: number;
   audioMonoMixdown?: boolean;
+  ndiFeeds?: NdiOutputFeed[];
 }
 
 export interface ObsStatus {
@@ -860,6 +863,10 @@ declare global {
         start: (payload?: { name?: string; fps?: number; width?: number; height?: number }) => Promise<{ ok: boolean; error?: string; source?: string; status?: NdiStatus }>;
         stop: () => Promise<{ ok: boolean; status?: NdiStatus }>;
         status: () => Promise<NdiStatus>;
+        startFeed: (feed: NdiOutputFeed) => Promise<{ ok: boolean; error?: string; status?: NdiFeedStatus }>;
+        stopFeed: (feedId: string) => Promise<{ ok: boolean; status?: NdiFeedStatus }>;
+        saveFeeds: (feeds: NdiOutputFeed[]) => Promise<{ ok: boolean }>;
+        getFeeds: () => Promise<{ ok: boolean; feeds: NdiOutputFeed[] }>;
       };
       session: {
         start: (payload?: { name?: string }) => Promise<any>;
@@ -1112,6 +1119,34 @@ export interface TranscriptionResult {
   error?: string;
 }
 
+export type NdiContentFilter = 'all' | 'bible_songs' | 'bible_only' | 'song_only' | 'presentations_only';
+
+export type NdiRenderMode = 'follow_program' | 'lower_third_only' | 'full_screen_only';
+
+export interface NdiOutputFeed {
+  id: string;
+  name: string;
+  enabled: boolean;
+  fps: number;
+  width: number;
+  height: number;
+  contentFilter: NdiContentFilter;
+  renderMode: NdiRenderMode;
+  transparentBg?: boolean;
+}
+
+export interface NdiFeedStatus {
+  id: string;
+  name: string;
+  running: boolean;
+  framesSent: number;
+  connections: number;
+  lastError: string;
+  width: number;
+  height: number;
+  fps: number;
+}
+
 export interface NdiStatus {
   ok: boolean;
   available: boolean;
@@ -1124,4 +1159,7 @@ export interface NdiStatus {
   height: number;
   connections: number;
   lastError: string;
+  feeds?: NdiFeedStatus[];
+  activeFeedCount?: number;
 }
+

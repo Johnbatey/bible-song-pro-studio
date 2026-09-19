@@ -28,6 +28,19 @@ const DEFAULTS = {
   audioCueDeviceId: 'default',
   audioMasterVolume: 100,
   audioMonoMixdown: false,
+  ndiFeeds: [
+    {
+      id: 'default-ndi-feed',
+      name: 'Bible Song Pro Studio',
+      enabled: false,
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      contentFilter: 'all',
+      renderMode: 'follow_program',
+      transparentBg: false,
+    },
+  ],
 };
 
 /**

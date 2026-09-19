@@ -70,11 +70,11 @@ export const PRESET_THEMES: Theme[] = [
     id: 'theme-1',
     name: 'Classic Gold',
     lowerThird: {
-      background: 'linear-gradient(135deg, #9A1312, #000000)',
+      background: 'linear-gradient(135deg, #1f0202, #6b0d0d, #9A1312)',
       backgroundType: 'gradient',
       backgroundColor: '#9A1312',
-      gradientStart: '#9A1312',
-      gradientEnd: '#000000',
+      gradientStart: '#1f0202',
+      gradientEnd: '#9A1312',
       gradientDirection: '135deg',
       backgroundOpacity: 0.95,
       accentColor: '#FFCF66',
@@ -94,11 +94,11 @@ export const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     fullScreen: {
-      background: 'linear-gradient(135deg, #9A1312, #000000)',
+      background: 'linear-gradient(135deg, #1f0202, #6b0d0d, #9A1312)',
       backgroundType: 'gradient',
       backgroundColor: '#9A1312',
-      gradientStart: '#9A1312',
-      gradientEnd: '#000000',
+      gradientStart: '#1f0202',
+      gradientEnd: '#9A1312',
       gradientDirection: '135deg',
       fontFamily: 'Georgia, serif',
       fontSize: 56,
@@ -112,7 +112,7 @@ export const PRESET_THEMES: Theme[] = [
       offsetY: 0,
     },
     slideTheme: {
-      backgroundColor: '#1a0505',
+      backgroundColor: '#1f0202',
       fontFamily: 'Georgia, serif',
       fontSize: 38,
       fontWeight: 600,
@@ -285,7 +285,32 @@ export function ThemeStudioModal() {
 
   const allThemes = useMemo(() => {
     const customMap = new Map(themes.map((t) => [t.id, ensureTheme(t)]));
-    const mergedPresets = PRESET_THEMES.map((preset) => customMap.get(preset.id) || ensureTheme(preset));
+    const mergedPresets = PRESET_THEMES.map((preset) => {
+      const existing = customMap.get(preset.id);
+      if (!existing) return ensureTheme(preset);
+      // If the preset has the legacy pitch-black gradient (#9A1312, #000000), upgrade to the rich preset gradient
+      if (
+        preset.id === 'theme-1' &&
+        (existing.fullScreen.background === 'linear-gradient(135deg, #9A1312, #000000)' || !existing.fullScreen.background)
+      ) {
+        return {
+          ...existing,
+          fullScreen: {
+            ...existing.fullScreen,
+            background: preset.fullScreen.background,
+            gradientStart: preset.fullScreen.gradientStart,
+            gradientEnd: preset.fullScreen.gradientEnd,
+          },
+          lowerThird: {
+            ...existing.lowerThird,
+            background: preset.lowerThird.background,
+            gradientStart: preset.lowerThird.gradientStart,
+            gradientEnd: preset.lowerThird.gradientEnd,
+          },
+        };
+      }
+      return existing;
+    });
     const nonPresetCustoms = themes.filter((t) => !PRESET_THEMES.some((p) => p.id === t.id)).map(ensureTheme);
     return [...mergedPresets, ...nonPresetCustoms];
   }, [themes]);
@@ -892,6 +917,41 @@ export function ThemeStudioModal() {
                 const isActive = activeTheme?.id === theme.id;
                 const isCustomItem = themes.some((th) => th.id === theme.id && !PRESET_THEMES.some((p) => p.id === th.id));
 
+                const fs = theme.fullScreen;
+                const isTransparent =
+                  fs.backgroundType === 'transparent' ||
+                  fs.backgroundColor === 'transparent' ||
+                  fs.background === 'transparent';
+
+                const thumbStyle: React.CSSProperties = isTransparent
+                  ? {
+                      backgroundColor: '#15161a',
+                      backgroundImage:
+                        'linear-gradient(45deg, #23252b 25%, transparent 25%),' +
+                        'linear-gradient(-45deg, #23252b 25%, transparent 25%),' +
+                        'linear-gradient(45deg, transparent 75%, #23252b 75%),' +
+                        'linear-gradient(-45deg, transparent 75%, #23252b 75%)',
+                      backgroundSize: '12px 12px',
+                      backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
+                    }
+                  : fs.backgroundMediaType === 'image' && fs.backgroundMediaUrl
+                  ? {
+                      backgroundColor: '#0c0e14',
+                      backgroundImage: `url("${(fs.backgroundMediaUrl.startsWith('http') ? fs.backgroundMediaUrl : `${assetBaseUrl.replace(/\/$/, '')}/${fs.backgroundMediaUrl.replace(/^\//, '')}`).replace(/"/g, '%22')}")`,
+                      backgroundSize: fs.backgroundFit === 'fill' ? '100% 100%' : (fs.backgroundFit || 'cover'),
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                    }
+                  : fs.background && fs.background.includes('gradient')
+                  ? {
+                      backgroundImage: fs.background,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }
+                  : {
+                      backgroundColor: fs.backgroundColor || fs.background || '#0c0e14',
+                    };
+
                 return (
                   <div
                     key={theme.id}
@@ -901,9 +961,7 @@ export function ThemeStudioModal() {
                     {/* Miniature 16:9 Thumbnail */}
                     <div
                       className="studio-theme-thumb"
-                      style={{
-                        background: theme.fullScreen.background || theme.fullScreen.backgroundColor || '#0c0e14',
-                      }}
+                      style={thumbStyle}
                     >
                       <span
                         style={{
@@ -1245,7 +1303,6 @@ export function ThemeStudioModal() {
           <div className="studio-sidebar-scroll">
             <ThemeEditorForm
               surface={surfaceTab}
-              contentMode={sampleType}
               values={currentFormValues}
               onChange={handleUpdateCurrentTheme}
             />

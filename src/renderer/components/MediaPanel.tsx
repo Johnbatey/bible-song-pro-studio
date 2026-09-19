@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
@@ -31,6 +31,7 @@ export function MediaPanel() {
   const standbyMedia = useAppStore((s) => s.standbyMedia);
   const setStandbyMedia = useAppStore((s) => s.setStandbyMedia);
   const doubleClickToGoLive = useAppStore((s) => s.doubleClickToGoLive);
+  const fxSettings = useAppStore((s) => s.fxSettings);
   const { position: barPosition, move: moveBar } = useBarPosition('bsp_mediaBarPosition');
 
   /* The transport belongs to whichever surface is actually holding a video.
@@ -69,6 +70,38 @@ export function MediaPanel() {
   const [menu, setMenu] = useState<{ item: MediaItem; x: number; y: number } | null>(null);
   const [mutedMediaIds, setMutedMediaIds] = useState<Record<string, boolean>>({});
   const [hoveredMediaId, setHoveredMediaId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'image' | 'video'>('all');
+  const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
+  const typeFilterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isTypeFilterOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (typeFilterRef.current && !typeFilterRef.current.contains(e.target as Node)) {
+        setIsTypeFilterOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [isTypeFilterOpen]);
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      if (typeFilter !== 'all' && item.type !== typeFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = item.name.toLowerCase().includes(q);
+        const matchesPath = item.sourcePath ? item.sourcePath.toLowerCase().includes(q) : false;
+        if (!matchesName && !matchesPath) return false;
+      }
+      return true;
+    });
+  }, [items, searchQuery, typeFilter]);
+
+  const imageCount = useMemo(() => items.filter((i) => i.type === 'image').length, [items]);
+  const videoCount = useMemo(() => items.filter((i) => i.type === 'video').length, [items]);
+
   const [mediaFits, setMediaFits] = useState<Record<string, 'contain' | 'cover' | 'fill'>>(() => {
     try {
       const saved = localStorage.getItem('bsp_media_fits');
@@ -298,6 +331,13 @@ export function MediaPanel() {
         muted: Boolean(mutedMediaIds[item.id]),
         opacity: 1,
       },
+      transition: {
+        type: fxSettings.transitionType,
+        duration: fxSettings.duration,
+        easing: 'ease',
+        animateBackground: fxSettings.animateBackground,
+      },
+      animateBackground: fxSettings.animateBackground,
     };
     projectScene(scene, { direct: opts.direct });
   };
@@ -401,7 +441,222 @@ export function MediaPanel() {
             but the lit tile already says it with a lamp and a lit edge, and the
             same state announced twice is the one thing an operator has to stop
             and reconcile. */}
-        <div className="section-title">Media Library ({items.length})</div>
+        <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span>Media Library ({items.length})</span>
+          {filteredItems.length !== items.length && (
+            <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 500 }}>
+              Showing {filteredItems.length} of {items.length}
+            </span>
+          )}
+        </div>
+
+        {items.length > 0 && (
+          <div style={{ marginBottom: 10, position: 'relative' }}>
+            <div
+              className="media-search-wrap"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: 'var(--bsp-raised, #1D1B1C)',
+                border: '1px solid var(--border-primary, #2A282A)',
+                borderRadius: 5,
+                padding: '2px 6px 2px 4px',
+                height: 28,
+                transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+              }}
+            >
+              {/* Type Filter Dropdown Trigger Button */}
+              <div style={{ position: 'relative' }} ref={typeFilterRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsTypeFilterOpen((prev) => !prev)}
+                  title={`Filter by type (${typeFilter === 'all' ? 'All' : typeFilter === 'image' ? 'Images' : 'Videos'})`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: typeFilter !== 'all' ? 'var(--accent-dim, rgba(235, 94, 40, 0.15))' : 'transparent',
+                    border: 'none',
+                    borderRadius: 3,
+                    padding: '3px 4px',
+                    marginRight: 4,
+                    color: typeFilter !== 'all' ? 'var(--accent, #EB5E28)' : 'var(--text-dim, #717075)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (typeFilter === 'all') e.currentTarget.style.color = 'var(--text-primary, #fff)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (typeFilter === 'all') e.currentTarget.style.color = 'var(--text-dim, #717075)';
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                  </svg>
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 2 }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {/* Filter Popover */}
+                {isTypeFilterOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      zIndex: 100,
+                      background: 'var(--bg-elevated, #232225)',
+                      border: '1px solid var(--border-primary, #333235)',
+                      borderRadius: 6,
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                      padding: 4,
+                      minWidth: 155,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                    }}
+                  >
+                    {[
+                      { key: 'all' as const, label: 'All Media', count: items.length, icon: (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                      )},
+                      { key: 'image' as const, label: 'Images Only', count: imageCount, icon: (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+                        </svg>
+                      )},
+                      { key: 'video' as const, label: 'Videos Only', count: videoCount, icon: (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                        </svg>
+                      )},
+                    ].map((opt) => {
+                      const isSelected = typeFilter === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => {
+                            setTypeFilter(opt.key);
+                            setIsTypeFilterOpen(false);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '5px 8px',
+                            background: isSelected ? 'var(--accent-dim, rgba(235, 94, 40, 0.15))' : 'transparent',
+                            color: isSelected ? 'var(--accent, #EB5E28)' : 'var(--text-secondary, #C8C7CB)',
+                            border: 'none',
+                            borderRadius: 4,
+                            cursor: 'pointer',
+                            fontSize: 11,
+                            textAlign: 'left',
+                            transition: 'background 0.12s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                              e.currentTarget.style.color = 'var(--text-primary, #fff)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = 'var(--text-secondary, #C8C7CB)';
+                            }
+                          }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {opt.icon}
+                            <span>{opt.label}</span>
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: isSelected ? 'var(--accent, #EB5E28)' : 'var(--text-dim, #717075)',
+                              background: isSelected ? 'rgba(235, 94, 40, 0.2)' : 'rgba(255,255,255,0.05)',
+                              padding: '1px 5px',
+                              borderRadius: 10,
+                              minWidth: 16,
+                              textAlign: 'center',
+                            }}
+                          >
+                            {opt.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Search Glass Icon */}
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--text-dim, #717075)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ flexShrink: 0, marginRight: 4 }}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+
+              {/* Search Input */}
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filter media..."
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: 'var(--text-primary, #F5F4F2)',
+                  fontSize: 11,
+                  fontFamily: 'inherit',
+                  padding: 0,
+                  minWidth: 0,
+                }}
+              />
+
+              {/* Clear search button if typed */}
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-dim, #717075)',
+                    cursor: 'pointer',
+                    padding: '2px 4px',
+                    fontSize: 11,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--text-primary, #fff)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-dim, #717075)')}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {items.length === 0 ? (
           <div
             onClick={handlePick}
@@ -425,9 +680,45 @@ export function MediaPanel() {
               Files stay where they are on disk — the library points at them.
             </div>
           </div>
+        ) : filteredItems.length === 0 ? (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '28px 16px',
+              background: 'rgba(255,255,255,0.02)',
+              borderRadius: 6,
+              border: '1px dashed var(--border-primary, #2A282A)',
+              margin: '10px 0',
+            }}
+          >
+            <div style={{ fontSize: 12, color: 'var(--text-secondary, #C8C7CB)', marginBottom: 6 }}>
+              No media matching current filter
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim, #717075)', marginBottom: 12 }}>
+              {typeFilter !== 'all' ? `Filtered by ${typeFilter}s` : ''} {searchQuery ? `with "${searchQuery}"` : ''}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setTypeFilter('all');
+              }}
+              style={{
+                fontSize: 11,
+                padding: '4px 10px',
+                borderRadius: 4,
+                background: 'var(--bsp-raised, #232225)',
+                border: '1px solid var(--border-primary, #333)',
+                color: 'var(--accent, #EB5E28)',
+                cursor: 'pointer',
+              }}
+            >
+              Reset Filter
+            </button>
+          </div>
         ) : (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingBottom: 16 }}>
-            {items.map((item) => {
+            {filteredItems.map((item) => {
               const isLive = programUrl === item.url;
               const isCued = previewUrl === item.url && !isLive;
               const tally = isLive ? 'var(--tally-program)' : 'var(--tally-preview)';
@@ -454,6 +745,13 @@ export function MediaPanel() {
                       muted: Boolean(mutedMediaIds[item.id]),
                       opacity: 1,
                     },
+                    transition: {
+                      type: fxSettings.transitionType,
+                      duration: fxSettings.duration,
+                      easing: 'ease',
+                      animateBackground: fxSettings.animateBackground,
+                    },
+                    animateBackground: fxSettings.animateBackground,
                   };
                   const queuePayload = {
                     reference: item.name,

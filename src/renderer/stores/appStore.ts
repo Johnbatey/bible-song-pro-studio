@@ -548,20 +548,31 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   },
 
   projectScene: (scene, opts = {}) => {
-    const { display } = get();
+    const { display, fxSettings } = get();
+    const effectiveScene = scene.transition ? scene : {
+      ...scene,
+      transition: {
+        type: fxSettings?.transitionType || 'fade',
+        duration: fxSettings?.duration || 0.4,
+        easing: 'ease',
+        animateBackground: fxSettings?.animateBackground ?? false,
+      },
+      animateBackground: scene.animateBackground ?? fxSettings?.animateBackground ?? false,
+    };
+
     // Keep it in the scene list so it can be re-fired later
-    if (!get().scenes.some((s) => s.id === scene.id)) get().addScene(scene);
+    if (!get().scenes.some((s) => s.id === effectiveScene.id)) get().addScene(effectiveScene);
 
     if (opts.direct || display.mode === 'basic') {
       // Straight to the audience. Preview follows so the two panes agree.
       set((s) => ({
-        display: { ...s.display, currentScene: scene, previewScene: scene, isTransitioning: false },
+        display: { ...s.display, currentScene: effectiveScene, previewScene: effectiveScene, isTransitioning: false },
         liveTheme: s.activeTheme ? { ...s.activeTheme } : null,
       }));
       return;
     }
     // Studio: stage it only — nothing changes on the audience display until Take.
-    set((s) => ({ display: { ...s.display, previewScene: scene } }));
+    set((s) => ({ display: { ...s.display, previewScene: effectiveScene } }));
   },
 
   takeToProgram: (transition = false) => {
@@ -660,11 +671,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       if (currentMode === 'fullscreen') {
         // Copy Fullscreen background settings to Lower-Third
         const fs = theme.fullScreen;
-        lt.background = fs.background || '';
-        lt.backgroundColor = fs.backgroundColor || '#000000';
-        lt.backgroundType = fs.backgroundType;
-        lt.backgroundMediaUrl = fs.backgroundMediaUrl;
-        lt.backgroundMediaType = fs.backgroundMediaType;
+        const isFsTransparent = fs.backgroundType === 'transparent' || fs.background === 'transparent' || fs.backgroundColor === 'transparent';
+        lt.background = isFsTransparent ? 'transparent' : (fs.background || '');
+        lt.backgroundColor = isFsTransparent ? 'transparent' : (fs.backgroundColor || '#000000');
+        lt.backgroundType = isFsTransparent ? 'transparent' : (fs.backgroundType || 'solid');
+        lt.backgroundMediaUrl = isFsTransparent ? '' : fs.backgroundMediaUrl;
+        lt.backgroundMediaType = isFsTransparent ? undefined : fs.backgroundMediaType;
         lt.backgroundFit = fs.backgroundFit;
         lt.backgroundLoop = fs.backgroundLoop;
         lt.backgroundOpacity = typeof fs.backgroundOpacity === 'number' ? fs.backgroundOpacity : 0.95;
@@ -673,22 +685,27 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         lt.savedGradientEnd = fs.savedGradientEnd;
         lt.savedGradientDir = fs.savedGradientDir;
         theme.lowerThird = lt;
+        if (theme.songLowerThird) theme.songLowerThird = { ...theme.songLowerThird, ...lt };
+        if (theme.bibleLowerThird) theme.bibleLowerThird = { ...theme.bibleLowerThird, ...lt };
       } else {
         // Copy Lower-Third background settings to Fullscreen
         const fs = { ...theme.fullScreen };
-        fs.background = lt.background;
-        fs.backgroundColor = lt.backgroundColor;
-        fs.backgroundType = lt.backgroundType;
-        fs.backgroundMediaUrl = lt.backgroundMediaUrl;
-        fs.backgroundMediaType = lt.backgroundMediaType;
+        const isLtTransparent = lt.backgroundType === 'transparent' || lt.background === 'transparent' || lt.backgroundColor === 'transparent';
+        fs.background = isLtTransparent ? 'transparent' : (lt.background || '');
+        fs.backgroundColor = isLtTransparent ? 'transparent' : (lt.backgroundColor || '#000000');
+        fs.backgroundType = isLtTransparent ? 'transparent' : (lt.backgroundType || 'solid');
+        fs.backgroundMediaUrl = isLtTransparent ? '' : lt.backgroundMediaUrl;
+        fs.backgroundMediaType = isLtTransparent ? undefined : lt.backgroundMediaType;
         fs.backgroundFit = lt.backgroundFit;
         fs.backgroundLoop = lt.backgroundLoop;
-        fs.backgroundOpacity = lt.backgroundOpacity;
+        fs.backgroundOpacity = typeof lt.backgroundOpacity === 'number' ? lt.backgroundOpacity : 1;
         fs.savedSolidColor = lt.savedSolidColor;
         fs.savedGradientStart = lt.savedGradientStart;
         fs.savedGradientEnd = lt.savedGradientEnd;
         fs.savedGradientDir = lt.savedGradientDir;
         theme.fullScreen = fs;
+        if (theme.songFullScreen) theme.songFullScreen = { ...theme.songFullScreen, ...fs };
+        if (theme.bibleFullScreen) theme.bibleFullScreen = { ...theme.bibleFullScreen, ...fs };
       }
 
       const updatedThemes = s.themes.some((t) => t.id === theme.id)
@@ -769,16 +786,24 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       if (isLinked) {
         theme.fullScreen = convertBgToSurface(theme.fullScreen, bg);
         theme.lowerThird = convertBgToSurface(theme.lowerThird, bg);
+        if (theme.songFullScreen) theme.songFullScreen = convertBgToSurface(theme.songFullScreen, bg);
+        if (theme.songLowerThird) theme.songLowerThird = convertBgToSurface(theme.songLowerThird, bg);
+        if (theme.bibleFullScreen) theme.bibleFullScreen = convertBgToSurface(theme.bibleFullScreen, bg);
+        if (theme.bibleLowerThird) theme.bibleLowerThird = convertBgToSurface(theme.bibleLowerThird, bg);
       } else if (mode === 'lowerThird') {
         theme.lowerThird = convertBgToSurface(theme.lowerThird, bg);
+        if (theme.songLowerThird) theme.songLowerThird = convertBgToSurface(theme.songLowerThird, bg);
+        if (theme.bibleLowerThird) theme.bibleLowerThird = convertBgToSurface(theme.bibleLowerThird, bg);
       } else {
         theme.fullScreen = convertBgToSurface(theme.fullScreen, bg);
+        if (theme.songFullScreen) theme.songFullScreen = convertBgToSurface(theme.songFullScreen, bg);
+        if (theme.bibleFullScreen) theme.bibleFullScreen = convertBgToSurface(theme.bibleFullScreen, bg);
       }
 
       const updatedThemes = s.themes.map((t) => (t.id === theme.id ? theme : t));
 
       let displayUpdates = s.display;
-      if (!isStudio && s.display.currentScene && (s.display.currentScene.type === 'song' || s.display.currentScene.type === 'bible')) {
+      if (s.display.currentScene && (s.display.currentScene.type === 'song' || s.display.currentScene.type === 'bible')) {
         if (s.display.currentScene.background) {
           displayUpdates = {
             ...displayUpdates,

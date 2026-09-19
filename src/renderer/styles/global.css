@@ -1230,6 +1230,11 @@ select option:hover, select option:focus, select option:checked {
   border-color: var(--accent);
 }
 
+.media-search-wrap:focus-within {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 .input::placeholder {
   color: var(--text-dim);
 }

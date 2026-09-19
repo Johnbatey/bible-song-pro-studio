@@ -866,7 +866,17 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                   }}
                   draggable={true}
                   onDragStart={(e) => {
-                    const scene = buildSongScene(song, slide, { includeCredits, target: lyricTab === 'translation' ? 'translation' : 'primary' });
+                    const scene = buildSongScene(song, slide, {
+                      includeCredits,
+                      target: lyricTab === 'translation' ? 'translation' : 'primary',
+                      transition: {
+                        type: fxSettings.transitionType,
+                        duration: fxSettings.duration,
+                        easing: 'ease',
+                        animateBackground: fxSettings.animateBackground,
+                      },
+                      animateBackground: fxSettings.animateBackground,
+                    });
                     const queuePayload = {
                       reference: `${song.title} · ${slide.label}`,
                       text: displayText,
@@ -917,7 +927,17 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                             text: displayText,
                             type: 'song',
                             source: 'Manual',
-                            scene: buildSongScene(song, slide, { includeCredits, target: lyricTab === 'translation' ? 'translation' : 'primary' }),
+                            scene: buildSongScene(song, slide, {
+                              includeCredits,
+                              target: lyricTab === 'translation' ? 'translation' : 'primary',
+                              transition: {
+                                type: fxSettings.transitionType,
+                                duration: fxSettings.duration,
+                                easing: 'ease',
+                                animateBackground: fxSettings.animateBackground,
+                              },
+                              animateBackground: fxSettings.animateBackground,
+                            }),
                             songId: song.id,
                             slideId: slide.id,
                             linesPerSlide: linesPerSlide,

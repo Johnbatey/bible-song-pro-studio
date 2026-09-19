@@ -194,6 +194,19 @@ export function getBackgroundFromTheme(theme: Theme | null, mode: 'fullscreen' |
   const surface = mode === 'lowerThird' ? theme?.lowerThird : theme?.fullScreen;
   if (!surface) return { type: 'transparent', color: 'transparent', gradient: 'transparent' };
 
+  if (
+    surface.backgroundType === 'transparent' ||
+    surface.backgroundColor === 'transparent' ||
+    surface.background === 'transparent'
+  ) {
+    return {
+      type: 'transparent',
+      color: 'transparent',
+      gradient: 'transparent',
+      opacity: typeof surface.backgroundOpacity === 'number' ? surface.backgroundOpacity : 1,
+    };
+  }
+
   if (surface.backgroundType === 'image' || (surface.backgroundMediaType === 'image' && surface.backgroundMediaUrl)) {
     return {
       type: 'image',
@@ -214,15 +227,22 @@ export function getBackgroundFromTheme(theme: Theme | null, mode: 'fullscreen' |
     };
   }
   const bgGradient = (surface as any).backgroundGradient || (surface.backgroundType === 'gradient' ? surface.background : undefined);
-  if (surface.backgroundType === 'gradient' || bgGradient) {
+  if (surface.backgroundType === 'gradient' || (bgGradient && bgGradient !== 'transparent')) {
     return {
       type: 'gradient',
       gradient: bgGradient || 'linear-gradient(135deg, #0a0f1d, #1e293b)',
       opacity: typeof surface.backgroundOpacity === 'number' ? surface.backgroundOpacity : 1,
     };
   }
-  if (surface.backgroundType === 'solid' || surface.backgroundColor || surface.background) {
-    const col = surface.backgroundColor || surface.background || '#000000';
+  if (
+    surface.backgroundType === 'solid' ||
+    (surface.backgroundColor && surface.backgroundColor !== 'transparent') ||
+    (surface.background && surface.background !== 'transparent')
+  ) {
+    const col =
+      (surface.backgroundColor && surface.backgroundColor !== 'transparent' ? surface.backgroundColor : undefined) ||
+      (surface.background && surface.background !== 'transparent' ? surface.background : undefined) ||
+      '#000000';
     return {
       type: 'solid',
       color: col,
@@ -237,7 +257,11 @@ export function getBackgroundFromTheme(theme: Theme | null, mode: 'fullscreen' |
  * Clean, Pro-Studio BackgroundPicker Component
  */
 export function BackgroundPicker({ value, onChange }: BackgroundPickerProps) {
-  const choice: Choice = (value?.type as Choice) || (value?.color === 'transparent' || value?.gradient === 'transparent' ? 'transparent' : 'gradient');
+  const isAlpha =
+    value?.type === 'transparent' ||
+    value?.color === 'transparent' ||
+    value?.gradient === 'transparent';
+  const choice: Choice = isAlpha ? 'transparent' : ((value?.type as Choice) || 'gradient');
   const info = parseBackgroundInfo(value?.gradient, value?.color);
 
   const isRadial = info.dir === 'radial';

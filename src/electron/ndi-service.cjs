@@ -215,16 +215,10 @@ const DEFAULT_NDI_NAME = 'Bible Song Pro Studio';
 function createNdiService() {
   let lib = null;
   let api = null;
-  let sendInstance = null;
-  let sourceName = DEFAULT_NDI_NAME;
-  let isRunning = false;
-  let captureTimer = null;
-  let displayWindow = null;
   let lastError = '';
-  let framesSent = 0;
-  let capturing = false; // drop frames rather than queue them if capture falls behind
-  let width = 1280;
-  let height = 720;
+  
+  // Active feeds map: feedId -> feed object
+  const activeFeeds = new Map();
 
   function initLibrary() {
     if (api) return true;
@@ -254,7 +248,6 @@ function createNdiService() {
     }
 
     try {
-
       koffi.struct('NDIlib_send_create_t', {
         p_ndi_name: 'const char *',
         p_groups: 'const char *',
@@ -287,6 +280,12 @@ function createNdiService() {
         sendVideo: lib.func('void NDIlib_send_send_video_v2(void *instance, const NDIlib_video_frame_v2_t *frame)'),
         getConnections: lib.func('int NDIlib_send_get_no_connections(void *instance, uint32_t timeout_ms)'),
       };
+
+      if (!api.initialize()) {
+        lastError = 'NDIlib_initialize failed — this CPU may lack the required instruction set.';
+        return false;
+      }
+
       lastError = '';
       return true;
     } catch (err) {
@@ -297,65 +296,13 @@ function createNdiService() {
     }
   }
 
-  function status() {
-    return {
-      ok: true,
-      available: Boolean(findLib()),
-      libraryLoaded: Boolean(api),
-      running: isRunning,
-      source: sourceName,
-      instanceActive: Boolean(sendInstance),
-      framesSent,
-      width,
-      height,
-      connections: connectionCount(),
-      lastError,
-    };
-  }
-
-  /** Receivers currently subscribed — 0 means nobody is watching, so capture can idle. */
-  function connectionCount() {
+  function getConnections(sendInstance) {
     if (!api || !sendInstance) return 0;
     try { return api.getConnections(sendInstance, 0); } catch { return 0; }
   }
 
-  function start(name) {
-    if (isRunning) return { ok: true, source: sourceName, status: status() };
-    if (name) sourceName = name;
-    if (!initLibrary()) return { ok: false, error: lastError, status: status() };
-
-    try {
-      if (!api.initialize()) {
-        lastError = 'NDIlib_initialize failed — this CPU may lack the required instruction set.';
-        return { ok: false, error: lastError, status: status() };
-      }
-      sendInstance = api.sendCreate({
-        p_ndi_name: sourceName,
-        p_groups: null,
-        clock_video: true,
-        clock_audio: false,
-      });
-      if (!sendInstance) {
-        lastError = 'NDIlib_send_create returned null';
-        return { ok: false, error: lastError, status: status() };
-      }
-      isRunning = true;
-      framesSent = 0;
-      lastError = '';
-      console.log('NDI source started:', sourceName);
-      return { ok: true, source: sourceName, status: status() };
-    } catch (err) {
-      lastError = err.message;
-      return { ok: false, error: lastError, status: status() };
-    }
-  }
-
-  function setDisplayWindow(win) {
-    displayWindow = win;
-  }
-
-  function sendFrame(bgraBuffer, frameWidth, frameHeight, fps) {
-    if (!isRunning || !sendInstance || !api) return false;
+  function sendVideoFrame(sendInstance, bgraBuffer, frameWidth, frameHeight, fps) {
+    if (!sendInstance || !api) return false;
     try {
       api.sendVideo(sendInstance, {
         xres: frameWidth,
@@ -371,37 +318,89 @@ function createNdiService() {
         p_metadata: null,
         timestamp: 0n,
       });
-      framesSent += 1;
       return true;
     } catch (err) {
-      lastError = err.message;
       return false;
     }
   }
 
-  function startCapture(fps = 30, options = {}) {
-    if (!isRunning || !displayWindow) return false;
-    if (options.width) width = options.width;
-    if (options.height) height = options.height;
-    stopCapture();
+  function formatFeedStatus(feed) {
+    if (!feed) return null;
+    return {
+      id: feed.id,
+      name: feed.name,
+      running: Boolean(feed.sendInstance),
+      framesSent: feed.framesSent || 0,
+      connections: getConnections(feed.sendInstance),
+      lastError: feed.lastError || '',
+      width: feed.width || 1920,
+      height: feed.height || 1080,
+      fps: feed.fps || 30,
+      contentFilter: feed.contentFilter || 'all',
+      renderMode: feed.renderMode || 'follow_program',
+    };
+  }
 
-    captureTimer = setInterval(async () => {
-      if (!displayWindow || displayWindow.isDestroyed() || !sendInstance) { stopCapture(); return; }
-      if (capturing) return;
-      
+  function getFeedStatus(feedId) {
+    const feed = activeFeeds.get(feedId);
+    return feed ? formatFeedStatus(feed) : null;
+  }
+
+  function getAllFeedStatuses() {
+    return Array.from(activeFeeds.values()).map(formatFeedStatus);
+  }
+
+  function status() {
+    const feedList = getAllFeedStatuses();
+    const primaryFeed = feedList[0] || null;
+    const totalFrames = feedList.reduce((acc, f) => acc + (f.framesSent || 0), 0);
+    const totalConnections = feedList.reduce((acc, f) => acc + (f.connections || 0), 0);
+
+    return {
+      ok: true,
+      available: Boolean(findLib()),
+      libraryLoaded: Boolean(api),
+      running: activeFeeds.size > 0,
+      activeFeedCount: activeFeeds.size,
+      source: primaryFeed ? primaryFeed.name : DEFAULT_NDI_NAME,
+      instanceActive: activeFeeds.size > 0,
+      framesSent: totalFrames,
+      width: primaryFeed ? primaryFeed.width : 1920,
+      height: primaryFeed ? primaryFeed.height : 1080,
+      connections: totalConnections,
+      lastError: lastError || (primaryFeed ? primaryFeed.lastError : ''),
+      feeds: feedList,
+    };
+  }
+
+  function startFeedCapture(feed) {
+    if (!feed || !feed.sendInstance || !feed.displayWindow) return;
+    if (feed.captureTimer) clearInterval(feed.captureTimer);
+
+    const targetW = feed.width || 1920;
+    const targetH = feed.height || 1080;
+    const fps = feed.fps || 30;
+
+    feed.captureTimer = setInterval(async () => {
+      if (!feed.displayWindow || feed.displayWindow.isDestroyed() || !feed.sendInstance) {
+        if (feed.captureTimer) { clearInterval(feed.captureTimer); feed.captureTimer = null; }
+        return;
+      }
+      if (feed.capturing) return;
+
       const now = Date.now();
-      const numConnections = connectionCount();
-      // When nobody is connected, publish at 1 FPS to keep NDI source discovery/preview responsive in OBS/vMix without wasting CPU
-      if (numConnections === 0 && options.idleWhenUnwatched !== false) {
-        if (captureTimer.lastIdleTick && now - captureTimer.lastIdleTick < 1000) return;
-        captureTimer.lastIdleTick = now;
+      const numConnections = getConnections(feed.sendInstance);
+      // When nobody is connected, publish at 1 FPS to keep NDI discovery responsive without wasting CPU
+      if (numConnections === 0) {
+        if (feed.lastIdleTick && now - feed.lastIdleTick < 1000) return;
+        feed.lastIdleTick = now;
       }
 
-      capturing = true;
+      feed.capturing = true;
       try {
         let rect = undefined;
-        if (displayWindow.getContentBounds) {
-          const bounds = displayWindow.getContentBounds();
+        if (feed.displayWindow.getContentBounds) {
+          const bounds = feed.displayWindow.getContentBounds();
           if (bounds && bounds.width > 0 && bounds.height > 0) {
             const scale = Math.min(bounds.width / 1920, bounds.height / 1080);
             const surfaceW = Math.max(1, Math.round(1920 * scale));
@@ -411,48 +410,160 @@ function createNdiService() {
             rect = { x: surfaceX, y: surfaceY, width: surfaceW, height: surfaceH };
           }
         }
-        let image = await displayWindow.capturePage(rect);
+        let image = await feed.displayWindow.capturePage(rect);
         if (image && !image.isEmpty()) {
-          const targetW = width || 1920;
-          const targetH = height || 1080;
-          
           const size = image.getSize();
           if (size.width !== targetW || size.height !== targetH) {
             image = image.resize({ width: targetW, height: targetH, quality: 'best' });
           }
-          
           const bitmap = image.toBitmap();
           if (bitmap && bitmap.length > 0) {
-            sendFrame(bitmap, targetW, targetH, fps);
+            const sent = sendVideoFrame(feed.sendInstance, bitmap, targetW, targetH, fps);
+            if (sent) feed.framesSent = (feed.framesSent || 0) + 1;
           }
         }
       } catch {
         // window closed mid-capture
       } finally {
-        capturing = false;
+        feed.capturing = false;
       }
-    }, Math.max(1000 / fps, 20));
+    }, Math.max(1000 / fps, 16));
+  }
+
+  function startFeed(feedConfig, displayWin) {
+    if (!feedConfig || !feedConfig.id) return { ok: false, error: 'Invalid feed config' };
+    const feedId = feedConfig.id;
+
+    if (activeFeeds.has(feedId)) {
+      const existing = activeFeeds.get(feedId);
+      if (displayWin && existing.displayWindow !== displayWin) {
+        existing.displayWindow = displayWin;
+        startFeedCapture(existing);
+      }
+      return { ok: true, feed: formatFeedStatus(existing), status: status() };
+    }
+
+    if (!initLibrary()) {
+      return { ok: false, error: lastError || 'NDI library not available', status: status() };
+    }
+
+    try {
+      const streamName = (feedConfig.name || DEFAULT_NDI_NAME).trim();
+      const sendInstance = api.sendCreate({
+        p_ndi_name: streamName,
+        p_groups: null,
+        clock_video: true,
+        clock_audio: false,
+      });
+
+      if (!sendInstance) {
+        return { ok: false, error: 'NDIlib_send_create returned null', status: status() };
+      }
+
+      const feed = {
+        id: feedId,
+        name: streamName,
+        sendInstance,
+        displayWindow: displayWin || null,
+        captureTimer: null,
+        framesSent: 0,
+        fps: feedConfig.fps || 30,
+        width: feedConfig.width || 1920,
+        height: feedConfig.height || 1080,
+        contentFilter: feedConfig.contentFilter || 'all',
+        renderMode: feedConfig.renderMode || 'follow_program',
+        transparentBg: feedConfig.transparentBg ?? (feedConfig.renderMode === 'lower_third_only'),
+        lastError: '',
+        capturing: false,
+      };
+
+      activeFeeds.set(feedId, feed);
+
+      if (displayWin) {
+        startFeedCapture(feed);
+      }
+
+      console.log(`NDI Feed started: [${feedId}] "${streamName}" (${feed.width}x${feed.height} @ ${feed.fps}fps, mode=${feed.renderMode}, filter=${feed.contentFilter})`);
+      return { ok: true, feed: formatFeedStatus(feed), status: status() };
+    } catch (err) {
+      return { ok: false, error: err.message, status: status() };
+    }
+  }
+
+  function setFeedWindow(feedId, win) {
+    const feed = activeFeeds.get(feedId);
+    if (!feed) return false;
+    feed.displayWindow = win;
+    startFeedCapture(feed);
     return true;
   }
 
-  function stopCapture() {
-    if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
-    capturing = false;
-  }
+  function stopFeed(feedId) {
+    const feed = activeFeeds.get(feedId);
+    if (!feed) return { ok: true, status: status() };
 
-  function stop() {
-    stopCapture();
-    isRunning = false;
-    if (sendInstance && api) {
-      try { api.sendDestroy(sendInstance); } catch { /* already gone */ }
+    if (feed.captureTimer) {
+      clearInterval(feed.captureTimer);
+      feed.captureTimer = null;
     }
-    sendInstance = null;
-    displayWindow = null;
+    if (feed.sendInstance && api) {
+      try { api.sendDestroy(feed.sendInstance); } catch { /* ignore */ }
+    }
+    feed.sendInstance = null;
+    feed.displayWindow = null;
+    activeFeeds.delete(feedId);
+    console.log(`NDI Feed stopped: [${feedId}] "${feed.name}"`);
     return { ok: true, status: status() };
   }
 
+  function stopAll() {
+    for (const feedId of Array.from(activeFeeds.keys())) {
+      stopFeed(feedId);
+    }
+    return { ok: true, status: status() };
+  }
+
+  // Backwards compatibility methods
+  function start(name) {
+    const defaultId = 'default-ndi-feed';
+    return startFeed({ id: defaultId, name: name || DEFAULT_NDI_NAME, fps: 30, width: 1920, height: 1080 });
+  }
+
+  function setDisplayWindow(win) {
+    // If only one feed or default feed, attach displayWindow
+    const defaultFeed = activeFeeds.get('default-ndi-feed') || Array.from(activeFeeds.values())[0];
+    if (defaultFeed) {
+      setFeedWindow(defaultFeed.id, win);
+    }
+  }
+
+  function startCapture(fps = 30, options = {}) {
+    const defaultFeed = activeFeeds.get('default-ndi-feed') || Array.from(activeFeeds.values())[0];
+    if (defaultFeed) {
+      if (options.width) defaultFeed.width = options.width;
+      if (options.height) defaultFeed.height = options.height;
+      defaultFeed.fps = fps;
+      startFeedCapture(defaultFeed);
+      return true;
+    }
+    return false;
+  }
+
+  function stopCapture() {
+    for (const feed of activeFeeds.values()) {
+      if (feed.captureTimer) {
+        clearInterval(feed.captureTimer);
+        feed.captureTimer = null;
+      }
+    }
+  }
+
+  function stop() {
+    return stopAll();
+  }
+
   function destroy() {
-    stop();
+    stopAll();
     if (api) {
       try { api.destroy(); } catch { /* already gone */ }
     }
@@ -461,7 +572,24 @@ function createNdiService() {
     return { ok: true };
   }
 
-  return { status, start, stop, destroy, setDisplayWindow, startCapture, stopCapture, sendFrame, connectionCount };
+  return {
+    status,
+    start,
+    stop,
+    destroy,
+    startFeed,
+    stopFeed,
+    stopAll,
+    setFeedWindow,
+    getFeedStatus,
+    getAllFeedStatuses,
+    setDisplayWindow,
+    startCapture,
+    stopCapture,
+    connectionCount: () => status().connections,
+    activeFeeds,
+  };
 }
 
 module.exports = { createNdiService, findLib, FOURCC_BGRA, DEFAULT_NDI_NAME };
+

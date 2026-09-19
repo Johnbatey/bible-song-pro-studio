@@ -1802,6 +1802,13 @@ export function BiblePanel() {
                         reference: `${verse.reference} (${verse.version || selectedVersion})`,
                         version: verse.version || selectedVersion,
                       },
+                      transition: {
+                        type: fxSettings.transitionType,
+                        duration: fxSettings.duration,
+                        easing: 'ease',
+                        animateBackground: fxSettings.animateBackground,
+                      },
+                      animateBackground: fxSettings.animateBackground,
                     };
                     const queuePayload = {
                       reference: verse.reference,
@@ -1953,6 +1960,13 @@ export function BiblePanel() {
                           reference: `${verse.reference} (${verse.version || selectedVersion})`,
                           version: verse.version || selectedVersion,
                         },
+                        transition: {
+                          type: fxSettings.transitionType,
+                          duration: fxSettings.duration,
+                          easing: 'ease',
+                          animateBackground: fxSettings.animateBackground,
+                        },
+                        animateBackground: fxSettings.animateBackground,
                       };
                       addToQueue({
                         reference: verse.reference,
