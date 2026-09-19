@@ -68,31 +68,31 @@ export function App() {
   const isShortcutsOpen = useAppStore((s) => s.isShortcutsOpen);
   const closeShortcuts = useAppStore((s) => s.closeShortcuts);
 
-  /* Global Keyboard Shortcuts (Cmd+K for Spotlight, ? / ⌘/ / F1 for Shortcuts Sheet) */
+  /* Global Keyboard Shortcuts (Spotlight, Cheat Sheet, Take, Settings, Output Mode, Studio Mode, Blackout, Logo, ESC, Next/Prev) */
   useEffect(() => {
     function handleGlobalKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       const isInput = tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable;
+      const isMod = e.metaKey || e.ctrlKey;
 
-      // Spotlight Command Palette (Cmd+K / Ctrl+K)
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      // 1. Spotlight Command Palette (Cmd+K / Ctrl+K)
+      if (isMod && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         e.stopPropagation();
         setIsCommandPaletteOpen((prev) => !prev);
         return;
       }
 
-      // Keyboard Shortcuts Cheat Sheet: '?', 'Shift+/', 'Cmd+/', 'Ctrl+/', 'F1'
+      // 2. Keyboard Shortcuts Cheat Sheet: '?', 'Shift+/', 'Cmd+/', 'Ctrl+/', 'F1'
       const isShortcutsKey =
         e.key === '?' ||
         e.key === 'F1' ||
-        ((e.metaKey || e.ctrlKey) && (e.key === '/' || e.code === 'Slash' || e.key === '?')) ||
+        (isMod && (e.key === '/' || e.code === 'Slash' || e.key === '?')) ||
         (e.shiftKey && (e.key === '/' || e.code === 'Slash'));
 
       if (isShortcutsKey) {
-        // When typing in an input field, only open shortcuts if modifier (Cmd/Ctrl) or F1 is pressed
-        if (isInput && !(e.metaKey || e.ctrlKey || e.key === 'F1')) {
+        if (isInput && !(isMod || e.key === 'F1')) {
           return;
         }
         e.preventDefault();
@@ -100,11 +100,159 @@ export function App() {
         useAppStore.getState().toggleShortcuts();
         return;
       }
+
+      // 3. Open Application Settings (Cmd+, / Ctrl+,)
+      if (isMod && !e.shiftKey && (e.key === ',' || e.key === '<')) {
+        e.preventDefault();
+        e.stopPropagation();
+        useAppStore.getState().openSettings();
+        return;
+      }
+
+      // 4. Emergency Audience Blackout (Cmd+Shift+B / Ctrl+Shift+B)
+      if (isMod && e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        e.stopPropagation();
+        const next = !useAppStore.getState().display.blackout;
+        useAppStore.getState().setBlackout(next);
+        useAppStore.getState().notify({
+          id: `blackout-${Date.now()}`,
+          text: next ? 'Emergency Blackout Active' : 'Blackout Deactivated',
+          type: next ? 'warning' : 'info',
+          duration: 3,
+          animation: 'slideDown',
+        });
+        return;
+      }
+
+      // 5. Studio Mode Take / Transition (F5 / Cmd+T / Ctrl+T)
+      if (e.key === 'F5' || (isMod && !e.shiftKey && e.key.toLowerCase() === 't')) {
+        e.preventDefault();
+        e.stopPropagation();
+        useAppStore.getState().takeToProgram(true);
+        return;
+      }
+
+      // 6. Toggle Output Mode: Fullscreen <-> Lower-Third (Cmd+D / Ctrl+D)
+      if (isMod && !e.shiftKey && e.key.toLowerCase() === 'd' && !useAppStore.getState().isSlideEditorOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        const current = useAppStore.getState().display.outputMode;
+        const next = current === 'fullscreen' ? 'lowerThird' : 'fullscreen';
+        useAppStore.getState().setOutputMode(next);
+        useAppStore.getState().notify({
+          id: `mode-toggle-${Date.now()}`,
+          text: `Output Mode: ${next === 'fullscreen' ? 'Fullscreen' : 'Lower-Third'}`,
+          type: 'info',
+          duration: 2.5,
+          animation: 'slideDown',
+        });
+        return;
+      }
+
+      // 7. Toggle Studio Mode: Basic <-> Studio (Cmd+M / Ctrl+M)
+      if (isMod && !e.shiftKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        e.stopPropagation();
+        const current = useAppStore.getState().display.mode;
+        const next = current === 'studio' ? 'basic' : 'studio';
+        useAppStore.getState().setMode(next);
+        useAppStore.getState().notify({
+          id: `studio-toggle-${Date.now()}`,
+          text: `Operating Mode: ${next === 'studio' ? 'Studio Mode (Live / Preview)' : 'Basic Mode (Direct)'}`,
+          type: 'info',
+          duration: 2.5,
+          animation: 'slideDown',
+        });
+        return;
+      }
+
+      // 8. Launch Pro Slide Editor (Cmd+E / Ctrl+E)
+      if (isMod && !e.shiftKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        e.stopPropagation();
+        useAppStore.getState().openSlideEditor();
+        return;
+      }
+
+      // 9. Logo / Standby Screen (Cmd+L / Ctrl+L)
+      if (isMod && !e.shiftKey && e.key.toLowerCase() === 'l') {
+        if (isInput) return;
+        e.preventDefault();
+        e.stopPropagation();
+        useAppStore.getState().clearProgram();
+        const standbyMedia = useAppStore.getState().standbyMedia;
+        useAppStore.getState().notify({
+          id: `logo-${Date.now()}`,
+          text: standbyMedia ? 'Logo Standby Screen Active' : 'Standby Screen Active',
+          type: 'info',
+          duration: 3,
+          animation: 'slideDown',
+        });
+        return;
+      }
+
+      // 10. Escape (ESC) key
+      if (e.key === 'Escape') {
+        const store = useAppStore.getState();
+        if (isCommandPaletteOpen) {
+          e.preventDefault();
+          setIsCommandPaletteOpen(false);
+          return;
+        }
+        if (store.isShortcutsOpen) {
+          e.preventDefault();
+          store.closeShortcuts();
+          return;
+        }
+        if (store.isSettingsOpen) {
+          e.preventDefault();
+          store.closeSettings();
+          return;
+        }
+        if (store.isSlideEditorOpen) {
+          e.preventDefault();
+          store.closeSlideEditor();
+          return;
+        }
+        if (store.isThemeStudioOpen) {
+          e.preventDefault();
+          store.closeThemeStudio();
+          return;
+        }
+        // If no modal is open, ESC clears live program output (Standby screen)
+        if (!isInput) {
+          e.preventDefault();
+          store.clearProgram();
+          store.notify({
+            id: `clear-${Date.now()}`,
+            text: 'Live Output Cleared (Standby Active)',
+            type: 'info',
+            duration: 2.5,
+            animation: 'slideDown',
+          });
+          return;
+        }
+      }
+
+      // 11. Next & Previous Navigation (ArrowRight / Space / PageDown & ArrowLeft / PageUp)
+      if (!isInput && !isMod) {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ' || e.code === 'Space') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('bsp:step-next'));
+          return;
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('bsp:step-prev'));
+          return;
+        }
+      }
     }
     // Listen in capture phase so focused panels cannot stop propagation before global shortcuts execute
     window.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleGlobalKeyDown, { capture: true });
-  }, []);
+  }, [isCommandPaletteOpen]);
 
   /* Cmd+Shift+B and the remote blackout endpoint both land here, so all three
      ways of blacking out go through the same store field. */

@@ -1190,8 +1190,30 @@ export function BiblePanel() {
         void sendAdjacentVerse(-1);
       }
     }
+    const handleStepNext = () => {
+      const activeScene = useAppStore.getState().display.currentScene;
+      const isFocused = isFocusedDock(containerRef.current);
+      if (isFocused || activeScene?.type === 'bible' || activeScene?.id?.startsWith('bible-')) {
+        void sendAdjacentVerse(1);
+      }
+    };
+
+    const handleStepPrev = () => {
+      const activeScene = useAppStore.getState().display.currentScene;
+      const isFocused = isFocusedDock(containerRef.current);
+      if (isFocused || activeScene?.type === 'bible' || activeScene?.id?.startsWith('bible-')) {
+        void sendAdjacentVerse(-1);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('bsp:step-next', handleStepNext);
+    window.addEventListener('bsp:step-prev', handleStepPrev);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('bsp:step-next', handleStepNext);
+      window.removeEventListener('bsp:step-prev', handleStepPrev);
+    };
   }, [visibleVerses, currentScene, previewScene, dualVersion, secondaryVersion, selectedVersion, outputMode, operatingMode]);
 
   const chapterLabel = results.length

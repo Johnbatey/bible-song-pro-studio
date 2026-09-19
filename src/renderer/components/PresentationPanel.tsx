@@ -745,8 +745,30 @@ export function PresentationPanel() {
       }
     }
 
+    const handleStepNext = () => {
+      const activeScene = useAppStore.getState().display.currentScene;
+      const isFocused = isFocusedDock(containerRef.current);
+      if (selectedDeck && (isFocused || activeScene?.type === 'presentation' || activeScene?.id?.startsWith('slide-') || activeScene?.id?.startsWith('pptx-'))) {
+        stepSlide(1);
+      }
+    };
+
+    const handleStepPrev = () => {
+      const activeScene = useAppStore.getState().display.currentScene;
+      const isFocused = isFocusedDock(containerRef.current);
+      if (selectedDeck && (isFocused || activeScene?.type === 'presentation' || activeScene?.id?.startsWith('slide-') || activeScene?.id?.startsWith('pptx-'))) {
+        stepSlide(-1);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('bsp:step-next', handleStepNext);
+    window.addEventListener('bsp:step-prev', handleStepPrev);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('bsp:step-next', handleStepNext);
+      window.removeEventListener('bsp:step-prev', handleStepPrev);
+    };
   }, [selectedDeck, filteredPage2Slides, currentScene, previewScene, isStudio, slideFxSettings]);
 
   /* Follow-Live Auto-Scroll: Keeps the active/cued slide smoothly in view */

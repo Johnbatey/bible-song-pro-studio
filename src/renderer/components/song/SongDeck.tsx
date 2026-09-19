@@ -451,8 +451,30 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
         step(-1);
       }
     }
+    const handleStepNext = () => {
+      const activeScene = useAppStore.getState().display.currentScene;
+      const isFocused = isFocusedDock(rootRef.current);
+      if (song && (isFocused || activeScene?.type === 'song' || activeScene?.id?.startsWith('song-'))) {
+        step(1);
+      }
+    };
+
+    const handleStepPrev = () => {
+      const activeScene = useAppStore.getState().display.currentScene;
+      const isFocused = isFocusedDock(rootRef.current);
+      if (song && (isFocused || activeScene?.type === 'song' || activeScene?.id?.startsWith('song-'))) {
+        step(-1);
+      }
+    };
+
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('bsp:step-next', handleStepNext);
+    window.addEventListener('bsp:step-prev', handleStepPrev);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('bsp:step-next', handleStepNext);
+      window.removeEventListener('bsp:step-prev', handleStepPrev);
+    };
   });
 
   return (
