@@ -11,7 +11,6 @@ export function TitleBar() {
   const mode = useAppStore((s) => s.display.mode);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
-  const takeToProgram = useAppStore((s) => s.takeToProgram);
   const setExternalDisplay = useAppStore((s) => s.setExternalDisplay);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
   const activeAlert = useAppStore((s) => s.activeAlert);
@@ -49,7 +48,6 @@ export function TitleBar() {
 
   const [isFullScreen, setIsFullScreen] = useState(false);
   const isStudio = mode === 'studio';
-  const hasPendingTake = isStudio && Boolean(previewScene) && currentScene?.id !== previewScene?.id;
 
   useEffect(() => {
     if (window.BSP) {
@@ -418,28 +416,6 @@ export function TitleBar() {
 
       {/* Right Controls: Live status, Black, Toolbar & Window Actions */}
       <div style={styles.controlsRight}>
-        {/* Cut / Fade Buttons if Studio Pending */}
-        {hasPendingTake && (
-          <div style={styles.takeGroup}>
-            <button
-              className="btn btn-sm btn-secondary"
-              style={styles.takeBtn}
-              onClick={() => takeToProgram(false)}
-              title="Cut directly to Program live (Instant)"
-            >
-              Cut
-            </button>
-            <button
-              className="btn btn-sm btn-primary"
-              style={{ ...styles.takeBtn, background: 'var(--accent)', borderColor: 'var(--accent)' }}
-              onClick={() => takeToProgram(true)}
-              title="Fade smoothly into Program live (Smooth transition)"
-            >
-              Fade
-            </button>
-          </div>
-        )}
-
         {/* Live / Standby / Blackout Dynamic Status Pill */}
         <button
           type="button"

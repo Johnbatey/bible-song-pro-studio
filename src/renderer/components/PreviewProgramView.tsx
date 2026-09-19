@@ -51,6 +51,7 @@ interface PreviewProgramViewProps {
 export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = {}) {
   const currentScene = useAppStore((s) => s.display.currentScene);
   const previewScene = useAppStore((s) => s.display.previewScene);
+  const takeToProgram = useAppStore((s) => s.takeToProgram);
   const isTransitioning = useAppStore((s) => s.display.isTransitioning);
   const mode = useAppStore((s) => s.display.mode);
   const setMode = useAppStore((s) => s.setMode);
@@ -289,6 +290,27 @@ export function PreviewProgramView({ onPanelChange }: PreviewProgramViewProps = 
             </svg>
             <span>Studio</span>
           </button>
+
+            {/* In Studio mode, Cut & Fade take buttons beside FS/LT (before FS & LT) */}
+            {isStudio && (
+              <BlockSegment>
+                <BlockButton
+                  disabled={!previewScene}
+                  onClick={() => takeToProgram(false)}
+                  title="Cut directly to Program live (Instant)"
+                >
+                  Cut
+                </BlockButton>
+                <BlockButton
+                  disabled={!previewScene}
+                  onClick={() => takeToProgram(true)}
+                  title="Fade smoothly into Program live (Smooth transition)"
+                  style={hasPendingTake ? { color: '#fb923c', fontWeight: 600 } : undefined}
+                >
+                  Fade
+                </BlockButton>
+              </BlockSegment>
+            )}
 
             <BlockSegment>
               <BlockButton
