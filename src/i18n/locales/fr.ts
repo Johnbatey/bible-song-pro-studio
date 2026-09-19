@@ -183,7 +183,7 @@ export const fr: MessageCatalog = {
   'settings.output.customStandby': 'Média de veille actif : {name}',
   'settings.output.resetDefaultStandby': 'Effacer le média de veille',
   'settings.output.ndiTitle': 'Sortie vidéo réseau NDI®',
-  'settings.output.ndiSub': 'Publier la sortie Program en live sur le réseau local pour OBS, vMix et récepteurs NDI',
+  'settings.output.ndiSub': 'Créer et personnaliser des flux réseau NDI indépendants avec forçage des modes Lower-Third et plein écran.',
   'settings.output.ndiRuntimeMissing': 'Le runtime NDI n’est pas installé sur cet ordinateur, rien à publier.',
   'settings.output.ndiSourceName': 'Nom de source NDI',
   'settings.output.ndiFps': 'Fréquence d’images cible',

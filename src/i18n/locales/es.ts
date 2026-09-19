@@ -183,7 +183,7 @@ export const es: MessageCatalog = {
   'settings.output.customStandby': 'Medio de espera activo: {name}',
   'settings.output.resetDefaultStandby': 'Borrar medio de espera',
   'settings.output.ndiTitle': 'Salida de vídeo en red NDI®',
-  'settings.output.ndiSub': 'Publicar salida Program en vivo por red local para OBS, vMix y receptores NDI',
+  'settings.output.ndiSub': 'Crear y personalizar flujos de red NDI independientes con anulación de modo Lower-Third y pantalla completa.',
   'settings.output.ndiRuntimeMissing': 'El runtime NDI no está instalado en este equipo, no hay nada que publicar.',
   'settings.output.ndiSourceName': 'Nombre de fuente NDI',
   'settings.output.ndiFps': 'Framerate objetivo',

@@ -1287,7 +1287,7 @@ export function SettingsModal() {
                     <div>
                       <div style={modalStyles.rowTitle}>{t('settings.output.ndiTitle')}</div>
                       <div style={modalStyles.rowSub}>
-                        Create &amp; customize independent NDI network streams for OBS, vMix, and broadcast switchers with Lower-Third and Fullscreen mode overrides.
+                        {t('settings.output.ndiSub')}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>

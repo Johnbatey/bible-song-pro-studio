@@ -183,7 +183,7 @@ export const en: MessageCatalog = {
   'settings.output.customStandby': 'Active Standby Media: {name}',
   'settings.output.resetDefaultStandby': 'Clear Standby Media',
   'settings.output.ndiTitle': 'NDI® Network Video Output',
-  'settings.output.ndiSub': 'Publish program output live over local network for OBS, vMix, and NDI receivers',
+  'settings.output.ndiSub': 'Create & customize independent NDI network streams with Lower-Third and Fullscreen mode overrides.',
   'settings.output.ndiRuntimeMissing': 'The NDI runtime is not installed on this computer, so there is nothing to publish to.',
   'settings.output.ndiSourceName': 'NDI Source Name',
   'settings.output.ndiFps': 'Target Frame Rate',

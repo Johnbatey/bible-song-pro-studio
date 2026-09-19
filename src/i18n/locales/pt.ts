@@ -183,7 +183,7 @@ export const pt: MessageCatalog = {
   'settings.output.customStandby': 'Média de espera ativa: {name}',
   'settings.output.resetDefaultStandby': 'Limpar média de espera',
   'settings.output.ndiTitle': 'Saída de vídeo em rede NDI®',
-  'settings.output.ndiSub': 'Publicar saída Program ao vivo na rede local para OBS, vMix e recetores NDI',
+  'settings.output.ndiSub': 'Criar e personalizar transmissões de rede NDI independentes com sobreposição de modo Lower-Third e ecrã inteiro.',
   'settings.output.ndiRuntimeMissing': 'O runtime NDI não está instalado neste computador, nada para publicar.',
   'settings.output.ndiSourceName': 'Nome da fonte NDI',
   'settings.output.ndiFps': 'Taxa de fotogramas alvo',
