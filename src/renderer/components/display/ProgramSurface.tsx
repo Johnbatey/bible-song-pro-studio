@@ -397,10 +397,7 @@ export interface ProgramSurfaceState {
   blackout?: boolean;
   settings?: Partial<AppSettings>;
   /**
-   * Whether an idle screen shows the "Bible Song Pro / Waiting for signal"
-   * card. Defaults on, so a caller that knows nothing about it behaves as
-   * before; Settings → Displays & Output turns it off for a room where a
-   * branded holding card between items is a distraction.
+   * Whether an idle screen shows standby media. Turn off to leave screens black between items.
    */
   showStandbyBrand?: boolean;
   standbyMedia?: { url: string; type: 'image' | 'video'; name?: string } | null;

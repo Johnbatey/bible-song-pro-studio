@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { MediaGrid } from './MediaGrid';
 import { CircularAngleDial, PRO_GRADIENT_PRESETS } from './BackgroundPicker';
 import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
@@ -235,6 +235,14 @@ export function ThemeEditorForm({
     }
   });
 
+  const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
+  const [fontSearchQuery, setFontSearchQuery] = useState('');
+  const [highlightedFont, setHighlightedFont] = useState<string | null>(null);
+  const fontMenuRef = useRef<HTMLDivElement>(null);
+  const fontListRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const initialFontRef = useRef<string>('');
+
   useEffect(() => {
     let mounted = true;
     fetchInstalledSystemFonts().then((fonts) => {
@@ -247,8 +255,96 @@ export function ThemeEditorForm({
     };
   }, []);
 
+  useEffect(() => {
+    if (!isFontMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fontMenuRef.current && !fontMenuRef.current.contains(e.target as Node)) {
+        setIsFontMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [isFontMenuOpen]);
+
+  useEffect(() => {
+    if (isFontMenuOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isFontMenuOpen]);
+
+  const defaultBundledFonts: FontOptionItem[] = useMemo(() => [
+    { value: '-apple-system, SF Pro Display, sans-serif', label: 'SF Pro Display' },
+    { value: 'Inter, sans-serif', label: 'Inter' },
+    { value: 'Poppins, sans-serif', label: 'Poppins' },
+    { value: 'Georgia, serif', label: 'Georgia' },
+    { value: "'Playfair Display', serif", label: 'Playfair Display' },
+    { value: "'Montserrat', sans-serif", label: 'Montserrat' },
+    { value: "'Cinzel', serif", label: 'Cinzel' },
+    { value: "'Roboto', sans-serif", label: 'Roboto' },
+    { value: "'Bebas Neue', sans-serif", label: 'Bebas Neue' },
+    { value: "'Crimson Pro', serif", label: 'Crimson Pro' },
+    { value: "'Lora', serif", label: 'Lora' },
+    { value: "'Oswald', sans-serif", label: 'Oswald' },
+  ], []);
+
+  const bundledFonts = useMemo(() => {
+    return fontOptions.length > 0
+      ? fontOptions.filter((f) => !f.isSystemFont)
+      : defaultBundledFonts;
+  }, [fontOptions, defaultBundledFonts]);
+
+  const installedSystemFonts = useMemo(() => {
+    return fontOptions.filter((f) => f.isSystemFont);
+  }, [fontOptions]);
+
+  const q = fontSearchQuery.toLowerCase().trim();
+
+  const filteredRecent = useMemo(() => {
+    return recentFonts.filter((rf) => !q || rf.toLowerCase().includes(q));
+  }, [recentFonts, q]);
+
+  const filteredBundled = useMemo(() => {
+    return bundledFonts.filter((f) => !q || f.label.toLowerCase().includes(q) || f.value.toLowerCase().includes(q));
+  }, [bundledFonts, q]);
+
+  const filteredInstalled = useMemo(() => {
+    return installedSystemFonts.filter((f) => !q || f.label.toLowerCase().includes(q) || f.value.toLowerCase().includes(q));
+  }, [installedSystemFonts, q]);
+
+  // Flattened list for keyboard navigation and preview tracking
+  const flatVisibleFonts = useMemo(() => {
+    const list: { value: string; label: string }[] = [];
+    const seen = new Set<string>();
+    filteredRecent.forEach((rf) => {
+      if (!seen.has(rf)) {
+        seen.add(rf);
+        const match = fontOptions.find((f) => f.value === rf) || defaultBundledFonts.find((f) => f.value === rf);
+        list.push({ value: rf, label: match ? match.label : rf.split(',')[0].replace(/['"]/g, '').trim() });
+      }
+    });
+    filteredBundled.forEach((f) => {
+      if (!seen.has(f.value)) {
+        seen.add(f.value);
+        list.push(f);
+      }
+    });
+    filteredInstalled.forEach((f) => {
+      if (!seen.has(f.value)) {
+        seen.add(f.value);
+        list.push(f);
+      }
+    });
+    return list;
+  }, [filteredRecent, filteredBundled, filteredInstalled, fontOptions, defaultBundledFonts]);
+
+  const handlePreviewFont = (fontValue: string) => {
+    setHighlightedFont(fontValue);
+    onChange({ fontFamily: fontValue });
+  };
+
   const handleFontSelect = (fontName: string) => {
     onChange({ fontFamily: fontName });
+    setHighlightedFont(fontName);
     try {
       const raw = localStorage.getItem('bsp_recent_fonts');
       const list: string[] = raw ? JSON.parse(raw) : [];
@@ -256,6 +352,64 @@ export function ThemeEditorForm({
       localStorage.setItem('bsp_recent_fonts', JSON.stringify(updated));
       setRecentFonts(updated);
     } catch {}
+  };
+
+  const handleCommitFont = (fontValue: string) => {
+    handleFontSelect(fontValue);
+    setIsFontMenuOpen(false);
+  };
+
+  const handleCancelFont = () => {
+    if (initialFontRef.current) {
+      onChange({ fontFamily: initialFontRef.current });
+    }
+    setIsFontMenuOpen(false);
+  };
+
+  const handleFontKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCancelFont();
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (flatVisibleFonts.length === 0) return;
+      const currentVal = highlightedFont || values.fontFamily || '-apple-system, SF Pro Display, sans-serif';
+      const currentIndex = flatVisibleFonts.findIndex((f) => f.value === currentVal);
+      const nextIndex = currentIndex < flatVisibleFonts.length - 1 ? currentIndex + 1 : 0;
+      const nextFont = flatVisibleFonts[nextIndex];
+      if (nextFont) {
+        handlePreviewFont(nextFont.value);
+        const el = fontListRef.current?.querySelector(`[data-font-idx="${nextIndex}"]`);
+        el?.scrollIntoView({ block: 'nearest' });
+      }
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (flatVisibleFonts.length === 0) return;
+      const currentVal = highlightedFont || values.fontFamily || '-apple-system, SF Pro Display, sans-serif';
+      const currentIndex = flatVisibleFonts.findIndex((f) => f.value === currentVal);
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : flatVisibleFonts.length - 1;
+      const prevFont = flatVisibleFonts[prevIndex];
+      if (prevFont) {
+        handlePreviewFont(prevFont.value);
+        const el = fontListRef.current?.querySelector(`[data-font-idx="${prevIndex}"]`);
+        el?.scrollIntoView({ block: 'nearest' });
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlightedFont) {
+        handleCommitFont(highlightedFont);
+      } else if (flatVisibleFonts.length > 0) {
+        handleCommitFont(flatVisibleFonts[0].value);
+      }
+      return;
+    }
   };
 
   const safeInt = (val: string | number, fallback = 0) => {
@@ -392,70 +546,365 @@ export function ThemeEditorForm({
         onReset={() => {
           onChange({
             fontFamily: '-apple-system, SF Pro Display, sans-serif',
-            fontSize: surface === 'full' ? 54 : 36,
-            referenceFontSize: surface === 'full' ? 34 : 24,
+            fontSize: surface === 'full' ? 65 : 36,
+            referenceFontSize: surface === 'full' ? 40 : 24,
             fontWeight: 700,
             textAlign: 'center',
             lineHeight: 1.35,
           });
         }}
       >
-        {/* Font Family Dropdown with System & Installed Fonts */}
-        <div className="studio-field-box">
+        {/* Font Family Custom Selector with Live Hover/Navigation Canvas Preview */}
+        <div className="studio-field-box" style={{ position: 'relative' }} ref={fontMenuRef}>
           <span className="studio-field-label">Font Family</span>
-          <select
-            className="studio-select"
-            value={values.fontFamily || '-apple-system, SF Pro Display, sans-serif'}
-            onChange={(e) => handleFontSelect(e.target.value)}
-          >
-            {/* 1. Recently Used Fonts (Up to 3) */}
-            {recentFonts.length > 0 && (
-              <optgroup label="── Recently Used ──">
-                {recentFonts.map((rf) => (
-                  <option key={`recent-${rf}`} value={rf}>
-                    {rf}
-                  </option>
-                ))}
-              </optgroup>
-            )}
+          {(() => {
+            const currentVal = values.fontFamily || '-apple-system, SF Pro Display, sans-serif';
+            const matchedOpt = fontOptions.find((f) => f.value === currentVal) || defaultBundledFonts.find((f) => f.value === currentVal);
+            const currentLabel = matchedOpt ? matchedOpt.label : (currentVal.split(',')[0].replace(/['"]/g, '').trim() || 'SF Pro Display');
 
-            {/* 2. Bundled & Google Fonts */}
-            <optgroup label="── Bundled Fonts ──">
-              {(fontOptions.length > 0 ? fontOptions.filter((f) => !f.isSystemFont) : [
-                { value: '-apple-system, SF Pro Display, sans-serif', label: 'SF Pro Display' },
-                { value: 'Inter, sans-serif', label: 'Inter' },
-                { value: 'Poppins, sans-serif', label: 'Poppins' },
-                { value: 'Georgia, serif', label: 'Georgia' },
-                { value: "'Playfair Display', serif", label: 'Playfair Display' },
-                { value: "'Montserrat', sans-serif", label: 'Montserrat' },
-                { value: "'Cinzel', serif", label: 'Cinzel' },
-                { value: "'Roboto', sans-serif", label: 'Roboto' },
-              ]).map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </optgroup>
+            let globalIdxCounter = 0;
 
-            {/* 3. Locally Installed System Fonts */}
-            {fontOptions.filter((f) => f.isSystemFont).length > 0 && (
-              <optgroup label="── Installed PC Fonts ──">
-                {fontOptions
-                  .filter((f) => f.isSystemFont)
-                  .map((f) => (
-                    <option key={f.value} value={f.value}>
-                      {f.label}
-                    </option>
-                  ))}
-              </optgroup>
-            )}
-          </select>
+            return (
+              <>
+                <button
+                  type="button"
+                  className="studio-select"
+                  onClick={() => {
+                    if (!isFontMenuOpen) {
+                      initialFontRef.current = values.fontFamily || '-apple-system, SF Pro Display, sans-serif';
+                      setHighlightedFont(initialFontRef.current);
+                      setIsFontMenuOpen(true);
+                      setFontSearchQuery('');
+                    } else {
+                      setIsFontMenuOpen(false);
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    paddingRight: 8,
+                  }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: currentVal }}>
+                    {currentLabel}
+                  </span>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      transform: isFontMenuOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.15s ease',
+                      opacity: 0.6,
+                      flexShrink: 0,
+                      marginLeft: 6,
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Popover */}
+                {isFontMenuOpen && (
+                  <div
+                    tabIndex={0}
+                    onKeyDown={handleFontKeyDown}
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      right: 0,
+                      zIndex: 1000,
+                      background: 'var(--bg-elevated, #1c1b1d)',
+                      border: '1px solid var(--border-primary, #333235)',
+                      borderRadius: 8,
+                      boxShadow: '0 16px 40px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0,0,0,0.5)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      maxHeight: 340,
+                      outline: 'none',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {/* Search Input Bar */}
+                    <div
+                      style={{
+                        padding: '6px 8px',
+                        borderBottom: '1px solid var(--border-primary, #2A282A)',
+                        background: 'var(--bsp-raised, #161516)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid var(--border-primary, #2A282A)',
+                          borderRadius: 4,
+                          padding: '2px 6px',
+                          height: 26,
+                        }}
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--text-dim, #717075)"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ marginRight: 6, flexShrink: 0 }}
+                        >
+                          <circle cx="11" cy="11" r="8" />
+                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <input
+                          ref={searchInputRef}
+                          type="text"
+                          value={fontSearchQuery}
+                          onChange={(e) => setFontSearchQuery(e.target.value)}
+                          placeholder="Search fonts..."
+                          style={{
+                            flex: 1,
+                            background: 'transparent',
+                            border: 'none',
+                            outline: 'none',
+                            color: '#fff',
+                            fontSize: 11,
+                            fontFamily: 'inherit',
+                            padding: 0,
+                            minWidth: 0,
+                          }}
+                        />
+                        {fontSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setFontSearchQuery('')}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--text-dim, #717075)',
+                              cursor: 'pointer',
+                              padding: '0 2px',
+                              fontSize: 11,
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Scrollable Font List */}
+                    <div
+                      ref={fontListRef}
+                      style={{
+                        flex: 1,
+                        overflowY: 'auto',
+                        padding: '4px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1,
+                      }}
+                    >
+                      {flatVisibleFonts.length === 0 ? (
+                        <div style={{ padding: '16px 12px', textAlign: 'center', fontSize: 11, color: 'var(--text-dim, #717075)' }}>
+                          No fonts found matching "{fontSearchQuery}"
+                        </div>
+                      ) : (
+                        <>
+                          {/* 1. Recently Used Fonts */}
+                          {filteredRecent.length > 0 && (
+                            <div>
+                              <div
+                                style={{
+                                  padding: '6px 8px 3px 8px',
+                                  fontSize: 10,
+                                  color: 'var(--text-dim, #717075)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.08em',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Recently Used
+                              </div>
+                              {filteredRecent.map((rf) => {
+                                const idx = globalIdxCounter++;
+                                const matched = fontOptions.find((f) => f.value === rf) || defaultBundledFonts.find((f) => f.value === rf);
+                                const lbl = matched ? matched.label : rf.split(',')[0].replace(/['"]/g, '').trim();
+                                const isSelected = (values.fontFamily || '-apple-system, SF Pro Display, sans-serif') === rf;
+                                const isHighlighted = (highlightedFont || values.fontFamily) === rf;
+
+                                return (
+                                  <div
+                                    key={`recent-${rf}`}
+                                    data-font-idx={idx}
+                                    onClick={() => handleCommitFont(rf)}
+                                    onMouseEnter={() => handlePreviewFont(rf)}
+                                    style={{
+                                      padding: '5px 8px',
+                                      borderRadius: 4,
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      background: isSelected
+                                        ? 'var(--accent-dim, rgba(235, 94, 40, 0.2))'
+                                        : isHighlighted
+                                        ? 'rgba(255, 255, 255, 0.08)'
+                                        : 'transparent',
+                                      color: isSelected ? 'var(--accent, #EB5E28)' : 'var(--text-primary, #E4E3E5)',
+                                      transition: 'background 0.08s ease',
+                                    }}
+                                  >
+                                    <span style={{ fontFamily: rf, fontSize: 13 }}>{lbl}</span>
+                                    {isSelected && (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* 2. Bundled Fonts */}
+                          {filteredBundled.length > 0 && (
+                            <div>
+                              <div
+                                style={{
+                                  padding: '6px 8px 3px 8px',
+                                  fontSize: 10,
+                                  color: 'var(--text-dim, #717075)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.08em',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Bundled Fonts
+                              </div>
+                              {filteredBundled.map((f) => {
+                                const idx = globalIdxCounter++;
+                                const isSelected = (values.fontFamily || '-apple-system, SF Pro Display, sans-serif') === f.value;
+                                const isHighlighted = (highlightedFont || values.fontFamily) === f.value;
+
+                                return (
+                                  <div
+                                    key={`bundled-${f.value}`}
+                                    data-font-idx={idx}
+                                    onClick={() => handleCommitFont(f.value)}
+                                    onMouseEnter={() => handlePreviewFont(f.value)}
+                                    style={{
+                                      padding: '5px 8px',
+                                      borderRadius: 4,
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      background: isSelected
+                                        ? 'var(--accent-dim, rgba(235, 94, 40, 0.2))'
+                                        : isHighlighted
+                                        ? 'rgba(255, 255, 255, 0.08)'
+                                        : 'transparent',
+                                      color: isSelected ? 'var(--accent, #EB5E28)' : 'var(--text-primary, #E4E3E5)',
+                                      transition: 'background 0.08s ease',
+                                    }}
+                                  >
+                                    <span style={{ fontFamily: f.value, fontSize: 13 }}>{f.label}</span>
+                                    {isSelected && (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* 3. Installed System Fonts */}
+                          {filteredInstalled.length > 0 && (
+                            <div>
+                              <div
+                                style={{
+                                  padding: '6px 8px 3px 8px',
+                                  fontSize: 10,
+                                  color: 'var(--text-dim, #717075)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.08em',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Installed PC Fonts ({installedSystemFonts.length})
+                              </div>
+                              {filteredInstalled.map((f) => {
+                                const idx = globalIdxCounter++;
+                                const isSelected = (values.fontFamily || '-apple-system, SF Pro Display, sans-serif') === f.value;
+                                const isHighlighted = (highlightedFont || values.fontFamily) === f.value;
+
+                                return (
+                                  <div
+                                    key={`sys-${f.value}`}
+                                    data-font-idx={idx}
+                                    onClick={() => handleCommitFont(f.value)}
+                                    onMouseEnter={() => handlePreviewFont(f.value)}
+                                    style={{
+                                      padding: '5px 8px',
+                                      borderRadius: 4,
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      background: isSelected
+                                        ? 'var(--accent-dim, rgba(235, 94, 40, 0.2))'
+                                        : isHighlighted
+                                        ? 'rgba(255, 255, 255, 0.08)'
+                                        : 'transparent',
+                                      color: isSelected ? 'var(--accent, #EB5E28)' : 'var(--text-primary, #E4E3E5)',
+                                      transition: 'background 0.08s ease',
+                                    }}
+                                  >
+                                    <span style={{ fontFamily: f.value, fontSize: 13 }}>{f.label}</span>
+                                    {isSelected && (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         {/* Font Size Slider */}
         <StudioSlider
           label="Font Size"
-          value={values.fontSize ?? (surface === 'full' ? 54 : 36)}
+          value={values.fontSize ?? (surface === 'full' ? 65 : 36)}
           min={16}
           max={120}
           unit="px"
@@ -526,52 +975,48 @@ export function ThemeEditorForm({
           </div>
         </div>
 
-        {/* Verse / Text Colour */}
+        {/* Verse Colour */}
         <StudioColorPicker
           label={contentMode === 'song' ? 'Text Colour' : 'Verse Colour'}
           value={values.fontColor || '#ffffff'}
           onChange={(col) => onChange({ fontColor: col })}
         />
 
-        {contentMode === 'bible' && (
-          <>
-            {/* Reference Size Slider */}
-            <StudioSlider
-              label="Reference Size"
-              value={values.referenceFontSize ?? (surface === 'full' ? 34 : 24)}
-              min={12}
-              max={60}
-              unit="px"
-              onChange={(val) => onChange({ referenceFontSize: val })}
-            />
+        {/* Reference Size Slider */}
+        <StudioSlider
+          label="Reference Size"
+          value={values.referenceFontSize ?? (surface === 'full' ? 40 : 24)}
+          min={12}
+          max={60}
+          unit="px"
+          onChange={(val) => onChange({ referenceFontSize: val })}
+        />
 
-            {/* Reference Colour & Match Verse Toggle */}
-            <div className="studio-grid-2">
-              <StudioColorPicker
-                label="Reference Colour"
-                disabled={Boolean(values.syncRefColor)}
-                value={values.syncRefColor ? (values.fontColor || '#ffffff') : (values.referenceColor || values.savedRefColor || '#FF5500')}
-                onChange={(col) => onChange({ referenceColor: col, savedRefColor: col, syncRefColor: false })}
-              />
-              <div className="studio-field-box" style={{ justifyContent: 'center', height: '100%', paddingBottom: 6 }}>
-                <StudioToggle
-                  label="Match Verse"
-                  checked={Boolean(values.syncRefColor)}
-                  onChange={(checked) => {
-                    const rememberedRefColor = values.referenceColor && values.referenceColor !== values.fontColor
-                      ? values.referenceColor
-                      : (values.savedRefColor || values.accentColor || '#FF5500');
-                    onChange({
-                      syncRefColor: checked,
-                      savedRefColor: rememberedRefColor,
-                      referenceColor: checked ? (values.fontColor || '#ffffff') : rememberedRefColor,
-                    });
-                  }}
-                />
-              </div>
-            </div>
-          </>
-        )}
+        {/* Reference Colour & Match Verse Toggle */}
+        <div className="studio-grid-2">
+          <StudioColorPicker
+            label="Reference Colour"
+            disabled={Boolean(values.syncRefColor)}
+            value={values.syncRefColor ? (values.fontColor || '#ffffff') : (values.referenceColor || values.savedRefColor || '#FF5500')}
+            onChange={(col) => onChange({ referenceColor: col, savedRefColor: col, syncRefColor: false })}
+          />
+          <div className="studio-field-box" style={{ justifyContent: 'center', height: '100%', paddingBottom: 6 }}>
+            <StudioToggle
+              label="Match Verse"
+              checked={Boolean(values.syncRefColor)}
+              onChange={(checked) => {
+                const rememberedRefColor = values.referenceColor && values.referenceColor !== values.fontColor
+                  ? values.referenceColor
+                  : (values.savedRefColor || values.accentColor || '#FF5500');
+                onChange({
+                  syncRefColor: checked,
+                  savedRefColor: rememberedRefColor,
+                  referenceColor: checked ? (values.fontColor || '#ffffff') : rememberedRefColor,
+                });
+              }}
+            />
+          </div>
+        </div>
 
         {surface === 'full' && (
           <StudioSlider
