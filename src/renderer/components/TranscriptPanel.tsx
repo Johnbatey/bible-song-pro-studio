@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../stores/appStore';
 import { Block, BlockButton } from './Block';
-import { useI18n } from '../../i18n/useI18n';
 import {
   TranscriptExportPayload,
   TranscriptScriptureQuote,
@@ -59,12 +58,9 @@ function loadStoredSessions(): TranscriptSessionItem[] {
 const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
-  const { t } = useI18n();
   const transcription = useAppStore((s) => s.transcription);
   const setTranscription = useAppStore((s) => s.setTranscription);
   const aiProviders = useAppStore((s) => s.aiProviders);
-  const syncTranscriptWithLive = useAppStore((s) => s.syncTranscriptWithLive);
-  const setSyncTranscriptWithLive = useAppStore((s) => s.setSyncTranscriptWithLive);
   const enabledProvider = aiProviders.find((p) => p.enabled);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -341,7 +337,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
         setTranscription({ text: editText });
       }
       setViewMode('live');
-      showToast(t('transcript.toast.updated'));
+      showToast('Transcript updated');
     } else {
       const current = activeSession?.text || '';
       setEditText(current);
@@ -377,7 +373,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
     }
     setEditText('');
     setViewMode('live');
-    showToast(t('transcript.toast.sessionCreated'));
+    showToast('New transcript session created');
   };
 
   const handleSelectSession = (session: TranscriptSessionItem) => {
@@ -394,7 +390,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
       setTranscription({ text: session.text, interimText: '' });
     }
     setViewMode('live');
-    showToast(t('transcript.toast.loaded', { title: session.title }));
+    showToast(`Loaded "${session.title}"`);
   };
 
   const handleStartRename = (session: TranscriptSessionItem, e: React.MouseEvent) => {
@@ -407,7 +403,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
     if (sessionRenameText.trim()) {
       saveSessions(sessions.map((s) => (s.id === id ? { ...s, title: sessionRenameText.trim(), updatedAt: Date.now() } : s)));
       if (id === activeSessionId) setSermonTitle(sessionRenameText.trim());
-      showToast(t('transcript.toast.renamed'));
+      showToast('Renamed transcript');
     }
     setEditingSessionId(null);
   };
@@ -415,7 +411,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
   const handleDeleteClick = (session: TranscriptSessionItem, e: React.MouseEvent) => {
     e.stopPropagation();
     if (transcription.isActive && session.id === liveSessionIdRef.current) {
-      showToast(t('transcript.toast.stopBeforeDelete'));
+      showToast('Stop recording first to delete this active transcript');
       return;
     }
     setSessionToDeleteId(session.id);
@@ -450,7 +446,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
         }
       }
     }
-    showToast(t('transcript.toast.sessionRemoved'));
+    showToast('Transcript session removed');
   };
 
   // Merge selected sessions into a unified transcript
@@ -497,7 +493,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
 
     setIsMergeMode(false);
     setSelectedMergeIds([]);
-    showToast(t('transcript.toast.merged', { count: toMerge.length }));
+    showToast(`Merged ${toMerge.length} transcript fragments into 1`);
   };
 
   // Position export menu under the export button
@@ -574,7 +570,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
     setIsExportOpen(false);
     const currentTranscript = viewMode === 'edit' ? editText : (activeSession?.text || transcription.text);
     if (!currentTranscript.trim()) {
-      showToast(t('transcript.toast.noTextToExport'));
+      showToast('No transcript text to export');
       return;
     }
 
@@ -599,29 +595,29 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
       if (format === 'md') {
         const md = formatTranscriptMarkdown(payload);
         downloadTranscriptFile(`${baseFilename}.md`, md, 'text/markdown;charset=utf-8');
-        showToast(t('transcript.toast.exportedMd'));
+        showToast('Exported Markdown (.md)');
       } else if (format === 'docx') {
         const docxBlob = buildTranscriptDocxBlob(payload);
         downloadTranscriptFile(`${baseFilename}.docx`, docxBlob, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        showToast(t('transcript.toast.exportedDocx'));
+        showToast('Exported Word Document (.docx)');
       } else if (format === 'pdf') {
         const pdfBlob = buildTranscriptPdfBlob(payload);
         downloadTranscriptFile(`${baseFilename}.pdf`, pdfBlob, 'application/pdf');
-        showToast(t('transcript.toast.exportedPdf'));
+        showToast('Exported PDF Document (.pdf)');
       } else if (format === 'json') {
         const jsonStr = buildTranscriptJson(payload);
         downloadTranscriptFile(`${baseFilename}.json`, jsonStr, 'application/json;charset=utf-8');
-        showToast(t('transcript.toast.exportedJson'));
+        showToast('Exported JSON (.json)');
       } else if (format === 'copy') {
         const ok = await copyTranscriptMarkdown(payload);
         if (ok) {
-          showToast(t('transcript.toast.copiedClipboard'));
+          showToast('Copied formatted transcript to clipboard');
         } else {
-          showToast(t('transcript.toast.copyFailed'));
+          showToast('Failed to copy to clipboard');
         }
       }
     } catch {
-      showToast(t('transcript.toast.exportFailed'));
+      showToast('Export failed');
     }
   }
 
@@ -682,7 +678,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
   const exportActions = [
     {
       id: 'md',
-      label: t('transcript.export.md'),
+      label: 'Markdown (.md)',
       icon: (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
@@ -695,7 +691,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
     },
     {
       id: 'docx',
-      label: t('transcript.export.docx'),
+      label: 'Word Document (.docx)',
       icon: (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
@@ -706,7 +702,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
     },
     {
       id: 'pdf',
-      label: t('transcript.export.pdf'),
+      label: 'PDF Document (.pdf)',
       icon: (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -717,7 +713,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
     },
     {
       id: 'json',
-      label: t('transcript.export.json'),
+      label: 'JSON Data (.json)',
       icon: (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="16 18 22 12 16 6" />
@@ -727,7 +723,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
     },
     {
       id: 'copy',
-      label: t('transcript.export.copyMarkdown'),
+      label: 'Copy Markdown',
       icon: (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -744,7 +740,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
 
   const shortcutCards = [
     {
-      label: t('transcript.shortcut.undo'),
+      label: 'Undo',
       shortcut: isMac ? '⌘Z' : 'Ctrl+Z',
       icon: (
         <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -754,7 +750,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
       ),
     },
     {
-      label: t('transcript.shortcut.redo'),
+      label: 'Redo',
       shortcut: isMac ? '⇧⌘Z' : 'Ctrl+Y',
       icon: (
         <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -764,7 +760,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
       ),
     },
     {
-      label: t('transcript.shortcut.copy'),
+      label: 'Copy',
       shortcut: isMac ? '⌘C' : 'Ctrl+C',
       icon: (
         <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -774,7 +770,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
       ),
     },
     {
-      label: t('transcript.shortcut.paste'),
+      label: 'Paste',
       shortcut: isMac ? '⌘V' : 'Ctrl+V',
       icon: (
         <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -788,14 +784,14 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
   return (
     <Block
       className="transcript-panel"
-      title={t('transcript.title')}
+      title="Live transcript"
       tools={(
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {/* Live Stream View Button */}
           <button
             type="button"
             onClick={() => setViewMode('live')}
-            title={t('transcript.viewLiveTitle')}
+            title="View live transcript speech"
             style={{
               height: 24,
               padding: '0 4px',
@@ -821,14 +817,14 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
               <path d="M18 10v4" />
               <path d="M22 12h-2" />
             </svg>
-            <span>{t('transcript.live')}</span>
+            <span>Live</span>
           </button>
 
           {/* Sessions List Tab Button */}
           <button
             type="button"
             onClick={() => setViewMode(viewMode === 'sessions' ? 'live' : 'sessions')}
-            title={t('transcript.viewSessionsTitle')}
+            title="View all transcript sessions"
             style={{
               height: 24,
               padding: '0 4px',
@@ -854,14 +850,14 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
               <line x1="3" y1="12" x2="3.01" y2="12" />
               <line x1="3" y1="18" x2="3.01" y2="18" />
             </svg>
-            <span>{t('transcript.list', { count: sessions.length })}</span>
+            <span>List ({sessions.length})</span>
           </button>
 
           {/* Edit Mode Toggle */}
           <button
             type="button"
             onClick={toggleEditMode}
-            title={viewMode === 'edit' ? t('transcript.doneTitle') : t('transcript.editTitle')}
+            title={viewMode === 'edit' ? 'Save and finish editing transcript' : 'Edit transcript text'}
             style={{
               height: 24,
               padding: '0 4px',
@@ -884,14 +880,14 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
-                <span>{t('transcript.done')}</span>
+                <span>Done</span>
               </>
             ) : (
               <>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                 </svg>
-                <span>{t('transcript.edit')}</span>
+                <span>Edit</span>
               </>
             )}
           </button>
@@ -900,7 +896,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
           <button
             type="button"
             onClick={() => setShowTags((prev) => !prev)}
-            title={t('transcript.tagsTitle')}
+            title="Configure Sermon Tags & Metadata (Church, Title, Speaker, Date)"
             style={{
               height: 24,
               padding: '0 4px',
@@ -922,7 +918,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
               <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
               <line x1="7" y1="7" x2="7.01" y2="7" />
             </svg>
-            <span>{t('transcript.tags')}</span>
+            <span>Tags</span>
           </button>
 
           {/* Export Dropdown */}
@@ -931,7 +927,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
               ref={exportBtnRef}
               type="button"
               onClick={() => setIsExportOpen((prev) => !prev)}
-              title={t('transcript.exportTitle')}
+              title="Export transcript as .md, .docx, .pdf, .json"
               style={{
                 height: 24,
                 padding: '0 4px',
@@ -954,7 +950,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              <span>{t('transcript.export')}</span>
+              <span>Export</span>
               <svg
                 width="10"
                 height="10"
@@ -1015,7 +1011,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                       <polyline points="7 10 12 15 17 10" />
                       <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
-                    <span>{t('transcript.exportTranscript')}</span>
+                    <span>Export Transcript</span>
                   </div>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
@@ -1064,7 +1060,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
           </div>
 
           {/* Open Live Scripture button */}
-          <BlockButton icon onClick={onOpenLiveScripture} title={t('transcript.openLive')} style={{ width: 22, height: 22 }}>
+          <BlockButton icon onClick={onOpenLiveScripture} title="Open Live Scripture" style={{ width: 22, height: 22 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
               <polyline points="15 3 21 3 21 9" />
@@ -1076,73 +1072,34 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
       flush
       bodyStyle={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}
       footer={(
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {transcription.isActive ? (
-              <button style={styles.stopBtn} onClick={stopTranscription}>
-                <span style={styles.stopDot} />
-                {t('transcript.stop')}
-              </button>
-            ) : (
-              <button
-                style={{ ...styles.startBtn, opacity: enabledProvider ? 1 : 0.6 }}
-                onClick={handleStartClick}
-                disabled={!enabledProvider}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" y1="19" x2="12" y2="22" />
-                </svg>
-                <span style={styles.startLabel}>{t('transcript.start')}</span>
-              </button>
-            )}
-
-            {/* Live AI Detection sync toggle button */}
-            <button
-              type="button"
-              onClick={() => setSyncTranscriptWithLive(!syncTranscriptWithLive)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '4px 8px',
-                background: syncTranscriptWithLive ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
-                border: `1px solid ${syncTranscriptWithLive ? 'rgba(34, 197, 94, 0.28)' : 'var(--border-primary, rgba(255,255,255,0.12))'}`,
-                borderRadius: 5,
-                cursor: 'pointer',
-                color: syncTranscriptWithLive ? 'var(--tally-preview)' : 'var(--text-dim)',
-                fontSize: 11,
-                fontWeight: 600,
-                fontFamily: 'var(--font-ui)',
-                transition: 'all 0.15s ease',
-              }}
-              title={syncTranscriptWithLive ? 'Live Sync Active: Playing Live AI also records transcript text' : 'Live Sync Inactive: AI detects scripture without recording transcript text'}
-            >
-              <span
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  background: syncTranscriptWithLive ? 'var(--tally-preview)' : 'var(--text-dim)',
-                  boxShadow: syncTranscriptWithLive ? '0 0 5px rgba(34, 197, 94, 0.6)' : 'none',
-                  flexShrink: 0,
-                }}
-              />
-              <span style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
-                Live Sync
-              </span>
+        <>
+          {transcription.isActive ? (
+            <button style={styles.stopBtn} onClick={stopTranscription}>
+              <span style={styles.stopDot} />
+              Stop transcribing
             </button>
-          </div>
-
+          ) : (
+            <button
+              style={{ ...styles.startBtn, opacity: enabledProvider ? 1 : 0.6 }}
+              onClick={handleStartClick}
+              disabled={!enabledProvider}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
+              <span style={styles.startLabel}>Start transcribing</span>
+            </button>
+          )}
           <span
             style={{
               ...styles.recDot,
               background: transcription.isActive ? 'var(--tally-fault)' : 'var(--tally-hold)',
             }}
-            title={transcription.isActive ? t('transcript.recording') : t('transcript.idle')}
+            title={transcription.isActive ? 'Recording' : 'Idle'}
           />
-        </div>
+        </>
       )}
     >
       {/* Feedback Toast Notification */}
@@ -1162,14 +1119,11 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                 <line x1="12" y1="19" x2="12" y2="22" />
               </svg>
-              <span>{t('transcript.resumePromptTitle')}</span>
+              <span>Resume or Start New Transcript?</span>
             </div>
 
             <p style={{ margin: 0, fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-              {t('transcript.resumePromptBody', {
-                title: activeSession?.title ?? '',
-                words: activeSession?.text.trim().split(/\s+/).length ?? 0,
-              })}
+              Active transcript <strong>"{activeSession?.title}"</strong> already has recorded text ({activeSession?.text.trim().split(/\s+/).length} words).
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
@@ -1181,7 +1135,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
-                <span>{t('transcript.resumeAppend', { title: activeSession?.title ?? '' })}</span>
+                <span>Resume "{activeSession?.title}" (Append speech)</span>
               </button>
 
               <button
@@ -1193,7 +1147,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                <span>{t('transcript.startFresh')}</span>
+                <span>Start Fresh Transcript Session</span>
               </button>
 
               <button
@@ -1201,7 +1155,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 onClick={() => setShowResumePrompt(false)}
                 style={styles.resumeCancelBtn}
               >
-                {t('common.cancel')}
+                Cancel
               </button>
             </div>
           </div>
@@ -1213,43 +1167,43 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
         <div style={styles.tagsDrawer}>
           <div style={styles.tagsGrid}>
             <label style={styles.tagLabel}>
-              <span style={styles.tagSpan}>{t('transcript.sermonTitle')}</span>
+              <span style={styles.tagSpan}>Sermon Title</span>
               <input
                 type="text"
                 style={styles.tagInput}
                 value={sermonTitle}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder={t('transcript.placeholder.title')}
+                placeholder="Title of the Sermon"
               />
             </label>
             <label style={styles.tagLabel}>
-              <span style={styles.tagSpan}>{t('transcript.speaker')}</span>
+              <span style={styles.tagSpan}>Speaker / Preacher</span>
               <input
                 type="text"
                 style={styles.tagInput}
                 value={speaker}
                 onChange={(e) => handleSpeakerChange(e.target.value)}
-                placeholder={t('transcript.placeholder.speaker')}
+                placeholder="Preacher Name"
               />
             </label>
             <label style={styles.tagLabel}>
-              <span style={styles.tagSpan}>{t('transcript.church')}</span>
+              <span style={styles.tagSpan}>Church</span>
               <input
                 type="text"
                 style={styles.tagInput}
                 value={churchName}
                 onChange={(e) => handleChurchChange(e.target.value)}
-                placeholder={t('transcript.placeholder.church')}
+                placeholder="Church Name"
               />
             </label>
             <label style={styles.tagLabel}>
-              <span style={styles.tagSpan}>{t('transcript.dateTime')}</span>
+              <span style={styles.tagSpan}>Date & Time</span>
               <input
                 type="text"
                 style={styles.tagInput}
                 value={dateTime}
                 onChange={(e) => handleDateTimeChange(e.target.value)}
-                placeholder={t('transcript.placeholder.dateTime')}
+                placeholder="Date and Time"
               />
             </label>
           </div>
@@ -1263,7 +1217,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 8 }}>
             <input
               type="text"
-              placeholder={t('transcript.searchPlaceholder')}
+              placeholder="Search transcript sessions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={styles.searchInput}
@@ -1282,7 +1236,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 borderColor: isMergeMode ? 'var(--tally-preview)' : 'var(--border-primary, rgba(255,255,255,0.12))',
                 color: isMergeMode ? 'var(--tally-preview)' : 'var(--text-secondary)',
               }}
-              title={t('transcript.mergeTitle')}
+              title="Select multiple transcript fragments to merge into one unified sermon"
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="16 3 21 3 21 8" />
@@ -1291,20 +1245,20 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 <line x1="15" y1="15" x2="21" y2="21" />
                 <line x1="4" y1="4" x2="9" y2="9" />
               </svg>
-              <span>{isMergeMode ? t('transcript.mergeCancel') : t('transcript.merge')}</span>
+              <span>{isMergeMode ? 'Cancel' : 'Merge'}</span>
             </button>
 
             <button
               type="button"
               onClick={handleCreateNewSession}
               style={styles.newSessionBtn}
-              title={t('transcript.newSessionTitle')}
+              title="Start a new transcript session"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span>{t('transcript.new')}</span>
+              <span>New</span>
             </button>
           </div>
 
@@ -1313,7 +1267,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
             <div style={styles.mergeBanner}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-primary)' }}>
                 <span style={{ fontWeight: 600 }}>{selectedMergeIds.length}</span>
-                <span style={{ color: 'var(--text-secondary)' }}>{t('transcript.selectedToMerge')}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>selected to merge</span>
               </div>
               <button
                 type="button"
@@ -1328,7 +1282,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
                 </svg>
-                <span>{t('transcript.mergeSelected', { count: selectedMergeIds.length })}</span>
+                <span>Merge Selected ({selectedMergeIds.length})</span>
               </button>
             </div>
           )}
@@ -1423,7 +1377,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                         )}
                         {isLiveRecordingThis && (
                           <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(239, 68, 68, 0.2)', color: 'var(--tally-fault)', fontWeight: 600 }}>
-                            {t('transcript.recordingBadge')}
+                            RECORDING
                           </span>
                         )}
                       </div>
@@ -1435,7 +1389,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                         <button
                           type="button"
                           onClick={(e) => handleStartRename(session, e)}
-                          title={t('transcript.rename')}
+                          title="Rename transcript"
                           style={styles.cardActionBtn}
                         >
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1445,7 +1399,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                         <button
                           type="button"
                           onClick={(e) => handleDeleteClick(session, e)}
-                          title={isLiveRecordingThis ? t('transcript.deleteStopRecording') : t('transcript.delete')}
+                          title={isLiveRecordingThis ? "Stop recording first to delete" : "Delete transcript"}
                           style={{ ...styles.cardActionBtn, color: 'var(--tally-fault, #ef4444)', opacity: isLiveRecordingThis ? 0.35 : 1 }}
                         >
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1474,7 +1428,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                       }}
                     >
                       <span style={{ fontSize: 11, color: '#fca5a5', fontWeight: 600 }}>
-                        {t('transcript.deleteConfirm')}
+                        Delete this transcript?
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <button
@@ -1494,7 +1448,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                             cursor: 'pointer',
                           }}
                         >
-                          {t('common.cancel')}
+                          Cancel
                         </button>
                         <button
                           type="button"
@@ -1510,7 +1464,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                             cursor: 'pointer',
                           }}
                         >
-                          {t('transcript.delete')}
+                          Delete
                         </button>
                       </div>
                     </div>
@@ -1519,7 +1473,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                   {/* Snippet / Metadata */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-dim)' }}>
                     <span>{session.speaker ? `${session.speaker} • ` : ''}{new Date(session.updatedAt || session.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    <span>{t('transcript.wordCount', { count: wordCount })}</span>
+                    <span>{wordCount} words</span>
                   </div>
 
                   {session.text && (
@@ -1533,7 +1487,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
 
             {filteredSessions.length === 0 && (
               <div style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center', padding: '20px 0' }}>
-                {t('transcript.noSearchResults', { query: searchQuery })}
+                No transcripts matching "{searchQuery}"
               </div>
             )}
           </div>
@@ -1551,7 +1505,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 type="button"
                 onClick={handleUndo}
                 disabled={!canUndo}
-                title={isMac ? t('transcript.undoTitleMac') : t('transcript.undoTitleWin')}
+                title={isMac ? "Undo (⌘Z)" : "Undo (Ctrl+Z)"}
                 style={{
                   ...styles.editToolBtn,
                   opacity: canUndo ? 1 : 0.4,
@@ -1562,7 +1516,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                   <path d="M3 7v6h6" />
                   <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
                 </svg>
-                <span>{t('transcript.shortcut.undo')}</span>
+                <span>Undo</span>
               </button>
 
               {/* Redo Button */}
@@ -1570,7 +1524,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                 type="button"
                 onClick={handleRedo}
                 disabled={!canRedo}
-                title={isMac ? t('transcript.redoTitleMac') : t('transcript.redoTitleWin')}
+                title={isMac ? "Redo (⇧⌘Z)" : "Redo (Ctrl+Y)"}
                 style={{
                   ...styles.editToolBtn,
                   opacity: canRedo ? 1 : 0.4,
@@ -1581,7 +1535,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                   <path d="M21 7v6h-6" />
                   <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
                 </svg>
-                <span>{t('transcript.shortcut.redo')}</span>
+                <span>Redo</span>
               </button>
 
               {/* Copy Current Edit Text Button with Animated Checkmark */}
@@ -1592,7 +1546,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                   setIsCopied(true);
                   setTimeout(() => setIsCopied(false), 1800);
                 }}
-                title={isMac ? t('transcript.copyTitleMac') : t('transcript.copyTitleWin')}
+                title={isMac ? "Copy current transcript (⌘C)" : "Copy current transcript (Ctrl+C)"}
                 style={{
                   ...styles.editToolBtn,
                   color: isCopied ? 'var(--tally-preview)' : 'var(--text-primary)',
@@ -1614,7 +1568,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                     >
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
-                    <span style={{ color: 'var(--tally-preview)' }}>{t('transcript.copied')}</span>
+                    <span style={{ color: 'var(--tally-preview)' }}>Copied!</span>
                   </>
                 ) : (
                   <>
@@ -1622,7 +1576,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                     </svg>
-                    <span>{t('transcript.shortcut.copy')}</span>
+                    <span>Copy</span>
                   </>
                 )}
               </button>
@@ -1695,7 +1649,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
             </p>
           ) : (
             <p className="transcript-panel__idle">
-              {transcription.isActive ? t('transcript.listening') : t('transcript.empty')}
+              {transcription.isActive ? 'Listening…' : 'Transcript appears here'}
             </p>
           )}
         </div>

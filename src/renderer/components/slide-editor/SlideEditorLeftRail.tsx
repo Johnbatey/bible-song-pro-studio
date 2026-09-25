@@ -40,7 +40,7 @@ function RailSlideThumb({
   renderThumb: (index: number, width: number) => React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState<number>(180);
+  const [width, setWidth] = useState<number>(214);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -56,7 +56,19 @@ function RailSlideThumb({
   }, []);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', overflow: 'hidden', background: '#000', display: 'flex' }}>
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%',
+        aspectRatio: '16 / 9',
+        overflow: 'hidden',
+        background: '#000',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
       {renderThumb(index, width)}
     </div>
   );
@@ -64,7 +76,7 @@ function RailSlideThumb({
 
 function CustomTemplateThumb({ template }: { template: CustomSlideTemplate }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState<number>(210);
+  const [width, setWidth] = useState<number>(214);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -80,7 +92,19 @@ function CustomTemplateThumb({ template }: { template: CustomSlideTemplate }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', overflow: 'hidden', background: '#000', display: 'flex' }}>
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%',
+        aspectRatio: '16 / 9',
+        overflow: 'hidden',
+        background: '#000',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
       <NativeSlideBoard
         elements={template.elements || []}
         background={template.background}
@@ -519,8 +543,37 @@ export function SlideEditorLeftRail({
   const [saveModal, setSaveModal] = useState<{ slideIndex: number } | null>(null);
   const [renameModal, setRenameModal] = useState<{ templateId: string; currentName: string } | null>(null);
   const [templateNameInput, setTemplateNameInput] = useState('');
-
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const slideCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const listContainerRef = useRef<HTMLDivElement>(null);
+
+  const [dragState, setDragState] = useState<{
+    draggedIndex: number;
+    overIndex: number;
+    deltaY: number;
+    itemHeight: number;
+  } | null>(null);
+
+  const dragInfoRef = useRef<{
+    startIndex: number;
+    startY: number;
+    rects: { height: number; center: number }[];
+    itemHeight: number;
+    hasMoved: boolean;
+  } | null>(null);
+
+  // Auto-scroll the active slide card into view and keep focus synced when selected
+  useEffect(() => {
+    if (dragState) return;
+    const card = slideCardRefs.current.get(activeSlideIndex);
+    if (card) {
+      card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const activeEl = document.activeElement;
+      if (listContainerRef.current && (listContainerRef.current === activeEl || listContainerRef.current.contains(activeEl))) {
+        card.focus({ preventScroll: true });
+      }
+    }
+  }, [activeSlideIndex, dragState]);
 
   // Subscribe to store updates
   useEffect(() => {
@@ -540,6 +593,89 @@ export function SlideEditorLeftRail({
     window.addEventListener('click', handleGlobalClick);
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
+
+  const handleCardPointerDown = (index: number, e: React.PointerEvent<HTMLDivElement>) => {
+    if (readOnlyDeck) return;
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, textarea, a, select')) return;
+
+    const container = listContainerRef.current;
+    if (!container) return;
+
+    const children = Array.from(container.children) as HTMLElement[];
+    const rects = children.map((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        height: r.height,
+        center: r.top + r.height / 2,
+      };
+    });
+
+    const itemHeight = rects[index]?.height || 120;
+    dragInfoRef.current = {
+      startIndex: index,
+      startY: e.clientY,
+      rects,
+      itemHeight,
+      hasMoved: false,
+    };
+
+    const handlePointerMove = (moveEv: PointerEvent) => {
+      if (!dragInfoRef.current) return;
+      const { startIndex, startY, rects: itemRects, itemHeight: h } = dragInfoRef.current;
+      const deltaY = moveEv.clientY - startY;
+
+      if (!dragInfoRef.current.hasMoved && Math.abs(deltaY) > 4) {
+        dragInfoRef.current.hasMoved = true;
+      }
+
+      if (dragInfoRef.current.hasMoved) {
+        const currentCenter = (itemRects[startIndex]?.center || 0) + deltaY;
+        let newOver = startIndex;
+        let minDiff = Infinity;
+
+        for (let i = 0; i < itemRects.length; i++) {
+          const diff = Math.abs(itemRects[i].center - currentCenter);
+          if (diff < minDiff) {
+            minDiff = diff;
+            newOver = i;
+          }
+        }
+
+        setDragState({
+          draggedIndex: startIndex,
+          overIndex: newOver,
+          deltaY,
+          itemHeight: h,
+        });
+      }
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+
+      const info = dragInfoRef.current;
+      dragInfoRef.current = null;
+
+      if (info && info.hasMoved) {
+        setDragState((prev) => {
+          if (prev && prev.draggedIndex !== prev.overIndex) {
+            onMoveSlide(prev.draggedIndex, prev.overIndex);
+            onSelectSlide(prev.overIndex);
+          }
+          return null;
+        });
+      } else {
+        setDragState(null);
+        onSelectSlide(index);
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false });
+    window.addEventListener('pointerup', handlePointerUp);
+  };
 
   const handleOpenSaveModal = (slideIndex: number) => {
     const targetSlide = slides[slideIndex];
@@ -598,14 +734,16 @@ export function SlideEditorLeftRail({
       style={{
         width: 240,
         minWidth: 240,
-        background: 'var(--bg-secondary)',
-        borderRight: '1px solid var(--border-primary)',
+        maxWidth: 240,
+        background: '#141416',
+        borderRight: '1px solid rgba(255, 255, 255, 0.08)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
         userSelect: 'none',
         boxSizing: 'border-box',
         position: 'relative',
+        color: '#f4f4f5',
       }}
     >
       {/* Hidden File Input for Importing Templates */}
@@ -618,34 +756,27 @@ export function SlideEditorLeftRail({
       />
 
       {/* Rail Nav Segmented Switcher */}
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-primary)' }}>
-        <div
-          style={{
-            display: 'flex',
-            background: 'var(--chrome-control)',
-            border: '1px solid var(--border-primary)',
-            padding: 3,
-            borderRadius: 6,
-            gap: 2,
-          }}
-        >
+      <div className="studio-tabs-row" style={{ padding: '10px 12px', background: '#141416', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+        <div className="studio-segmented-pill" style={{ display: 'flex', background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: 7, padding: 2, gap: 2 }}>
           <button
             type="button"
+            className={`studio-segmented-tab ${activeTab === 'slides' ? 'active' : ''}`}
             onClick={() => setActiveTab('slides')}
             style={{
               flex: 1,
-              padding: '6px 8px',
-              background: activeTab === 'slides' ? '#FF5500' : 'transparent',
-              border: 'none',
-              borderRadius: 6,
-              color: activeTab === 'slides' ? '#ffffff' : 'var(--text-secondary)',
+              padding: '6px 4px',
               fontSize: 12,
-              fontWeight: 600,
+              fontWeight: activeTab === 'slides' ? 600 : 500,
+              border: 'none',
+              borderRadius: 5,
+              background: activeTab === 'slides' ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+              color: activeTab === 'slides' ? '#ffffff' : '#94a3b8',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 6,
+              transition: 'all 0.15s ease',
             }}
           >
             <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}>
@@ -656,21 +787,23 @@ export function SlideEditorLeftRail({
           </button>
           <button
             type="button"
+            className={`studio-segmented-tab ${activeTab === 'templates' ? 'active' : ''}`}
             onClick={() => setActiveTab('templates')}
             style={{
               flex: 1,
-              padding: '6px 8px',
-              background: activeTab === 'templates' ? '#FF5500' : 'transparent',
-              border: 'none',
-              borderRadius: 6,
-              color: activeTab === 'templates' ? '#ffffff' : 'var(--text-secondary)',
+              padding: '6px 4px',
               fontSize: 12,
-              fontWeight: 600,
+              fontWeight: activeTab === 'templates' ? 600 : 500,
+              border: 'none',
+              borderRadius: 5,
+              background: activeTab === 'templates' ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+              color: activeTab === 'templates' ? '#ffffff' : '#94a3b8',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 6,
+              transition: 'all 0.15s ease',
             }}
           >
             <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: 'none', stroke: 'currentColor', strokeWidth: 2 }}>
@@ -685,7 +818,7 @@ export function SlideEditorLeftRail({
 
       {/* Main Tab Content */}
       {activeTab === 'slides' ? (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Action Toolbar */}
           <div
             style={{
@@ -693,58 +826,239 @@ export function SlideEditorLeftRail({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              borderBottom: '1px solid var(--border-primary)',
-              background: 'var(--bg-primary)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              background: '#141416',
+              flexShrink: 0,
             }}
           >
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {t('slideEditor.rail.slidesDeckCount', { count: slides.length })}
             </span>
             {!readOnlyDeck && (
-              <button
-                type="button"
-                onClick={onAddSlide}
-                style={{
-                  background: 'var(--accent, #FF5500)',
-                  border: 'none',
-                  borderRadius: 4,
-                  color: '#ffffff',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: '4px 8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-                title={t('slideEditor.rail.addSlide')}
-              >
-                <span>+</span> {t('slideEditor.rail.newSlide')}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={onAddSlide}
+                  style={{
+                    background: 'var(--accent, #FF5500)',
+                    border: 'none',
+                    borderRadius: 5,
+                    color: '#ffffff',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: '5px 9px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    transition: 'opacity 0.15s ease',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                  title={t('slideEditor.rail.addSlide')}
+                >
+                  <span>+</span> {t('slideEditor.rail.newSlide')}
+                </button>
+              </div>
             )}
           </div>
 
           {/* Slides Thumbnail List */}
-          <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+          <div
+            ref={listContainerRef}
+            className="studio-sidebar-scroll"
+            tabIndex={0}
+            role="region"
+            aria-label="Slide thumbnail list"
+            onKeyDown={(e) => {
+              const target = e.target as HTMLElement | null;
+              if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (activeSlideIndex < slides.length - 1) {
+                  const nextIdx = activeSlideIndex + 1;
+                  onSelectSlide(nextIdx);
+                  slideCardRefs.current.get(nextIdx)?.focus({ preventScroll: true });
+                }
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (activeSlideIndex > 0) {
+                  const prevIdx = activeSlideIndex - 1;
+                  onSelectSlide(prevIdx);
+                  slideCardRefs.current.get(prevIdx)?.focus({ preventScroll: true });
+                }
+              } else if ((e.key === 'Delete' || e.key === 'Backspace') && !readOnlyDeck && slides.length > 1) {
+                e.preventDefault();
+                e.stopPropagation();
+                onDeleteSlide(activeSlideIndex);
+              } else if (e.key === 'Home') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (slides.length > 0) {
+                  onSelectSlide(0);
+                  slideCardRefs.current.get(0)?.focus({ preventScroll: true });
+                }
+              } else if (e.key === 'End') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (slides.length > 0) {
+                  const lastIdx = slides.length - 1;
+                  onSelectSlide(lastIdx);
+                  slideCardRefs.current.get(lastIdx)?.focus({ preventScroll: true });
+                }
+              } else if (e.key === 'PageDown') {
+                e.preventDefault();
+                e.stopPropagation();
+                const nextIdx = Math.min(slides.length - 1, activeSlideIndex + 5);
+                onSelectSlide(nextIdx);
+                slideCardRefs.current.get(nextIdx)?.focus({ preventScroll: true });
+              } else if (e.key === 'PageUp') {
+                e.preventDefault();
+                e.stopPropagation();
+                const prevIdx = Math.max(0, activeSlideIndex - 5);
+                onSelectSlide(prevIdx);
+                slideCardRefs.current.get(prevIdx)?.focus({ preventScroll: true });
+              }
+            }}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              padding: 12,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              overflowY: 'auto',
+              outline: 'none',
+              position: 'relative',
+              boxSizing: 'border-box',
+            }}
+          >
             {slides.map((slide, index) => {
               const isActive = index === activeSlideIndex;
+              const isThisDragged = dragState?.draggedIndex === index;
+
+              // Fluid animated displacement calculation
+              let transform = 'none';
+              let transition = 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.2s ease, border-color 0.15s ease';
+              let zIndex = 1;
+              let opacity = 1;
+              let boxShadow = isActive ? '0 0 14px rgba(255, 85, 0, 0.4)' : 'none';
+
+              if (dragState) {
+                const { draggedIndex, overIndex, deltaY, itemHeight } = dragState;
+                const shift = itemHeight + 12; // gap is 12px
+                if (isThisDragged) {
+                  transform = `translateY(${deltaY}px) scale(1.03)`;
+                  zIndex = 50;
+                  transition = 'none';
+                  boxShadow = '0 16px 36px rgba(0, 0, 0, 0.85), 0 0 0 2px var(--accent, #FF5500), 0 0 20px rgba(255, 85, 0, 0.4)';
+                  opacity = 0.96;
+                } else if (draggedIndex < overIndex && index > draggedIndex && index <= overIndex) {
+                  transform = `translateY(-${shift}px)`;
+                } else if (draggedIndex > overIndex && index < draggedIndex && index >= overIndex) {
+                  transform = `translateY(${shift}px)`;
+                }
+              }
+
               return (
                 <div
                   key={slide.id || index}
-                  onClick={() => onSelectSlide(index)}
+                  ref={(el) => {
+                    if (el) slideCardRefs.current.set(index, el);
+                    else slideCardRefs.current.delete(index);
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Slide ${index + 1}`}
+                  onPointerDown={(e) => handleCardPointerDown(index, e)}
+                  onKeyDown={(e) => {
+                    const target = e.target as HTMLElement | null;
+                    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onSelectSlide(index);
+                    } else if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (activeSlideIndex < slides.length - 1) {
+                        const nextIdx = activeSlideIndex + 1;
+                        onSelectSlide(nextIdx);
+                        slideCardRefs.current.get(nextIdx)?.focus({ preventScroll: true });
+                      }
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (activeSlideIndex > 0) {
+                        const prevIdx = activeSlideIndex - 1;
+                        onSelectSlide(prevIdx);
+                        slideCardRefs.current.get(prevIdx)?.focus({ preventScroll: true });
+                      }
+                    } else if ((e.key === 'Delete' || e.key === 'Backspace') && !readOnlyDeck && slides.length > 1) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onDeleteSlide(index);
+                    } else if (e.key === 'Home') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (slides.length > 0) {
+                        onSelectSlide(0);
+                        slideCardRefs.current.get(0)?.focus({ preventScroll: true });
+                      }
+                    } else if (e.key === 'End') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (slides.length > 0) {
+                        const lastIdx = slides.length - 1;
+                        onSelectSlide(lastIdx);
+                        slideCardRefs.current.get(lastIdx)?.focus({ preventScroll: true });
+                      }
+                    } else if (e.key === 'PageDown') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const nextIdx = Math.min(slides.length - 1, activeSlideIndex + 5);
+                      onSelectSlide(nextIdx);
+                      slideCardRefs.current.get(nextIdx)?.focus({ preventScroll: true });
+                    } else if (e.key === 'PageUp') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const prevIdx = Math.max(0, activeSlideIndex - 5);
+                      onSelectSlide(prevIdx);
+                      slideCardRefs.current.get(prevIdx)?.focus({ preventScroll: true });
+                    }
+                  }}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setSlideContextMenu({ x: e.clientX, y: e.clientY, slideIndex: index });
                   }}
                   style={{
                     position: 'relative',
-                    cursor: 'pointer',
+                    cursor: readOnlyDeck ? 'pointer' : (isThisDragged ? 'grabbing' : 'grab'),
                     borderRadius: 6,
-                    border: isActive ? '2px solid var(--accent, #FF5500)' : '1px solid var(--border-primary)',
+                    border: isActive ? '2px solid var(--accent, #FF5500)' : '1px solid rgba(255, 255, 255, 0.1)',
                     background: '#09090b',
-                    boxShadow: isActive ? '0 0 12px rgba(255, 85, 0, 0.35)' : 'none',
+                    boxShadow,
                     overflow: 'hidden',
-                    transition: 'all 0.15s ease',
+                    outline: 'none',
+                    transform,
+                    transition,
+                    zIndex,
+                    opacity,
+                    touchAction: 'none',
+                    userSelect: 'none',
+                    flexShrink: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive && !dragState) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive && !dragState) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
                   }}
                 >
                   {/* Badge Number */}
@@ -761,20 +1075,34 @@ export function SlideEditorLeftRail({
                       padding: '2px 6px',
                       borderRadius: 4,
                       backdropFilter: 'blur(2px)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
                     }}
                   >
                     {index + 1}
                   </div>
 
                   {/* Thumbnail Container */}
-                  <div style={{ width: '100%', aspectRatio: '16/9', overflow: 'hidden', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div
+                    style={{
+                      width: '100%',
+                      aspectRatio: '16 / 9',
+                      minHeight: 120,
+                      overflow: 'hidden',
+                      background: '#000',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      pointerEvents: 'none',
+                      flexShrink: 0,
+                    }}
+                  >
                     {renderThumb ? (
                       <RailSlideThumb index={index} renderThumb={renderThumb} />
                     ) : (
                       <NativeSlideBoard
                         elements={slideElementsFor(slide)}
                         background={slide.background}
-                        width={210}
+                        width={214}
                       />
                     )}
                   </div>
@@ -782,15 +1110,16 @@ export function SlideEditorLeftRail({
                   {/* Slide Label Footer */}
                   <div
                     style={{
-                      padding: '4px 8px',
+                      padding: '5px 8px',
                       fontSize: 11,
-                      color: isActive ? '#ffffff' : 'var(--text-secondary)',
-                      background: isActive ? 'rgba(255, 85, 0, 0.15)' : 'rgba(0, 0, 0, 0.4)',
-                      borderTop: '1px solid var(--border-primary)',
+                      color: isActive ? '#ffffff' : '#94a3b8',
+                      background: isActive ? 'rgba(255, 85, 0, 0.15)' : 'rgba(0, 0, 0, 0.5)',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       fontWeight: isActive ? 600 : 400,
+                      flexShrink: 0,
                     }}
                   >
                     {slide.title || t('slideEditor.rail.slideLabel', { n: index + 1 })}
@@ -804,29 +1133,31 @@ export function SlideEditorLeftRail({
           <div
             style={{
               padding: '8px 12px',
-              borderTop: '1px solid var(--border-primary)',
-              background: 'var(--bg-primary)',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              background: '#141416',
               fontSize: 11,
-              color: 'var(--text-dim)',
+              color: '#71717a',
               display: 'flex',
               justifyContent: 'space-between',
+              flexShrink: 0,
             }}
           >
-            <span>{t('slideEditor.rail.activeSlide')} <strong style={{ color: 'var(--text-primary)' }}>{activeSlideIndex + 1}</strong></span>
+            <span>{t('slideEditor.rail.activeSlide')} <strong style={{ color: '#f4f4f5' }}>{activeSlideIndex + 1}</strong></span>
             <span>{t('slideEditor.rail.total')} {slides.length}</span>
           </div>
         </div>
       ) : (
         /* Templates Panel */
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Templates Action Toolbar */}
           <div
             style={{
               padding: '10px 12px',
               display: 'flex',
               gap: 6,
-              borderBottom: '1px solid var(--border-primary)',
-              background: 'var(--bg-primary)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              background: '#141416',
+              flexShrink: 0,
             }}
           >
             <button
@@ -857,10 +1188,10 @@ export function SlideEditorLeftRail({
               onClick={handleImportClick}
               style={{
                 padding: '6px 9px',
-                background: 'var(--chrome-control)',
-                border: '1px solid var(--border-primary)',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
                 borderRadius: 5,
-                color: 'var(--text-primary)',
+                color: '#f4f4f5',
                 fontSize: 11,
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -879,10 +1210,10 @@ export function SlideEditorLeftRail({
               onClick={handleExportAllTemplates}
               style={{
                 padding: '6px 9px',
-                background: 'var(--chrome-control)',
-                border: '1px solid var(--border-primary)',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
                 borderRadius: 5,
-                color: 'var(--text-primary)',
+                color: '#f4f4f5',
                 fontSize: 11,
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -898,10 +1229,10 @@ export function SlideEditorLeftRail({
             </button>
           </div>
 
-          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="studio-sidebar-scroll" style={{ flex: 1, minHeight: 0, padding: 12, display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', boxSizing: 'border-box' }}>
             {/* Custom User Templates Section */}
             {customTemplates.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent, #FF5500)', textTransform: 'uppercase' }}>
                     {t('slideEditor.rail.myCustomTemplates', { count: customTemplates.length })}
@@ -914,7 +1245,7 @@ export function SlideEditorLeftRail({
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: 'var(--text-secondary)',
+                      color: '#94a3b8',
                       fontSize: 11,
                       cursor: 'pointer',
                       display: 'flex',
@@ -937,7 +1268,7 @@ export function SlideEditorLeftRail({
                       setTemplateContextMenu({ x: e.clientX, y: e.clientY, template: tpl, isPrebuilt: false });
                     }}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.03)',
+                      background: '#09090b',
                       border: '1px solid rgba(255, 85, 0, 0.25)',
                       borderRadius: 6,
                       overflow: 'hidden',
@@ -945,6 +1276,7 @@ export function SlideEditorLeftRail({
                       display: 'flex',
                       flexDirection: 'column',
                       position: 'relative',
+                      flexShrink: 0,
                     }}
                   >
                     <div onClick={() => onApplyTemplate(tpl.id)}>
@@ -963,7 +1295,7 @@ export function SlideEditorLeftRail({
                     >
                       <span
                         onClick={() => onApplyTemplate(tpl.id)}
-                        style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}
+                        style={{ fontSize: 11, fontWeight: 700, color: '#f4f4f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}
                       >
                         {tpl.name}
                       </span>
@@ -984,7 +1316,7 @@ export function SlideEditorLeftRail({
                             updateCustomTemplateFromSlide(tpl.id, slides[activeSlideIndex]);
                             alert(t('slideEditor.errors.templateUpdated', { name: tpl.name, slide: activeSlideIndex + 1 }));
                           }}
-                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 2 }}
+                          style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 2 }}
                           title={t('slideEditor.rail.updateFromSlideTitle')}
                         >
                           <IconRefresh size={12} />
@@ -992,7 +1324,7 @@ export function SlideEditorLeftRail({
                         <button
                           type="button"
                           onClick={() => exportCustomTemplate(tpl)}
-                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 2 }}
+                          style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 2 }}
                           title={t('slideEditor.rail.exportTemplateTitle')}
                         >
                           <IconExport size={12} />
@@ -1013,7 +1345,7 @@ export function SlideEditorLeftRail({
             )}
 
             {/* Prebuilt System Templates */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase' }}>
                   {t('slideEditor.rail.prebuiltTemplates')}
@@ -1028,7 +1360,7 @@ export function SlideEditorLeftRail({
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: 'var(--text-secondary)',
+                    color: '#94a3b8',
                     fontSize: 11,
                     cursor: 'pointer',
                     display: 'flex',
@@ -1053,8 +1385,8 @@ export function SlideEditorLeftRail({
                       setTemplateContextMenu({ x: e.clientX, y: e.clientY, template: templateObj, isPrebuilt: true });
                     }}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      background: '#09090b',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
                       borderRadius: 6,
                       overflow: 'hidden',
                       cursor: 'pointer',
@@ -1062,13 +1394,14 @@ export function SlideEditorLeftRail({
                       display: 'flex',
                       flexDirection: 'column',
                       transition: 'all 0.15s ease',
+                      flexShrink: 0,
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = 'rgba(244, 98, 31, 0.5)';
                       e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.5)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
@@ -1082,7 +1415,7 @@ export function SlideEditorLeftRail({
                         color: 'rgba(255, 255, 255, 0.9)',
                         padding: '6px 10px',
                         background: 'rgba(0, 0, 0, 0.6)',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',

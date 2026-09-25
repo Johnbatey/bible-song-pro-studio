@@ -43,7 +43,7 @@ function applyStageMessage(message: unknown): void {
   state = reduceStage(state, message);
 
   // The operator's window is where these are set, so it is where they persist.
-  if (state.theme !== previous.theme) persistTheme(state.theme);
+  if (state.theme !== previous.theme) persistTheme(state.theme, state.layout?.id);
   /* Only preset ids go to localStorage. An operator-authored layout is a whole
      document, not an id the stage can look up on its own, so its restoration
      is the library's job — see restoreStageSession below. */
@@ -103,7 +103,7 @@ async function restoreStageSession(): Promise<void> {
   const active = layouts.find((item) => item.id === activeId);
   if (!active) return;
   publishStage({
-    customLayout: { id: active.id, name: active.name, bgColor: active.bgColor, zones: active.zones },
+    customLayout: { id: active.id, name: active.name, bgColor: active.bgColor, zones: active.zones, theme: active.theme },
   });
 }
 

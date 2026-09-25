@@ -36,6 +36,10 @@ interface SlideEditorQuickToolbarProps {
   onSelectTool: (tool: ActiveTool) => void;
   smartSnap: boolean;
   onToggleSmartSnap: () => void;
+  clipToCanvas?: boolean;
+  onToggleClipToCanvas?: () => void;
+  viewMode?: 'single' | 'artboard';
+  onToggleViewMode?: () => void;
   selectedElementId?: string | null;
   onUpdateElement?: (id: string, updates: Partial<SlideElement>) => void;
   pptx?: PptxToolbarActions | null;
@@ -49,6 +53,10 @@ export function SlideEditorQuickToolbar({
   onSelectTool,
   smartSnap,
   onToggleSmartSnap,
+  clipToCanvas,
+  onToggleClipToCanvas,
+  viewMode = 'artboard',
+  onToggleViewMode,
   selectedElementId,
   onUpdateElement,
   pptx = null,
@@ -268,10 +276,26 @@ export function SlideEditorQuickToolbar({
     };
   }, [isDraggingToolbar]);
 
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!activeDropdown) return;
+    const handleOutsideClick = (e: MouseEvent | PointerEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setActiveDropdown(null);
+      }
+    };
+    window.addEventListener('pointerdown', handleOutsideClick);
+    return () => window.removeEventListener('pointerdown', handleOutsideClick);
+  }, [activeDropdown]);
+
+  const isSelectActive = activeTool === 'select' && activeDropdown === null;
   const isShapeActive = ['box', 'rectangle', 'rounded', 'circle', 'triangle', 'star', 'line'].includes(activeTool);
 
   return (
     <div
+      ref={toolbarRef}
+      className="slide-editor-quick-toolbar"
       style={{
         ...CONTAINER,
         ...(toolbarPos
@@ -279,6 +303,16 @@ export function SlideEditorQuickToolbar({
           : { top: 54 }),
       }}
     >
+      <style>{`
+        .slide-editor-quick-toolbar button,
+        .slide-editor-quick-toolbar button:focus,
+        .slide-editor-quick-toolbar button:focus-visible,
+        .slide-editor-quick-toolbar button:active {
+          outline: none !important;
+          box-shadow: none !important;
+          -webkit-tap-highlight-color: transparent !important;
+        }
+      `}</style>
       {/* Unified Toolbar Card Block (Matching Reference Image 2) */}
       <div style={TOOLBAR_CARD}>
         {/* Integrated Top Drag Handle & Label */}
@@ -303,22 +337,23 @@ export function SlideEditorQuickToolbar({
           {/* 0. Select & Move Pointer Tool */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               onSelectTool('select');
               setActiveDropdown(null);
             }}
-            style={activeTool === 'select' ? PILL_BTN_ACTIVE : PILL_BTN}
+            style={isSelectActive ? PILL_BTN_ACTIVE : PILL_BTN}
             title={t('slideEditor.toolbar.selectTitle')}
           >
             <svg viewBox="0 0 24 24" style={ICON}>
               <path d="M3 3l7 18 3-7 7-3L3 3z" fill="currentColor" />
             </svg>
-            <span>{t('slideEditor.toolbar.select')}</span>
           </button>
 
           {/* 1. Text Tool */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               onSelectTool('text');
               setActiveDropdown(null);
@@ -329,13 +364,13 @@ export function SlideEditorQuickToolbar({
             <svg viewBox="0 0 24 24" style={ICON}>
               <path d="M4 7V4h16v3M9 20h6M12 4v16" />
             </svg>
-            <span>{t('slideEditor.toolbar.text')}</span>
           </button>
 
           {/* 2. Bible Tool Button (Proper SVG Bible Icon) */}
           <div style={{ position: 'relative' }}>
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setActiveDropdown(activeDropdown === 'scripture' ? null : 'scripture')}
               style={activeDropdown === 'scripture' ? PILL_BTN_ACTIVE : PILL_BTN}
               title={t('slideEditor.toolbar.bibleTitle')}
@@ -345,7 +380,6 @@ export function SlideEditorQuickToolbar({
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 <path d="M12 6v6M9 9h6" />
               </svg>
-              <span>{t('slideEditor.toolbar.bible')}</span>
             </button>
 
             {/* Scripture Popover */}
@@ -462,6 +496,7 @@ export function SlideEditorQuickToolbar({
           <div style={{ position: 'relative' }}>
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setActiveDropdown(activeDropdown === 'shapes' ? null : 'shapes')}
               style={isShapeActive || activeDropdown === 'shapes' ? PILL_BTN_ACTIVE : PILL_BTN}
               title={t('slideEditor.toolbar.shapeTitle')}
@@ -469,8 +504,6 @@ export function SlideEditorQuickToolbar({
               <svg viewBox="0 0 24 24" style={ICON}>
                 <rect x="3" y="3" width="18" height="18" rx="4" />
               </svg>
-              <span>{t('slideEditor.toolbar.shape')}</span>
-              <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
             </button>
 
             {activeDropdown === 'shapes' && (
@@ -478,6 +511,7 @@ export function SlideEditorQuickToolbar({
                 {/* 1. Rectangle */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     onSelectTool('rectangle');
                     setActiveDropdown(null);
@@ -495,6 +529,7 @@ export function SlideEditorQuickToolbar({
                 {/* 2. Rounded */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     onSelectTool('rounded');
                     setActiveDropdown(null);
@@ -512,6 +547,7 @@ export function SlideEditorQuickToolbar({
                 {/* 3. Circle */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     onSelectTool('circle');
                     setActiveDropdown(null);
@@ -529,6 +565,7 @@ export function SlideEditorQuickToolbar({
                 {/* 4. Triangle */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     onSelectTool('triangle');
                     setActiveDropdown(null);
@@ -546,6 +583,7 @@ export function SlideEditorQuickToolbar({
                 {/* 5. Star */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     onSelectTool('star');
                     setActiveDropdown(null);
@@ -563,6 +601,7 @@ export function SlideEditorQuickToolbar({
                 {/* 6. Line */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     onSelectTool('line');
                     setActiveDropdown(null);
@@ -583,6 +622,7 @@ export function SlideEditorQuickToolbar({
           {/* 4. Image Tool (Triggers File Picker Upload) */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               onSelectTool('image');
               setActiveDropdown(null);
@@ -595,13 +635,13 @@ export function SlideEditorQuickToolbar({
               <circle cx="9" cy="9" r="2" />
               <path d="M21 15l-3.086-3.086a2 2 0 00-2.828 0L6 21" />
             </svg>
-            <span>{t('slideEditor.toolbar.image')}</span>
           </button>
 
           {/* 5. Draw Category Dropdown (Pencil Freehand & Pen Bezier Vector) */}
           <div style={{ position: 'relative' }}>
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setActiveDropdown(activeDropdown === 'draw' ? null : 'draw')}
               style={activeTool === 'pencil' || activeTool === 'bezier' || activeDropdown === 'draw' ? PILL_BTN_ACTIVE : PILL_BTN}
               title={t('slideEditor.toolbar.drawTitle')}
@@ -609,8 +649,6 @@ export function SlideEditorQuickToolbar({
               <svg viewBox="0 0 24 24" style={ICON}>
                 <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
               </svg>
-              <span>{t('slideEditor.toolbar.draw')}</span>
-              <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
             </button>
 
             {activeDropdown === 'draw' && (
@@ -618,6 +656,7 @@ export function SlideEditorQuickToolbar({
                 {/* 1. Freehand Pencil */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     onSelectTool('pencil');
                     setActiveDropdown(null);
@@ -642,6 +681,7 @@ export function SlideEditorQuickToolbar({
                 {/* 2. Bezier Pen */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     onSelectTool('bezier');
                     setActiveDropdown(null);
@@ -678,6 +718,7 @@ export function SlideEditorQuickToolbar({
                       <button
                         key={w}
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setPenStrokeWidth(w)}
                         style={{
                           flex: 1,
@@ -714,6 +755,7 @@ export function SlideEditorQuickToolbar({
         <div style={{ position: 'relative' }}>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               setActiveDropdown(activeDropdown === 'song' ? null : 'song');
               setShowSectionDetail(false);
@@ -724,8 +766,6 @@ export function SlideEditorQuickToolbar({
             <svg viewBox="0 0 24 24" style={ICON}>
               <path d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12 0a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span>{t('slideEditor.toolbar.song')}</span>
-            <span style={{ fontSize: 9, opacity: 0.7 }}>▼</span>
           </button>
 
           {activeDropdown === 'song' && (
@@ -777,6 +817,7 @@ export function SlideEditorQuickToolbar({
                           {/* Arrow > button opening 2nd level section window */}
                           <button
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               setSelectedSong(s);
                               setShowSectionDetail(true);
@@ -809,6 +850,7 @@ export function SlideEditorQuickToolbar({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
                     <button
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => setShowSectionDetail(false)}
                       style={{ background: 'none', border: 'none', color: '#FF5500', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
                     >
@@ -825,6 +867,7 @@ export function SlideEditorQuickToolbar({
                       <button
                         key={sec}
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => handleInsertSongSection(selectedSong, sec)}
                         style={{
                           padding: '6px 12px',
@@ -852,6 +895,7 @@ export function SlideEditorQuickToolbar({
         {/* 6. Smart Snap Toggle */}
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={onToggleSmartSnap}
           style={smartSnap ? PILL_BTN_ACTIVE : PILL_BTN}
           title={t('slideEditor.toolbar.smartSnapTitle')}
@@ -862,10 +906,51 @@ export function SlideEditorQuickToolbar({
           </svg>
         </button>
 
-        {/* 7. Delete Layer Button */}
+        {/* 7. Trim View / Clip Canvas Toggle */}
+        {onToggleClipToCanvas && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onToggleClipToCanvas}
+            style={clipToCanvas ? PILL_BTN_ACTIVE : PILL_BTN}
+            title={clipToCanvas ? t('slideEditor.canvas.clipCanvasOn') : t('slideEditor.canvas.clipCanvasOff')}
+          >
+            <svg viewBox="0 0 24 24" style={ICON}>
+              <path d="M6 2v14a2 2 0 002 2h14" />
+              <path d="M18 22V8a2 2 0 00-2-2H2" />
+            </svg>
+          </button>
+        )}
+
+        {/* 8. Artboard View / Single Slide View Mode Toggle */}
+        {onToggleViewMode && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onToggleViewMode}
+            style={viewMode === 'artboard' ? PILL_BTN_ACTIVE : PILL_BTN}
+            title={viewMode === 'artboard' ? 'Switch to Single Slide View' : 'Switch to Side-by-Side Artboard View'}
+          >
+            <svg viewBox="0 0 24 24" style={ICON}>
+              {viewMode === 'artboard' ? (
+                <>
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </>
+              ) : (
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              )}
+            </svg>
+          </button>
+        )}
+
+        {/* 8. Delete Layer Button */}
         {pptx && (
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={pptx.onDelete}
             disabled={!pptx.hasSelection}
             style={pptx.hasSelection ? DANGER_BTN : DISABLED_BTN}
@@ -929,27 +1014,32 @@ const TOOLBAR_PILL: React.CSSProperties = {
 };
 
 const PILL_BTN: React.CSSProperties = {
+  width: 28,
   height: 28,
-  padding: '0 9px',
+  padding: 0,
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 5,
-  background: 'var(--chrome-control)',
-  border: '1px solid var(--border-primary)',
+  justifyContent: 'center',
+  background: 'rgba(255, 255, 255, 0.05)',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
   borderRadius: 6,
-  color: 'var(--text-primary)',
+  color: 'rgba(255, 255, 255, 0.85)',
   fontSize: 12,
   fontWeight: 600,
   cursor: 'pointer',
   transition: 'all 0.15s ease',
+  outline: 'none',
+  boxShadow: 'none',
+  boxSizing: 'border-box',
 };
 
 const PILL_BTN_ACTIVE: React.CSSProperties = {
   ...PILL_BTN,
-  background: 'var(--chrome-control-active)',
-  borderColor: 'var(--accent)',
-  color: 'var(--text-primary)',
-  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+  background: 'rgba(255, 85, 0, 0.18)',
+  border: '1px solid #FF5500',
+  color: '#FF5500',
+  boxShadow: 'none',
+  outline: 'none',
 };
 
 const DANGER_BTN: React.CSSProperties = {
@@ -973,8 +1063,8 @@ const DIVIDER: React.CSSProperties = {
 };
 
 const ICON: React.CSSProperties = {
-  width: 13,
-  height: 13,
+  width: 14,
+  height: 14,
   fill: 'none',
   stroke: 'currentColor',
   strokeWidth: 2,

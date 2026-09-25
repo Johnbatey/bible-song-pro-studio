@@ -282,7 +282,9 @@ export function FxAnimationPopover({
           max="5.0"
           step="0.1"
           value={activeFxSettings.duration}
-          onChange={(e) => handleUpdateSettings({ duration: parseFloat(e.target.value) || 0.5 })}
+          onChange={(e) => handleUpdateSettings({ duration: parseFloat(e.target.value) || 0.4 })}
+          onDoubleClick={() => handleUpdateSettings({ duration: 0.4 })}
+          title="Transition duration (Double-click to reset to 0.4s)"
           style={{
             width: '100%',
             height: 5,
@@ -304,6 +306,21 @@ export function FxAnimationPopover({
           onChange={(checked) => handleUpdateSettings({ animateBackground: checked })}
           label="Animate Background"
           description={isSlidesMode ? "Animate slide background alongside elements" : "Animate background alongside text"}
+        />
+      </div>
+
+      {/* Stage Display FX Animation Toggle */}
+      <div
+        style={{
+          paddingTop: 8,
+          borderTop: '1px solid var(--border-primary, rgba(255, 255, 255, 0.08))',
+        }}
+      >
+        <AppleToggle
+          checked={activeFxSettings.stageDisplayFxEnabled !== false}
+          onChange={(checked) => handleUpdateSettings({ stageDisplayFxEnabled: checked })}
+          label="Stage Display FX"
+          description="Play transition animations on stage confidence display"
         />
       </div>
     </div>,

@@ -417,6 +417,49 @@ export function ThemeStudioModal() {
     setScale((s) => Math.max(0.2, Math.min(2.5, Math.round((s + delta) * 100) / 100)));
   };
 
+  /* Keyboard Cmd/Ctrl +/-/0/1 zoom (Photoshop & Illustrator standard) */
+  useEffect(() => {
+    function handleThemeCanvasZoomKeys(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey) {
+        const key = e.key;
+        const code = e.code;
+
+        // Zoom In: Cmd/Ctrl + '+' or '=' or 'Add' or code === 'Equal' or 'NumpadAdd'
+        const isZoomIn = key === '=' || key === '+' || key === 'Add' || code === 'Equal' || code === 'NumpadAdd' || (e.shiftKey && (key === '+' || code === 'Equal'));
+        
+        // Zoom Out: Cmd/Ctrl + '-' or '_' or 'Subtract' or code === 'Minus' or code === 'NumpadSubtract'
+        const isZoomOut = key === '-' || key === '_' || key === 'Subtract' || code === 'Minus' || code === 'NumpadSubtract';
+        
+        // Fit to Window: Cmd/Ctrl + '0' or code === 'Digit0' or code === 'Numpad0'
+        const isFit = key === '0' || code === 'Digit0' || code === 'Numpad0';
+        
+        // 100% 1:1 Actual Size: Cmd/Ctrl + '1' or code === 'Digit1' or code === 'Numpad1'
+        const isActualSize = key === '1' || code === 'Digit1' || code === 'Numpad1';
+
+        if (isZoomIn) {
+          e.preventDefault();
+          e.stopPropagation();
+          setScale((s) => Math.min(2.5, Math.round((s + 0.1) * 100) / 100));
+        } else if (isZoomOut) {
+          e.preventDefault();
+          e.stopPropagation();
+          setScale((s) => Math.max(0.2, Math.round((s - 0.1) * 100) / 100));
+        } else if (isFit) {
+          e.preventDefault();
+          e.stopPropagation();
+          fitToViewport();
+        } else if (isActualSize) {
+          e.preventDefault();
+          e.stopPropagation();
+          setScale(1.0);
+          setPan({ x: 0, y: 0 });
+        }
+      }
+    }
+    window.addEventListener('keydown', handleThemeCanvasZoomKeys, { capture: true });
+    return () => window.removeEventListener('keydown', handleThemeCanvasZoomKeys, { capture: true });
+  }, [fitToViewport]);
+
   const sampleVerseText = 'For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.';
   const sampleVerseRef = 'John 3:16 (KJV)';
 
@@ -1123,7 +1166,7 @@ export function ThemeStudioModal() {
                     transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${scale})`,
                     transformOrigin: 'center center',
                     willChange: isPanning ? 'transform' : 'auto',
-                    borderRadius: 8,
+                    borderRadius: 0,
                     overflow: 'hidden',
                     boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.12)',
                     background: showCheckerboard

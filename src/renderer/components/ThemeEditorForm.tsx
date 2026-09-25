@@ -17,6 +17,8 @@ interface StudioSliderProps {
   step?: number;
   unit?: string;
   displayValue?: string;
+  defaultValue?: number;
+  hardMax?: number;
   onChange: (val: number) => void;
 }
 
@@ -28,30 +30,99 @@ export function StudioSlider({
   step = 1,
   unit = 'px',
   displayValue,
+  defaultValue,
+  hardMax = 5000,
   onChange,
 }: StudioSliderProps) {
+  const [isEditing, setIsEditing] = useState(false);
   const safeVal = Number.isFinite(value) ? value : min;
-  const percentage = Math.max(0, Math.min(100, ((safeVal - min) / (max - min)) * 100));
+  const [draft, setDraft] = useState(String(safeVal));
+
+  useEffect(() => {
+    if (!isEditing) {
+      setDraft(String(safeVal));
+    }
+  }, [safeVal, isEditing]);
+
+  const effectiveMax = Math.max(max, safeVal);
+  const percentage = Math.max(0, Math.min(100, ((safeVal - min) / (effectiveMax - min || 1)) * 100));
   const sliderBg = `linear-gradient(to right, #10B981 0%, #10B981 ${percentage}%, var(--studio-track-bg, #272B33) ${percentage}%, var(--studio-track-bg, #272B33) 100%)`;
+
+  const commitDraft = () => {
+    const parsed = parseFloat(draft);
+    if (!isNaN(parsed)) {
+      const clamped = Math.max(min, Math.min(hardMax, parsed));
+      onChange(clamped);
+    }
+    setIsEditing(false);
+  };
+
+  const handleReset = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (defaultValue !== undefined) {
+      onChange(defaultValue);
+    } else {
+      onChange(min);
+    }
+  };
 
   return (
     <div className="studio-slider-row">
       <div className="studio-slider-labels">
         <span className="studio-slider-name">{label}</span>
-        <span className="studio-slider-value">
-          {displayValue ?? `${safeVal}${unit}`}
-        </span>
+        {isEditing ? (
+          <input
+            type="number"
+            autoFocus
+            min={min}
+            max={hardMax}
+            step={step}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitDraft}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitDraft();
+              if (e.key === 'Escape') setIsEditing(false);
+            }}
+            style={{
+              width: 58,
+              padding: '1px 4px',
+              fontSize: 11,
+              fontWeight: 700,
+              textAlign: 'right',
+              background: 'rgba(0, 0, 0, 0.5)',
+              border: '1px solid #10B981',
+              borderRadius: 4,
+              color: '#fff',
+              outline: 'none',
+            }}
+          />
+        ) : (
+          <span
+            className="studio-slider-value"
+            onClick={() => {
+              setDraft(String(safeVal));
+              setIsEditing(true);
+            }}
+            title="Click to type exact value (up to 5000px)"
+            style={{ cursor: 'pointer' }}
+          >
+            {displayValue ?? `${safeVal}${unit}`}
+          </span>
+        )}
       </div>
       <div className="studio-slider-track-wrap">
         <input
           type="range"
           min={min}
-          max={max}
+          max={effectiveMax}
           step={step}
-          value={safeVal}
+          value={Math.min(safeVal, effectiveMax)}
           onChange={(e) => onChange(parseFloat(e.target.value))}
+          onDoubleClick={handleReset}
+          title={defaultValue !== undefined ? `Double-click to reset to default (${defaultValue}${unit})` : 'Double-click to reset'}
           className="studio-range-slider"
-          style={{ background: sliderBg }}
+          style={{ background: sliderBg, cursor: 'pointer' }}
         />
       </div>
     </div>
@@ -97,25 +168,432 @@ interface StudioColorPickerProps {
 export function StudioColorPicker({ label, value, disabled = false, onChange }: StudioColorPickerProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const safeVal = value && value.startsWith('#') ? value : '#ffffff';
+  const [draft, setDraft] = useState(safeVal.toUpperCase());
+
+  useEffect(() => {
+    setDraft(safeVal.toUpperCase());
+  }, [safeVal]);
+
+  const commitHex = (val: string) => {
+    let clean = val.trim();
+    if (!clean.startsWith('#')) clean = `#${clean}`;
+    if (/^#[0-9A-Fa-f]{6}$/.test(clean) || /^#[0-9A-Fa-f]{3}$/.test(clean)) {
+      onChange(clean.toLowerCase());
+    }
+  };
 
   return (
     <div className="studio-field-box">
       <span className="studio-field-label">{label}</span>
       <div
         className="studio-color-picker-btn"
-        onClick={() => !disabled && inputRef.current?.click()}
-        style={{ opacity: disabled ? 0.4 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
+        style={{ opacity: disabled ? 0.4 : 1, cursor: disabled ? 'not-allowed' : 'default' }}
       >
-        <div className="studio-color-swatch" style={{ background: safeVal }} />
-        <span className="studio-color-hex">{safeVal}</span>
+        <div
+          className="studio-color-swatch"
+          style={{ background: safeVal, cursor: disabled ? 'not-allowed' : 'pointer' }}
+          onClick={() => !disabled && inputRef.current?.click()}
+          title="Click to open color picker"
+        />
+        <input
+          type="text"
+          className="studio-color-hex-input"
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            commitHex(e.target.value);
+          }}
+          onBlur={() => {
+            commitHex(draft);
+            setDraft(safeVal.toUpperCase());
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              commitHex(draft);
+            }
+          }}
+          spellCheck={false}
+        />
         <input
           ref={inputRef}
           type="color"
           value={safeVal}
           disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setDraft(e.target.value.toUpperCase());
+          }}
           style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
         />
+      </div>
+    </div>
+  );
+}
+
+interface StudioGradientRampProps {
+  startColor: string;
+  endColor: string;
+  direction?: string;
+  isRadial?: boolean;
+  startPos?: number;
+  endPos?: number;
+  onColorChange: (updates: { start?: string; end?: string; startPos?: number; endPos?: number }) => void;
+  onSwapColors: () => void;
+}
+
+export function StudioGradientRamp({
+  startColor,
+  endColor,
+  direction = '135deg',
+  isRadial = false,
+  startPos: propStartPos = 0,
+  endPos: propEndPos = 100,
+  onColorChange,
+  onSwapColors,
+}: StudioGradientRampProps) {
+  const [activeStop, setActiveStop] = useState<'start' | 'end'>('start');
+  const [startPos, setStartPos] = useState<number>(propStartPos);
+  const [endPos, setEndPos] = useState<number>(propEndPos);
+
+  const startInputRef = useRef<HTMLInputElement | null>(null);
+  const endInputRef = useRef<HTMLInputElement | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+
+  const [startDraft, setStartDraft] = useState(startColor.toUpperCase());
+  const [endDraft, setEndDraft] = useState(endColor.toUpperCase());
+
+  useEffect(() => {
+    setStartPos(propStartPos);
+  }, [propStartPos]);
+
+  useEffect(() => {
+    setEndPos(propEndPos);
+  }, [propEndPos]);
+
+  useEffect(() => {
+    setStartDraft(startColor.toUpperCase());
+  }, [startColor]);
+
+  useEffect(() => {
+    setEndDraft(endColor.toUpperCase());
+  }, [endColor]);
+
+  const commitStartHex = (val: string) => {
+    let clean = val.trim();
+    if (!clean.startsWith('#')) clean = `#${clean}`;
+    if (/^#[0-9A-Fa-f]{6}$/.test(clean) || /^#[0-9A-Fa-f]{3}$/.test(clean)) {
+      onColorChange({ start: clean.toLowerCase() });
+    }
+  };
+
+  const commitEndHex = (val: string) => {
+    let clean = val.trim();
+    if (!clean.startsWith('#')) clean = `#${clean}`;
+    if (/^#[0-9A-Fa-f]{6}$/.test(clean) || /^#[0-9A-Fa-f]{3}$/.test(clean)) {
+      onColorChange({ end: clean.toLowerCase() });
+    }
+  };
+
+  const handlePointerDownTrack = (e: React.PointerEvent<HTMLDivElement>, targetStop?: 'start' | 'end') => {
+    if (!trackRef.current) return;
+    e.preventDefault();
+    const rect = trackRef.current.getBoundingClientRect();
+    const calculatePos = (clientX: number) => {
+      const pct = ((clientX - rect.left) / rect.width) * 100;
+      return Math.round(Math.max(0, Math.min(100, pct)));
+    };
+
+    const clickPos = calculatePos(e.clientX);
+    let stopToMove = targetStop;
+    if (!stopToMove) {
+      const distStart = Math.abs(clickPos - startPos);
+      const distEnd = Math.abs(clickPos - endPos);
+      stopToMove = distStart <= distEnd ? 'start' : 'end';
+    }
+
+    setActiveStop(stopToMove);
+    if (stopToMove === 'start') {
+      setStartPos(clickPos);
+      onColorChange({ startPos: clickPos });
+    } else {
+      setEndPos(clickPos);
+      onColorChange({ endPos: clickPos });
+    }
+
+    const activeStopRef = stopToMove;
+
+    const onPointerMove = (moveEvt: PointerEvent) => {
+      const pos = calculatePos(moveEvt.clientX);
+      if (activeStopRef === 'start') {
+        setStartPos(pos);
+        onColorChange({ startPos: pos });
+      } else {
+        setEndPos(pos);
+        onColorChange({ endPos: pos });
+      }
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
+
+  return (
+    <div className="studio-field-box" style={{ gap: 10 }}>
+      {/* Header Row: Label & Flip Button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <span className="studio-field-label" style={{ marginBottom: 0 }}>Gradient Ramp</span>
+        <button
+          type="button"
+          onClick={onSwapColors}
+          title="Flip Highlight & Shadow Colors"
+          className="studio-reset-btn"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '2px 6px',
+            fontSize: 11,
+            color: 'var(--text-secondary, #94a3b8)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: 4,
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="17 1 21 5 17 9" />
+            <path d="M3 5h18" />
+            <polyline points="7 23 3 19 7 15" />
+            <path d="M21 19H3" />
+          </svg>
+          <span>Flip</span>
+        </button>
+      </div>
+
+      {/* Visual Gradient Ramp Track with Movable / Clickable Stop Pins */}
+      <div
+        ref={trackRef}
+        onPointerDown={(e) => handlePointerDownTrack(e)}
+        style={{
+          position: 'relative',
+          width: '100%',
+          paddingTop: 4,
+          paddingBottom: 18,
+          cursor: 'ew-resize',
+          touchAction: 'none',
+        }}
+      >
+        {/* Gradient Bar */}
+        <div
+          style={{
+            height: 22,
+            width: '100%',
+            borderRadius: 5,
+            background: isRadial
+              ? `radial-gradient(circle, ${startColor} ${startPos}%, ${endColor} ${endPos}%)`
+              : `linear-gradient(to right, ${startColor} ${startPos}%, ${endColor} ${endPos}%)`,
+            boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.4)',
+          }}
+        />
+
+        {/* Start / Highlight Stop Handle Pin */}
+        <div
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            handlePointerDownTrack(e, 'start');
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveStop('start');
+            startInputRef.current?.click();
+          }}
+          style={{
+            position: 'absolute',
+            left: `calc(${startPos}% - 8px)`,
+            bottom: 0,
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            zIndex: activeStop === 'start' ? 10 : 2,
+          }}
+          title={`Highlight Color: ${startColor} (Click handle to choose color)`}
+        >
+          <div
+            style={{
+              width: 0,
+              height: 0,
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderBottom: `6px solid ${activeStop === 'start' ? '#10B981' : '#ffffff'}`,
+            }}
+          />
+          <div
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: 3,
+              background: startColor,
+              border: activeStop === 'start' ? '2px solid #10B981' : '1px solid #ffffff',
+              boxShadow: activeStop === 'start' ? '0 0 8px rgba(16, 185, 129, 0.8)' : '0 1px 4px rgba(0,0,0,0.6)',
+            }}
+          />
+        </div>
+
+        {/* End / Shadow Stop Handle Pin */}
+        <div
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            handlePointerDownTrack(e, 'end');
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveStop('end');
+            endInputRef.current?.click();
+          }}
+          style={{
+            position: 'absolute',
+            left: `calc(${endPos}% - 8px)`,
+            bottom: 0,
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            zIndex: activeStop === 'end' ? 10 : 2,
+          }}
+          title={`Shadow Color: ${endColor} (Click handle to choose color)`}
+        >
+          <div
+            style={{
+              width: 0,
+              height: 0,
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderBottom: `6px solid ${activeStop === 'end' ? '#10B981' : '#ffffff'}`,
+            }}
+          />
+          <div
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: 3,
+              background: endColor,
+              border: activeStop === 'end' ? '2px solid #10B981' : '1px solid #ffffff',
+              boxShadow: activeStop === 'end' ? '0 0 8px rgba(16, 185, 129, 0.8)' : '0 1px 4px rgba(0,0,0,0.6)',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Hidden Native Color Pickers */}
+      <input
+        ref={startInputRef}
+        type="color"
+        value={startColor.startsWith('#') ? startColor : '#0f172a'}
+        onChange={(e) => onColorChange({ start: e.target.value })}
+        style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
+      />
+      <input
+        ref={endInputRef}
+        type="color"
+        value={endColor.startsWith('#') ? endColor : '#312e81'}
+        onChange={(e) => onColorChange({ end: e.target.value })}
+        style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
+      />
+
+      {/* Stop Hex Color Inputs (Highlight vs Shadow) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 6, width: '100%', boxSizing: 'border-box' }}>
+        {/* Highlight Stop Chip */}
+        <div
+          className={`studio-color-picker-btn ${activeStop === 'start' ? 'active' : ''}`}
+          style={{
+            height: 30,
+            padding: '2px 6px',
+            gap: 6,
+            minWidth: 0,
+            overflow: 'hidden',
+            boxSizing: 'border-box',
+            borderColor: activeStop === 'start' ? '#10B981' : undefined,
+          }}
+          onClick={() => setActiveStop('start')}
+        >
+          <div
+            className="studio-color-swatch"
+            style={{ width: 16, height: 16, borderRadius: 3, background: startColor, cursor: 'pointer', flexShrink: 0 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveStop('start');
+              startInputRef.current?.click();
+            }}
+            title="Click to choose Highlight color"
+          />
+          <input
+            type="text"
+            className="studio-color-hex-input"
+            value={startDraft}
+            onChange={(e) => {
+              setStartDraft(e.target.value);
+              commitStartHex(e.target.value);
+            }}
+            onBlur={() => {
+              commitStartHex(startDraft);
+              setStartDraft(startColor.toUpperCase());
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitStartHex(startDraft);
+            }}
+            spellCheck={false}
+            title="Highlight hex code"
+          />
+        </div>
+
+        {/* Shadow Stop Chip */}
+        <div
+          className={`studio-color-picker-btn ${activeStop === 'end' ? 'active' : ''}`}
+          style={{
+            height: 30,
+            padding: '2px 6px',
+            gap: 6,
+            minWidth: 0,
+            overflow: 'hidden',
+            boxSizing: 'border-box',
+            borderColor: activeStop === 'end' ? '#10B981' : undefined,
+          }}
+          onClick={() => setActiveStop('end')}
+        >
+          <div
+            className="studio-color-swatch"
+            style={{ width: 16, height: 16, borderRadius: 3, background: endColor, cursor: 'pointer', flexShrink: 0 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveStop('end');
+              endInputRef.current?.click();
+            }}
+            title="Click to choose Shadow color"
+          />
+          <input
+            type="text"
+            className="studio-color-hex-input"
+            value={endDraft}
+            onChange={(e) => {
+              setEndDraft(e.target.value);
+              commitEndHex(e.target.value);
+            }}
+            onBlur={() => {
+              commitEndHex(endDraft);
+              setEndDraft(endColor.toUpperCase());
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitEndHex(endDraft);
+            }}
+            spellCheck={false}
+            title="Shadow hex code"
+          />
+        </div>
       </div>
     </div>
   );
@@ -180,12 +658,10 @@ export function ThemeEditorForm({
   values,
   onChange,
   surface,
-  contentMode = 'bible',
 }: {
   values: any;
   onChange: (updates: any) => void;
   surface: ThemeSurface;
-  contentMode?: 'bible' | 'song';
 }) {
   const assetBaseUrl = useAssetBaseUrl();
   const previewMedia = values.backgroundMediaUrl
@@ -496,17 +972,25 @@ export function ThemeEditorForm({
     }
   };
 
-  const startInputRef = useRef<HTMLInputElement | null>(null);
-  const endInputRef = useRef<HTMLInputElement | null>(null);
+  const currentStartPos = bgInfo.startPos ?? 0;
+  const currentEndPos = bgInfo.endPos ?? 100;
 
   const isRadial = currentDir === 'radial';
   const numericAngle = parseInt(currentDir.replace('deg', ''), 10) || 135;
 
-  const handleGradientChange = (updates: { start?: string; end?: string; dir?: string }) => {
+  const handleGradientChange = (updates: {
+    start?: string;
+    end?: string;
+    dir?: string;
+    startPos?: number;
+    endPos?: number;
+  }) => {
     const s = updates.start ?? currentStart;
     const e = updates.end ?? currentEnd;
     const d = updates.dir ?? currentDir;
-    const gradCss = gradientCss(s, e, d);
+    const sp = updates.startPos ?? currentStartPos;
+    const ep = updates.endPos ?? currentEndPos;
+    const gradCss = gradientCss(s, e, d, sp, ep);
     onChange({
       backgroundType: 'gradient',
       background: gradCss,
@@ -906,7 +1390,8 @@ export function ThemeEditorForm({
           label="Font Size"
           value={values.fontSize ?? (surface === 'full' ? 65 : 36)}
           min={16}
-          max={120}
+          max={200}
+          defaultValue={surface === 'full' ? 65 : 36}
           unit="px"
           onChange={(val) => onChange({ fontSize: val })}
         />
@@ -977,7 +1462,7 @@ export function ThemeEditorForm({
 
         {/* Verse Colour */}
         <StudioColorPicker
-          label={contentMode === 'song' ? 'Text Colour' : 'Verse Colour'}
+          label="Verse Colour"
           value={values.fontColor || '#ffffff'}
           onChange={(col) => onChange({ fontColor: col })}
         />
@@ -987,7 +1472,8 @@ export function ThemeEditorForm({
           label="Reference Size"
           value={values.referenceFontSize ?? (surface === 'full' ? 40 : 24)}
           min={12}
-          max={60}
+          max={200}
+          defaultValue={surface === 'full' ? 40 : 24}
           unit="px"
           onChange={(val) => onChange({ referenceFontSize: val })}
         />
@@ -1200,72 +1686,17 @@ export function ThemeEditorForm({
               </select>
             </div>
 
-            {/* Live Gradient Color Stops & Spectrum Bar */}
-            <div className="studio-field-box">
-              <div className="studio-field-label">Color Stops & Spectrum</div>
-              <div className="studio-gradient-bar-row">
-                {/* Start Color Swatch */}
-                <div
-                  onClick={() => startInputRef.current?.click()}
-                  className="studio-gradient-swatch-chip"
-                  style={{
-                    background: currentStart.startsWith('#') ? currentStart : '#0f172a',
-                  }}
-                  title={`Start Color: ${currentStart}`}
-                >
-                  <input
-                    ref={startInputRef}
-                    type="color"
-                    value={currentStart.startsWith('#') ? currentStart : '#0f172a'}
-                    onChange={(e) => handleGradientChange({ start: e.target.value })}
-                    style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
-                  />
-                </div>
-
-                {/* Live Gradient Track */}
-                <div
-                  className="studio-gradient-spectrum-track"
-                  style={{
-                    background: isRadial
-                      ? `radial-gradient(circle, ${currentStart}, ${currentEnd})`
-                      : `linear-gradient(to right, ${currentStart}, ${currentEnd})`,
-                  }}
-                />
-
-                {/* Swap Colors Button */}
-                <button
-                  type="button"
-                  onClick={handleSwapGradient}
-                  title="Swap Start & End Colors"
-                  className="studio-gradient-swap-btn"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="17 1 21 5 17 9" />
-                    <path d="M3 5h18" />
-                    <polyline points="7 23 3 19 7 15" />
-                    <path d="M21 19H3" />
-                  </svg>
-                </button>
-
-                {/* End Color Swatch */}
-                <div
-                  onClick={() => endInputRef.current?.click()}
-                  className="studio-gradient-swatch-chip"
-                  style={{
-                    background: currentEnd.startsWith('#') ? currentEnd : '#312e81',
-                  }}
-                  title={`End Color: ${currentEnd}`}
-                >
-                  <input
-                    ref={endInputRef}
-                    type="color"
-                    value={currentEnd.startsWith('#') ? currentEnd : '#312e81'}
-                    onChange={(e) => handleGradientChange({ end: e.target.value })}
-                    style={{ opacity: 0, width: 0, height: 0, position: 'absolute', pointerEvents: 'none' }}
-                  />
-                </div>
-              </div>
-            </div>
+            {/* Visual Gradient Ramp Slider with Dual Movable Handles & Click-to-Pick Color */}
+            <StudioGradientRamp
+              startColor={currentStart}
+              endColor={currentEnd}
+              direction={currentDir}
+              isRadial={isRadial}
+              startPos={currentStartPos}
+              endPos={currentEndPos}
+              onColorChange={handleGradientChange}
+              onSwapColors={handleSwapGradient}
+            />
 
             {/* Gradient Angle (Linear Mode) */}
             {!isRadial && (

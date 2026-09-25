@@ -280,6 +280,12 @@ export function PresentationPanel() {
 
   function handleConfirmCreateProject() {
     const title = newProjectTitle.trim() || t('pres.newDeck');
+    const isDark = useAppStore.getState().uiThemeMode !== 'light';
+    const bg: SlideBackground = isDark
+      ? { type: 'color', value: '#ffffff' }
+      : { type: 'color', value: '#0C0B0B' };
+    const textColor = isDark ? '#000000' : '#ffffff';
+
     const newDeck: PresentationDeck = {
       id: `deck-${Date.now()}`,
       title,
@@ -295,7 +301,7 @@ export function PresentationPanel() {
           hidden: false,
           buildCount: 0,
           buildStep: 0,
-          background: { type: 'color', value: '#0C0B0B' },
+          background: bg,
           elements: [
             {
               id: `text-${Date.now()}`,
@@ -306,7 +312,7 @@ export function PresentationPanel() {
               width: 80,
               height: 30,
               fontSize: 48,
-              color: '#ffffff',
+              color: textColor,
               fontWeight: 700,
               textAlign: 'center',
             },
@@ -731,6 +737,7 @@ export function PresentationPanel() {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || !selectedDeck) return;
+      if (useAppStore.getState().isSlideEditorOpen) return;
       if (!isFocusedDock(containerRef.current)) return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
@@ -746,6 +753,7 @@ export function PresentationPanel() {
     }
 
     const handleStepNext = () => {
+      if (useAppStore.getState().isSlideEditorOpen) return;
       const activeScene = useAppStore.getState().display.currentScene;
       const isFocused = isFocusedDock(containerRef.current);
       if (selectedDeck && (isFocused || activeScene?.type === 'presentation' || activeScene?.id?.startsWith('slide-') || activeScene?.id?.startsWith('pptx-'))) {
@@ -754,6 +762,7 @@ export function PresentationPanel() {
     };
 
     const handleStepPrev = () => {
+      if (useAppStore.getState().isSlideEditorOpen) return;
       const activeScene = useAppStore.getState().display.currentScene;
       const isFocused = isFocusedDock(containerRef.current);
       if (selectedDeck && (isFocused || activeScene?.type === 'presentation' || activeScene?.id?.startsWith('slide-') || activeScene?.id?.startsWith('pptx-'))) {
@@ -1086,9 +1095,6 @@ export function PresentationPanel() {
                       <div style={{ fontSize: 13, fontWeight: 650, color: live ? '#FF5500' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {title}
                       </div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
-                        {subtitle || slideLabel(index + 1)}
-                      </div>
                     </div>
                   </div>
 
@@ -1188,7 +1194,6 @@ export function PresentationPanel() {
                 <div style={styles.projectSlideFooter}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={styles.projectSlideTitle}>{title}</div>
-                    <div style={styles.projectSlideSubtitle}>{subtitle || slideLabel(index + 1)}</div>
                   </div>
 
                   <div style={{ display: 'flex', gap: 4 }}>

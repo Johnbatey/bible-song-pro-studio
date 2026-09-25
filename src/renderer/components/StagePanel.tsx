@@ -8,7 +8,8 @@ import { useAssetBaseUrl } from '../hooks/useAssetBaseUrl';
 import { publishStage, useStageState } from '../services/stage-bus';
 import { formatTime, timerSeconds } from '../../stage/stage-state';
 import { StageSurface } from '../../stage/StageSurface';
-import { LAYOUTS, LAYOUT_IDS } from '../../stage/layouts';
+import { getEffectiveLayout, LAYOUTS, LAYOUT_IDS, type StageLayout } from '../../stage/layouts';
+
 import { useLayoutLibrary } from '../../stage/layout-library';
 import { isPresetId } from '../../stage/layout-model';
 import type { StageTheme } from '../../stage/theme';
@@ -198,23 +199,45 @@ export function StagePanel() {
   /* Operator controls publish a message rather than setting local state: the
      stage windows have to receive the same one, and the preview below is
      rendered from the result of applying it. */
-  /* A preset travels as its id — the stage has the table and can look it up.
-     An operator's layout has to travel whole, because nothing on the stage
-     side has ever heard of it. Either way the choice is recorded so the next
-     launch comes back to it. */
+  /* A preset or saved layout travels with its effective configuration so any
+     window or stage display receives customized zone tweaks and colors immediately. */
   const applyLayout = useCallback((id: LayoutId) => {
-    if (isPresetId(id)) {
-      publishStage({ layout: id });
-    } else {
-      const saved = library.layouts.find((item) => item.id === id);
-      if (!saved) return;
+    const effective = getEffectiveLayout(id, library.layouts);
+    if (effective) {
       publishStage({
-        customLayout: { id: saved.id, name: saved.name, bgColor: saved.bgColor, zones: saved.zones },
+        layout: id,
+        customLayout: {
+          id: effective.id,
+          name: effective.name,
+          bgColor: effective.bgColor,
+          zones: effective.zones,
+          theme: effective.theme,
+        },
       });
     }
     void library.setActive(id);
   }, [library]);
-  const applyTheme = useCallback((patch: Partial<StageTheme>) => publishStage({ theme: patch }), []);
+
+  const applyTheme = useCallback(
+    (themePatch: Partial<StageTheme>, layoutPatch?: Partial<StageLayout>) => {
+      const payload: Record<string, unknown> = { theme: themePatch };
+      if (layoutPatch) {
+        payload.customLayout = {
+          id: layoutPatch.id || stage.layout.id,
+          name: layoutPatch.name || stage.layout.name,
+          bgColor: layoutPatch.bgColor || themePatch.background || stage.layout.bgColor,
+          zones: layoutPatch.zones || stage.layout.zones,
+          theme: layoutPatch.theme,
+        };
+        if (themePatch.background) {
+          payload.backgroundColor = themePatch.background;
+        }
+      }
+      publishStage(payload);
+    },
+    [stage.layout],
+  );
+
   const timerCommand = useCallback(
     (command: 'start' | 'stop' | 'reset') => publishStage({ kind: 'timer-command', command, atMs: Date.now() }),
     [],
@@ -282,7 +305,8 @@ export function StagePanel() {
               <input
                 type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={0.01} value={zoom}
                 onChange={(e) => setZoomAround(Number(e.currentTarget.value))}
-                title={t('stage.zoomScale')}
+                onDoubleClick={() => setZoomAround(1)}
+                title={`${t('stage.zoomScale')} (Double-click to reset to 100%)`}
               />
               <span className="zoombar-val">{zoomLabel}</span>
               <div className="zoombar-divider" />
@@ -303,11 +327,13 @@ export function StagePanel() {
             {settingsOpen && (
               <StageSettingsPopover
                 theme={stage.theme}
+                layout={stage.layout}
                 onChange={applyTheme}
                 onClose={() => setSettingsOpen(false)}
                 anchorRef={settingsBtnRef}
               />
             )}
+
             <span style={styles.footerLabel}>LAYOUT</span>
             <CustomDropdown
               value={activeLayout}

@@ -6,13 +6,21 @@ import { LayerList, type LayerRow } from './LayerList';
 import { ShapeInspector } from '../ShapeInspector';
 import { SlideTextPanel } from '../SlideTextPanel';
 import { CustomDropdown } from '../CustomDropdown';
-import { AppleToggle } from '../AppleToggle';
 import { slideElementsFor } from '../NativeSlideBoard';
 import type { ParsedShape } from '../../slide-engine/parser/slide-parser';
 import type { PresentationSlide, SlideElement } from '../../types';
+import { useAppStore } from '../../stores/appStore';
 import { parseBackgroundInfo, gradientCss } from '../../utils/background';
 import { fetchInstalledSystemFonts, type FontOptionItem } from '../../utils/system-fonts';
 import { importSlideImage } from '../../utils/import-slide-image';
+import {
+  StudioSlider,
+  StudioToggle,
+  StudioColorPicker,
+  StudioGradientRamp,
+} from '../ThemeEditorForm';
+import { CircularAngleDial } from '../BackgroundPicker';
+import '../ThemeStudio.css';
 
 export interface PptxInspector {
   selected: ParsedShape[];
@@ -714,6 +722,22 @@ export function SlideEditorRightSidebar({
   const bgFileInputRef = useRef<HTMLInputElement>(null);
 
   const [systemFontItems, setSystemFontItems] = useState<FontOptionItem[]>([]);
+  const [recentFonts, setRecentFonts] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('bsp_recent_fonts');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
+  const [fontSearchQuery, setFontSearchQuery] = useState('');
+  const [highlightedFont, setHighlightedFont] = useState<string | null>(null);
+  const fontMenuRef = useRef<HTMLDivElement>(null);
+  const fontListRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const initialFontRef = useRef<string>('');
 
   useEffect(() => {
     let isMounted = true;
@@ -725,6 +749,23 @@ export function SlideEditorRightSidebar({
     };
   }, []);
 
+  useEffect(() => {
+    if (!isFontMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fontMenuRef.current && !fontMenuRef.current.contains(e.target as Node)) {
+        setIsFontMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [isFontMenuOpen]);
+
+  useEffect(() => {
+    if (isFontMenuOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isFontMenuOpen]);
+
   // Accordion Section Expansion States (collapsed by default)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     canvas: false,
@@ -734,14 +775,55 @@ export function SlideEditorRightSidebar({
     geometry: false,
   });
 
-  const [lockAspect, setLockAspect] = useState(true);
-
   const toggleSection = (key: string) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const uiThemeMode = useAppStore((s) => s.uiThemeMode);
+  const defaultThemeBgColor = uiThemeMode !== 'light' ? '#ffffff' : '#18181b';
   const bgType = slide.background?.type || 'color';
-  const bgValue = slide.background?.value || '#18181b';
+  const bgValue = slide.background?.value || defaultThemeBgColor;
+
+  // Canvas background memory tracking (restores settings when turning back on or switching modes)
+  const lastColorRef = useRef<string>(bgType === 'color' && bgValue !== 'transparent' ? bgValue : defaultThemeBgColor);
+  const lastGradientRef = useRef<string>(bgType === 'gradient' ? bgValue : 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)');
+  const lastImageRef = useRef<string>(bgType === 'image' ? bgValue : '');
+  const lastNonAlphaModeRef = useRef<'color' | 'gradient' | 'image'>(bgType === 'gradient' ? 'gradient' : bgType === 'image' ? 'image' : 'color');
+
+  useEffect(() => {
+    if (bgType === 'color' && bgValue !== 'transparent' && bgValue !== 'none') {
+      lastColorRef.current = bgValue;
+      lastNonAlphaModeRef.current = 'color';
+    } else if (bgType === 'gradient') {
+      lastGradientRef.current = bgValue;
+      lastNonAlphaModeRef.current = 'gradient';
+    } else if (bgType === 'image') {
+      lastImageRef.current = bgValue;
+      lastNonAlphaModeRef.current = 'image';
+    }
+  }, [bgType, bgValue]);
+
+  // Shape and vector fill & border color memory tracking
+  const lastFillColorMap = useRef<Record<string, string>>({});
+  const lastBorderColorMap = useRef<Record<string, string>>({});
+  const lastBorderWidthMap = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (selectedElement) {
+      const fill = selectedElement.backgroundColor || selectedElement.fillColor;
+      if (fill && fill !== 'transparent' && fill !== 'none') {
+        lastFillColorMap.current[selectedElement.id] = fill;
+      }
+      const borderCol = selectedElement.borderColor || selectedElement.strokeColor;
+      if (borderCol && borderCol !== 'transparent' && borderCol !== 'none') {
+        lastBorderColorMap.current[selectedElement.id] = borderCol;
+      }
+      const borderW = selectedElement.borderWidth ?? selectedElement.strokeWidth;
+      if (borderW && borderW > 0) {
+        lastBorderWidthMap.current[selectedElement.id] = borderW;
+      }
+    }
+  }, [selectedElement]);
 
   /* Through the same helper both canvases render with, so a slide that has
      never been touched still shows its default title and body here — reading
@@ -753,20 +835,6 @@ export function SlideEditorRightSidebar({
     : (selectedElement ? [selectedElement.id] : []);
   const nativeRows = nativeLayerRows(nativeElements, activeSelectionIds, t);
 
-  /**
-   * Which element the Typography controls act on.
-   *
-   * This used to fall through to `elements.find(type === 'text')` whenever the
-   * selection was not text, which produced the two complaints this panel
-   * earns: select a shape and the font controls silently retype some other
-   * block, or — on a slide with no text at all — appear live and do nothing.
-   *
-   * Now it is one of three states, and the panel says which:
-   *   text selected      → edit that element
-   *   nothing selected   → edit the slide's first text element, named in the
-   *                        header so the operator knows what will change
-   *   non-text selected  → null, and Typography does not render at all
-   */
   const firstPptxText = pptx
     ? (pptx.selected.find((s) => s.paragraphs && s.paragraphs.length > 0) ||
        pptx.shapes.find((s) => s.paragraphs && s.paragraphs.length > 0) || null)
@@ -774,11 +842,23 @@ export function SlideEditorRightSidebar({
   const firstPptxRun = firstPptxText?.paragraphs?.[0]?.[0];
 
   const firstTextElement = nativeElements.find((e) => e.type === 'text') || null;
+  const firstShapeElement = nativeElements.find((e) => e.type === 'shape' || e.type === 'bezier' || e.type === 'image') || null;
+  const pptxShape = pptx && pptx.selected && pptx.selected.length > 0 ? pptx.selected[0] : null;
+
   const targetTextElement = pptx
     ? null
     : (selectedElement
         ? (selectedElement.type === 'text' ? selectedElement : null)
         : firstTextElement);
+
+  const targetShapeElement = pptxShape
+    ? null
+    : (selectedElement
+        ? selectedElement
+        : firstShapeElement);
+
+  const targetEffectElement = selectedElement || firstTextElement || firstShapeElement || nativeElements[0] || null;
+  const targetGeomElement = selectedElement || nativeElements[0] || null;
 
   const typographyScope = pptx
     ? (pptx.selected.length > 0
@@ -792,25 +872,75 @@ export function SlideEditorRightSidebar({
     ? (firstPptxRun?.fontFamily || firstPptxRun?.fontFace || 'Inter')
     : (targetTextElement?.fontFamily || 'Inter');
 
-  const fontOptions = useMemo(() => {
-    const list: FontOptionItem[] = systemFontItems.length > 0
-      ? [...systemFontItems]
-      : FONT_FAMILIES.map((f) => ({ value: f.value, label: f.label, isSystemFont: false }));
+  const defaultBundledFonts: FontOptionItem[] = useMemo(() => [
+    { value: 'Inter', label: 'Inter' },
+    { value: 'Aptos', label: 'Aptos' },
+    { value: 'General Sans', label: 'General Sans' },
+    { value: 'Outfit', label: 'Outfit' },
+    { value: 'Roboto', label: 'Roboto' },
+    { value: 'SF Pro Display', label: 'SF Pro Display' },
+    { value: 'Arial', label: 'Arial' },
+    { value: 'Helvetica', label: 'Helvetica' },
+    { value: 'Montserrat', label: 'Montserrat' },
+    { value: 'Poppins', label: 'Poppins' },
+    { value: 'Oswald', label: 'Oswald' },
+    { value: 'Bebas Neue', label: 'Bebas Neue' },
+    { value: 'Playfair Display', label: 'Playfair Display' },
+    { value: 'Georgia', label: 'Georgia' },
+    { value: 'Cinzel', label: 'Cinzel' },
+    { value: 'Crimson Pro', label: 'Crimson Pro' },
+    { value: 'Lora', label: 'Lora' },
+    { value: 'Courier New', label: 'Courier New' },
+  ], []);
 
-    if (currentFontFamily && !list.some((f) => f.value.toLowerCase() === currentFontFamily.toLowerCase())) {
-      list.unshift({ value: currentFontFamily, label: currentFontFamily, isSystemFont: true });
-    }
+  const bundledFonts = useMemo(() => {
+    return systemFontItems.length > 0
+      ? systemFontItems.filter((f) => !f.isSystemFont)
+      : defaultBundledFonts;
+  }, [systemFontItems, defaultBundledFonts]);
 
-    return list.map((f) => ({
-      value: f.value,
-      label: (
-        <span style={{ fontFamily: `"${f.value}", sans-serif`, fontSize: 13 }}>
-          {f.label}
-        </span>
-      ),
-      sublabel: f.isSystemFont ? t('slideEditor.sidebar.systemFont') : t('slideEditor.sidebar.appFont'),
-    }));
-  }, [systemFontItems, currentFontFamily, t]);
+  const installedSystemFonts = useMemo(() => {
+    return systemFontItems.filter((f) => f.isSystemFont);
+  }, [systemFontItems]);
+
+  const q = fontSearchQuery.toLowerCase().trim();
+
+  const filteredRecent = useMemo(() => {
+    return recentFonts.filter((rf) => !q || rf.toLowerCase().includes(q));
+  }, [recentFonts, q]);
+
+  const filteredBundled = useMemo(() => {
+    return bundledFonts.filter((f) => !q || f.label.toLowerCase().includes(q) || f.value.toLowerCase().includes(q));
+  }, [bundledFonts, q]);
+
+  const filteredInstalled = useMemo(() => {
+    return installedSystemFonts.filter((f) => !q || f.label.toLowerCase().includes(q) || f.value.toLowerCase().includes(q));
+  }, [installedSystemFonts, q]);
+
+  const flatVisibleFonts = useMemo(() => {
+    const list: { value: string; label: string }[] = [];
+    const seen = new Set<string>();
+    filteredRecent.forEach((rf) => {
+      if (!seen.has(rf)) {
+        seen.add(rf);
+        const match = systemFontItems.find((f) => f.value === rf) || defaultBundledFonts.find((f) => f.value === rf);
+        list.push({ value: rf, label: match ? match.label : rf.split(',')[0].replace(/['"]/g, '').trim() });
+      }
+    });
+    filteredBundled.forEach((f) => {
+      if (!seen.has(f.value)) {
+        seen.add(f.value);
+        list.push(f);
+      }
+    });
+    filteredInstalled.forEach((f) => {
+      if (!seen.has(f.value)) {
+        seen.add(f.value);
+        list.push(f);
+      }
+    });
+    return list;
+  }, [filteredRecent, filteredBundled, filteredInstalled, systemFontItems, defaultBundledFonts]);
 
   const currentFontWeight = pptx
     ? (firstPptxRun?.fontWeight ?? (firstPptxRun?.bold ? 700 : 600))
@@ -840,8 +970,6 @@ export function SlideEditorRightSidebar({
     ? (typeof firstPptxText?.opacity === 'number' ? firstPptxText.opacity : 1)
     : (targetTextElement?.opacity ?? 1);
 
-  const pptxShape = pptx && pptx.selected && pptx.selected.length > 0 ? pptx.selected[0] : null;
-
   /** Every Typography control writes through here, so none of them can act on
       a target that is not there. */
   const setText = (updates: Partial<SlideElement>) => {
@@ -855,6 +983,77 @@ export function SlideEditorRightSidebar({
       if (updates.textAlign && pptx.onTextAlign) pptx.onTextAlign(updates.textAlign);
     } else if (targetTextElement) {
       onUpdateElement(targetTextElement.id, updates);
+    }
+  };
+
+  const handlePreviewFont = (fontValue: string) => {
+    setHighlightedFont(fontValue);
+    setText({ fontFamily: fontValue });
+  };
+
+  const handleFontSelect = (fontName: string) => {
+    setText({ fontFamily: fontName });
+    setHighlightedFont(fontName);
+    try {
+      const raw = localStorage.getItem('bsp_recent_fonts');
+      const list: string[] = raw ? JSON.parse(raw) : [];
+      const updated = [fontName, ...list.filter((f) => f !== fontName)].slice(0, 3);
+      localStorage.setItem('bsp_recent_fonts', JSON.stringify(updated));
+      setRecentFonts(updated);
+    } catch {}
+  };
+
+  const handleCommitFont = (fontValue: string) => {
+    handleFontSelect(fontValue);
+    setIsFontMenuOpen(false);
+  };
+
+  const handleCancelFont = () => {
+    if (initialFontRef.current) {
+      setText({ fontFamily: initialFontRef.current });
+    }
+    setIsFontMenuOpen(false);
+  };
+
+  const handleFontKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCancelFont();
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (flatVisibleFonts.length === 0) return;
+      const currentVal = highlightedFont || currentFontFamily || 'Inter';
+      const currentIndex = flatVisibleFonts.findIndex((f) => f.value === currentVal);
+      const nextIndex = currentIndex < flatVisibleFonts.length - 1 ? currentIndex + 1 : 0;
+      const nextFont = flatVisibleFonts[nextIndex];
+      if (nextFont) {
+        handlePreviewFont(nextFont.value);
+        const el = fontListRef.current?.querySelector(`[data-font-idx="${nextIndex}"]`);
+        el?.scrollIntoView({ block: 'nearest' });
+      }
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (flatVisibleFonts.length === 0) return;
+      const currentVal = highlightedFont || currentFontFamily || 'Inter';
+      const currentIndex = flatVisibleFonts.findIndex((f) => f.value === currentVal);
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : flatVisibleFonts.length - 1;
+      const prevFont = flatVisibleFonts[prevIndex];
+      if (prevFont) {
+        handlePreviewFont(prevFont.value);
+        const el = fontListRef.current?.querySelector(`[data-font-idx="${prevIndex}"]`);
+        el?.scrollIntoView({ block: 'nearest' });
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const chosen = highlightedFont || currentFontFamily;
+      if (chosen) handleCommitFont(chosen);
     }
   };
 
@@ -912,18 +1111,23 @@ export function SlideEditorRightSidebar({
     onUpdateSlide({ background: { type: 'image', value: imported.url } });
   };
 
+  const bgInfo = parseBackgroundInfo(bgValue, undefined);
+  let globalFontIdxCounter = 0;
+
   return (
     <aside
       style={{
         width: 290,
         minWidth: 290,
-        background: 'var(--bg-secondary)',
-        borderLeft: '1px solid var(--border-primary)',
+        background: '#141416',
+        borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
         userSelect: 'none',
         boxSizing: 'border-box',
+        color: '#f4f4f5',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       }}
     >
       <input
@@ -934,33 +1138,24 @@ export function SlideEditorRightSidebar({
         onChange={handleBgImageUpload}
       />
 
-      {/* Tri-Tab Header */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-primary)', background: 'var(--bg-primary)' }}>
-        {(['design', 'layer', 'ai'] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            style={{
-              flex: 1,
-              padding: '10px 8px',
-              background: activeTab === tab ? 'var(--chrome-control)' : 'transparent',
-              border: 'none',
-              borderBottom: activeTab === tab ? '2px solid #FF5500' : '2px solid transparent',
-              color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: 'pointer',
-              textTransform: 'capitalize',
-            }}
-          >
-            {tab === 'design' ? t('slideEditor.sidebar.tabDesign') : tab === 'layer' ? t('slideEditor.sidebar.tabLayer') : t('slideEditor.sidebar.tabAi')}
-          </button>
-        ))}
+      {/* Tri-Tab Header Row Styled with Theme Studio Pill */}
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: '#141416' }}>
+        <div className="studio-segmented-pill">
+          {(['design', 'layer', 'ai'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`studio-segmented-tab ${activeTab === tab ? 'active' : ''}`}
+            >
+              {tab === 'design' ? t('slideEditor.sidebar.tabDesign') : tab === 'layer' ? t('slideEditor.sidebar.tabLayer') : t('slideEditor.sidebar.tabAi')}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Viewport Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 14 }} className="bar-scroll">
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 14 }} className="bar-scroll">
         {/* ---- DESIGN TAB ------------------------------------------------- */}
         {activeTab === 'design' && pptx && (
           <>
@@ -978,144 +1173,228 @@ export function SlideEditorRightSidebar({
 
         {activeTab === 'design' && !pptx && (
           <>
-            {/* Aspect Ratio & Canvas Section */}
-            <div style={styles.sectionCard}>
-              <div style={styles.sectionHeader} onClick={() => toggleSection('canvas')}>
-                <span style={styles.sectionTitle}>{t('slideEditor.sidebar.canvasAspect')}</span>
-                <ChevronIcon open={Boolean(openSections.canvas)} />
-              </div>
+            {/* Canvas Background Section (Aspect ratio removed as requested) */}
+            <div className="studio-section" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 14 }}>
+              <button
+                type="button"
+                className="studio-section-header"
+                onClick={() => toggleSection('canvas')}
+              >
+                <div className="studio-section-title-wrap">
+                  <div className={`studio-section-chevron ${openSections.canvas ? 'open' : 'closed'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                  <span>{t('slideEditor.sidebar.canvasBackground')}</span>
+                </div>
+              </button>
 
               {openSections.canvas && (
-                <div style={styles.sectionBody}>
-                  {/* Aspect Ratio Pills */}
-                  <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>{t('slideEditor.sidebar.aspectRatio')}</span>
-                    <div style={styles.pillGroup}>
-                      {(['16:9', '4:3', 'lower-third'] as const).map((ratio) => (
-                        <button
-                          key={ratio}
-                          type="button"
-                          onClick={() => onUpdateSlide({ aspectRatio: ratio })}
-                          style={{
-                            ...styles.pillBtn,
-                            background: (slide.aspectRatio || '16:9') === ratio ? '#FF5500' : 'transparent',
-                            color: (slide.aspectRatio || '16:9') === ratio ? '#ffffff' : 'var(--text-secondary)',
-                          }}
-                        >
-                          {ratio}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Lock Aspect Ratio */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11, color: 'var(--text-primary)', fontWeight: 600 }}>
-                      <input
-                        type="checkbox"
-                        checked={lockAspect}
-                        onChange={(e) => setLockAspect(e.target.checked)}
-                        style={{ accentColor: '#FF5500', cursor: 'pointer' }}
-                      />
-                      Lock aspect ratio
-                    </label>
-                  </div>
-
-                  {/* Canvas Background Header & Toggle */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                    <span style={styles.propLabel}>{t('slideEditor.sidebar.canvasBackground')}</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onUpdateSlide({
-                          background: {
-                            type: 'color',
-                            value: bgValue === 'transparent' ? '#18181b' : 'transparent',
-                          },
-                        })
-                      }
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: 4,
-                        border: 'none',
-                        background: bgValue === 'transparent' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
-                        color: bgValue === 'transparent' ? '#f87171' : '#4ade80',
-                        fontSize: 10,
-                        fontWeight: 700,
-                        cursor: 'pointer',
+                <div className="studio-section-content" style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 10 }}>
+                  {/* Canvas Background Toggle & Mode Pills */}
+                  <div className="studio-toggle-row">
+                    <span className="studio-toggle-label">{t('slideEditor.sidebar.canvasBackground')}</span>
+                    <StudioToggle
+                      checked={bgValue !== 'transparent'}
+                      onChange={(on) => {
+                        if (!on) {
+                          onUpdateSlide({ background: { type: 'color', value: 'transparent' } });
+                        } else {
+                          const mode = lastNonAlphaModeRef.current || 'color';
+                          if (mode === 'gradient') {
+                            onUpdateSlide({ background: { type: 'gradient', value: lastGradientRef.current || 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)' } });
+                          } else if (mode === 'image') {
+                            onUpdateSlide({ background: { type: 'image', value: lastImageRef.current || '' } });
+                          } else {
+                            onUpdateSlide({ background: { type: 'color', value: lastColorRef.current || '#18181b' } });
+                          }
+                        }
                       }}
-                    >
-                      {bgValue === 'transparent' ? t('slideEditor.sidebar.backgroundOff') : t('slideEditor.sidebar.backgroundOn')}
-                    </button>
+                    />
                   </div>
 
                   {/* Background Mode Pills */}
-                  <div style={styles.pillGroup}>
+                  <div className="studio-segmented-pill">
                     {(['color', 'gradient', 'image', 'none'] as const).map((type) => (
                       <button
                         key={type}
                         type="button"
-                        onClick={() =>
-                          onUpdateSlide({
-                            background: {
-                              type: type === 'none' ? 'color' : type,
-                              value:
-                                type === 'none'
-                                  ? 'transparent'
-                                  : type === 'gradient'
-                                  ? 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)'
-                                  : type === 'color'
-                                  ? bgValue === 'transparent' ? '#18181b' : bgValue
-                                  : bgValue || '',
-                            },
-                          })
-                        }
-                        style={{
-                          ...styles.pillBtn,
-                          fontSize: 10,
-                          background:
-                            (type === 'none' && bgValue === 'transparent') ||
-                            (type !== 'none' && bgType === type && bgValue !== 'transparent')
-                              ? '#FF5500'
-                              : 'transparent',
-                          color:
-                            (type === 'none' && bgValue === 'transparent') ||
-                            (type !== 'none' && bgType === type && bgValue !== 'transparent')
-                              ? '#ffffff'
-                              : 'var(--text-secondary)',
+                        onClick={() => {
+                          if (type === 'none') {
+                            onUpdateSlide({ background: { type: 'color', value: 'transparent' } });
+                          } else if (type === 'color') {
+                            onUpdateSlide({ background: { type: 'color', value: lastColorRef.current || '#18181b' } });
+                          } else if (type === 'gradient') {
+                            onUpdateSlide({ background: { type: 'gradient', value: lastGradientRef.current || 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)' } });
+                          } else if (type === 'image') {
+                            onUpdateSlide({ background: { type: 'image', value: lastImageRef.current || '' } });
+                          }
                         }}
+                        className={`studio-segmented-tab ${
+                          (type === 'none' && bgValue === 'transparent') ||
+                          (type !== 'none' && bgType === type && bgValue !== 'transparent')
+                            ? 'active'
+                            : ''
+                        }`}
+                        style={{ fontSize: 11 }}
                       >
-                        {type === 'none' ? t('slideEditor.sidebar.bgOffTrans') : type === 'color' ? t('slideEditor.sidebar.bgColor') : type === 'gradient' ? t('slideEditor.sidebar.bgGradient') : t('slideEditor.sidebar.bgImage')}
+                        {type === 'none' ? 'Alpha' : type === 'color' ? t('slideEditor.sidebar.bgColor') : type === 'gradient' ? t('slideEditor.sidebar.bgGradient') : t('slideEditor.sidebar.bgImage')}
                       </button>
                     ))}
                   </div>
 
-                  {/* Solid Color Picker */}
+                  {/* Solid Color Picker with Selectable/Copyable Hex */}
                   {bgType === 'color' && bgValue !== 'transparent' && (
-                    <div style={styles.colorPillRow}>
-                      <input
-                        type="color"
-                        value={bgValue.startsWith('#') ? bgValue : '#18181b'}
-                        onChange={(e) => onUpdateSlide({ background: { type: 'color', value: e.target.value } })}
-                        style={styles.colorSwatch}
-                      />
-                      <input
-                        type="text"
-                        value={bgValue.toUpperCase()}
-                        onChange={(e) => onUpdateSlide({ background: { type: 'color', value: e.target.value } })}
-                        style={styles.colorHexInput}
-                      />
-                      <span style={styles.opacityBadge}>100%</span>
-                    </div>
+                    <StudioColorPicker
+                      label={t('slideEditor.sidebar.bgColor')}
+                      value={bgValue.startsWith('#') ? bgValue : '#18181b'}
+                      onChange={(c) => onUpdateSlide({ background: { type: 'color', value: c } })}
+                    />
                   )}
 
-                  {/* Gradient Ramp & Dual Stop Color Controls */}
+                  {/* Gradient Ramp & Stop Controls */}
                   {bgType === 'gradient' && (
-                    <GradientRampPicker
-                      value={bgValue}
-                      t={t}
-                      onChange={(css) => onUpdateSlide({ background: { type: 'gradient', value: css } })}
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <StudioGradientRamp
+                        startColor={bgInfo.start || '#F97316'}
+                        endColor={bgInfo.end || '#7C2D12'}
+                        direction={bgInfo.dir || '135deg'}
+                        isRadial={bgInfo.dir === 'radial'}
+                        startPos={bgInfo.startPos ?? 0}
+                        endPos={bgInfo.endPos ?? 100}
+                        onColorChange={({ start, end, startPos, endPos }) => {
+                          const s = start ?? bgInfo.start ?? '#F97316';
+                          const e = end ?? bgInfo.end ?? '#7C2D12';
+                          const d = bgInfo.dir ?? '135deg';
+                          const sp = startPos ?? bgInfo.startPos ?? 0;
+                          const ep = endPos ?? bgInfo.endPos ?? 100;
+                          const nextCss = gradientCss(s, e, d, sp, ep);
+                          lastGradientRef.current = nextCss;
+                          onUpdateSlide({ background: { type: 'gradient', value: nextCss } });
+                        }}
+                        onSwapColors={() => {
+                          const s = bgInfo.start || '#F97316';
+                          const e = bgInfo.end || '#7C2D12';
+                          const d = bgInfo.dir ?? '135deg';
+                          const sp = bgInfo.startPos ?? 0;
+                          const ep = bgInfo.endPos ?? 100;
+                          const nextCss = gradientCss(e, s, d, 100 - ep, 100 - sp);
+                          lastGradientRef.current = nextCss;
+                          onUpdateSlide({ background: { type: 'gradient', value: nextCss } });
+                        }}
+                      />
+
+                      {/* Gradient Angle Controls with Circular Dial (Linear Mode) */}
+                      {bgInfo.dir !== 'radial' && (
+                        <div className="studio-field-box">
+                          <div className="studio-slider-labels">
+                            <span className="studio-slider-name">{t('slideEditor.sidebar.gradientAngle')}</span>
+                            <span className="studio-slider-value">
+                              {(parseInt(bgInfo.dir.replace('deg', ''), 10) || 135)}°
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <CircularAngleDial
+                              angleDeg={parseInt(bgInfo.dir.replace('deg', ''), 10) || 135}
+                              isRadial={false}
+                              onChangeAngle={(deg) => {
+                                const s = bgInfo.start || '#F97316';
+                                const e = bgInfo.end || '#7C2D12';
+                                const nextCss = gradientCss(s, e, `${deg}deg`, bgInfo.startPos ?? 0, bgInfo.endPos ?? 100);
+                                lastGradientRef.current = nextCss;
+                                onUpdateSlide({ background: { type: 'gradient', value: nextCss } });
+                              }}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <div className="studio-slider-track-wrap">
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={360}
+                                  step={1}
+                                  value={parseInt(bgInfo.dir.replace('deg', ''), 10) || 135}
+                                  onChange={(evt) => {
+                                    const deg = Number(evt.target.value);
+                                    const s = bgInfo.start || '#F97316';
+                                    const endColor = bgInfo.end || '#7C2D12';
+                                    const nextCss = gradientCss(s, endColor, `${deg}deg`, bgInfo.startPos ?? 0, bgInfo.endPos ?? 100);
+                                    lastGradientRef.current = nextCss;
+                                    onUpdateSlide({ background: { type: 'gradient', value: nextCss } });
+                                  }}
+                                  className="studio-range-slider"
+                                  style={{
+                                    background: `linear-gradient(to right, #10B981 0%, #10B981 ${(((parseInt(bgInfo.dir.replace('deg', ''), 10) || 135)) / 360) * 100}%, var(--studio-track-bg, rgba(255, 255, 255, 0.12)) ${(((parseInt(bgInfo.dir.replace('deg', ''), 10) || 135)) / 360) * 100}%, var(--studio-track-bg, rgba(255, 255, 255, 0.12)) 100%)`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Direction Presets */}
+                      <div className="studio-segmented-pill">
+                        {[
+                          { label: '135°', dir: '135deg' },
+                          { label: '90°', dir: '90deg' },
+                          { label: '180°', dir: '180deg' },
+                          { label: '0°', dir: '0deg' },
+                          { label: 'Radial', dir: 'radial' },
+                        ].map((preset) => {
+                          const on = (bgInfo.dir || '135deg') === preset.dir;
+                          return (
+                            <button
+                              key={preset.dir}
+                              type="button"
+                              onClick={() => {
+                                const s = bgInfo.start || '#F97316';
+                                const e = bgInfo.end || '#7C2D12';
+                                const nextCss = gradientCss(s, e, preset.dir, bgInfo.startPos ?? 0, bgInfo.endPos ?? 100);
+                                lastGradientRef.current = nextCss;
+                                onUpdateSlide({ background: { type: 'gradient', value: nextCss } });
+                              }}
+                              className={`studio-segmented-tab ${on ? 'active' : ''}`}
+                              style={{ fontSize: 10, padding: '4px 0' }}
+                            >
+                              {preset.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Quick Gradient Presets Grid */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                        <span className="studio-field-label" style={{ marginBottom: 0 }}>{t('slideEditor.sidebar.presets')}</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                          {[
+                            'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)',
+                            'linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%)',
+                            'linear-gradient(135deg, #10b981 0%, #064e3b 100%)',
+                            'linear-gradient(135deg, #8b5cf6 0%, #4c1d95 100%)',
+                            'linear-gradient(135deg, #ec4899 0%, #831843 100%)',
+                            'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+                          ].map((grad, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => {
+                                lastGradientRef.current = grad;
+                                onUpdateSlide({ background: { type: 'gradient', value: grad } });
+                              }}
+                              style={{
+                                height: 26,
+                                background: grad,
+                                border: bgValue === grad ? '2px solid #10B981' : '1px solid rgba(255, 255, 255, 0.15)',
+                                borderRadius: 5,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {/* Background Image Upload & Presets */}
@@ -1126,12 +1405,12 @@ export function SlideEditorRightSidebar({
                         onClick={() => bgFileInputRef.current?.click()}
                         style={{
                           padding: '8px 12px',
-                          background: 'var(--chrome-control)',
-                          border: '1px dashed var(--border-primary)',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px dashed rgba(255, 255, 255, 0.18)',
                           borderRadius: 6,
-                          color: 'var(--text-primary)',
-                          fontSize: 11,
-                          fontWeight: 600,
+                          color: '#f4f4f5',
+                          fontSize: 12,
+                          fontWeight: 500,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -1139,11 +1418,11 @@ export function SlideEditorRightSidebar({
                           gap: 6,
                         }}
                       >
-                        <IconFolder size={13} /> {t('slideEditor.sidebar.chooseImage')}
+                        <IconFolder size={14} /> {t('slideEditor.sidebar.chooseImage')}
                       </button>
 
                       {bgValue && bgValue.startsWith('data:') && (
-                        <div style={{ fontSize: 10, color: '#4ade80', fontWeight: 600, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                        <div style={{ fontSize: 11, color: '#10B981', fontWeight: 600, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                           <IconCheck size={12} /> {t('slideEditor.sidebar.imageLoaded')}
                         </div>
                       )}
@@ -1155,16 +1434,16 @@ export function SlideEditorRightSidebar({
 
             {/* Multi-Selection Alignment & Operations Card */}
             {selectedElementIds.length > 1 && (
-              <div style={styles.sectionCard}>
-                <div style={styles.sectionHeader}>
-                  <span style={styles.sectionTitle}>
+              <div className="studio-section" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 14 }}>
+                <div className="studio-section-header">
+                  <span className="studio-slider-name">
                     {t('slideEditor.sidebar.multiSelection', { count: selectedElementIds.length })}
                   </span>
                 </div>
-                <div style={styles.sectionBody}>
-                  <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>{t('slideEditor.sidebar.alignment')}</span>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 6 }}>
+                  <div className="studio-field-box">
+                    <span className="studio-field-label">{t('slideEditor.sidebar.alignment')}</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, width: '100%' }}>
                       {[
                         { label: t('slideEditor.sidebar.alignLeft'), align: 'left' },
                         { label: t('slideEditor.sidebar.alignCenter'), align: 'center' },
@@ -1203,10 +1482,10 @@ export function SlideEditorRightSidebar({
                           }}
                           style={{
                             height: 26,
-                            background: 'var(--chrome-control)',
-                            border: '1px solid var(--border-primary)',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
                             borderRadius: 5,
-                            color: 'var(--text-primary)',
+                            color: '#f4f4f5',
                             fontSize: 10,
                             fontWeight: 600,
                             cursor: 'pointer',
@@ -1225,12 +1504,12 @@ export function SlideEditorRightSidebar({
                       style={{
                         flex: 1,
                         height: 28,
-                        background: 'var(--chrome-control)',
-                        border: '1px solid var(--border-primary)',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
                         borderRadius: 5,
-                        color: '#FF5500',
+                        color: '#10B981',
                         fontSize: 11,
-                        fontWeight: 700,
+                        fontWeight: 600,
                         cursor: 'pointer',
                       }}
                     >
@@ -1243,11 +1522,11 @@ export function SlideEditorRightSidebar({
                         height: 28,
                         padding: '0 10px',
                         background: 'rgba(239, 68, 68, 0.15)',
-                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        border: '1px solid rgba(239, 68, 68, 0.35)',
                         borderRadius: 5,
                         color: '#f87171',
                         fontSize: 11,
-                        fontWeight: 700,
+                        fontWeight: 600,
                         cursor: 'pointer',
                       }}
                     >
@@ -1258,81 +1537,317 @@ export function SlideEditorRightSidebar({
               </div>
             )}
 
-            {/* Typography. Hidden outright when the selection is a shape or an
-                image: a control that cannot act on what is selected is worse
-                than a control that is not there, because it invites the click
-                and then swallows it. */}
-            {typographyScope === 'unavailable' ? (
-              selectedElement && (
-                <div style={styles.sectionCard}>
-                  <div style={styles.sectionHeader}>
-                    <span style={{ ...styles.sectionTitle, color: 'var(--text-dim)' }}>{t('slideEditor.sidebar.typography')}</span>
+            {/* Typography Section */}
+            <div className="studio-section" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 14 }}>
+              <button
+                type="button"
+                className="studio-section-header"
+                onClick={() => toggleSection('typography')}
+              >
+                <div className="studio-section-title-wrap">
+                  <div className={`studio-section-chevron ${openSections.typography ? 'open' : 'closed'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
                   </div>
-                  <div style={{ ...styles.sectionBody, color: 'var(--text-dim)', fontSize: 11 }}>
-                    {selectedElement.type === 'shape' ? t('slideEditor.sidebar.shapeNoType') : t('slideEditor.sidebar.imageNoType')}{' '}
-                    {t('slideEditor.sidebar.selectTextHint')}
-                  </div>
+                  <span>
+                    {t('slideEditor.sidebar.typography')}
+                    {targetTextElement && (
+                      <span style={{ color: 'rgba(255, 255, 255, 0.4)', fontWeight: 400, fontSize: 11 }}>
+                        {' '}— {(targetTextElement.content || t('slideEditor.sidebar.firstTextBlock')).toString().trim().slice(0, 16) || t('slideEditor.sidebar.firstTextBlock')}
+                      </span>
+                    )}
+                  </span>
                 </div>
-              )
-            ) : (
-            <div style={styles.sectionCard}>
-              <div style={styles.sectionHeader} onClick={() => toggleSection('typography')}>
-                <span style={styles.sectionTitle}>
-                  Typography
-                  {typographyScope === 'default' && targetTextElement && (
-                    <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>
-                      {' '}— {(targetTextElement.content || t('slideEditor.sidebar.firstTextBlock')).toString().trim().slice(0, 18) || t('slideEditor.sidebar.firstTextBlock')}
-                    </span>
-                  )}
-                </span>
-                <ChevronIcon open={Boolean(openSections.typography)} />
-              </div>
+              </button>
 
               {openSections.typography && (
-                <div style={styles.sectionBody}>
-                  {/* Font Family Dropdown */}
-                  <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>{t('slideEditor.sidebar.font')}</span>
+                !targetTextElement && !pptx ? (
+                  <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: 11, padding: '10px 4px 4px 4px' }}>
+                    {t('slideEditor.sidebar.selectTextHint')}
+                  </div>
+                ) : (
+                  <div className="studio-section-content" style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 10 }}>
+                    {/* Font Family Dropdown with Live Canvas Preview */}
+                    <div className="studio-field-box">
+                    <span className="studio-field-label">{t('slideEditor.sidebar.font')}</span>
+                    <div style={{ position: 'relative', width: '100%' }} ref={fontMenuRef}>
+                      <button
+                        type="button"
+                        className="studio-dropdown-btn"
+                        onClick={() => {
+                          if (!isFontMenuOpen) {
+                            initialFontRef.current = currentFontFamily;
+                            setHighlightedFont(currentFontFamily);
+                          }
+                          setIsFontMenuOpen(!isFontMenuOpen);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                          padding: '7px 10px',
+                          background: '#1c1c1f',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: 6,
+                          color: '#f4f4f5',
+                          fontSize: 13,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{ fontFamily: currentFontFamily, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {currentFontFamily}
+                        </span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </button>
+
+                      {isFontMenuOpen && (
+                        <div
+                          className="studio-font-menu-popover"
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 4px)',
+                            left: 0,
+                            right: 0,
+                            maxHeight: 280,
+                            background: '#18181b',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: 8,
+                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+                            zIndex: 100005,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {/* Search Bar */}
+                          <div style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                            <input
+                              ref={searchInputRef}
+                              type="text"
+                              placeholder="Search fonts..."
+                              value={fontSearchQuery}
+                              onChange={(e) => setFontSearchQuery(e.target.value)}
+                              onKeyDown={handleFontKeyDown}
+                              style={{
+                                width: '100%',
+                                background: '#27272a',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: 4,
+                                padding: '4px 8px',
+                                color: '#ffffff',
+                                fontSize: 12,
+                                outline: 'none',
+                                boxSizing: 'border-box',
+                              }}
+                            />
+                          </div>
+
+                          {/* Scrollable Font List */}
+                          <div ref={fontListRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 0', maxHeight: 220 }}>
+                            {/* 1. Recent Fonts */}
+                            {filteredRecent.length > 0 && (
+                              <div>
+                                <div
+                                  style={{
+                                    padding: '4px 8px 2px 8px',
+                                    fontSize: 10,
+                                    color: '#71717a',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.08em',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Recent Fonts
+                                </div>
+                                {filteredRecent.map((rf) => {
+                                  const idx = globalFontIdxCounter++;
+                                  const isSelected = currentFontFamily === rf;
+                                  const isHighlighted = (highlightedFont || currentFontFamily) === rf;
+
+                                  return (
+                                    <div
+                                      key={`recent-${rf}`}
+                                      data-font-idx={idx}
+                                      onClick={() => handleCommitFont(rf)}
+                                      onMouseEnter={() => handlePreviewFont(rf)}
+                                      style={{
+                                        padding: '5px 8px',
+                                        borderRadius: 4,
+                                        cursor: 'pointer',
+                                        fontSize: 12,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        background: isSelected
+                                          ? 'rgba(16, 185, 129, 0.2)'
+                                          : isHighlighted
+                                          ? 'rgba(255, 255, 255, 0.08)'
+                                          : 'transparent',
+                                        color: isSelected ? '#10B981' : '#f4f4f5',
+                                        transition: 'background 0.08s ease',
+                                      }}
+                                    >
+                                      <span style={{ fontFamily: rf, fontSize: 13 }}>
+                                        {rf.split(',')[0].replace(/['"]/g, '').trim()}
+                                      </span>
+                                      {isSelected && (
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                          <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* 2. Bundled Fonts */}
+                            {filteredBundled.length > 0 && (
+                              <div>
+                                <div
+                                  style={{
+                                    padding: '6px 8px 2px 8px',
+                                    fontSize: 10,
+                                    color: '#71717a',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.08em',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Bundled Fonts
+                                </div>
+                                {filteredBundled.map((f) => {
+                                  const idx = globalFontIdxCounter++;
+                                  const isSelected = currentFontFamily === f.value;
+                                  const isHighlighted = (highlightedFont || currentFontFamily) === f.value;
+
+                                  return (
+                                    <div
+                                      key={`bundled-${f.value}`}
+                                      data-font-idx={idx}
+                                      onClick={() => handleCommitFont(f.value)}
+                                      onMouseEnter={() => handlePreviewFont(f.value)}
+                                      style={{
+                                        padding: '5px 8px',
+                                        borderRadius: 4,
+                                        cursor: 'pointer',
+                                        fontSize: 12,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        background: isSelected
+                                          ? 'rgba(16, 185, 129, 0.2)'
+                                          : isHighlighted
+                                          ? 'rgba(255, 255, 255, 0.08)'
+                                          : 'transparent',
+                                        color: isSelected ? '#10B981' : '#f4f4f5',
+                                        transition: 'background 0.08s ease',
+                                      }}
+                                    >
+                                      <span style={{ fontFamily: f.value, fontSize: 13 }}>{f.label}</span>
+                                      {isSelected && (
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                          <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* 3. Installed PC Fonts */}
+                            {filteredInstalled.length > 0 && (
+                              <div>
+                                <div
+                                  style={{
+                                    padding: '6px 8px 2px 8px',
+                                    fontSize: 10,
+                                    color: '#71717a',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.08em',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Installed PC Fonts ({installedSystemFonts.length})
+                                </div>
+                                {filteredInstalled.map((f) => {
+                                  const idx = globalFontIdxCounter++;
+                                  const isSelected = currentFontFamily === f.value;
+                                  const isHighlighted = (highlightedFont || currentFontFamily) === f.value;
+
+                                  return (
+                                    <div
+                                      key={`sys-${f.value}`}
+                                      data-font-idx={idx}
+                                      onClick={() => handleCommitFont(f.value)}
+                                      onMouseEnter={() => handlePreviewFont(f.value)}
+                                      style={{
+                                        padding: '5px 8px',
+                                        borderRadius: 4,
+                                        cursor: 'pointer',
+                                        fontSize: 12,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        background: isSelected
+                                          ? 'rgba(16, 185, 129, 0.2)'
+                                          : isHighlighted
+                                          ? 'rgba(255, 255, 255, 0.08)'
+                                          : 'transparent',
+                                        color: isSelected ? '#10B981' : '#f4f4f5',
+                                        transition: 'background 0.08s ease',
+                                      }}
+                                    >
+                                      <span style={{ fontFamily: `"${f.value}", sans-serif`, fontSize: 13 }}>{f.label}</span>
+                                      {isSelected && (
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                          <polyline points="20 6 9 17 4 12" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Font Weight */}
+                  <div className="studio-field-box">
+                    <span className="studio-field-label">{t('slideEditor.sidebar.fontStyle')}</span>
                     <CustomDropdown
-                      value={currentFontFamily}
-                      options={fontOptions}
-                      onChange={(font) => setText({ fontFamily: font })}
+                      value={String(currentFontWeight)}
+                      options={fontWeightOptions(t)}
+                      onChange={(wt) => setText({ fontWeight: parseInt(wt, 10) })}
                       style={{ width: '100%' }}
-                      zIndex={100005}
+                      zIndex={100004}
                     />
                   </div>
 
-                  {/* Font Style / Sub-family & Size Row */}
-                  <div style={styles.twoColRow}>
-                    <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>{t('slideEditor.sidebar.fontStyle')}</span>
-                      <CustomDropdown
-                        value={String(currentFontWeight)}
-                        options={fontWeightOptions(t)}
-                        onChange={(wt) => setText({ fontWeight: parseInt(wt, 10) })}
-                        style={{ width: '100%' }}
-                        zIndex={100005}
-                      />
-                    </div>
-                    <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>{t('slideEditor.sidebar.size')}</span>
-                      <ScrubbableInput
-                        value={currentFontSize}
-                        onChange={(v) => setText({ fontSize: v })}
-                        min={6}
-                        max={300}
-                        step={1}
-                        badge="⤌⤍"
-                        suffix="px"
-                        title={t('slideEditor.sidebar.fontSizeTitle')}
-                      />
-                    </div>
-                  </div>
+                  {/* Font Size with StudioSlider */}
+                  <StudioSlider
+                    label={t('slideEditor.sidebar.size')}
+                    value={currentFontSize}
+                    min={10}
+                    max={200}
+                    defaultValue={48}
+                    step={1}
+                    unit="px"
+                    onChange={(size) => setText({ fontSize: size })}
+                  />
 
-                  {/* Line Height & Letter Spacing Row */}
-                  <div style={styles.twoColRow}>
-                    <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>{t('slideEditor.sidebar.lineHeight')}</span>
+                  {/* Line Height & Letter Spacing */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div className="studio-field-box">
+                      <span className="studio-field-label">{t('slideEditor.sidebar.lineHeight')}</span>
                       <ScrubbableInput
                         value={currentLineHeight}
                         onChange={(v) => setText({ lineHeight: v })}
@@ -1343,8 +1858,8 @@ export function SlideEditorRightSidebar({
                         badge="⤌⤍"
                       />
                     </div>
-                    <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>{t('slideEditor.sidebar.letterSpacing')}</span>
+                    <div className="studio-field-box">
+                      <span className="studio-field-label">{t('slideEditor.sidebar.letterSpacing')}</span>
                       <ScrubbableInput
                         value={currentLetterSpacing}
                         onChange={(v) => setText({ letterSpacing: v })}
@@ -1358,45 +1873,18 @@ export function SlideEditorRightSidebar({
                     </div>
                   </div>
 
-                  {/* Color Swatch */}
-                  <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>{t('slideEditor.sidebar.color')}</span>
-                    <div style={styles.colorPillRow}>
-                      <input
-                        type="color"
-                        value={normalizeHex(currentColor) || '#ffffff'}
-                        onChange={(e) => {
-                          setDraft(null);
-                          setText({ color: e.target.value });
-                        }}
-                        style={styles.colorSwatch}
-                      />
-                      <input
-                        type="text"
-                        spellCheck={false}
-                        value={fieldValue('color', (currentColor || '#FFFFFF').toUpperCase())}
-                        onChange={(e) => editField('color', e.target.value, (v) => {
-                          if (/^#[0-9a-f]{6}$/i.test(v.trim())) setText({ color: v.trim().toLowerCase() });
-                        })}
-                        onBlur={(e) => {
-                          const hex = normalizeHex(e.target.value);
-                          if (hex) setText({ color: hex });
-                          setDraft(null);
-                        }}
-                        style={styles.colorHexInput}
-                      />
-                      <span style={styles.opacityBadge}>
-                        {Math.round(currentOpacity * 100)}%
-                      </span>
-                    </div>
-                  </div>
+                  {/* Text Color Picker with Selectable/Copyable Hex */}
+                  <StudioColorPicker
+                    label={t('slideEditor.sidebar.color')}
+                    value={normalizeHex(currentColor) || '#ffffff'}
+                    onChange={(c) => setText({ color: c })}
+                  />
 
-                  {/* Horizontal & Vertical Alignment & Quick Styles */}
-                  <div style={styles.propRowCol}>
-                    <span style={styles.propLabel}>{t('slideEditor.sidebar.alignmentStyles')}</span>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {/* Horizontal Alignment */}
-                      <div style={{ ...styles.segmentGroup, flex: 1 }}>
+                  {/* Horizontal Alignment */}
+                  <div className="studio-field-box">
+                    <span className="studio-field-label">{t('slideEditor.sidebar.alignmentStyles')}</span>
+                    <div style={{ display: 'flex', gap: 6, width: '100%' }}>
+                      <div className="studio-segmented-pill" style={{ flex: 1 }}>
                         {(['left', 'center', 'right', 'justify'] as const).map((align) => {
                           const on = currentTextAlign === align;
                           return (
@@ -1404,11 +1892,7 @@ export function SlideEditorRightSidebar({
                               key={align}
                               type="button"
                               onClick={() => setText({ textAlign: align })}
-                              style={{
-                                ...styles.segmentBtn,
-                                background: on ? 'var(--chrome-control-active)' : 'transparent',
-                                color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
-                              }}
+                              className={`studio-segmented-tab ${on ? 'active' : ''}`}
                               title={t('slideEditor.sidebar.alignTitle', { align })}
                             >
                               <AlignIcon align={align} />
@@ -1418,18 +1902,12 @@ export function SlideEditorRightSidebar({
                       </div>
 
                       {/* Italic & Underline Toggles */}
-                      <div style={{ ...styles.segmentGroup, width: 64 }}>
+                      <div className="studio-segmented-pill" style={{ width: 68 }}>
                         <button
                           type="button"
                           onClick={() => setText({ fontStyle: targetTextElement?.fontStyle === 'italic' ? 'normal' : 'italic' })}
-                          style={{
-                            ...styles.segmentBtn,
-                            background: targetTextElement?.fontStyle === 'italic' ? 'var(--chrome-control-active)' : 'transparent',
-                            color: targetTextElement?.fontStyle === 'italic' ? '#FF5500' : 'var(--text-secondary)',
-                            fontStyle: 'italic',
-                            fontWeight: 700,
-                            fontFamily: 'serif',
-                          }}
+                          className={`studio-segmented-tab ${targetTextElement?.fontStyle === 'italic' ? 'active' : ''}`}
+                          style={{ fontStyle: 'italic', fontFamily: 'serif', fontWeight: 700 }}
                           title={t('slideEditor.sidebar.italic')}
                         >
                           I
@@ -1437,49 +1915,42 @@ export function SlideEditorRightSidebar({
                         <button
                           type="button"
                           onClick={() => setText({ textDecoration: targetTextElement?.textDecoration === 'underline' ? 'none' : 'underline' })}
-                          style={{
-                            ...styles.segmentBtn,
-                            background: targetTextElement?.textDecoration === 'underline' ? 'var(--chrome-control-active)' : 'transparent',
-                            color: targetTextElement?.textDecoration === 'underline' ? '#FF5500' : 'var(--text-secondary)',
-                            textDecoration: 'underline',
-                            fontWeight: 700,
-                          }}
+                          className={`studio-segmented-tab ${targetTextElement?.textDecoration === 'underline' ? 'active' : ''}`}
+                          style={{ textDecoration: 'underline', fontWeight: 700 }}
                           title={t('slideEditor.sidebar.underline')}
                         >
                           U
                         </button>
                       </div>
-
-                      {/* Vertical Alignment */}
-                      <div style={{ ...styles.segmentGroup, width: 90 }}>
-                        {(['top', 'middle', 'bottom'] as const).map((vAlign) => {
-                          const on = (targetTextElement?.vAlign || 'middle') === vAlign;
-                          return (
-                            <button
-                              key={vAlign}
-                              type="button"
-                              onClick={() => setText({ vAlign })}
-                              style={{
-                                ...styles.segmentBtn,
-                                background: on ? 'var(--chrome-control-active)' : 'transparent',
-                                color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
-                              }}
-                              title={t('slideEditor.sidebar.verticalAlign', { align: vAlign })}
-                            >
-                              <VAlignIcon vAlign={vAlign} />
-                            </button>
-                          );
-                        })}
-                      </div>
+                    </div>
+                  </div>
+                  {/* Vertical Alignment */}
+                  <div className="studio-field-box">
+                    <span className="studio-field-label">Vertical Alignment</span>
+                    <div className="studio-segmented-pill">
+                      {(['top', 'middle', 'bottom'] as const).map((vAlign) => {
+                        const on = (targetTextElement?.vAlign || 'middle') === vAlign;
+                        return (
+                          <button
+                            key={vAlign}
+                            type="button"
+                            onClick={() => setText({ vAlign })}
+                            className={`studio-segmented-tab ${on ? 'active' : ''}`}
+                            title={t('slideEditor.sidebar.verticalAlign', { align: vAlign })}
+                          >
+                            <VAlignIcon vAlign={vAlign} />
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Decoration & Case (BS, Bs, bs for BibleSong) */}
-                  <div style={styles.twoColRow}>
+                  {/* Decoration & Case */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     {/* Decoration */}
-                    <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>{t('slideEditor.sidebar.decoration')}</span>
-                      <div style={styles.segmentGroup}>
+                    <div className="studio-field-box">
+                      <span className="studio-field-label">{t('slideEditor.sidebar.decoration')}</span>
+                      <div className="studio-segmented-pill">
                         {(['none', 'underline', 'line-through'] as const).map((deco) => {
                           const on = (targetTextElement?.textDecoration || 'none') === deco;
                           return (
@@ -1487,12 +1958,7 @@ export function SlideEditorRightSidebar({
                               key={deco}
                               type="button"
                               onClick={() => setText({ textDecoration: deco })}
-                              style={{
-                                ...styles.segmentBtn,
-                                background: on ? 'var(--chrome-control-active)' : 'transparent',
-                                color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                textDecoration: deco === 'none' ? undefined : deco,
-                              }}
+                              className={`studio-segmented-tab ${on ? 'active' : ''}`}
                               title={deco === 'none' ? t('slideEditor.sidebar.noDecoration') : deco === 'underline' ? t('slideEditor.sidebar.underline') : t('slideEditor.sidebar.strikethrough')}
                             >
                               {deco === 'none' ? '―' : deco === 'underline' ? 'U' : 'S'}
@@ -1502,10 +1968,10 @@ export function SlideEditorRightSidebar({
                       </div>
                     </div>
 
-                    {/* Case (BS, Bs, bs for BibleSong) */}
-                    <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>{t('slideEditor.sidebar.case')}</span>
-                      <div style={styles.segmentGroup}>
+                    {/* Text Transform Case */}
+                    <div className="studio-field-box">
+                      <span className="studio-field-label">{t('slideEditor.sidebar.case')}</span>
+                      <div className="studio-segmented-pill">
                         {(['none', 'uppercase', 'capitalize', 'lowercase'] as const).map((tc) => {
                           const on = (targetTextElement?.textTransform || 'none') === tc;
                           return (
@@ -1513,15 +1979,11 @@ export function SlideEditorRightSidebar({
                               key={tc}
                               type="button"
                               onClick={() => setText({ textTransform: tc })}
-                              style={{
-                                ...styles.segmentBtn,
-                                background: on ? 'var(--chrome-control-active)' : 'transparent',
-                                color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                fontWeight: tc === 'uppercase' ? 700 : 500,
-                              }}
+                              className={`studio-segmented-tab ${on ? 'active' : ''}`}
+                              style={{ fontWeight: tc === 'uppercase' ? 700 : 500 }}
                               title={t('slideEditor.sidebar.caseTitle', { tc })}
                             >
-                              {tc === 'none' ? '―' : tc === 'uppercase' ? 'BS' : tc === 'capitalize' ? 'Bs' : 'bs'}
+                              {tc === 'none' ? '―' : tc === 'uppercase' ? 'AA' : tc === 'capitalize' ? 'Aa' : 'aa'}
                             </button>
                           );
                         })}
@@ -1529,606 +1991,474 @@ export function SlideEditorRightSidebar({
                     </div>
                   </div>
                 </div>
-              )}
+              ))}
             </div>
-            )}
 
             {/* Shape, Fill & Border Section */}
-            {(selectedElement || pptxShape) && (
-              <div style={styles.sectionCard}>
-                <div style={styles.sectionHeader} onClick={() => toggleSection('shape')}>
-                  <span style={styles.sectionTitle}>
-                    {selectedElement?.type === 'bezier'
+            <div className="studio-section" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 14 }}>
+              <button
+                type="button"
+                className="studio-section-header"
+                onClick={() => toggleSection('shape')}
+              >
+                <div className="studio-section-title-wrap">
+                  <div className={`studio-section-chevron ${openSections.shape ? 'open' : 'closed'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                  <span>
+                    {targetShapeElement?.type === 'bezier'
                       ? t('slideEditor.sidebar.vectorPathFillStroke')
                       : t('slideEditor.sidebar.shapeFillBorder')}
                   </span>
-                  <ChevronIcon open={Boolean(openSections.shape)} />
                 </div>
+              </button>
 
-                {openSections.shape && (
-                  <div style={styles.sectionBody}>
-                    {/* Path Closed/Open Loop Toggle for Bezier curves */}
-                    {!pptxShape && selectedElement?.type === 'bezier' && (
-                      <div style={styles.propRowCol}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={styles.propLabel}>Path State</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextClosed = !selectedElement.closed;
-                              onUpdateElement(selectedElement.id, {
-                                closed: nextClosed,
-                                isLoopFilled: nextClosed,
-                                backgroundColor: nextClosed ? (selectedElement.backgroundColor !== 'transparent' ? selectedElement.backgroundColor : '#FF5500') : selectedElement.backgroundColor,
-                                fillColor: nextClosed ? (selectedElement.fillColor !== 'transparent' ? selectedElement.fillColor : '#FF5500') : selectedElement.fillColor,
+              {openSections.shape && (
+                <div className="studio-section-content" style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 10 }}>
+                  {/* Path Closed/Open Loop Toggle for Bezier curves */}
+                  {!pptxShape && targetShapeElement?.type === 'bezier' && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="studio-slider-name">Path State</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextClosed = !targetShapeElement.closed;
+                          onUpdateElement(targetShapeElement.id, {
+                            closed: nextClosed,
+                            isLoopFilled: nextClosed,
+                            backgroundColor: nextClosed ? (targetShapeElement.backgroundColor !== 'transparent' ? targetShapeElement.backgroundColor : '#10B981') : targetShapeElement.backgroundColor,
+                            fillColor: nextClosed ? (targetShapeElement.fillColor !== 'transparent' ? targetShapeElement.fillColor : '#10B981') : targetShapeElement.fillColor,
+                          });
+                        }}
+                        className="studio-reset-btn"
+                        style={{
+                          background: targetShapeElement.closed ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                          border: `1px solid ${targetShapeElement.closed ? '#10B981' : 'rgba(255, 255, 255, 0.12)'}`,
+                          color: targetShapeElement.closed ? '#10B981' : 'rgba(255, 255, 255, 0.5)',
+                          fontSize: 11,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {targetShapeElement.closed ? '● Closed Loop (Shape)' : '○ Open Curve'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Fill Color */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="studio-field-label" style={{ marginBottom: 0 }}>{t('slideEditor.sidebar.fillColor')}</span>
+                      {!pptxShape && targetShapeElement && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentFill = targetShapeElement.backgroundColor || targetShapeElement.fillColor;
+                            const isClear = !currentFill || currentFill === 'transparent' || currentFill === 'none';
+                            if (isClear) {
+                              const restored = lastFillColorMap.current[targetShapeElement.id] || '#FF5500';
+                              onUpdateElement(targetShapeElement.id, {
+                                backgroundColor: restored,
+                                fillColor: restored,
+                                isLoopFilled: true,
                               });
-                            }}
-                            style={{
-                              background: selectedElement.closed ? 'var(--accent-dim)' : 'transparent',
-                              border: `1px solid ${selectedElement.closed ? 'var(--accent)' : 'var(--border-primary)'}`,
-                              borderRadius: 4,
-                              color: selectedElement.closed ? 'var(--accent)' : 'var(--text-dim)',
-                              fontSize: 10,
-                              fontWeight: 700,
-                              padding: '3px 8px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 4,
-                            }}
-                            title="Toggle between closed shape loop and open line curve"
-                          >
-                            <span>{selectedElement.closed ? '● Closed Loop (Shape)' : '○ Open Curve'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Fill Color & Transparent Toggle */}
-                    <div style={styles.propRowCol}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>{t('slideEditor.sidebar.fillColor')}</span>
-                        {!pptxShape && selectedElement && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextColor = selectedElement.backgroundColor === 'transparent' ? '#FF5500' : 'transparent';
-                              onUpdateElement(selectedElement.id, {
-                                backgroundColor: nextColor,
-                                fillColor: nextColor,
-                                isLoopFilled: nextColor !== 'transparent',
+                            } else {
+                              lastFillColorMap.current[targetShapeElement.id] = currentFill;
+                              onUpdateElement(targetShapeElement.id, {
+                                backgroundColor: 'transparent',
+                                fillColor: 'transparent',
+                                isLoopFilled: false,
                               });
-                            }}
-                            style={{
-                              background: selectedElement.backgroundColor === 'transparent' ? 'var(--accent-dim)' : 'transparent',
-                              border: '1px solid var(--border-primary)',
-                              borderRadius: 4,
-                              color: selectedElement.backgroundColor === 'transparent' ? 'var(--accent)' : 'var(--text-dim)',
-                              fontSize: 10,
-                              fontWeight: 600,
-                              padding: '2px 6px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {selectedElement.backgroundColor === 'transparent' ? t('slideEditor.sidebar.noFillActive') : t('slideEditor.sidebar.clearFill')}
-                          </button>
-                        )}
-                      </div>
-                      <div style={styles.colorPillRow}>
-                        <input
-                          type="color"
-                          value={
-                            pptxShape
-                              ? (normalizeHex(typeof pptxShape.fillColor === 'string' ? pptxShape.fillColor : undefined) || '#FF5500')
-                              : (normalizeHex(selectedElement?.backgroundColor || selectedElement?.fillColor) || '#FF5500')
-                          }
-                          onChange={(e) => {
-                            if (pptxShape) (pptx as PptxInspector | null)?.onFill(e.target.value);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, {
-                              backgroundColor: e.target.value,
-                              fillColor: e.target.value,
-                              isLoopFilled: e.target.value !== 'transparent' && e.target.value !== 'none',
-                            });
+                            }
                           }}
-                          style={styles.colorSwatch}
-                        />
-                        <input
-                          type="text"
-                          spellCheck={false}
-                          value={
-                            pptxShape
-                              ? ((typeof pptxShape.fillColor === 'string' ? pptxShape.fillColor : '#FF5500')).toUpperCase()
-                              : (((selectedElement?.backgroundColor || selectedElement?.fillColor) && selectedElement?.backgroundColor !== 'transparent' && selectedElement?.fillColor !== 'transparent') ? (normalizeHex(selectedElement?.backgroundColor || selectedElement?.fillColor) || selectedElement?.backgroundColor || selectedElement?.fillColor || '#FF5500') : '#FF5500').toUpperCase()
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (pptxShape) (pptx as PptxInspector | null)?.onFill(val);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, {
-                              backgroundColor: val,
-                              fillColor: val,
-                              isLoopFilled: val !== 'transparent' && val !== 'none',
-                            });
-                          }}
-                          style={styles.colorHexInput}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Fill Opacity Slider */}
-                    {selectedElement && (
-                      <div style={styles.propRowCol}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={styles.propLabel}>{t('slideEditor.sidebar.fillOpacity')}</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {Math.round((selectedElement.fillOpacity ?? 1) * 100)}%
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={Math.round((selectedElement.fillOpacity ?? 1) * 100)}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) / 100;
-                              onUpdateElement(selectedElement.id, { fillOpacity: val });
-                            }}
-                            style={{ flex: 1, accentColor: '#FF5500' }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Border / Stroke Color */}
-                    <div style={styles.propRowCol}>
-                      <span style={styles.propLabel}>
-                        {selectedElement?.type === 'bezier'
-                          ? t('slideEditor.sidebar.strokeColor')
-                          : t('slideEditor.sidebar.borderColor')}
-                      </span>
-                      <div style={styles.colorPillRow}>
-                        <input
-                          type="color"
-                          value={
-                            pptxShape
-                              ? (normalizeHex(typeof pptxShape.strokeColor === 'string' ? pptxShape.strokeColor : undefined) || '#FF5500')
-                              : (normalizeHex(selectedElement?.borderColor || selectedElement?.strokeColor) || '#FF5500')
-                          }
-                          onChange={(e) => {
-                            if (pptxShape) (pptx as PptxInspector | null)?.onStroke(e.target.value, (pptxShape?.strokeWidthPx as number) || 2);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, {
-                              borderColor: e.target.value,
-                              strokeColor: e.target.value,
-                            });
-                          }}
-                          style={styles.colorSwatch}
-                        />
-                        <input
-                          type="text"
-                          spellCheck={false}
-                          value={
-                            pptxShape
-                              ? ((typeof pptxShape.strokeColor === 'string' ? pptxShape.strokeColor : '#FF5500')).toUpperCase()
-                              : (selectedElement?.borderColor || selectedElement?.strokeColor || '#FF5500').toUpperCase()
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (pptxShape) (pptx as PptxInspector | null)?.onStroke(val);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, {
-                              borderColor: val,
-                              strokeColor: val,
-                            });
-                          }}
-                          style={styles.colorHexInput}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Stroke Opacity Slider */}
-                    {selectedElement && (
-                      <div style={styles.propRowCol}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={styles.propLabel}>{t('slideEditor.sidebar.strokeOpacity')}</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {Math.round((selectedElement.strokeOpacity ?? 1) * 100)}%
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={Math.round((selectedElement.strokeOpacity ?? 1) * 100)}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) / 100;
-                              onUpdateElement(selectedElement.id, { strokeOpacity: val });
-                            }}
-                            style={{ flex: 1, accentColor: '#FF5500' }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Border / Stroke Width Slider */}
-                    <div style={styles.propRowCol}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>
-                          {selectedElement?.type === 'bezier'
-                            ? t('slideEditor.sidebar.strokeWidth')
-                            : t('slideEditor.sidebar.borderWidth')}
-                        </span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (selectedElement ? (selectedElement.borderWidth ?? selectedElement.strokeWidth ?? (selectedElement.type === 'shape' ? 3 : 4)) : 0)}px
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input
-                          type="range"
-                          min="0"
-                          max="30"
-                          value={pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (selectedElement ? (selectedElement.borderWidth ?? selectedElement.strokeWidth ?? (selectedElement.type === 'shape' ? 3 : 4)) : 0)}
-                          onChange={(e) => {
-                            const bw = parseInt(e.target.value, 10);
-                            if (pptxShape) (pptx as PptxInspector | null)?.onStroke((typeof pptxShape?.strokeColor === 'string' ? pptxShape.strokeColor : '#FF5500'), bw);
-                            else if (selectedElement) onUpdateElement(selectedElement.id, { borderWidth: bw, strokeWidth: bw });
-                          }}
-                          style={{ flex: 1, accentColor: '#FF5500' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Corner Radius Slider (Works on All Shapes, Text Boxes & Images!) */}
-                    <div style={styles.propRowCol}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>{t('slideEditor.sidebar.cornerRadius')}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {selectedElement?.borderRadius ?? 0}px
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input
-                          type="range"
-                          min="0"
-                          max="50"
-                          value={selectedElement?.borderRadius ?? 0}
-                          onChange={(e) => {
-                            const radius = parseInt(e.target.value, 10);
-                            if (selectedElement) onUpdateElement(selectedElement.id, { borderRadius: radius });
-                          }}
-                          style={{ flex: 1, accentColor: '#FF5500' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Layer Opacity Slider */}
-                    <div style={styles.propRowCol}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>{t('slideEditor.sidebar.layerOpacity')}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {Math.round((selectedElement?.opacity ?? 1) * 100)}%
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={Math.round((selectedElement?.opacity ?? 1) * 100)}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) / 100;
-                            if (selectedElement) onUpdateElement(selectedElement.id, { opacity: val });
-                          }}
-                          style={{ flex: 1, accentColor: '#FF5500' }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Effects & Shadows Section */}
-            {selectedElement && (
-              <div style={styles.sectionCard}>
-                <div style={styles.sectionHeader} onClick={() => toggleSection('effects')}>
-                  <span style={styles.sectionTitle}>{t('slideEditor.sidebar.effectsShadows')}</span>
-                  <ChevronIcon open={Boolean(openSections.effects)} />
-                </div>
-
-                {openSections.effects && (
-                  <div style={styles.sectionBody}>
-                    {/* Text Drop Shadow (For Text & Shape elements with content) */}
-                    {(selectedElement.type === 'text' || selectedElement.type === 'shape') && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 10, borderBottom: '1px solid var(--border-primary)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{t('slideEditor.sidebar.textDropShadow')}</span>
-                          <input
-                            type="checkbox"
-                            checked={Boolean(selectedElement.shadowEnabled)}
-                            onChange={(e) => onUpdateElement(selectedElement.id, { shadowEnabled: e.target.checked })}
-                            style={{ cursor: 'pointer', accentColor: '#FF5500' }}
-                          />
-                        </div>
-
-                        {selectedElement.shadowEnabled && (
-                          <>
-                            {/* Color */}
-                            <div style={styles.propRowCol}>
-                              <span style={styles.propLabel}>Shadow Color</span>
-                              <div style={styles.colorPillRow}>
-                                <input
-                                  type="color"
-                                  value={normalizeHex(selectedElement.shadowColor) || '#000000'}
-                                  onChange={(e) => onUpdateElement(selectedElement.id, { shadowColor: e.target.value })}
-                                  style={styles.colorSwatch}
-                                />
-                                <input
-                                  type="text"
-                                  spellCheck={false}
-                                  value={(selectedElement.shadowColor || '#000000').toUpperCase()}
-                                  onChange={(e) => onUpdateElement(selectedElement.id, { shadowColor: e.target.value })}
-                                  style={styles.colorHexInput}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Blur Radius */}
-                            <div style={styles.propRowCol}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={styles.propLabel}>{t('slideEditor.sidebar.blurRadius')}</span>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                                  {selectedElement.shadowBlur ?? 8}px
-                                </span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="40"
-                                value={selectedElement.shadowBlur ?? 8}
-                                onChange={(e) => onUpdateElement(selectedElement.id, { shadowBlur: parseInt(e.target.value, 10) })}
-                                style={{ accentColor: '#FF5500' }}
-                              />
-                            </div>
-
-                            {/* Offset X & Y */}
-                            <div style={styles.twoColRow}>
-                              <div style={styles.propRowCol}>
-                                <span style={styles.propLabel}>{t('slideEditor.sidebar.offsetX')}</span>
-                                <ScrubbableInput
-                                  value={selectedElement.shadowOffsetX ?? 0}
-                                  onChange={(v) => onUpdateElement(selectedElement.id, { shadowOffsetX: v })}
-                                  min={-30}
-                                  max={30}
-                                  step={1}
-                                />
-                              </div>
-                              <div style={styles.propRowCol}>
-                                <span style={styles.propLabel}>{t('slideEditor.sidebar.offsetY')}</span>
-                                <ScrubbableInput
-                                  value={selectedElement.shadowOffsetY ?? 4}
-                                  onChange={(v) => onUpdateElement(selectedElement.id, { shadowOffsetY: v })}
-                                  min={-30}
-                                  max={30}
-                                  step={1}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Opacity */}
-                            <div style={styles.propRowCol}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={styles.propLabel}>{t('slideEditor.sidebar.shadowOpacity')}</span>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                                  {Math.round((selectedElement.shadowOpacity ?? 0.5) * 100)}%
-                                </span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={Math.round((selectedElement.shadowOpacity ?? 0.5) * 100)}
-                                onChange={(e) => onUpdateElement(selectedElement.id, { shadowOpacity: parseFloat(e.target.value) / 100 })}
-                                style={{ accentColor: '#FF5500' }}
-                              />
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Container Box Shadow (For Shapes, Images, & Containers) */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: (selectedElement.type === 'text' || selectedElement.type === 'shape') ? 6 : 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{t('slideEditor.sidebar.containerBoxShadow')}</span>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(selectedElement.boxShadowEnabled)}
-                          onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowEnabled: e.target.checked })}
-                          style={{ cursor: 'pointer', accentColor: '#FF5500' }}
-                        />
-                      </div>
-
-                      {selectedElement.boxShadowEnabled && (
-                        <>
-                          {/* Color */}
-                          <div style={styles.propRowCol}>
-                            <span style={styles.propLabel}>{t('slideEditor.sidebar.boxShadowColor')}</span>
-                            <div style={styles.colorPillRow}>
-                              <input
-                                type="color"
-                                value={normalizeHex(selectedElement.boxShadowColor) || '#000000'}
-                                onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowColor: e.target.value })}
-                                style={styles.colorSwatch}
-                              />
-                              <input
-                                type="text"
-                                spellCheck={false}
-                                value={(selectedElement.boxShadowColor || '#000000').toUpperCase()}
-                                onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowColor: e.target.value })}
-                                style={styles.colorHexInput}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Blur Radius */}
-                          <div style={styles.propRowCol}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={styles.propLabel}>{t('slideEditor.sidebar.blurRadius')}</span>
-                              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {selectedElement.boxShadowBlur ?? 12}px
-                              </span>
-                            </div>
-                            <input
-                              type="range"
-                              min="0"
-                              max="50"
-                              value={selectedElement.boxShadowBlur ?? 12}
-                              onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowBlur: parseInt(e.target.value, 10) })}
-                              style={{ accentColor: '#FF5500' }}
-                            />
-                          </div>
-
-                          {/* Offset X & Y */}
-                          <div style={styles.twoColRow}>
-                            <div style={styles.propRowCol}>
-                              <span style={styles.propLabel}>{t('slideEditor.sidebar.offsetX')}</span>
-                              <ScrubbableInput
-                                value={selectedElement.boxShadowOffsetX ?? 0}
-                                onChange={(v) => onUpdateElement(selectedElement.id, { boxShadowOffsetX: v })}
-                                min={-30}
-                                max={30}
-                                step={1}
-                              />
-                            </div>
-                            <div style={styles.propRowCol}>
-                              <span style={styles.propLabel}>{t('slideEditor.sidebar.offsetY')}</span>
-                              <ScrubbableInput
-                                value={selectedElement.boxShadowOffsetY ?? 6}
-                                onChange={(v) => onUpdateElement(selectedElement.id, { boxShadowOffsetY: v })}
-                                min={-30}
-                                max={30}
-                                step={1}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Opacity */}
-                          <div style={styles.propRowCol}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={styles.propLabel}>{t('slideEditor.sidebar.boxShadowOpacity')}</span>
-                              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {Math.round((selectedElement.boxShadowOpacity ?? 0.4) * 100)}%
-                              </span>
-                            </div>
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              value={Math.round((selectedElement.boxShadowOpacity ?? 0.4) * 100)}
-                              onChange={(e) => onUpdateElement(selectedElement.id, { boxShadowOpacity: parseFloat(e.target.value) / 100 })}
-                              style={{ accentColor: '#FF5500' }}
-                            />
-                          </div>
-                        </>
+                          className="studio-reset-btn"
+                          style={{ fontSize: 11 }}
+                        >
+                          {(!targetShapeElement.backgroundColor || targetShapeElement.backgroundColor === 'transparent') ? t('slideEditor.sidebar.noFillActive') : t('slideEditor.sidebar.clearFill')}
+                        </button>
                       )}
                     </div>
+                    <StudioColorPicker
+                      label=""
+                      value={
+                        pptxShape
+                          ? (normalizeHex(typeof pptxShape.fillColor === 'string' ? pptxShape.fillColor : undefined) || '#10B981')
+                          : (normalizeHex(targetShapeElement?.backgroundColor || targetShapeElement?.fillColor) || '#10B981')
+                      }
+                      onChange={(c) => {
+                        if (pptxShape) (pptx as PptxInspector | null)?.onFill(c);
+                        else if (targetShapeElement) {
+                          if (c && c !== 'transparent' && c !== 'none') {
+                            lastFillColorMap.current[targetShapeElement.id] = c;
+                          }
+                          onUpdateElement(targetShapeElement.id, {
+                            backgroundColor: c,
+                            fillColor: c,
+                            isLoopFilled: c !== 'transparent' && c !== 'none',
+                          });
+                        }
+                      }}
+                    />
                   </div>
-                )}
-              </div>
-            )}
+
+                  {/* Fill Opacity Slider */}
+                  {targetShapeElement && (
+                    <StudioSlider
+                      label={t('slideEditor.sidebar.fillOpacity')}
+                      value={Math.round((targetShapeElement.fillOpacity ?? 1) * 100)}
+                      min={0}
+                      max={100}
+                      step={1}
+                      unit="%"
+                      onChange={(val) => onUpdateElement(targetShapeElement.id, { fillOpacity: val / 100 })}
+                    />
+                  )}
+
+                  {/* Border / Stroke Color */}
+                  <StudioColorPicker
+                    label={
+                      targetShapeElement?.type === 'bezier'
+                        ? t('slideEditor.sidebar.strokeColor')
+                        : t('slideEditor.sidebar.borderColor')
+                    }
+                    value={
+                      pptxShape
+                        ? (normalizeHex(typeof pptxShape.strokeColor === 'string' ? pptxShape.strokeColor : undefined) || '#10B981')
+                        : (normalizeHex(targetShapeElement?.borderColor || targetShapeElement?.strokeColor) || '#10B981')
+                    }
+                    onChange={(c) => {
+                      if (pptxShape) (pptx as PptxInspector | null)?.onStroke(c, (pptxShape?.strokeWidthPx as number) || 2);
+                      else if (targetShapeElement) {
+                        if (c && c !== 'transparent' && c !== 'none') {
+                          lastBorderColorMap.current[targetShapeElement.id] = c;
+                        }
+                        onUpdateElement(targetShapeElement.id, {
+                          borderColor: c,
+                          strokeColor: c,
+                        });
+                      }
+                    }}
+                  />
+
+                  {/* Stroke Opacity Slider */}
+                  {targetShapeElement && (
+                    <StudioSlider
+                      label={t('slideEditor.sidebar.strokeOpacity')}
+                      value={Math.round((targetShapeElement.strokeOpacity ?? 1) * 100)}
+                      min={0}
+                      max={100}
+                      step={1}
+                      unit="%"
+                      onChange={(val) => onUpdateElement(targetShapeElement.id, { strokeOpacity: val / 100 })}
+                    />
+                  )}
+
+                  {/* Border / Stroke Width Slider */}
+                  <StudioSlider
+                    label={
+                      targetShapeElement?.type === 'bezier'
+                        ? t('slideEditor.sidebar.strokeWidth')
+                        : t('slideEditor.sidebar.borderWidth')
+                    }
+                    value={pptxShape ? ((pptxShape.strokeWidthPx as number) || 0) : (targetShapeElement ? (targetShapeElement.borderWidth ?? targetShapeElement.strokeWidth ?? (targetShapeElement.type === 'shape' ? 3 : 4)) : 0)}
+                    min={0}
+                    max={30}
+                    step={1}
+                    unit="px"
+                    onChange={(bw) => {
+                      if (pptxShape) (pptx as PptxInspector | null)?.onStroke((typeof pptxShape?.strokeColor === 'string' ? pptxShape.strokeColor : '#10B981'), bw);
+                      else if (targetShapeElement) {
+                        if (bw > 0) lastBorderWidthMap.current[targetShapeElement.id] = bw;
+                        onUpdateElement(targetShapeElement.id, { borderWidth: bw, strokeWidth: bw });
+                      }
+                    }}
+                  />
+
+                  {/* Corner Radius Slider */}
+                  <StudioSlider
+                    label={t('slideEditor.sidebar.cornerRadius')}
+                    value={targetShapeElement?.borderRadius ?? 0}
+                    min={0}
+                    max={50}
+                    step={1}
+                    unit="px"
+                    onChange={(radius) => {
+                      if (targetShapeElement) onUpdateElement(targetShapeElement.id, { borderRadius: radius });
+                    }}
+                  />
+
+                  {/* Layer Opacity Slider */}
+                  <StudioSlider
+                    label={t('slideEditor.sidebar.layerOpacity')}
+                    value={Math.round((targetShapeElement?.opacity ?? 1) * 100)}
+                    min={0}
+                    max={100}
+                    step={1}
+                    unit="%"
+                    onChange={(val) => {
+                      if (targetShapeElement) onUpdateElement(targetShapeElement.id, { opacity: val / 100 });
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Effects & Shadows Section */}
+            <div className="studio-section" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 14 }}>
+              <button
+                type="button"
+                className="studio-section-header"
+                onClick={() => toggleSection('effects')}
+              >
+                <div className="studio-section-title-wrap">
+                  <div className={`studio-section-chevron ${openSections.effects ? 'open' : 'closed'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                  <span>{t('slideEditor.sidebar.effectsShadows')}</span>
+                </div>
+              </button>
+
+              {openSections.effects && (
+                <div className="studio-section-content" style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 10 }}>
+                  {/* Text Drop Shadow */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 10, borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div className="studio-toggle-row">
+                      <span className="studio-toggle-label">{t('slideEditor.sidebar.textDropShadow')}</span>
+                      <StudioToggle
+                        checked={Boolean(targetEffectElement?.shadowEnabled)}
+                        onChange={(checked) => targetEffectElement && onUpdateElement(targetEffectElement.id, { shadowEnabled: checked })}
+                      />
+                    </div>
+
+                    {targetEffectElement?.shadowEnabled && (
+                      <>
+                        <StudioColorPicker
+                          label="Shadow Color"
+                          value={normalizeHex(targetEffectElement.shadowColor) || '#000000'}
+                          onChange={(c) => onUpdateElement(targetEffectElement.id, { shadowColor: c })}
+                        />
+
+                        <StudioSlider
+                          label={t('slideEditor.sidebar.blurRadius')}
+                          value={targetEffectElement.shadowBlur ?? 8}
+                          min={0}
+                          max={40}
+                          step={1}
+                          unit="px"
+                          onChange={(v) => onUpdateElement(targetEffectElement.id, { shadowBlur: v })}
+                        />
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <div className="studio-field-box">
+                            <span className="studio-field-label">{t('slideEditor.sidebar.offsetX')}</span>
+                            <ScrubbableInput
+                              value={targetEffectElement.shadowOffsetX ?? 0}
+                              onChange={(v) => onUpdateElement(targetEffectElement.id, { shadowOffsetX: v })}
+                              min={-30}
+                              max={30}
+                              step={1}
+                            />
+                          </div>
+                          <div className="studio-field-box">
+                            <span className="studio-field-label">{t('slideEditor.sidebar.offsetY')}</span>
+                            <ScrubbableInput
+                              value={targetEffectElement.shadowOffsetY ?? 4}
+                              onChange={(v) => onUpdateElement(targetEffectElement.id, { shadowOffsetY: v })}
+                              min={-30}
+                              max={30}
+                              step={1}
+                            />
+                          </div>
+                        </div>
+
+                        <StudioSlider
+                          label={t('slideEditor.sidebar.shadowOpacity')}
+                          value={Math.round((targetEffectElement.shadowOpacity ?? 0.5) * 100)}
+                          min={0}
+                          max={100}
+                          step={1}
+                          unit="%"
+                          onChange={(val) => onUpdateElement(targetEffectElement.id, { shadowOpacity: val / 100 })}
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  {/* Container Box Shadow */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div className="studio-toggle-row">
+                      <span className="studio-toggle-label">{t('slideEditor.sidebar.containerBoxShadow')}</span>
+                      <StudioToggle
+                        checked={Boolean(targetEffectElement?.boxShadowEnabled)}
+                        onChange={(checked) => targetEffectElement && onUpdateElement(targetEffectElement.id, { boxShadowEnabled: checked })}
+                      />
+                    </div>
+
+                    {targetEffectElement?.boxShadowEnabled && (
+                      <>
+                        <StudioColorPicker
+                          label={t('slideEditor.sidebar.boxShadowColor')}
+                          value={normalizeHex(targetEffectElement.boxShadowColor) || '#000000'}
+                          onChange={(c) => onUpdateElement(targetEffectElement.id, { boxShadowColor: c })}
+                        />
+
+                        <StudioSlider
+                          label={t('slideEditor.sidebar.blurRadius')}
+                          value={targetEffectElement.boxShadowBlur ?? 12}
+                          min={0}
+                          max={50}
+                          step={1}
+                          unit="px"
+                          onChange={(v) => onUpdateElement(targetEffectElement.id, { boxShadowBlur: v })}
+                        />
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <div className="studio-field-box">
+                            <span className="studio-field-label">{t('slideEditor.sidebar.offsetX')}</span>
+                            <ScrubbableInput
+                              value={targetEffectElement.boxShadowOffsetX ?? 0}
+                              onChange={(v) => onUpdateElement(targetEffectElement.id, { boxShadowOffsetX: v })}
+                              min={-30}
+                              max={30}
+                              step={1}
+                            />
+                          </div>
+                          <div className="studio-field-box">
+                            <span className="studio-field-label">{t('slideEditor.sidebar.offsetY')}</span>
+                            <ScrubbableInput
+                              value={targetEffectElement.boxShadowOffsetY ?? 6}
+                              onChange={(v) => onUpdateElement(targetEffectElement.id, { boxShadowOffsetY: v })}
+                              min={-30}
+                              max={30}
+                              step={1}
+                            />
+                          </div>
+                        </div>
+
+                        <StudioSlider
+                          label={t('slideEditor.sidebar.boxShadowOpacity')}
+                          value={Math.round((targetEffectElement.boxShadowOpacity ?? 0.4) * 100)}
+                          min={0}
+                          max={100}
+                          step={1}
+                          unit="%"
+                          onChange={(val) => onUpdateElement(targetEffectElement.id, { boxShadowOpacity: val / 100 })}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Geometry & Transform Section */}
-            {selectedElement && (
-              <div style={styles.sectionCard}>
-                <div style={styles.sectionHeader} onClick={() => toggleSection('geometry')}>
-                  <span style={styles.sectionTitle}>{t('slideEditor.sidebar.geometryTransform')}</span>
-                  <ChevronIcon open={Boolean(openSections.geometry)} />
+            <div className="studio-section" style={{ borderBottom: 'none', paddingBottom: 14 }}>
+              <button
+                type="button"
+                className="studio-section-header"
+                onClick={() => toggleSection('geometry')}
+              >
+                <div className="studio-section-title-wrap">
+                  <div className={`studio-section-chevron ${openSections.geometry ? 'open' : 'closed'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </div>
+                  <span>{t('slideEditor.sidebar.geometryTransform')}</span>
                 </div>
+              </button>
 
-                {openSections.geometry && (
-                  <div style={styles.sectionBody}>
-                    <div style={styles.twoColRow}>
-                      <div style={styles.propRowCol}>
-                        <span style={styles.propLabel}>{t('slideEditor.sidebar.xPosition')}</span>
-                        <ScrubbableInput
-                          value={selectedElement.x || 0}
-                          onChange={(v) => onUpdateElement(selectedElement.id, { x: v })}
-                          min={-100}
-                          max={200}
-                          step={1}
-                        />
-                      </div>
-                      <div style={styles.propRowCol}>
-                        <span style={styles.propLabel}>{t('slideEditor.sidebar.yPosition')}</span>
-                        <ScrubbableInput
-                          value={selectedElement.y || 0}
-                          onChange={(v) => onUpdateElement(selectedElement.id, { y: v })}
-                          min={-100}
-                          max={200}
-                          step={1}
-                        />
-                      </div>
+              {openSections.geometry && (
+                <div className="studio-section-content" style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div className="studio-field-box">
+                      <span className="studio-field-label">{t('slideEditor.sidebar.xPosition')}</span>
+                      <ScrubbableInput
+                        value={targetGeomElement?.x || 0}
+                        onChange={(v) => targetGeomElement && onUpdateElement(targetGeomElement.id, { x: v })}
+                        min={-100}
+                        max={200}
+                        step={1}
+                      />
                     </div>
-
-                    <div style={styles.twoColRow}>
-                      <div style={styles.propRowCol}>
-                        <span style={styles.propLabel}>{t('slideEditor.sidebar.width')}</span>
-                        <ScrubbableInput
-                          value={selectedElement.width || 0}
-                          onChange={(v) => onUpdateElement(selectedElement.id, { width: v })}
-                          min={1}
-                          max={200}
-                          step={1}
-                        />
-                      </div>
-                      <div style={styles.propRowCol}>
-                        <span style={styles.propLabel}>{t('slideEditor.sidebar.height')}</span>
-                        <ScrubbableInput
-                          value={selectedElement.height || 0}
-                          onChange={(v) => onUpdateElement(selectedElement.id, { height: v })}
-                          min={1}
-                          max={200}
-                          step={1}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Rotation Control */}
-                    <div style={styles.propRowCol}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.propLabel}>{t('slideEditor.sidebar.rotationAngle', { deg: selectedElement.rotation || 0 })}</span>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateElement(selectedElement.id, { rotation: ((selectedElement.rotation || 0) - 90) % 360 })}
-                            style={{ background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', borderRadius: 4, color: 'var(--text-primary)', padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}
-                            title={t('slideEditor.sidebar.rotateLeft')}
-                          >
-                            ↺ -90°
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateElement(selectedElement.id, { rotation: ((selectedElement.rotation || 0) + 90) % 360 })}
-                            style={{ background: 'var(--chrome-control)', border: '1px solid var(--border-primary)', borderRadius: 4, color: 'var(--text-primary)', padding: '2px 6px', fontSize: 10, cursor: 'pointer' }}
-                            title={t('slideEditor.sidebar.rotateRight')}
-                          >
-                            ↻ +90°
-                          </button>
-                        </div>
-                      </div>
-                      <input
-                        type="range"
-                        min="-180"
-                        max="180"
-                        value={selectedElement.rotation || 0}
-                        onChange={(e) => onUpdateElement(selectedElement.id, { rotation: parseInt(e.target.value, 10) })}
-                        style={{ accentColor: '#FF5500' }}
+                    <div className="studio-field-box">
+                      <span className="studio-field-label">{t('slideEditor.sidebar.yPosition')}</span>
+                      <ScrubbableInput
+                        value={targetGeomElement?.y || 0}
+                        onChange={(v) => targetGeomElement && onUpdateElement(targetGeomElement.id, { y: v })}
+                        min={-100}
+                        max={200}
+                        step={1}
                       />
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div className="studio-field-box">
+                      <span className="studio-field-label">{t('slideEditor.sidebar.width')}</span>
+                      <ScrubbableInput
+                        value={targetGeomElement?.width || 0}
+                        onChange={(v) => targetGeomElement && onUpdateElement(targetGeomElement.id, { width: v })}
+                        min={1}
+                        max={200}
+                        step={1}
+                      />
+                    </div>
+                    <div className="studio-field-box">
+                      <span className="studio-field-label">{t('slideEditor.sidebar.height')}</span>
+                      <ScrubbableInput
+                        value={targetGeomElement?.height || 0}
+                        onChange={(v) => targetGeomElement && onUpdateElement(targetGeomElement.id, { height: v })}
+                        min={1}
+                        max={200}
+                        step={1}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Rotation Control */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="studio-field-label" style={{ marginBottom: 0 }}>
+                        {t('slideEditor.sidebar.rotationAngle', { deg: targetGeomElement?.rotation || 0 })}
+                      </span>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          type="button"
+                          onClick={() => targetGeomElement && onUpdateElement(targetGeomElement.id, { rotation: ((targetGeomElement.rotation || 0) - 90) % 360 })}
+                          className="studio-reset-btn"
+                          style={{ fontSize: 10 }}
+                          title={t('slideEditor.sidebar.rotateLeft')}
+                        >
+                          ↺ -90°
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => targetGeomElement && onUpdateElement(targetGeomElement.id, { rotation: ((targetGeomElement.rotation || 0) + 90) % 360 })}
+                          className="studio-reset-btn"
+                          style={{ fontSize: 10 }}
+                          title={t('slideEditor.sidebar.rotateRight')}
+                        >
+                          ↻ +90°
+                        </button>
+                      </div>
+                    </div>
+                    <StudioSlider
+                      label=""
+                      value={targetGeomElement?.rotation || 0}
+                      min={-180}
+                      max={180}
+                      step={1}
+                      unit="°"
+                      onChange={(rot) => targetGeomElement && onUpdateElement(targetGeomElement.id, { rotation: rot })}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
 

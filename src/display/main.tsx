@@ -4,11 +4,10 @@ import { ProgramSurface, type ProgramSurfaceState } from '../renderer/components
 import { installFontFaces } from '../shared/display-fonts';
 import './style.css';
 
-let assetBaseUrl = 'http://localhost:8942';
-
 function DisplayHost() {
   const [displayState, setDisplayState] = useState<ProgramSurfaceState>({});
   const [scale, setScale] = useState(1);
+  const [assetBaseUrl, setAssetBaseUrl] = useState('http://localhost:8942');
 
   useEffect(() => {
     function updateScale() {
@@ -28,13 +27,22 @@ function DisplayHost() {
 
     async function init() {
       const baseUrl = await window.BSP?.media?.baseUrl?.().catch(() => null);
-      if (baseUrl) assetBaseUrl = baseUrl;
-      installFontFaces(assetBaseUrl);
+      if (baseUrl && mounted) {
+        setAssetBaseUrl(baseUrl);
+        installFontFaces(baseUrl);
+      }
 
       const displayApi = window.BSP?.display;
       cleanup = displayApi?.onMessage?.((msg: any) => {
-        const next = msg?.type === 'display:update' ? msg.state : msg;
-        if (next) setDisplayState(next);
+        if (!msg) return;
+        // Ignore genlock commands or non-display messages so they don't overwrite presentation state
+        if (msg.type && (msg.type.startsWith('genlock:') || msg.type === 'stage:message')) {
+          return;
+        }
+        const next = msg.type === 'display:update' ? msg.state : msg;
+        if (next && mounted && (next.scene !== undefined || next.outputMode !== undefined || next.theme !== undefined || next.broadcastScene !== undefined)) {
+          setDisplayState(next);
+        }
       });
 
       const initialState = await displayApi?.getState?.().catch(() => null);
@@ -71,13 +79,14 @@ function DisplayHost() {
         transform: `translate(-50%, -50%) scale(${scale})`,
         transformOrigin: 'center center',
         overflow: 'hidden',
-        background: (displayState.outputMode || displayState.mode) === 'lowerThird' ? 'transparent' : '#000',
+        background: 'transparent',
       }}
     >
       <ProgramSurface
         className="audience-program-surface"
         state={displayState}
         assetBaseUrl={assetBaseUrl}
+        isExternalDisplay={true}
       />
     </div>
   );

@@ -22,11 +22,12 @@ export interface StageTheme {
 
 const THEME_KEY = 'bsp-stage-theme';
 const LAYOUT_KEY = 'bsp-stage-layout';
+const THEMES_KEY = 'bsp_stage_layout_themes';
 
-export function defaultTheme(): StageTheme {
+export function defaultTheme(layoutId?: string, bg?: string): StageTheme {
   return {
     accent: '#fbbf24',
-    background: '#000000',
+    background: bg || (layoutId === 'band' ? '#0a0a0a' : layoutId === 'sermon' ? '#05070d' : '#000000'),
     text: '#ffffff',
     fontScale: 1,
     showClock: true,
@@ -64,17 +65,55 @@ export function safeStorage(): MiniStorage {
   return NO_STORAGE;
 }
 
-export function loadTheme(): StageTheme {
+export function getLayoutThemes(): Record<string, StageTheme> {
   try {
-    const raw = safeStorage().getItem(THEME_KEY);
-    if (raw) return { ...defaultTheme(), ...JSON.parse(raw) };
+    const raw = safeStorage().getItem(THEMES_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
-    /* corrupt or unavailable storage — the default is always usable */
+    return {};
   }
-  return defaultTheme();
 }
 
-export function persistTheme(theme: StageTheme): void {
+export function loadLayoutTheme(layoutId: string, layoutBg?: string): StageTheme {
+  const all = getLayoutThemes();
+  if (all[layoutId]) {
+    return { ...defaultTheme(layoutId, layoutBg), ...all[layoutId] };
+  }
+  return defaultTheme(layoutId, layoutBg);
+}
+
+export function persistLayoutTheme(layoutId: string, theme: StageTheme): void {
+  if (!layoutId) return;
+  try {
+    const all = getLayoutThemes();
+    all[layoutId] = theme;
+    safeStorage().setItem(THEMES_KEY, JSON.stringify(all));
+  } catch {
+    /* storage may be unavailable */
+  }
+}
+
+export function getLayoutTheme(layout?: { id?: string; bgColor?: string; theme?: StageTheme } | string | null): StageTheme {
+  if (!layout) return defaultTheme();
+  if (typeof layout === 'string') {
+    return loadLayoutTheme(layout);
+  }
+  if (layout.theme) {
+    return { ...defaultTheme(layout.id, layout.bgColor), ...layout.theme };
+  }
+  return loadLayoutTheme(layout.id || 'default', layout.bgColor);
+}
+
+export function loadTheme(layoutId?: string): StageTheme {
+  const id = layoutId || loadLayoutId() || 'default';
+  return loadLayoutTheme(id);
+}
+
+export function persistTheme(theme: StageTheme, layoutId?: string): void {
+  const id = layoutId || loadLayoutId() || 'default';
+  persistLayoutTheme(id, theme);
   try {
     safeStorage().setItem(THEME_KEY, JSON.stringify(theme));
   } catch {
@@ -93,6 +132,7 @@ export function persistLayoutId(id: string): void {
     /* storage may be unavailable */
   }
 }
+
 
 /** Fade a #rrggbb toward transparent. Anything unparseable degrades to white
     at the same alpha rather than painting the zone black. */

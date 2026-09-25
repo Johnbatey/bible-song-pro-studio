@@ -32,31 +32,44 @@ export function useStageSync(): void {
   const currentScene = useAppStore((s) => s.display.currentScene);
   const queue = useAppStore((s) => s.queue);
   const activeAlert = useAppStore((s) => s.activeAlert);
+  const fxSettings = useAppStore((s) => s.fxSettings);
+  const slideFxSettings = useAppStore((s) => s.slideFxSettings);
 
   // What is on the screen now, and which song it belongs to.
   useEffect(() => {
     const { songTitle, songSubtitle } = songCue(currentScene);
-    /* Neither of these has a reference line worth showing. A presentation's is
-       the deck's own title, and a media scene falls back to `scene.name` —
-       which for media is the file name off the operator's disk. The stage was
-       putting "Screenshot 2026-08-10 at 00.24.51.png" over the platform in
-       accent orange; the picture is the content, and its file name is a detail
-       of the library, not something a musician needs. */
     const isPresentation = currentScene?.type === 'presentation';
     const isMedia = currentScene?.type === 'media';
     const isSong = currentScene?.type === 'song';
+    const activeFx = isPresentation ? slideFxSettings : fxSettings;
+    const stageDisplayFxEnabled = activeFx?.stageDisplayFxEnabled !== false;
+
     publishStage({
       current: currentScene
         ? {
+            id: currentScene.id,
             title: isPresentation || isMedia || isSong ? '' : (currentScene.content?.reference || currentScene.name),
             body: currentScene.content?.text || '',
             bodyHtml: currentScene.content?.html || '',
+            slide: currentScene.content?.slide,
+            transition: currentScene.transition || {
+              type: activeFx?.transitionType || 'fade',
+              duration: activeFx?.duration || 0.4,
+              animateBackground: activeFx?.animateBackground,
+            },
           }
         : null,
       songTitle,
       songSubtitle,
+      fxAnimation: {
+        transitionType: activeFx?.transitionType || 'fade',
+        duration: activeFx?.duration || 0.4,
+        animateBackground: activeFx?.animateBackground || false,
+        stageDisplayFxEnabled,
+      },
+      stageDisplayFxEnabled,
     });
-  }, [currentScene]);
+  }, [currentScene, fxSettings, slideFxSettings]);
 
   /* What is queued to go next. Keyed on the item's identity rather than the
      array's, so re-ordering further down the queue does not repaint the stage. */

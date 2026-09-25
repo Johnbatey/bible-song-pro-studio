@@ -15,8 +15,8 @@ import { createRoot } from 'react-dom/client';
 import type { ProgramSurfaceState } from '../renderer/components/display/ProgramSurface';
 import { installFontFaces } from '../shared/display-fonts';
 import { StageSurface } from './StageSurface';
-import { cycleLayoutId, LAYOUTS } from './layouts';
-import { persistLayoutId } from './theme';
+import { cycleLayoutId, getEffectiveLayout, LAYOUTS } from './layouts';
+import { getLayoutTheme, persistLayoutId } from './theme';
 import { clearStageContent, initialStageState, reduceStage, type StageState } from './stage-state';
 import './stage-page.css';
 
@@ -32,11 +32,20 @@ function stageReducer(state: StageState, action: StageAction): StageState {
     case 'message':
       return reduceStage(state, action.payload);
     case 'layout': {
-      const layout = LAYOUTS[action.id];
+      const layout = getEffectiveLayout(action.id);
       if (!layout) return state;
       persistLayoutId(layout.id);
-      return { ...state, layout, backgroundColor: layout.bgColor };
+      const theme = layout.theme || getLayoutTheme(layout);
+      return {
+        ...state,
+        layout,
+        theme,
+        backgroundColor: theme.background || layout.bgColor,
+        clockVisible: theme.showClock,
+        timerVisible: theme.showTimer,
+      };
     }
+
     case 'clear':
       return clearStageContent(state);
     default:

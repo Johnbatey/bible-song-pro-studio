@@ -120,8 +120,10 @@ export function normalizeLayout(raw: unknown): StageLayout {
     name: String(obj.name || 'Untitled layout').slice(0, 60) || 'Untitled layout',
     bgColor: typeof obj.bgColor === 'string' && obj.bgColor ? obj.bgColor : '#000000',
     zones: zones.map((zone) => normalizeZone(zone as Partial<StageZone>)),
+    ...(obj.theme && typeof obj.theme === 'object' ? { theme: obj.theme as StageLayout['theme'] } : {}),
   };
 }
+
 
 /** A deep copy with fresh ids, for "duplicate" and for opening a preset in the
     designer. Sharing zone objects with the preset table would let an edit in

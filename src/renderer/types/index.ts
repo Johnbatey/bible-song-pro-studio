@@ -189,6 +189,8 @@ export interface Slide {
   elements?: SlideElement[];
   background?: SlideBackground;
   aspectRatio?: '16:9' | '4:3' | 'lower-third';
+  gridX?: number;
+  gridY?: number;
 }
 
 export interface PresentationDeck {
@@ -224,6 +226,8 @@ export interface PresentationSlide {
      slide re-parses through the same pipeline as an untouched one. Only
      slides actually edited carry this. */
   editor?: { filename: string; xml: string };
+  gridX?: number;
+  gridY?: number;
 }
 
 export interface Background {
@@ -255,6 +259,7 @@ export interface FxAnimationSettings {
   transitionType: FxTransitionType;
   duration: number; // Duration in seconds (0.1 to 5.0)
   animateBackground: boolean;
+  stageDisplayFxEnabled?: boolean;
 }
 
 export interface Transition {
@@ -735,7 +740,7 @@ export interface Alert {
   text: string;
   type: 'info' | 'warning' | 'announcement' | 'custom';
   duration: number;
-  animation: string;
+  animation?: string;
   position?: 'top' | 'bottom';
   speed?: number;
   cycles?: number;

@@ -9,6 +9,7 @@ export function StatusBar() {
   const mode = useAppStore((s) => s.display.mode);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
   const transcription = useAppStore((s) => s.transcription);
+  const scenes = useAppStore((s) => s.scenes);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const [ndiStatus, setNdiStatus] = useState<{ running: boolean; connections: number } | null>(null);
 
@@ -64,6 +65,10 @@ export function StatusBar() {
             <path d="M12 6v6l4 2" />
           </svg>
           {transcription.isActive ? t('status.transcribing') : t('status.transcriptionOff')}
+        </span>
+        <span style={styles.separator} />
+        <span style={styles.item}>
+          {t('status.scenes', { count: scenes.length })}
         </span>
         {currentScene && (
           <>

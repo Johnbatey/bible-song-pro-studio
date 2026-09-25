@@ -15,6 +15,8 @@ export interface BackgroundInfo {
   start: string;
   end: string;
   dir: string;
+  startPos?: number;
+  endPos?: number;
 }
 
 export const DEFAULT_GROUND = '#0c0e14';
@@ -22,10 +24,18 @@ export const DEFAULT_GRADIENT_START = '#0f172a';
 export const DEFAULT_GRADIENT_END = '#312e81';
 
 /** Assemble the CSS for a gradient. `radial` is a direction here, not a type. */
-export function gradientCss(start: string, end: string, dir: string): string {
+export function gradientCss(
+  start: string,
+  end: string,
+  dir: string,
+  startPos?: number,
+  endPos?: number
+): string {
+  const sPos = typeof startPos === 'number' ? ` ${startPos}%` : ' 0%';
+  const ePos = typeof endPos === 'number' ? ` ${endPos}%` : ' 100%';
   return dir === 'radial'
-    ? `radial-gradient(circle, ${start}, ${end})`
-    : `linear-gradient(${dir}, ${start}, ${end})`;
+    ? `radial-gradient(circle at center, ${start}${sPos}, ${end}${ePos})`
+    : `linear-gradient(${dir}, ${start}${sPos}, ${end}${ePos})`;
 }
 
 /**
@@ -45,6 +55,8 @@ export function parseBackgroundInfo(
       start: DEFAULT_GRADIENT_START,
       end: DEFAULT_GRADIENT_END,
       dir: '135deg',
+      startPos: 0,
+      endPos: 100,
     };
   }
   if (str.includes('gradient')) {
@@ -52,6 +64,11 @@ export function parseBackgroundInfo(
     const rgbes = str.match(/rgba?\([^)]+\)/g) || [];
     const colors = [...hexes, ...rgbes];
     const dirMatch = str.match(/(\d+deg|circle)/i);
+
+    const pctMatches = [...str.matchAll(/(\d+)%/g)].map((m) => parseInt(m[1], 10));
+    const startPos = pctMatches.length >= 2 ? pctMatches[0] : 0;
+    const endPos = pctMatches.length >= 2 ? pctMatches[pctMatches.length - 1] : 100;
+
     return {
       type: 'gradient',
       color: colors[0] || DEFAULT_GRADIENT_START,
@@ -61,6 +78,8 @@ export function parseBackgroundInfo(
          direction `radial`, so translate rather than offering a direction the
          dropdown has no option for. */
       dir: dirMatch ? (dirMatch[1].toLowerCase() === 'circle' ? 'radial' : dirMatch[1]) : '135deg',
+      startPos,
+      endPos,
     };
   }
   return {
@@ -69,6 +88,8 @@ export function parseBackgroundInfo(
     start: DEFAULT_GRADIENT_START,
     end: DEFAULT_GRADIENT_END,
     dir: '135deg',
+    startPos: 0,
+    endPos: 100,
   };
 }
 

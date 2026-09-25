@@ -389,7 +389,7 @@ export interface ProgramSurfaceState {
     sources?: Record<string, SourceDocument>;
   transition?: { active: boolean; type: string; progress: number } | null;
   animateBackground?: boolean;
-  fxAnimation?: { transitionType: string; duration: number; animateBackground: boolean };
+  fxAnimation?: { transitionType: string; duration: number; animateBackground: boolean; stageDisplayFxEnabled?: boolean; };
     outputMode?: 'fullscreen' | 'lowerThird';
   theme?: Theme | null;
   activeAlert?: Alert | null;

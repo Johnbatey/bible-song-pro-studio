@@ -19,6 +19,11 @@ import type { StageLayout, StageZone } from './layouts';
 import { resolveColor, type StageTheme } from './theme';
 import { formatTime, timerSeconds, type StageContent, type StageMessage, type StageTimer } from './stage-state';
 import { SlideStage } from '../renderer/components/display/SlideStage';
+import {
+  resolveFxAnimation,
+  TypedWordText,
+  SlideTransitionContainer,
+} from '../renderer/components/display/ProgramSurface';
 import type { SlideProjection, WordStudyEntry } from '../renderer/types';
 
 /** The most messages that fit before the block starts covering the lyrics. */
@@ -54,6 +59,13 @@ export interface StageZonesProps {
   songSubtitle?: string;
   timer: StageTimer;
   messages: StageMessage[];
+  fxAnimation?: {
+    transitionType: string;
+    duration: number;
+    animateBackground?: boolean;
+    stageDisplayFxEnabled?: boolean;
+  } | null;
+  stageDisplayFxEnabled?: boolean;
 }
 
 /**
@@ -112,7 +124,21 @@ function ClockValue({ style }: { style: CSSProperties }) {
     const id = window.setInterval(() => setValue(clockString()), 10_000);
     return () => window.clearInterval(id);
   }, []);
-  return <div className="zone-value" style={style}>{value}</div>;
+  return (
+    <div
+      className="zone-value"
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        ...style,
+      }}
+    >
+      {value}
+    </div>
+  );
 }
 
 function clockString(): string {
@@ -127,7 +153,21 @@ function TimerValue({ timer, style }: { timer: StageTimer; style: CSSProperties 
     const id = window.setInterval(() => tick((n) => n + 1), 250);
     return () => window.clearInterval(id);
   }, [timer.running]);
-  return <div className="zone-value" style={style}>{formatTime(timerSeconds(timer))}</div>;
+  return (
+    <div
+      className="zone-value"
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        ...style,
+      }}
+    >
+      {formatTime(timerSeconds(timer))}
+    </div>
+  );
 }
 
 function zoneFrame(zone: StageZone): CSSProperties {
@@ -158,9 +198,16 @@ export function StageZones({
   songSubtitle,
   timer,
   messages,
+  fxAnimation,
+  stageDisplayFxEnabled = true,
 }: StageZonesProps) {
   const scale = theme.fontScale;
   const px = (size: number) => `${Math.round(size * scale)}px`;
+
+  const fxEnabled = stageDisplayFxEnabled !== false && fxAnimation?.stageDisplayFxEnabled !== false;
+  const rawTrans = current?.transition || (fxAnimation ? { type: fxAnimation.transitionType, duration: fxAnimation.duration, animateBackground: fxAnimation.animateBackground } : { type: 'fade', duration: 0.4 });
+  const activeTransition = fxEnabled ? rawTrans : { type: 'cut', duration: 0 };
+  const fxAnim = resolveFxAnimation(activeTransition);
 
   return (
     <div className="stage-zones">
@@ -202,9 +249,21 @@ export function StageZones({
           ].filter(Boolean).join(' ');
           return (
             <div key={key} className={classes} data-zone={zone.type} style={frame}>
-              {activeMedia && <ZoneMedia media={activeMedia} />}
+              {activeMedia && (
+                <div
+                  key={activeMedia.url}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    animation: fxAnim.animateBg && fxAnim.css !== 'none' ? fxAnim.css : undefined,
+                  }}
+                >
+                  <ZoneMedia media={activeMedia} />
+                </div>
+              )}
               <div className="zone-inner">
                 <div
+                  key={current?.title ? `title-${current.title}` : 'no-title'}
                   className="zone-title zone-reference"
                   style={{
                     display: !fullBleed && current?.title && !wordStudy ? undefined : 'none',
@@ -212,12 +271,14 @@ export function StageZones({
                     fontWeight: 700,
                     textAlign: zone.textAlign || 'center',
                     color: resolveColor('accent', theme),
+                    animation: fxAnim.css !== 'none' ? fxAnim.css : undefined,
                   }}
                 >
                   {current?.title || ''}
                 </div>
                 {wordStudy ? (
                   <div
+                    key={wordStudy.strongs || wordStudy.lemma}
                     className="stage-wordstudy-card"
                     style={{
                       width: '100%',
@@ -234,6 +295,7 @@ export function StageZones({
                       color: '#ffffff',
                       overflow: 'hidden',
                       containerType: 'inline-size',
+                      animation: fxAnim.css !== 'none' ? fxAnim.css : undefined,
                     }}
                   >
                     {/* LEFT COLUMN: Main Lemma, Transliteration, Badge, Gloss & KJV Usage */}
@@ -373,9 +435,15 @@ export function StageZones({
                     </div>
                   </div>
                 ) : activeSlide ? (
-                  <SlideStage projection={activeSlide} className="zone-slide-stage" />
+                  <SlideTransitionContainer
+                    currentSlide={activeSlide}
+                    sceneId={current?.id || (activeSlide as any)?.id || 'stage-slide'}
+                    transition={activeTransition}
+                    defaultDuration={fxAnim.durationSec || 0.4}
+                  />
                 ) : secondaryVerse?.text ? (
                   <div
+                    key={current?.id || `${current?.title}-${current?.body}`}
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '1fr 1fr',
@@ -383,6 +451,7 @@ export function StageZones({
                       width: '100%',
                       height: '100%',
                       alignItems: 'center',
+                      animation: fxAnim.css !== 'none' ? fxAnim.css : undefined,
                     }}
                   >
                     {/* LEFT COLUMN: Primary Version */}
@@ -408,15 +477,28 @@ export function StageZones({
                       >
                         {current?.title || ''}
                       </div>
-                      <BodyText
-                        content={current}
-                        style={{
-                          fontSize: px(base * 0.88),
-                          fontWeight: zone.fontWeight || 600,
-                          textAlign: zone.textAlign || 'center',
-                          color: resolveColor(zone.color || 'text', theme),
-                        }}
-                      />
+                      {fxAnim.isWordType && current?.body ? (
+                        <TypedWordText
+                          text={current.body}
+                          duration={fxAnim.durationSec}
+                          textAlign={zone.textAlign || 'center'}
+                          style={{
+                            fontSize: px(base * 0.88),
+                            fontWeight: zone.fontWeight || 600,
+                            color: resolveColor(zone.color || 'text', theme),
+                          }}
+                        />
+                      ) : (
+                        <BodyText
+                          content={current}
+                          style={{
+                            fontSize: px(base * 0.88),
+                            fontWeight: zone.fontWeight || 600,
+                            textAlign: zone.textAlign || 'center',
+                            color: resolveColor(zone.color || 'text', theme),
+                          }}
+                        />
+                      )}
                     </div>
 
                     {/* RIGHT COLUMN: Secondary Version */}
@@ -441,29 +523,64 @@ export function StageZones({
                       >
                         {secondaryVerse.reference}
                       </div>
-                      <div
-                        style={{
-                          fontSize: px(base * 0.88),
-                          fontWeight: zone.fontWeight || 600,
-                          textAlign: zone.textAlign || 'center',
-                          color: resolveColor(zone.color || 'text', theme),
-                          whiteSpace: 'pre-wrap',
-                        }}
-                      >
-                        {secondaryVerse.text}
-                      </div>
+                      {fxAnim.isWordType && secondaryVerse.text ? (
+                        <TypedWordText
+                          text={secondaryVerse.text}
+                          duration={fxAnim.durationSec}
+                          textAlign={zone.textAlign || 'center'}
+                          style={{
+                            fontSize: px(base * 0.88),
+                            fontWeight: zone.fontWeight || 600,
+                            color: resolveColor(zone.color || 'text', theme),
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            fontSize: px(base * 0.88),
+                            fontWeight: zone.fontWeight || 600,
+                            textAlign: zone.textAlign || 'center',
+                            color: resolveColor(zone.color || 'text', theme),
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          {secondaryVerse.text}
+                        </div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <BodyText
-                    content={current}
+                ) : fxAnim.isWordType && current?.body && !current.bodyHtml ? (
+                  <TypedWordText
+                    key={current?.id || current?.body}
+                    text={current.body}
+                    duration={fxAnim.durationSec}
+                    textAlign={zone.textAlign || 'center'}
                     style={{
                       fontSize: px(base),
                       fontWeight: zone.fontWeight || 600,
-                      textAlign: zone.textAlign || 'center',
                       color: resolveColor(zone.color || 'text', theme),
+                      animation: fxAnim.css !== 'none' ? fxAnim.css : undefined,
                     }}
                   />
+                ) : (
+                  <div
+                    key={current?.id || `${current?.title}-${current?.body}`}
+                    style={{
+                      width: '100%',
+                      animation: fxAnim.css !== 'none' ? fxAnim.css : undefined,
+                    }}
+                  >
+                    <BodyText
+                      content={current}
+                      style={{
+                        fontSize: px(base),
+                        fontWeight: zone.fontWeight || 600,
+                        textAlign: zone.textAlign || 'center',
+                        color: resolveColor(zone.color || 'text', theme),
+                      }}
+                    />
+                  </div>
                 )}
                 {!fullBleed && !wordStudy && <div className="zone-notes">{current?.notes || ''}</div>}
               </div>
@@ -500,10 +617,19 @@ export function StageZones({
           const valueStyle: CSSProperties = {
             fontSize: px(zone.fontSize || 20),
             color: resolveColor(zone.color || (zone.type === 'timer' ? 'accent' : 'faint'), theme),
+            textAlign: zone.textAlign || 'center',
+            width: '100%',
           };
           return (
             <div key={key} className={`zone zone-${zone.type}`} data-zone={zone.type} style={frame}>
-              <div className="zone-inner">
+              <div
+                className="zone-inner"
+                style={{
+                  alignItems: zone.textAlign === 'left' ? 'flex-start' : zone.textAlign === 'right' ? 'flex-end' : 'center',
+                  justifyContent: 'center',
+                  textAlign: zone.textAlign || 'center',
+                }}
+              >
                 {zone.type === 'clock'
                   ? <ClockValue style={valueStyle} />
                   : <TimerValue timer={timer} style={valueStyle} />}

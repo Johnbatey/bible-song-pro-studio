@@ -1191,6 +1191,7 @@ export function BiblePanel() {
       }
     }
     const handleStepNext = () => {
+      if (useAppStore.getState().isSlideEditorOpen) return;
       const activeScene = useAppStore.getState().display.currentScene;
       const isFocused = isFocusedDock(containerRef.current);
       if (isFocused || activeScene?.type === 'bible' || activeScene?.id?.startsWith('bible-')) {
@@ -1199,6 +1200,7 @@ export function BiblePanel() {
     };
 
     const handleStepPrev = () => {
+      if (useAppStore.getState().isSlideEditorOpen) return;
       const activeScene = useAppStore.getState().display.currentScene;
       const isFocused = isFocusedDock(containerRef.current);
       if (isFocused || activeScene?.type === 'bible' || activeScene?.id?.startsWith('bible-')) {

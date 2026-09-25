@@ -102,7 +102,23 @@ export function StageSurface({
           already carries that class, and a descendant selector here would then
           restyle the component's internals from the outside. */}
       <section className="stage-program" aria-label="Program output">
-        <ProgramSurface state={program} preview assetBaseUrl={assetBaseUrl} />
+        <ProgramSurface
+          state={
+            state.stageDisplayFxEnabled === false
+              ? {
+                  ...program,
+                  fxAnimation: {
+                    transitionType: 'cut',
+                    duration: 0,
+                    animateBackground: false,
+                    stageDisplayFxEnabled: false,
+                  },
+                }
+              : program
+          }
+          preview
+          assetBaseUrl={assetBaseUrl}
+        />
       </section>
 
       <section className="stage-stage" aria-label="Confidence content">
@@ -120,6 +136,8 @@ export function StageSurface({
           songSubtitle={state.songSubtitle}
           timer={state.timer}
           messages={state.messages}
+          fxAnimation={state.fxAnimation}
+          stageDisplayFxEnabled={state.stageDisplayFxEnabled !== false}
         />
         <div className="stage-idle">
           <div className="idle-ring"><div className="idle-dot" /></div>

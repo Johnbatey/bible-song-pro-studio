@@ -1,30 +1,7 @@
-/* =========================================================================
-   <LayerList> — the zones, topmost first, dragged into order
-   -------------------------------------------------------------------------
-   Zones paint in array order, so the last one in the layout is the one on top.
-   The list is therefore reversed: every design tool puts the front layer at
-   the top of the list, and matching that costs one `.slice().reverse()` here
-   rather than a lifetime of operators reading the list upside down.
-
-   Reordering is a drag. The first version used a pair of arrow buttons per
-   row, which meant four controls fighting for a 230px rail and a move of three
-   places costing three clicks. Dragging is what the gesture is, so the row
-   carries a grip and the list shows where the row would land.
-
-   The drag is pointer-based rather than HTML5 drag-and-drop: DnD in Electron
-   brings its own ghost image, its own cursor rules and a dragover event that
-   fires on the wrong element half the time. Pointer events are the same ones
-   the canvas already uses, and they behave.
-   ========================================================================= */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import React, { useRef, useState } from 'react';
 import type { StageZone } from '../stage/layouts';
 import { ZONE_LABELS } from '../stage/layout-model';
 import { Eye, EyeOff, GripDots, Locked, Unlocked, ZONE_ICONS } from './icons';
-
-/** How far the pointer travels before a press becomes a drag. Below this a
-    press is a click that selects, which is what most presses are. */
-const DRAG_THRESHOLD_PX = 4;
 
 export interface LayerListProps {
   zones: StageZone[];
@@ -36,85 +13,109 @@ export interface LayerListProps {
   onReorder: (from: number, to: number) => void;
 }
 
-interface DragState {
-  /** Index into `zones` of the row being dragged. */
-  from: number;
-  startY: number;
-  active: boolean;
-}
-
 export function LayerList({ zones, selection, hiddenTypes, onSelect, onToggle, onReorder }: LayerListProps) {
   const listRef = useRef<HTMLUListElement | null>(null);
-  const dragRef = useRef<DragState | null>(null);
-  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
+
+  // Pointer-based fluid drag state
+  const [dragState, setDragState] = useState<{
+    draggedIndex: number;
+    overIndex: number;
+    deltaY: number;
+    itemHeight: number;
+  } | null>(null);
+
+  const dragInfoRef = useRef<{
+    startIndex: number;
+    startY: number;
+    rects: { center: number; height: number }[];
+    itemHeight: number;
+    hasMoved: boolean;
+  } | null>(null);
 
   /** Display order: front layer first. */
   const ordered = zones.slice().reverse();
-  const toDisplayIndex = (arrayIndex: number) => zones.length - 1 - arrayIndex;
 
-  /** Which gap the pointer is currently over, in display positions 0..n. */
-  const gapUnderPointer = useCallback((clientY: number): number => {
-    const list = listRef.current;
-    if (!list) return 0;
-    const rows = [...list.children] as HTMLElement[];
-    for (let i = 0; i < rows.length; i += 1) {
-      const rect = rows[i].getBoundingClientRect();
-      // Past a row's midpoint means the drop goes below it, which is the gap
-      // after it. Testing against the midpoint rather than the edges is what
-      // makes the indicator flip once per row instead of flickering in the
-      // dead space between them.
-      if (clientY < rect.top + rect.height / 2) return i;
-    }
-    return rows.length;
-  }, []);
+  const handlePointerDown = (e: React.PointerEvent, displayIndex: number) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, textarea, a, select')) return;
 
-  const onPointerDown = useCallback((event: ReactPointerEvent, arrayIndex: number) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    dragRef.current = { from: arrayIndex, startY: event.clientY, active: false };
-  }, []);
+    const container = listRef.current;
+    if (!container) return;
 
-  useEffect(() => {
-    function onMove(event: PointerEvent) {
-      const state = dragRef.current;
-      if (!state) return;
-      if (!state.active) {
-        if (Math.abs(event.clientY - state.startY) < DRAG_THRESHOLD_PX) return;
-        state.active = true;
-      }
-      setDrag({ from: state.from, over: gapUnderPointer(event.clientY) });
-    }
+    const children = Array.from(container.children) as HTMLElement[];
+    const rects = children.map((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        height: r.height,
+        center: r.top + r.height / 2,
+      };
+    });
 
-    function onUp() {
-      const state = dragRef.current;
-      dragRef.current = null;
-      if (!state?.active) { setDrag(null); return; }
-
-      setDrag((current) => {
-        if (current) commit(current.from, current.over);
-        return null;
-      });
-    }
-
-    function commit(fromArray: number, overDisplay: number) {
-      const fromDisplay = toDisplayIndex(fromArray);
-      /* A row dropped into a gap below itself lands one place higher than the
-         gap index suggests, because removing it first shifts everything after
-         it up. Every list-reorder bug is some version of forgetting this. */
-      const target = overDisplay > fromDisplay ? overDisplay - 1 : overDisplay;
-      if (target === fromDisplay) return;
-      onReorder(fromArray, zones.length - 1 - target);
-    }
-
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp);
+    const itemHeight = rects[displayIndex]?.height || 36;
+    dragInfoRef.current = {
+      startIndex: displayIndex,
+      startY: e.clientY,
+      rects,
+      itemHeight,
+      hasMoved: false,
     };
-  }, [gapUnderPointer, onReorder, zones.length]);
+
+    const handlePointerMove = (moveEv: PointerEvent) => {
+      if (!dragInfoRef.current) return;
+      const { startIndex, startY, rects: itemRects, itemHeight: h } = dragInfoRef.current;
+      const deltaY = moveEv.clientY - startY;
+
+      if (!dragInfoRef.current.hasMoved && Math.abs(deltaY) > 3) {
+        dragInfoRef.current.hasMoved = true;
+      }
+
+      if (dragInfoRef.current.hasMoved) {
+        const currentCenter = (itemRects[startIndex]?.center || 0) + deltaY;
+        let newOver = startIndex;
+        let minDiff = Infinity;
+
+        for (let i = 0; i < itemRects.length; i++) {
+          const diff = Math.abs(itemRects[i].center - currentCenter);
+          if (diff < minDiff) {
+            minDiff = diff;
+            newOver = i;
+          }
+        }
+
+        setDragState({
+          draggedIndex: startIndex,
+          overIndex: newOver,
+          deltaY,
+          itemHeight: h,
+        });
+      }
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+
+      const info = dragInfoRef.current;
+      dragInfoRef.current = null;
+
+      if (info && info.hasMoved) {
+        setDragState((prev) => {
+          if (prev && prev.draggedIndex !== prev.overIndex) {
+            const fromArray = zones.length - 1 - prev.draggedIndex;
+            const toArray = zones.length - 1 - prev.overIndex;
+            onReorder(fromArray, toArray);
+          }
+          return null;
+        });
+      } else {
+        setDragState(null);
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false });
+    window.addEventListener('pointerup', handlePointerUp);
+  };
 
   return (
     <div className="dz-layers">
@@ -127,9 +128,8 @@ export function LayerList({ zones, selection, hiddenTypes, onSelect, onToggle, o
         <p className="dz-note">No zones yet. Add one from the toolbar over the canvas.</p>
       )}
 
-      <ul className="dz-layer-list" ref={listRef} data-dragging={drag ? '' : undefined}>
+      <ul className="dz-layer-list" ref={listRef}>
         {ordered.map((zone, displayIndex) => {
-          const arrayIndex = zones.length - 1 - displayIndex;
           const selected = selection.includes(zone.id);
           const typeName = ZONE_LABELS[zone.type as keyof typeof ZONE_LABELS] || zone.type;
           const title = zone.label || typeName;
@@ -138,7 +138,21 @@ export function LayerList({ zones, selection, hiddenTypes, onSelect, onToggle, o
             hiddenTypes.has(zone.type) ? 'hidden by theme' : '',
           ].filter(Boolean);
           const Icon = ZONE_ICONS[zone.type];
-          const beingDragged = drag?.from === arrayIndex;
+          const isThisDragged = dragState?.draggedIndex === displayIndex;
+
+          // Fluid animated displacement calculation
+          let transform = 'none';
+          if (dragState) {
+            const { draggedIndex, overIndex, deltaY, itemHeight } = dragState;
+            const shift = itemHeight + 4; // gap between items
+            if (isThisDragged) {
+              transform = `translateY(${deltaY}px) scale(1.02)`;
+            } else if (draggedIndex < overIndex && displayIndex > draggedIndex && displayIndex <= overIndex) {
+              transform = `translateY(-${shift}px)`;
+            } else if (draggedIndex > overIndex && displayIndex < draggedIndex && displayIndex >= overIndex) {
+              transform = `translateY(${shift}px)`;
+            }
+          }
 
           return (
             <li
@@ -146,9 +160,17 @@ export function LayerList({ zones, selection, hiddenTypes, onSelect, onToggle, o
               className="dz-layer"
               data-selected={selected || undefined}
               data-invisible={zone.visible === false || undefined}
-              data-dragged={beingDragged || undefined}
-              data-drop-before={drag?.over === displayIndex || undefined}
-              data-drop-after={(drag && drag.over === ordered.length && displayIndex === ordered.length - 1) || undefined}
+              data-dragged={isThisDragged || undefined}
+              onPointerDown={(e) => handlePointerDown(e, displayIndex)}
+              style={{
+                transform,
+                zIndex: isThisDragged ? 50 : 1,
+                boxShadow: isThisDragged ? '0 12px 28px rgba(0, 0, 0, 0.5)' : undefined,
+                opacity: isThisDragged ? 0.95 : 1,
+                transition: isThisDragged
+                  ? 'box-shadow 0.15s ease, opacity 0.15s ease'
+                  : 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1), background 0.15s ease, border-color 0.15s ease',
+              }}
             >
               {/* 1. Visibility (Eye) Toggle Button on Far Left */}
               <button
@@ -192,8 +214,8 @@ export function LayerList({ zones, selection, hiddenTypes, onSelect, onToggle, o
               {/* 4. Drag Grip Handle on Far Right */}
               <span
                 className="dz-layer-grip"
-                title="Drag to reorder — the top of this list is the front of the stage"
-                onPointerDown={(event) => onPointerDown(event, arrayIndex)}
+                title="Drag to reorder layers"
+                style={{ cursor: isThisDragged ? 'grabbing' : 'grab' }}
               >
                 <GripDots />
               </span>

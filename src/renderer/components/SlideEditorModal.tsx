@@ -34,7 +34,7 @@ import {
 } from '../slide-engine/edit/style';
 import { groupShapes, layerUnits, moveLayerUnit, selectionHasGroup, ungroupShapes } from '../slide-engine/edit/grouping';
 import type { SelectionState } from '../slide-engine/edit/geometry';
-import type { PresentationDeck, PresentationSlide, SlideElement } from '../types';
+import type { PresentationDeck, PresentationSlide, SlideElement, SlideBackground } from '../types';
 import { getCustomTemplates } from '../services/customTemplateStore';
 import { importSlideImage } from '../utils/import-slide-image';
 import { useI18n } from '../../i18n/useI18n';
@@ -48,11 +48,23 @@ export function SlideEditorModal() {
   const addPresentationDeck = useAppStore((s) => s.addPresentationDeck);
   const scenes = useAppStore((s) => s.scenes);
   const openSlideEditor = useAppStore((s) => s.openSlideEditor);
+  const uiThemeMode = useAppStore((s) => s.uiThemeMode);
+  const isDarkUI = uiThemeMode !== 'light';
+  const defaultSlideBg: SlideBackground = isDarkUI
+    ? { type: 'color', value: '#ffffff' }
+    : { type: 'color', value: '#18181b' };
+  const defaultSlideTextColor = isDarkUI ? '#000000' : '#ffffff';
 
   // Deck State
   const [deck, setDeck] = useState<PresentationDeck>(() => {
     const existing = presentationDecks.find((d) => d.id === activePresentationId);
     if (existing) return existing;
+    const isDark = useAppStore.getState().uiThemeMode !== 'light';
+    const initBg: SlideBackground = isDark
+      ? { type: 'color', value: '#ffffff' }
+      : { type: 'color', value: '#18181b' };
+    const initTextColor = isDark ? '#000000' : '#ffffff';
+
     return {
       id: activePresentationId || `deck-${Date.now()}`,
       title: t('slideEditor.defaults.untitledPresentation'),
@@ -63,7 +75,7 @@ export function SlideEditorModal() {
         {
           id: 'slide-1',
           title: t('slideEditor.defaults.welcomePresentation'),
-          body: t('slideEditor.defaults.doubleClickEdit'),
+          body: '',
           label: 'Slide 1',
           notes: '',
           transition: 'fade',
@@ -71,38 +83,23 @@ export function SlideEditorModal() {
           hidden: false,
           buildCount: 1,
           buildStep: 1,
-          background: { type: 'gradient', value: 'linear-gradient(135deg, #f97316 0%, #7c2d12 100%)' },
+          background: initBg,
           aspectRatio: '16:9',
           elements: [
             {
               id: 'title-1',
               type: 'text',
               x: 6.3,
-              y: 20.4,
+              y: 35.0,
               width: 87.5,
-              height: 18.5,
+              height: 25.0,
               content: t('slideEditor.defaults.welcomePresentation'),
               fontSize: 64,
               fontFamily: 'Inter',
               fontWeight: 700,
-              color: '#ffffff',
+              color: initTextColor,
               textAlign: 'center',
               zIndex: 1,
-            },
-            {
-              id: 'body-1',
-              type: 'text',
-              x: 8.3,
-              y: 44.4,
-              width: 83.3,
-              height: 27.8,
-              content: t('slideEditor.defaults.doubleClickEdit'),
-              fontSize: 36,
-              fontFamily: 'Inter',
-              fontWeight: 500,
-              color: 'rgba(255, 255, 255, 0.85)',
-              textAlign: 'center',
-              zIndex: 2,
             },
           ],
         },
@@ -123,11 +120,13 @@ export function SlideEditorModal() {
   }, [history, historyPointer, deck]);
 
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<'single' | 'artboard'>('artboard');
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const selectedElementId = selectedElementIds[selectedElementIds.length - 1] || null;
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [activeStrokeWidth, setActiveStrokeWidth] = useState<number>(4);
   const [smartSnap, setSmartSnap] = useState(true);
+  const [clipToCanvas, setClipToCanvas] = useState(false);
 
   /* An imported PowerPoint deck is rendered from its own package, not from the
      stored title/body pair — those are only what the library grid and search
@@ -230,7 +229,7 @@ export function SlideEditorModal() {
     {
       id: 'slide-default',
       title: t('slideEditor.defaults.untitledSlide'),
-      body: t('slideEditor.defaults.doubleClickBody'),
+      body: '',
       label: t('slideEditor.defaults.slideN', { n: 1 }),
       notes: '',
       transition: 'fade' as const,
@@ -238,7 +237,7 @@ export function SlideEditorModal() {
       hidden: false,
       buildCount: 1,
       buildStep: 1,
-      background: { type: 'color' as const, value: '#18181b' },
+      background: defaultSlideBg,
       aspectRatio: '16:9' as const,
       elements: [],
     },
@@ -459,6 +458,56 @@ export function SlideEditorModal() {
         return;
       }
 
+      // Cmd/Ctrl +/-/0/1 (Canvas Zoom - Photoshop & Illustrator standard)
+      if (e.metaKey || e.ctrlKey) {
+        const key = e.key;
+        const code = e.code;
+        const keyCode = e.keyCode || e.which;
+
+        const isZoomIn =
+          key === '=' ||
+          key === '+' ||
+          key === 'Add' ||
+          code === 'Equal' ||
+          code === 'NumpadAdd' ||
+          keyCode === 187 ||
+          keyCode === 61 ||
+          (e.shiftKey && (key === '+' || code === 'Equal'));
+
+        const isZoomOut =
+          key === '-' ||
+          key === '_' ||
+          key === 'Subtract' ||
+          code === 'Minus' ||
+          code === 'NumpadSubtract' ||
+          keyCode === 189 ||
+          keyCode === 173;
+
+        const isFit = key === '0' || code === 'Digit0' || code === 'Numpad0' || keyCode === 48;
+        const isActual = key === '1' || code === 'Digit1' || code === 'Numpad1' || keyCode === 49;
+
+        if (isZoomIn) {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('slide-editor-zoom-event', { detail: { action: 'in' } }));
+          return;
+        }
+        if (isZoomOut) {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('slide-editor-zoom-event', { detail: { action: 'out' } }));
+          return;
+        }
+        if (isFit) {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('slide-editor-zoom-event', { detail: { action: 'fit' } }));
+          return;
+        }
+        if (isActual) {
+          e.preventDefault();
+          window.dispatchEvent(new CustomEvent('slide-editor-zoom-event', { detail: { action: 'actual' } }));
+          return;
+        }
+      }
+
       // Single Key Pro Design Tool Shortcuts (V, T, P, B, R, O, C, L, H)
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         const key = e.key.toLowerCase();
@@ -604,7 +653,7 @@ export function SlideEditorModal() {
         return;
       }
 
-      // Arrow Keys (Nudge selected elements)
+      // Arrow Keys (Nudge selected elements if elements are selected, or switch slide if no elements are selected)
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (!isPptxDeck && selectedElementIds.length > 0) {
           e.preventDefault();
@@ -616,18 +665,37 @@ export function SlideEditorModal() {
             if (!selectedElementIds.includes(el.id) || el.locked) return el;
             return {
               ...el,
-              x: Math.max(-100, Math.min(200, parseFloat((el.x + dx).toFixed(1)))),
-              y: Math.max(-100, Math.min(200, parseFloat((el.y + dy).toFixed(1)))),
+              x: parseFloat((el.x + dx).toFixed(1)),
+              y: parseFloat((el.y + dy).toFixed(1)),
             };
           });
           handleUpdateSlideElements(updated);
+        } else if (selectedElementIds.length === 0 && (!isPptxDeck || !pptxSelection?.ids?.length)) {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const totalSlides = isPptxDeck ? (pkg.slides?.length || 0) : slides.length;
+            const currentIdx = isPptxDeck ? pkg.activeIndex : activeSlideIndex;
+            if (currentIdx < totalSlides - 1) {
+              const nextIdx = currentIdx + 1;
+              if (isPptxDeck) pkg.setActiveIndex(nextIdx);
+              else setActiveSlideIndex(nextIdx);
+            }
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const currentIdx = isPptxDeck ? pkg.activeIndex : activeSlideIndex;
+            if (currentIdx > 0) {
+              const prevIdx = currentIdx - 1;
+              if (isPptxDeck) pkg.setActiveIndex(prevIdx);
+              else setActiveSlideIndex(prevIdx);
+            }
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPptxDeck, pptxSelection, selectedElementIds, activeSlideElements, handlePptxDelete, handleDuplicateElements, handleUpdateSlideElements, handleUndo, handleRedo, pptxHistory]);
+  }, [isPptxDeck, pptxSelection, selectedElementIds, activeSlideElements, handlePptxDelete, handleDuplicateElements, handleUpdateSlideElements, handleUndo, handleRedo, pptxHistory, slides, activeSlideIndex, pkg]);
 
   const handlePptxTextEdit = useCallback((shape: ParsedShape, value: string) => {
     setShapeText(shape, value);
@@ -923,7 +991,7 @@ export function SlideEditorModal() {
     }
   };
 
-  const renderNativeThumb = useCallback((index: number, width = 180) => {
+  const renderNativeThumb = useCallback((index: number, width: number) => {
     const slide = slides[index];
     if (!slide) return null;
     return (
@@ -937,57 +1005,370 @@ export function SlideEditorModal() {
 
   if (!isSlideEditorOpen) return null;
 
+  function normalizeAndSortSlides2D(slidesList: PresentationSlide[]): PresentationSlide[] {
+    if (slidesList.length === 0) return [];
+
+    let minX = Infinity;
+    let minY = Infinity;
+    slidesList.forEach((s, idx) => {
+      const gx = s.gridX ?? idx;
+      const gy = s.gridY ?? 0;
+      if (gx < minX) minX = gx;
+      if (gy < minY) minY = gy;
+    });
+
+    if (minX === Infinity || minX > 0) minX = 0;
+    if (minY === Infinity || minY > 0) minY = 0;
+
+    const normalized = slidesList.map((s, idx) => ({
+      ...s,
+      gridX: (s.gridX ?? idx) - minX,
+      gridY: (s.gridY ?? 0) - minY,
+    }));
+
+    normalized.sort((a, b) => {
+      const rowDiff = (a.gridY ?? 0) - (b.gridY ?? 0);
+      if (rowDiff !== 0) return rowDiff;
+      return (a.gridX ?? 0) - (b.gridX ?? 0);
+    });
+
+    return normalized;
+  }
+
   // Slide CRUD Actions
   function handleAddSlide() {
-    const newSlide: PresentationSlide = {
-      id: `slide-${Date.now()}`,
-      title: t('slideEditor.defaults.newSlide'),
-      body: t('slideEditor.defaults.doubleClickBody'),
-      label: t('slideEditor.defaults.slideN', { n: slides.length + 1 }),
-      notes: '',
-      transition: 'fade',
-      durationMs: 3000,
-      hidden: false,
-      buildCount: 1,
-      buildStep: 1,
-      background: { type: 'color', value: '#18181b' },
-      aspectRatio: deck.aspectRatio || '16:9',
-      elements: [
-        {
-          id: `title-${Date.now()}`,
-          type: 'text',
-          x: 6.3,
-          y: 20.4,
-          width: 87.5,
-          height: 18.5,
-          content: t('slideEditor.defaults.newSlideTitle'),
-          fontSize: 64,
-          fontFamily: 'Inter',
-          fontWeight: 700,
-          color: '#ffffff',
-          textAlign: 'center',
-          zIndex: 1,
-        },
-      ],
-    };
-    const nextSlides = [...slides, newSlide];
-    updateDeckState((prev) => ({ ...prev, slides: nextSlides }));
-    setActiveSlideIndex(nextSlides.length - 1);
+    let createdSlideId = `slide-${Date.now()}`;
+    updateDeckState((prev) => {
+      const current = prev.slides.length > 0 ? prev.slides : slides;
+      const active = current[activeSlideIndex] || current[current.length - 1];
+      const gx = active ? (active.gridX ?? activeSlideIndex) + 1 : current.length;
+      const gy = active ? (active.gridY ?? 0) : 0;
+
+      // Shift existing slides at or to the right on that row
+      current.forEach((s) => {
+        if ((s.gridY ?? 0) === gy && (s.gridX ?? 0) >= gx) {
+          s.gridX = (s.gridX ?? 0) + 1;
+        }
+      });
+
+      const newSlide: PresentationSlide = {
+        id: createdSlideId,
+        title: t('slideEditor.defaults.newSlide'),
+        body: '',
+        label: t('slideEditor.defaults.slideN', { n: current.length + 1 }),
+        notes: '',
+        transition: 'fade',
+        durationMs: 3000,
+        hidden: false,
+        buildCount: 1,
+        buildStep: 1,
+        background: defaultSlideBg,
+        aspectRatio: prev.aspectRatio || '16:9',
+        gridX: gx,
+        gridY: gy,
+        elements: [
+          {
+            id: `title-${Date.now()}`,
+            type: 'text',
+            x: 6.3,
+            y: 20.4,
+            width: 87.5,
+            height: 18.5,
+            content: t('slideEditor.defaults.newSlideTitle'),
+            fontSize: 64,
+            fontFamily: 'Inter',
+            fontWeight: 700,
+            color: defaultSlideTextColor,
+            textAlign: 'center',
+            zIndex: 1,
+          },
+        ],
+      };
+
+      const sorted = normalizeAndSortSlides2D([...current, newSlide]);
+      return { ...prev, slides: sorted };
+    });
+
+    setTimeout(() => {
+      setDeck((latest) => {
+        const foundIdx = latest.slides.findIndex((s) => s.id === createdSlideId);
+        if (foundIdx >= 0) setActiveSlideIndex(foundIdx);
+        return latest;
+      });
+    }, 0);
+
+    setSelectedElementIds([]);
+  }
+
+  function handleAddSlideAt(direction: 'top' | 'bottom' | 'left' | 'right', fromIndex: number) {
+    let createdSlideId = '';
+
+    updateDeckState((prev) => {
+      let lastAssignedGx = -1;
+      let lastAssignedGy = 0;
+      const currentSlides: PresentationSlide[] = (prev.slides.length > 0 ? prev.slides : [{
+        id: 'slide-1',
+        title: t('slideEditor.defaults.welcomePresentation'),
+        body: '',
+        label: t('slideEditor.defaults.slideN', { n: 1 }),
+        notes: '',
+        transition: 'fade' as const,
+        durationMs: 3000,
+        hidden: false,
+        buildCount: 1,
+        buildStep: 1,
+        background: defaultSlideBg,
+        aspectRatio: prev.aspectRatio || '16:9',
+        elements: [],
+      }]).map((s, idx) => {
+        let gx = s.gridX;
+        let gy = s.gridY;
+        if (gx === undefined || gy === undefined) {
+          gx = lastAssignedGx + 1;
+          gy = lastAssignedGy;
+        }
+        lastAssignedGx = gx;
+        lastAssignedGy = gy;
+        return { ...s, gridX: gx, gridY: gy };
+      });
+
+      const validFrom = Math.max(0, Math.min(currentSlides.length - 1, fromIndex));
+      const fromSlide = currentSlides[validFrom];
+      const fromGx = fromSlide.gridX ?? validFrom;
+      const fromGy = fromSlide.gridY ?? 0;
+
+      const isOccupied = (gx: number, gy: number) => {
+        return currentSlides.some((s) => (s.gridX ?? 0) === gx && (s.gridY ?? 0) === gy);
+      };
+
+      let newGx = fromGx;
+      let newGy = fromGy;
+
+      if (direction === 'bottom') {
+        const targetGy = fromGy + 1;
+        if (!isOccupied(fromGx, targetGy)) {
+          // Empty slot exists directly below! Fill the column without shifting other rows down.
+          newGx = fromGx;
+          newGy = targetGy;
+        } else {
+          // Slot is occupied, create a new row between fromGy and fromGy + 1
+          currentSlides.forEach((s) => {
+            if ((s.gridY ?? 0) >= targetGy) {
+              s.gridY = (s.gridY ?? 0) + 1;
+            }
+          });
+          newGx = fromGx;
+          newGy = targetGy;
+        }
+      } else if (direction === 'top') {
+        if (fromGy > 0 && !isOccupied(fromGx, fromGy - 1)) {
+          // Empty slot exists directly above! Fill the column without shifting other rows up.
+          newGx = fromGx;
+          newGy = fromGy - 1;
+        } else if (fromGy === 0) {
+          // At top edge, shift all rows down to create a new top row at 0
+          currentSlides.forEach((s) => {
+            s.gridY = (s.gridY ?? 0) + 1;
+          });
+          newGx = fromGx;
+          newGy = 0;
+        } else {
+          // Above slot is occupied, insert a row at fromGy
+          currentSlides.forEach((s) => {
+            if ((s.gridY ?? 0) >= fromGy) {
+              s.gridY = (s.gridY ?? 0) + 1;
+            }
+          });
+          newGx = fromGx;
+          newGy = fromGy;
+        }
+      } else if (direction === 'right') {
+        const targetGx = fromGx + 1;
+        if (!isOccupied(targetGx, fromGy)) {
+          // Empty slot directly to the right!
+          newGx = targetGx;
+          newGy = fromGy;
+        } else {
+          // Slot is occupied, shift slides at or to the right of targetGx in this row
+          currentSlides.forEach((s) => {
+            if ((s.gridY ?? 0) === fromGy && (s.gridX ?? 0) >= targetGx) {
+              s.gridX = (s.gridX ?? 0) + 1;
+            }
+          });
+          newGx = targetGx;
+          newGy = fromGy;
+        }
+      } else if (direction === 'left') {
+        if (fromGx > 0 && !isOccupied(fromGx - 1, fromGy)) {
+          // Empty slot directly to the left! Fill it without moving fromSlide
+          newGx = fromGx - 1;
+          newGy = fromGy;
+        } else if (fromGx === 0) {
+          // At the leftmost column edge: shift all columns across all rows right by 1
+          currentSlides.forEach((s) => {
+            s.gridX = (s.gridX ?? 0) + 1;
+          });
+          newGx = 0;
+          newGy = fromGy;
+        } else {
+          // Slot (fromGx - 1) is occupied, so insert a column before fromGx: shift fromSlide and slides to its right
+          currentSlides.forEach((s) => {
+            if ((s.gridY ?? 0) === fromGy && (s.gridX ?? 0) >= fromGx) {
+              s.gridX = (s.gridX ?? 0) + 1;
+            }
+          });
+          newGx = fromGx;
+          newGy = fromGy;
+        }
+      }
+
+      createdSlideId = `slide-${Date.now()}`;
+      const newSlide: PresentationSlide = {
+        id: createdSlideId,
+        title: t('slideEditor.defaults.newSlide'),
+        body: '',
+        label: t('slideEditor.defaults.slideN', { n: currentSlides.length + 1 }),
+        notes: '',
+        transition: 'fade',
+        durationMs: 3000,
+        hidden: false,
+        buildCount: 1,
+        buildStep: 1,
+        background: defaultSlideBg,
+        aspectRatio: prev.aspectRatio || '16:9',
+        gridX: newGx,
+        gridY: newGy,
+        elements: [
+          {
+            id: `title-${Date.now()}`,
+            type: 'text',
+            x: 6.3,
+            y: 20.4,
+            width: 87.5,
+            height: 18.5,
+            content: t('slideEditor.defaults.newSlideTitle'),
+            fontSize: 64,
+            fontFamily: 'Inter',
+            fontWeight: 700,
+            color: defaultSlideTextColor,
+            textAlign: 'center',
+            zIndex: 1,
+          },
+        ],
+      };
+
+      currentSlides.push(newSlide);
+      const sorted = normalizeAndSortSlides2D(currentSlides);
+      return { ...prev, slides: sorted };
+    });
+
+    setTimeout(() => {
+      setDeck((latest) => {
+        const foundIdx = latest.slides.findIndex((s) => s.id === createdSlideId);
+        if (foundIdx >= 0) {
+          setActiveSlideIndex(foundIdx);
+        }
+        return latest;
+      });
+    }, 0);
+
+    setSelectedElementIds([]);
+  }
+
+  function handleMoveElementBetweenSlides(
+    fromIndex: number,
+    toIndex: number,
+    elementIds: string[],
+    isDuplicate: boolean,
+    dropCoords?: { x: number; y: number }
+  ) {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= slides.length || toIndex >= slides.length) return;
+    const sourceSlide = slides[fromIndex];
+    const targetSlide = slides[toIndex];
+    if (!sourceSlide || !targetSlide) return;
+
+    const sourceElements = slideElementsFor(sourceSlide);
+    const targetElements = slideElementsFor(targetSlide);
+
+    const itemsToTransfer = sourceElements.filter((el) => elementIds.includes(el.id));
+    if (itemsToTransfer.length === 0) return;
+
+    const now = Date.now();
+    const maxZ = Math.max(0, ...targetElements.map((e) => e.zIndex || 1));
+
+    const transferredElements: SlideElement[] = itemsToTransfer.map((el, idx) => {
+      const newId = isDuplicate ? `el-${now}-${idx}` : el.id;
+      let newX = el.x;
+      let newY = el.y;
+      if (dropCoords) {
+        newX = Math.max(0, Math.min(95, Math.round(dropCoords.x * 10) / 10));
+        newY = Math.max(0, Math.min(95, Math.round(dropCoords.y * 10) / 10));
+      }
+      return {
+        ...el,
+        id: newId,
+        x: newX,
+        y: newY,
+        zIndex: maxZ + 1 + idx,
+      };
+    });
+
+    const nextSourceElements = isDuplicate
+      ? sourceElements
+      : sourceElements.filter((el) => !elementIds.includes(el.id));
+
+    const nextTargetElements = [...targetElements, ...transferredElements];
+
+    updateDeckState((prev) => {
+      const current = prev.slides.length > 0 ? prev.slides : slides;
+      const updated = current.map((s, idx) => {
+        if (idx === fromIndex && fromIndex === toIndex) {
+          return { ...s, elements: nextTargetElements };
+        }
+        if (idx === fromIndex) {
+          return { ...s, elements: nextSourceElements };
+        }
+        if (idx === toIndex) {
+          return { ...s, elements: nextTargetElements };
+        }
+        return s;
+      });
+      return { ...prev, slides: updated };
+    });
+
+    setActiveSlideIndex(toIndex);
+    setSelectedElementIds(transferredElements.map((el) => el.id));
   }
 
   function handleDuplicateSlide(index: number) {
     const target = slides[index];
     if (!target) return;
+    let createdSlideId = `slide-${Date.now()}`;
     const duplicated: PresentationSlide = {
       ...target,
-      id: `slide-${Date.now()}`,
+      id: createdSlideId,
       title: `${target.title}${t('slideEditor.defaults.copySuffix')}`,
+      gridX: (target.gridX ?? index) + 1,
+      gridY: target.gridY ?? 0,
       elements: target.elements?.map((el) => ({ ...el, id: `${el.id}-copy-${Date.now()}` })),
     };
-    const nextSlides = [...slides];
-    nextSlides.splice(index + 1, 0, duplicated);
-    updateDeckState((prev) => ({ ...prev, slides: nextSlides }));
-    setActiveSlideIndex(index + 1);
+    updateDeckState((prev) => {
+      const current = prev.slides.length > 0 ? prev.slides : slides;
+      current.forEach((s) => {
+        if ((s.gridY ?? 0) === (target.gridY ?? 0) && (s.gridX ?? 0) >= (duplicated.gridX ?? 0)) {
+          s.gridX = (s.gridX ?? 0) + 1;
+        }
+      });
+      const sorted = normalizeAndSortSlides2D([...current, duplicated]);
+      return { ...prev, slides: sorted };
+    });
+    setTimeout(() => {
+      setDeck((latest) => {
+        const foundIdx = latest.slides.findIndex((s) => s.id === createdSlideId);
+        if (foundIdx >= 0) setActiveSlideIndex(foundIdx);
+        return latest;
+      });
+    }, 0);
   }
 
   function handleDeleteSlide(index: number) {
@@ -995,25 +1376,109 @@ export function SlideEditorModal() {
       if (pkg.slides.length <= 1) return;
       pkg.slides.splice(index, 1);
       deck.slides.splice(index, 1);
-      const nextActive = Math.max(0, Math.min(pkg.slides.length - 1, pkg.activeIndex >= index ? pkg.activeIndex - 1 : pkg.activeIndex));
-      pkg.setActiveIndex(nextActive);
+      pkg.setActiveIndex(Math.min(index, pkg.slides.length - 1));
       setPptxRevision((n) => n + 1);
       handleSaveToDeck();
       return;
     }
     if (slides.length <= 1) return;
-    const nextSlides = slides.filter((_, i) => i !== index);
-    updateDeckState((prev) => ({ ...prev, slides: nextSlides }));
-    setActiveSlideIndex(Math.min(index, nextSlides.length - 1));
+    updateDeckState((prev) => {
+      const remaining = (prev.slides.length > 0 ? prev.slides : slides).filter((_, i) => i !== index);
+      const sorted = normalizeAndSortSlides2D(remaining);
+      return { ...prev, slides: sorted };
+    });
+    setActiveSlideIndex(Math.min(index, slides.length - 2));
   }
 
   function handleMoveSlide(fromIndex: number, toIndex: number) {
-    if (toIndex < 0 || toIndex >= slides.length) return;
-    const nextSlides = [...slides];
-    const [moved] = nextSlides.splice(fromIndex, 1);
-    nextSlides.splice(toIndex, 0, moved);
-    updateDeckState((prev) => ({ ...prev, slides: nextSlides }));
+    if (fromIndex === toIndex) return;
+    if (isPptxDeck) {
+      if (fromIndex < 0 || toIndex < 0 || fromIndex >= pkg.slides.length || toIndex >= pkg.slides.length) return;
+      const [movedPkg] = pkg.slides.splice(fromIndex, 1);
+      pkg.slides.splice(toIndex, 0, movedPkg);
+      const [movedDeck] = deck.slides.splice(fromIndex, 1);
+      deck.slides.splice(toIndex, 0, movedDeck);
+      pkg.setActiveIndex(toIndex);
+      setPptxRevision((n) => n + 1);
+      handleSaveToDeck();
+      return;
+    }
+    updateDeckState((prev) => {
+      const currentSlides = prev.slides.length > 0 ? [...prev.slides] : [...slides];
+      if (fromIndex < 0 || toIndex < 0 || fromIndex >= currentSlides.length || toIndex >= currentSlides.length) return prev;
+
+      // Extract existing sorted grid slots in reading order
+      const existingGridSlots = currentSlides.map((s, idx) => ({
+        gridX: s.gridX ?? idx,
+        gridY: s.gridY ?? 0,
+      }));
+
+      // Reorder the slides array
+      const [moved] = currentSlides.splice(fromIndex, 1);
+      currentSlides.splice(toIndex, 0, moved);
+
+      // Reassign spatial grid positions according to the reordered list
+      const updated = currentSlides.map((s, idx) => ({
+        ...s,
+        gridX: existingGridSlots[idx]?.gridX ?? idx,
+        gridY: existingGridSlots[idx]?.gridY ?? 0,
+      }));
+
+      const sorted = normalizeAndSortSlides2D(updated);
+      return { ...prev, slides: sorted };
+    });
     setActiveSlideIndex(toIndex);
+  }
+
+  function handleMoveArtboardToGrid(slideIndex: number, targetGridX: number, targetGridY: number) {
+    if (slideIndex < 0 || slideIndex >= slides.length) return;
+    const targetSlide = slides[slideIndex];
+    if (!targetSlide) return;
+    const targetSlideId = targetSlide.id;
+
+    updateDeckState((prev) => {
+      const currentSlides = (prev.slides.length > 0 ? prev.slides : slides).map((s, idx) => ({
+        ...s,
+        gridX: s.gridX ?? idx,
+        gridY: s.gridY ?? 0,
+      }));
+
+      const moving = currentSlides[slideIndex];
+      if (!moving) return prev;
+
+      const oldGx = moving.gridX ?? slideIndex;
+      const oldGy = moving.gridY ?? 0;
+
+      if (oldGx === targetGridX && oldGy === targetGridY) return prev;
+
+      // Check if another slide occupies the target slot
+      const occupant = currentSlides.find((s, idx) => idx !== slideIndex && s.gridX === targetGridX && s.gridY === targetGridY);
+
+      if (occupant) {
+        // Swap positions with the occupant
+        occupant.gridX = oldGx;
+        occupant.gridY = oldGy;
+        moving.gridX = targetGridX;
+        moving.gridY = targetGridY;
+      } else {
+        // Move into empty grid slot directly
+        moving.gridX = targetGridX;
+        moving.gridY = targetGridY;
+      }
+
+      const sorted = normalizeAndSortSlides2D(currentSlides);
+      return { ...prev, slides: sorted };
+    });
+
+    setTimeout(() => {
+      setDeck((latest) => {
+        const foundIdx = latest.slides.findIndex((s) => s.id === targetSlideId);
+        if (foundIdx >= 0) {
+          setActiveSlideIndex(foundIdx);
+        }
+        return latest;
+      });
+    }, 0);
   }
 
   function handleApplyTemplate(templateType: string) {
@@ -1481,6 +1946,14 @@ export function SlideEditorModal() {
         ) : (
         <SlideEditorCanvasBoard
           slide={activeSlide}
+          slides={slides}
+          activeSlideIndex={activeSlideIndex}
+          viewMode={viewMode}
+          onToggleViewMode={() => setViewMode((m) => (m === 'artboard' ? 'single' : 'artboard'))}
+          onSelectSlide={setActiveSlideIndex}
+          onAddSlideAt={handleAddSlideAt}
+          onMoveSlideToGrid={handleMoveArtboardToGrid}
+          onMoveElementBetweenSlides={handleMoveElementBetweenSlides}
           activeTool={activeTool}
           strokeWidth={activeStrokeWidth}
           selectedElementId={selectedElementId}
@@ -1492,6 +1965,8 @@ export function SlideEditorModal() {
           onDuplicateElements={handleDuplicateElements}
           onAddElements={(newEls) => handleUpdateSlideElements([...activeSlideElements, ...newEls])}
           smartSnap={smartSnap}
+          clipToCanvas={clipToCanvas}
+          onToggleClipToCanvas={() => setClipToCanvas(!clipToCanvas)}
         />
         )}
 
@@ -1503,6 +1978,10 @@ export function SlideEditorModal() {
           onSelectTool={handleSelectTool}
           smartSnap={smartSnap}
           onToggleSmartSnap={() => setSmartSnap(!smartSnap)}
+          clipToCanvas={clipToCanvas}
+          onToggleClipToCanvas={() => setClipToCanvas(!clipToCanvas)}
+          viewMode={viewMode}
+          onToggleViewMode={() => setViewMode((m) => (m === 'artboard' ? 'single' : 'artboard'))}
           selectedElementId={selectedElementId}
           onUpdateElement={handleUpdateElement}
           onAddElements={(newEls) => handleUpdateSlideElements([...activeSlideElements, ...newEls])}

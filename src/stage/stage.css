@@ -155,8 +155,9 @@
 /* ---- Clock / timer zones ---- */
 .stage-display .zone-clock .zone-inner,
 .stage-display .zone-timer .zone-inner {
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
+  text-align: center;
 }
 
 .stage-display .zone-clock .zone-value,
@@ -164,6 +165,8 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   letter-spacing: 0.04em;
+  text-align: center;
+  width: 100%;
 }
 
 /* ---- Playlist / cue zone ---- */

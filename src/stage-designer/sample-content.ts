@@ -73,7 +73,7 @@ function sampleSlide(): SlideProjection {
 }
 
 export function sampleContent(kind: SampleKind): SampleContent {
-  const timer: StageTimer = { running: false, startedAtMs: null, accumulatedSeconds: 754 };
+  const timer: StageTimer = { running: false, startedAtMs: null, accumulatedSeconds: 0 };
   const messages: StageMessage[] = [{ id: 'sample-msg', text: 'Band: hold the last chorus' }];
 
   if (kind === 'song') {

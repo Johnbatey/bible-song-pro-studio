@@ -452,6 +452,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
       }
     }
     const handleStepNext = () => {
+      if (useAppStore.getState().isSlideEditorOpen) return;
       const activeScene = useAppStore.getState().display.currentScene;
       const isFocused = isFocusedDock(rootRef.current);
       if (song && (isFocused || activeScene?.type === 'song' || activeScene?.id?.startsWith('song-'))) {
@@ -460,6 +461,7 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
     };
 
     const handleStepPrev = () => {
+      if (useAppStore.getState().isSlideEditorOpen) return;
       const activeScene = useAppStore.getState().display.currentScene;
       const isFocused = isFocusedDock(rootRef.current);
       if (song && (isFocused || activeScene?.type === 'song' || activeScene?.id?.startsWith('song-'))) {

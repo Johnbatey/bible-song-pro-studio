@@ -10,16 +10,22 @@
    Ported from handleStateUpdate/handleTimerCommand in the old
    public/stage-display/stage-display.js.
    ========================================================================= */
-import { LAYOUTS, type StageLayout } from './layouts';
-import { defaultTheme, loadLayoutId, loadTheme, type StageTheme } from './theme';
+import { getEffectiveLayout, LAYOUTS, type StageLayout } from './layouts';
+import { defaultTheme, getLayoutTheme, loadLayoutId, loadTheme, type StageTheme } from './theme';
 
 export interface StageContent {
+  id?: string;
   title?: string;
   body?: string;
   /** Verse-number superscripts only — see isSafeVerseMarkup in StageZones. */
   bodyHtml?: string;
   notes?: string;
   slide?: import('../renderer/types').SlideProjection;
+  transition?: {
+    type?: string;
+    duration?: number;
+    animateBackground?: boolean;
+  };
 }
 
 export interface StageMessage {
@@ -49,11 +55,20 @@ export interface StageState {
   messages: StageMessage[];
   theme: StageTheme;
   layout: StageLayout;
+  fxAnimation?: {
+    transitionType: string;
+    duration: number;
+    animateBackground?: boolean;
+    stageDisplayFxEnabled?: boolean;
+  } | null;
+  stageDisplayFxEnabled?: boolean;
 }
 
 export function initialStageState(): StageState {
-  const theme = loadTheme();
-  const layout = LAYOUTS[loadLayoutId() || ''] || LAYOUTS.default;
+  const activeId = loadLayoutId() || 'default';
+  const layout = getEffectiveLayout(activeId);
+  const theme = layout.theme || getLayoutTheme(layout);
+
   return {
     mode: 'confidence',
     current: null,
@@ -69,6 +84,13 @@ export function initialStageState(): StageState {
     messages: [],
     theme,
     layout,
+    stageDisplayFxEnabled: true,
+    fxAnimation: {
+      transitionType: 'fade',
+      duration: 0.4,
+      animateBackground: false,
+      stageDisplayFxEnabled: true,
+    },
   };
 }
 
@@ -186,9 +208,20 @@ export function reduceStage(state: StageState, payload: unknown): StageState {
   let next = state;
   const set = (patch: Partial<StageState>) => { next = { ...next, ...patch }; };
 
-  if (typeof value.layout === 'string' && LAYOUTS[value.layout]) {
-    set({ layout: LAYOUTS[value.layout], backgroundColor: LAYOUTS[value.layout].bgColor });
+  if (typeof value.layout === 'string') {
+    const eff = getEffectiveLayout(value.layout);
+    if (eff) {
+      const layoutTheme = eff.theme || getLayoutTheme(eff);
+      set({
+        layout: eff,
+        theme: layoutTheme,
+        backgroundColor: layoutTheme.background || eff.bgColor,
+        clockVisible: layoutTheme.showClock,
+        timerVisible: layoutTheme.showTimer,
+      });
+    }
   }
+
 
   /* An operator-authored layout from the Stage Layout editor draws in place of
      the preset, reusing the same zone vocabulary. Its bgColor also becomes the
@@ -204,14 +237,24 @@ export function reduceStage(state: StageState, payload: unknown): StageState {
       name: String(custom.name || 'Custom'),
       bgColor: String(custom.bgColor || '#000000'),
       zones: custom.zones as StageLayout['zones'],
+      theme: custom.theme as StageTheme | undefined,
     };
-    set({ layout, backgroundColor: layout.bgColor });
+    const layoutTheme = layout.theme || getLayoutTheme(layout);
+    set({
+      layout,
+      theme: layoutTheme,
+      backgroundColor: layoutTheme.background || layout.bgColor,
+      clockVisible: layoutTheme.showClock,
+      timerVisible: layoutTheme.showTimer,
+    });
   }
 
   if (value.theme && typeof value.theme === 'object') {
     const theme = { ...next.theme, ...(value.theme as Partial<StageTheme>) };
+    const layout = { ...next.layout, theme, bgColor: theme.background };
     set({
       theme,
+      layout,
       backgroundColor: theme.background,
       clockVisible: theme.showClock,
       timerVisible: theme.showTimer,
@@ -233,6 +276,11 @@ export function reduceStage(state: StageState, payload: unknown): StageState {
   if ('timerVisible' in value) set({ timerVisible: value.timerVisible !== false });
   if ('clockVisible' in value) set({ clockVisible: value.clockVisible !== false });
   if ('backgroundColor' in value) set({ backgroundColor: String(value.backgroundColor || '#000000') });
+  if ('stageDisplayFxEnabled' in value) set({ stageDisplayFxEnabled: value.stageDisplayFxEnabled !== false });
+  if ('fxAnimation' in value || 'fx' in value) {
+    const fx = (value.fxAnimation || value.fx) as StageState['fxAnimation'];
+    set({ fxAnimation: fx });
+  }
 
   return next;
 }

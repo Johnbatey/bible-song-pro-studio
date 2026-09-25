@@ -56,12 +56,16 @@ export interface StageZone {
   locked?: boolean;
 }
 
+import type { StageTheme } from './theme';
+
 export interface StageLayout {
   id: string;
   name: string;
   bgColor: string;
   zones: StageZone[];
+  theme?: StageTheme;
 }
+
 
 export const LAYOUTS: Record<string, StageLayout> = {
   default: {
@@ -127,6 +131,94 @@ export const LAYOUTS: Record<string, StageLayout> = {
 
 export const LAYOUT_IDS = Object.keys(LAYOUTS);
 
+import { getLayoutTheme, safeStorage } from './theme';
+
+const OVERRIDES_KEY = 'bsp_stage_layout_overrides';
+
+export function getLayoutOverrides(): Record<string, StageLayout> {
+  try {
+    const raw = safeStorage().getItem(OVERRIDES_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveLayoutOverride(layout: StageLayout): void {
+  if (!layout || !layout.id) return;
+  try {
+    const overrides = getLayoutOverrides();
+    overrides[layout.id] = {
+      ...layout,
+      zones: Array.isArray(layout.zones) ? layout.zones : [],
+    };
+    safeStorage().setItem(OVERRIDES_KEY, JSON.stringify(overrides));
+  } catch {
+    // storage may be unavailable
+  }
+}
+
+export function removeLayoutOverride(id: string): void {
+  try {
+    const overrides = getLayoutOverrides();
+    if (overrides[id]) {
+      delete overrides[id];
+      safeStorage().setItem(OVERRIDES_KEY, JSON.stringify(overrides));
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function hasLayoutOverride(id: string): boolean {
+  return Boolean(getLayoutOverrides()[id]);
+}
+
+/**
+ * Returns the effective layout for an id, checking in order:
+ * 1. Custom layouts from library
+ * 2. User tweaks / overrides for this layout id (e.g. customized preset)
+ * 3. Factory preset definition
+ * 4. Fallback default preset
+ */
+export function getEffectiveLayout(id: string, customLayouts?: StageLayout[]): StageLayout {
+  let layout: StageLayout;
+  if (customLayouts && Array.isArray(customLayouts)) {
+    const custom = customLayouts.find((item) => item && item.id === id);
+    if (custom) {
+      layout = { ...custom, zones: Array.isArray(custom.zones) ? custom.zones : [] };
+    } else {
+      const overrides = getLayoutOverrides();
+      if (overrides[id]) {
+        const item = overrides[id];
+        layout = { ...item, zones: Array.isArray(item.zones) ? item.zones : [] };
+      } else if (LAYOUTS[id]) {
+        layout = JSON.parse(JSON.stringify(LAYOUTS[id]));
+      } else {
+        layout = JSON.parse(JSON.stringify(LAYOUTS.default));
+      }
+    }
+  } else {
+    const overrides = getLayoutOverrides();
+    if (overrides[id]) {
+      const item = overrides[id];
+      layout = { ...item, zones: Array.isArray(item.zones) ? item.zones : [] };
+    } else if (LAYOUTS[id]) {
+      layout = JSON.parse(JSON.stringify(LAYOUTS[id]));
+    } else {
+      layout = JSON.parse(JSON.stringify(LAYOUTS.default));
+    }
+  }
+  const theme = getLayoutTheme(layout);
+  return {
+    ...layout,
+    theme,
+    bgColor: theme.background || layout.bgColor,
+  };
+}
+
 /** The layout `L` moves to from the current one, wrapping in both directions. */
 export function cycleLayoutId(currentId: string, direction = 1): string {
   const index = LAYOUT_IDS.indexOf(currentId);
@@ -134,3 +226,4 @@ export function cycleLayoutId(currentId: string, direction = 1): string {
   const from = index === -1 ? -1 : index;
   return LAYOUT_IDS[(from + direction + LAYOUT_IDS.length) % LAYOUT_IDS.length];
 }
+

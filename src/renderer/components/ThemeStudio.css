@@ -441,12 +441,45 @@
   text-transform: uppercase;
 }
 
+.studio-color-hex-input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  color: #ffffff;
+  text-transform: uppercase;
+  padding: 0;
+  user-select: text;
+  cursor: text;
+}
+
+.studio-color-hex-input:focus {
+  color: #10b981;
+}
+
 /* ── Studio Green Toggle Switch ── */
 .studio-toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  gap: 8px;
+}
+
+.studio-toggle-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  letter-spacing: -0.01em;
 }
 
 .studio-toggle-switch {

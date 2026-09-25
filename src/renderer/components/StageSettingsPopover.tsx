@@ -13,6 +13,9 @@ import { createPortal } from 'react-dom';
 import type { CSSProperties, RefObject } from 'react';
 import { fontWeight } from '../styles/type';
 import { defaultTheme, persistTheme, type StageTheme } from '../../stage/theme';
+import { saveLayoutOverride, type StageLayout } from '../../stage/layouts';
+import { useDraggableModal } from '../hooks/useDraggableModal';
+import { useAppStore } from '../stores/appStore';
 
 const ACCENTS = ['#fbbf24', '#0a84ff', '#30d158', '#ff453a', '#bf5af2', '#ff9f0a'];
 const BACKGROUNDS = ['#000000', '#05070d', '#0a0a0a', '#0d1b2a', '#1a1a1a'];
@@ -26,22 +29,38 @@ const TOGGLES: Array<{ key: 'showClock' | 'showTimer' | 'showLabels'; label: str
 
 export interface StageSettingsPopoverProps {
   theme: StageTheme;
-  onChange: (patch: Partial<StageTheme>) => void;
+  layout?: StageLayout;
+  onChange: (patch: Partial<StageTheme>, layoutPatch?: Partial<StageLayout>) => void;
   onClose: () => void;
   anchorRef: RefObject<HTMLElement | null>;
 }
 
 const POPOVER_WIDTH = 270;
 
-export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: StageSettingsPopoverProps) {
+export function StageSettingsPopover({ theme, layout, onChange, onClose, anchorRef }: StageSettingsPopoverProps) {
+  const fxSettings = useAppStore((s) => s.fxSettings);
+  const setFxSettings = useAppStore((s) => s.setFxSettings);
   const ref = useRef<HTMLDivElement | null>(null);
   const [rect, setRect] = useState<{ top: number; left: number } | null>(null);
+  const { modalStyle, headerProps } = useDraggableModal();
 
   const handlePatch = (patch: Partial<StageTheme>) => {
-    const next = { ...theme, ...patch };
-    persistTheme(next);
-    onChange(patch);
+    const nextTheme = { ...theme, ...patch };
+    persistTheme(nextTheme, layout?.id);
+
+    let layoutPatch: Partial<StageLayout> | undefined;
+    if (layout) {
+      const updatedLayout: StageLayout = {
+        ...layout,
+        ...(patch.background ? { bgColor: patch.background } : {}),
+        theme: nextTheme,
+      };
+      saveLayoutOverride(updatedLayout);
+      layoutPatch = updatedLayout;
+    }
+    onChange(patch, layoutPatch);
   };
+
 
   const measure = useCallback(() => {
     const anchor = anchorRef.current?.getBoundingClientRect();
@@ -135,12 +154,12 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
   return createPortal(
     <div
       ref={ref}
-      style={{ ...styles.popover, top: rect.top, left: rect.left }}
+      style={{ ...styles.popover, ...modalStyle, top: rect.top, left: rect.left }}
       role="dialog"
       aria-label="Stage display appearance"
     >
       {/* Fixed Header */}
-      <div style={styles.header}>
+      <div {...headerProps} style={{ ...styles.header, ...headerProps.style }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
@@ -170,10 +189,17 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
               step={0.1}
               value={theme.fontScale}
               onChange={(e) => handlePatch({ fontScale: Number(e.currentTarget.value) })}
+              onDoubleClick={() => handlePatch({ fontScale: 1 })}
               style={{ width: 64, height: 4, accentColor: 'rgba(255, 255, 255, 0.85)', cursor: 'pointer' }}
-              title="Stage font scale"
+              title="Stage font scale (Double-click to reset to 100%)"
             />
-            <span style={styles.scaleValue}>{Math.round(theme.fontScale * 100)}%</span>
+            <span
+              style={{ ...styles.scaleValue, cursor: 'pointer' }}
+              onClick={() => handlePatch({ fontScale: 1 })}
+              title="Click to reset to 100%"
+            >
+              {Math.round(theme.fontScale * 100)}%
+            </span>
           </div>
         </div>
 
@@ -202,17 +228,29 @@ export function StageSettingsPopover({ theme, onChange, onClose, anchorRef }: St
           </div>
         </div>
 
-        {/* Keyboard Shortcuts */}
+        {/* FX Animations Toggle */}
         <div style={styles.section}>
-          <div style={styles.shortcutBox}>
-            <span style={{ fontSize: 11, color: '#a1a1aa' }}>
-              <strong style={{ color: '#ffffff' }}>L</strong> Layout Picker  •  <strong style={{ color: '#ffffff' }}>Esc</strong> Clear Message
-            </span>
+          <div style={styles.label}>Stage Transition FX</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+            <button
+              type="button"
+              onClick={() => setFxSettings({ stageDisplayFxEnabled: fxSettings?.stageDisplayFxEnabled === false })}
+              style={{
+                ...styles.chip,
+                background: fxSettings?.stageDisplayFxEnabled !== false ? 'rgba(255, 85, 0, 0.18)' : '#141416',
+                borderColor: fxSettings?.stageDisplayFxEnabled !== false ? '#FF5500' : 'rgba(255, 255, 255, 0.12)',
+                color: fxSettings?.stageDisplayFxEnabled !== false ? '#ffffff' : '#a1a1aa',
+                width: '100%',
+                justifyContent: 'center',
+              }}
+            >
+              Animations {fxSettings?.stageDisplayFxEnabled !== false ? 'Enabled ✓' : 'Disabled (Cut)'}
+            </button>
           </div>
         </div>
 
         {/* Reset Theme Button */}
-        <button type="button" onClick={() => handlePatch(defaultTheme())} style={styles.reset}>
+        <button type="button" onClick={() => handlePatch(defaultTheme(layout?.id, layout?.bgColor))} style={styles.reset}>
           Reset Theme
         </button>
       </div>
@@ -310,13 +348,6 @@ const styles: Record<string, CSSProperties> = {
     cursor: 'pointer',
     textAlign: 'center',
     transition: 'all 0.15s ease',
-  },
-  shortcutBox: {
-    padding: '6px 8px',
-    borderRadius: 6,
-    background: 'var(--chrome-control)',
-    border: '1px solid var(--border-primary)',
-    textAlign: 'center',
   },
   reset: {
     width: '100%',

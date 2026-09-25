@@ -46,8 +46,7 @@ function PlayGlyph() {
   );
 }
 
-/* backward.end.fill — the bar-and-triangle that means "back to the start",
-   not a generic rewind arrow: there is no previous clip to step to. */
+/* backward.end.fill — the bar-and-triangle that means "back to the start" */
 function RestartGlyph() {
   return (
     <svg width="11" height="12" viewBox="0 0 11 12" aria-hidden focusable="false">
@@ -56,6 +55,30 @@ function RestartGlyph() {
         d="M10.1 1.9v8.2a.6.6 0 0 1-.92.5L4.1 7.1a.72.72 0 0 1 0-1.2l5.08-3.5a.6.6 0 0 1 .92.5Z"
         fill="currentColor"
       />
+    </svg>
+  );
+}
+
+function RewindGlyph() {
+  return (
+    <svg width="11" height="12" viewBox="0 0 12 12" aria-hidden focusable="false" fill="currentColor">
+      <path d="M5.8 2.2a.5.5 0 0 0-.8-.4L.7 5.4a.7.7 0 0 0 0 1.2l4.3 3.6a.5.5 0 0 0 .8-.4V7.5l4.3 3.6a.5.5 0 0 0 .8-.4V1.3a.5.5 0 0 0-.8-.4L6 4.5V2.2Z" />
+    </svg>
+  );
+}
+
+function ForwardGlyph() {
+  return (
+    <svg width="11" height="12" viewBox="0 0 12 12" aria-hidden focusable="false" fill="currentColor">
+      <path d="M6.2 2.2a.5.5 0 0 1 .8-.4l4.3 3.6a.7.7 0 0 1 0 1.2l-4.3 3.6a.5.5 0 0 1-.8-.4V7.5L2 11.1a.5.5 0 0 1-.8-.4V1.3a.5.5 0 0 1 .8-.4L6 4.5V2.2Z" />
+    </svg>
+  );
+}
+
+function StopGlyph() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden focusable="false" fill="currentColor">
+      <rect x="1" y="1" width="8" height="8" rx="1.2" />
     </svg>
   );
 }
@@ -120,8 +143,13 @@ export function MediaTransport() {
   const clock = useAppStore((s) => s.display.videoClock);
   const setVideoPlaying = useAppStore((s) => s.setVideoPlaying);
   const seekVideo = useAppStore((s) => s.seekVideo);
+  const restartVideo = useAppStore((s) => s.restartVideo);
+  const stepVideo = useAppStore((s) => s.stepVideo);
+  const stopVideo = useAppStore((s) => s.stopVideo);
+  const setVideoSpeed = useAppStore((s) => s.setVideoSpeed);
   const setVideoLoop = useAppStore((s) => s.setVideoLoop);
   const setVideoMuted = useAppStore((s) => s.setVideoMuted);
+
   const isMuted = useAppStore((s) => {
     if (s.display.videoTransport.muted !== undefined) return s.display.videoTransport.muted;
     const scene = s.display.videoTransport.target === 'program'
@@ -136,17 +164,21 @@ export function MediaTransport() {
     return scene?.background?.loop !== false;
   });
 
+  const SPEEDS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+  const currentSpeed = transport.speed || 1.0;
+  const cycleSpeed = () => {
+    const idx = SPEEDS.indexOf(currentSpeed);
+    const nextIdx = idx >= 0 && idx < SPEEDS.length - 1 ? idx + 1 : 0;
+    setVideoSpeed(SPEEDS[nextIdx]);
+  };
+
   const trackRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const fillRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
   const [scrubTime, setScrubTime] = useState<number | null>(null);
   const [railHot, setRailHot] = useState(false);
-  /* The strip gives up its readout before it gives up its rail, and the rail
-     before the play button, so a narrow dock still leaves something usable
-     rather than a row of clipped stubs. Measured rather than guessed at from
-     the window: this sits in a dock the operator can drag to any width. */
-  const [stripWidth, setStripWidth] = useState(268);
+  const [stripWidth, setStripWidth] = useState(330);
 
   useEffect(() => {
     const el = stripRef.current;
@@ -156,14 +188,13 @@ export function MediaTransport() {
     return () => observer.disconnect();
   }, []);
 
-  /* The clock keeps both figures at every width — a duration you cannot see is
-     the complaint this replaced. The two secondary buttons go first instead. */
-  const showLoop = stripWidth >= 232;
-  const showRestart = stripWidth >= 196;
+  const showLoop = stripWidth >= 280;
+  const showRestart = stripWidth >= 160;
+  const showStep = stripWidth >= 320;
+  const showSpeed = stripWidth >= 360;
 
   const duration = clock.duration;
   const isScrubbing = scrubTime !== null;
-  /* While dragging, the thumb answers to the pointer and nothing else. */
   const shownTime = isScrubbing ? scrubTime : clock.currentTime;
   const progress = duration > 0 ? Math.min(1, Math.max(0, shownTime / duration)) : 0;
   const remaining = Math.max(0, duration - shownTime);
@@ -179,8 +210,6 @@ export function MediaTransport() {
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (duration <= 0) return;
-    /* A synthetic pointer has no capture to take; the drag still works from
-       the move handler, so a refusal here must not kill the interaction. */
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture */ }
     setScrubTime(timeAtClientX(e.clientX));
   };
@@ -199,35 +228,16 @@ export function MediaTransport() {
     } catch { /* nothing held */ }
   };
 
-  const nudge = useCallback((delta: number) => {
-    if (duration <= 0) return;
-    seekVideo(Math.min(duration, Math.max(0, clock.currentTime + delta)));
-  }, [clock.currentTime, duration, seekVideo]);
-
-  /* Bound to the strip, not the document — this is one control among many and
-     must not eat the console's keys when it does not have focus. */
   const onKeyDown = (e: React.KeyboardEvent) => {
     const step = e.shiftKey ? 1 : 5;
     if (e.key === ' ') { e.preventDefault(); setVideoPlaying(!transport.playing); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); nudge(-step); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); nudge(step); }
-    else if (e.key === 'Home') { e.preventDefault(); seekVideo(0); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); stepVideo(-step); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); stepVideo(step); }
+    else if (e.key === 'Home' || e.key === 'r' || e.key === 'R') { e.preventDefault(); restartVideo(); }
+    else if (e.key === 's' || e.key === 'S') { e.preventDefault(); stopVideo(); }
     else if (e.key === 'End') { e.preventDefault(); seekVideo(Math.max(0, duration - 0.1)); }
   };
 
-  /* The playhead runs on wall clock, not on reports.
-   *
-   * A video only fires timeupdate about four times a second, so a head driven
-   * straight off it steps in visible ~250ms jumps. Between reports the elapsed
-   * real time is a better estimate of where the clip is than the last report
-   * is, so the position is interpolated from the most recent report and
-   * re-anchored whenever a new one lands — the head never drifts, it just
-   * stops waiting.
-   *
-   * Painted through refs rather than state: this runs every frame, and the
-   * timecode beside it only changes once a second. Re-rendering the whole
-   * strip at 60fps to move one bar would be the expensive way to do it.
-   */
   const anchorRef = useRef({ time: 0, at: 0 });
   const progressRef = useRef(0);
   progressRef.current = progress;
@@ -243,8 +253,6 @@ export function MediaTransport() {
   }, []);
 
   useEffect(() => {
-    /* Scrubbing follows the pointer and a paused clip does not move — both are
-       exact, and neither wants a frame loop. */
     if (duration <= 0 || isScrubbing || !transport.playing) {
       paint(progressRef.current);
       return;
@@ -252,21 +260,17 @@ export function MediaTransport() {
     let frame = 0;
     const tick = () => {
       const { time, at } = anchorRef.current;
-      /* Clamped so a loop wrap parks at the end for the frame or two before
-         the next report brings it back to zero, rather than running past. */
-      paint(Math.min(duration, time + (performance.now() - at) / 1000) / duration);
+      paint(Math.min(duration, time + ((performance.now() - at) / 1000) * (currentSpeed || 1.0)) / duration);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [duration, isScrubbing, transport.playing, paint]);
+  }, [duration, isScrubbing, transport.playing, currentSpeed, paint]);
 
-  /* While scrubbing, React is not re-rendering the bar for us — paint it. */
   useEffect(() => {
     if (isScrubbing) paint(progress);
   }, [isScrubbing, progress, paint]);
 
-  /* A clip swapped underneath the strip leaves a stale drag behind. */
   useEffect(() => { setScrubTime(null); }, [transport.target]);
 
   return (
@@ -278,13 +282,10 @@ export function MediaTransport() {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
         height: 26,
-        /* Takes what the chrome bar can spare and gives it back first: the
-           panel title and Import Media come before the transport when the
-           dock is dragged narrow. */
-        flex: '0 1 330px',
-        minWidth: 118,
+        flex: '0 1 420px',
+        minWidth: 140,
         padding: '0 9px 0 5px',
         background: 'var(--chrome-control)',
         border: '1px solid var(--border-primary)',
@@ -295,12 +296,24 @@ export function MediaTransport() {
       {showRestart && (
         <button
           type="button"
-          onClick={() => seekVideo(0)}
-          title="Back to start  (Home)"
-          aria-label="Back to start"
+          onClick={() => restartVideo()}
+          title="Restart media from beginning  (Home / R)"
+          aria-label="Restart media"
           style={{ ...glyphButton, color: 'var(--text-dim)' }}
         >
           <RestartGlyph />
+        </button>
+      )}
+
+      {showStep && (
+        <button
+          type="button"
+          onClick={() => stepVideo(-5)}
+          title="Rewind 5s  (Left Arrow)"
+          aria-label="Rewind 5s"
+          style={{ ...glyphButton, color: 'var(--text-dim)' }}
+        >
+          <RewindGlyph />
         </button>
       )}
 
@@ -314,6 +327,28 @@ export function MediaTransport() {
         {transport.playing ? <PauseGlyph /> : <PlayGlyph />}
       </button>
 
+      <button
+        type="button"
+        onClick={() => stopVideo()}
+        title="Stop media  (S)"
+        aria-label="Stop media"
+        style={{ ...glyphButton, color: 'var(--text-dim)' }}
+      >
+        <StopGlyph />
+      </button>
+
+      {showStep && (
+        <button
+          type="button"
+          onClick={() => stepVideo(5)}
+          title="Fast Forward 5s  (Right Arrow)"
+          aria-label="Fast Forward 5s"
+          style={{ ...glyphButton, color: 'var(--text-dim)' }}
+        >
+          <ForwardGlyph />
+        </button>
+      )}
+
       {showLoop && (
         <>
           <button
@@ -324,8 +359,6 @@ export function MediaTransport() {
             aria-pressed={looping}
             style={{
               ...glyphButton,
-              /* Loop is not an on-air state, so it never wears Signal. On is
-                 white, off is muted — the same weight every other toggle uses. */
               color: looping ? 'var(--text-primary)' : 'var(--text-mute)',
             }}
           >
@@ -347,6 +380,26 @@ export function MediaTransport() {
         </>
       )}
 
+      {showSpeed && (
+        <button
+          type="button"
+          onClick={cycleSpeed}
+          title={`Speed: ${currentSpeed}x — click to cycle speed`}
+          aria-label={`Playback speed ${currentSpeed}x`}
+          style={{
+            ...glyphButton,
+            width: 'auto',
+            padding: '0 4px',
+            fontSize: '10px',
+            fontWeight: 700,
+            fontFamily: 'var(--font-signal)',
+            color: currentSpeed !== 1.0 ? 'var(--bsp-signal)' : 'var(--text-dim)',
+          }}
+        >
+          {currentSpeed}x
+        </button>
+      )}
+
       {/* Rail */}
       <div
         ref={trackRef}
@@ -365,7 +418,7 @@ export function MediaTransport() {
         style={{
           position: 'relative',
           flex: '1 1 auto',
-          minWidth: 64,
+          minWidth: 54,
           height: 20,
           display: 'flex',
           alignItems: 'center',
@@ -388,7 +441,7 @@ export function MediaTransport() {
               position: 'absolute', inset: 0, right: 'auto',
               width: `${progress * 100}%`,
               background: tally,
-              borderRadius: 'inherit',
+              borderRadius: 1,
             }}
           />
           <div

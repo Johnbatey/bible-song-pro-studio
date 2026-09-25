@@ -19,7 +19,17 @@
    still be there.
    ========================================================================= */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LAYOUTS, LAYOUT_IDS, type StageLayout, type StageZone, type ZoneType } from '../stage/layouts';
+import {
+  getEffectiveLayout,
+  hasLayoutOverride,
+  LAYOUTS,
+  LAYOUT_IDS,
+  removeLayoutOverride,
+  saveLayoutOverride,
+  type StageLayout,
+  type StageZone,
+  type ZoneType,
+} from '../stage/layouts';
 import {
   cloneLayout,
   clamp,
@@ -42,7 +52,9 @@ import { isTypingTarget } from './keyboard';
 import { Menu, MenuItem } from './Menu';
 import { Back, Plus, Redo, Undo, ZONE_ICONS } from './icons';
 import { sampleContent, sampleProgramState, SAMPLE_LABELS, type SampleKind } from './sample-content';
+import { getLayoutTheme, persistLayoutTheme, persistTheme, type StageTheme } from '../stage/theme';
 import type { StageMode } from '../stage/stage-state';
+
 import './designer.css';
 
 const GRID_STEPS = [0, 1, 2.5, 5, 10];
@@ -146,12 +158,24 @@ export function StageDesigner() {
   const stageIsIdle = !feeds.stage.current?.body && !feeds.stage.current?.title && !feeds.program.scene;
   const usingSample = forceSample || stageIsIdle;
 
+  const currentLayoutTheme = useMemo(() => {
+    return layout.theme || getLayoutTheme(layout);
+  }, [layout]);
+
   const { previewStage, previewProgram } = useMemo(() => {
-    if (!usingSample) return { previewStage: feeds.stage, previewProgram: feeds.program };
+    const baseStage = {
+      ...feeds.stage,
+      theme: currentLayoutTheme,
+      backgroundColor: currentLayoutTheme.background || layout.bgColor,
+      clockVisible: currentLayoutTheme.showClock,
+      timerVisible: currentLayoutTheme.showTimer,
+      layout,
+    };
+    if (!usingSample) return { previewStage: baseStage, previewProgram: feeds.program };
     const sample = sampleContent(sampleKind);
     return {
       previewStage: {
-        ...feeds.stage,
+        ...baseStage,
         current: sample.current,
         next: sample.next,
         songTitle: sample.songTitle,
@@ -161,7 +185,7 @@ export function StageDesigner() {
       },
       previewProgram: sampleProgramState(sample.slide),
     };
-  }, [usingSample, sampleKind, feeds.stage, feeds.program]);
+  }, [usingSample, sampleKind, feeds.stage, feeds.program, currentLayoutTheme, layout]);
 
   const canvasStage = useMemo(() => ({ ...previewStage, mode }), [previewStage, mode]);
 
@@ -171,11 +195,10 @@ export function StageDesigner() {
      designer should say which of the two it is. */
   const hiddenTypes = useMemo(() => {
     const hidden = new Set<string>();
-    const { theme, clockVisible, timerVisible } = feeds.stage;
-    if (!(clockVisible && theme.showClock)) hidden.add('clock');
-    if (!(timerVisible && theme.showTimer)) hidden.add('timer');
+    if (!currentLayoutTheme.showClock) hidden.add('clock');
+    if (!currentLayoutTheme.showTimer) hidden.add('timer');
     return hidden;
-  }, [feeds.stage]);
+  }, [currentLayoutTheme]);
 
   /* ---- live push ---------------------------------------------------------- */
   /* What the stage was last given. The rule for Live is one sentence — push
@@ -242,9 +265,7 @@ export function StageDesigner() {
   }, [history]);
 
   /* On open, pick up where the operator left off: the layout the stage is
-     actually showing if it is a custom one, otherwise their last saved
-     layout, otherwise a blank. Opening onto an unrelated default and then
-     saving is how the reference editor used to wipe a live layout. */
+     actually showing (with any user tweaks), otherwise active layout, otherwise default. */
   const bootstrapped = useRef(false);
   useEffect(() => {
     if (bootstrapped.current || !library.loaded) return;
@@ -252,39 +273,41 @@ export function StageDesigner() {
 
     const liveLayout = feeds.stage.layout;
     if (liveLayout && liveLayout.id) {
-      if (!isPresetId(liveLayout.id) && liveLayout.zones?.length > 0) {
-        const match = library.layouts.find((item) => item.id === liveLayout.id);
-        openLayout(
-          normalizeLayout(liveLayout),
-          match?.id || null,
-          match ? `Editing “${match.name}”, live on the stage` : 'Editing the layout currently on the stage',
-          true,
-        );
-        return;
-      } else if (isPresetId(liveLayout.id)) {
-        const preset = LAYOUTS[liveLayout.id] || LAYOUTS.default;
-        openLayout(
-          cloneLayout(preset, { name: `${preset.name} copy` }),
-          null,
-          `Started from active ${preset.name} preset`,
-          true,
-        );
-        return;
-      }
+      const match = library.layouts.find((item) => item.id === liveLayout.id);
+      const effective = getEffectiveLayout(liveLayout.id, library.layouts);
+      openLayout(
+        effective,
+        liveLayout.id,
+        match ? `Editing “${match.name}”, live on the stage` : `Editing ${effective.name}, live on the stage`,
+        true,
+      );
+      return;
     }
     const active = library.layouts.find((item) => item.id === library.activeId) || library.layouts[0];
     if (active) {
       openLayout(active, active.id, `Opened “${active.name}”`, true);
       return;
     }
-    const preset = LAYOUTS.default;
+    const preset = getEffectiveLayout('default', library.layouts);
     openLayout(
-      cloneLayout(preset, { name: `${preset.name} copy` }),
-      null,
+      preset,
+      'default',
       `Started from the ${preset.name} preset`,
       true,
     );
   }, [library.loaded, library.layouts, library.activeId, feeds.stage.layout, openLayout]);
+
+  /* Automatically remember user tweaks per layout/preset id so switching
+     between layouts (e.g. minimal -> slide -> minimal) preserves customizations. */
+  useEffect(() => {
+    if (layout && layout.id) {
+      saveLayoutOverride(layout);
+      if (sourceId && sourceId !== layout.id) {
+        saveLayoutOverride({ ...layout, id: sourceId });
+      }
+    }
+  }, [layout, sourceId]);
+
 
   /* ---- zone edits --------------------------------------------------------- */
   const setZones = useCallback((zones: StageZone[], silent: boolean) => {
@@ -475,6 +498,7 @@ export function StageDesigner() {
       setStatus({ text: result.error || 'Could not save', tone: 'warn' });
       return;
     }
+    saveLayoutOverride(target);
     await library.setActive(target.id);
     history.reset(target);
     setSourceId(target.id);
@@ -482,6 +506,7 @@ export function StageDesigner() {
     pushLayout(target);
     setStatus({ text: `Saved “${target.name}”`, tone: 'ok' });
   }, [layout, sourceId, library, history, pushLayout]);
+
 
   const deleteFromLibrary = useCallback(async (id: string, name: string) => {
     await library.remove(id);
@@ -491,6 +516,41 @@ export function StageDesigner() {
     }
     setStatus({ text: `Deleted “${name}”`, tone: 'ok' });
   }, [library, sourceId]);
+
+  const handleThemeChange = useCallback((patch: Partial<StageTheme>) => {
+    const currentTheme = layout.theme || getLayoutTheme(layout);
+    const nextTheme: StageTheme = { ...currentTheme, ...patch };
+    persistLayoutTheme(layout.id, nextTheme);
+    setLayout((current) => {
+      const nextLayout: StageLayout = {
+        ...current,
+        ...(patch.background ? { bgColor: patch.background } : {}),
+        theme: nextTheme,
+      };
+      saveLayoutOverride(nextLayout);
+      return nextLayout;
+    });
+    window.BSP?.stage?.sendState?.({
+      theme: nextTheme,
+      backgroundColor: nextTheme.background || layout.bgColor,
+      customLayout: {
+        id: layout.id,
+        name: layout.name,
+        bgColor: nextTheme.background || layout.bgColor,
+        zones: layout.zones,
+        theme: nextTheme,
+      },
+    }).catch(() => {});
+  }, [layout, setLayout]);
+
+  const handleLayoutChange = useCallback((patch: Partial<StageLayout>) => {
+    setLayout((current) => {
+      const next = { ...current, ...patch };
+      saveLayoutOverride(next);
+      return next;
+    });
+  }, [setLayout]);
+
 
   /* ---- keyboard ----------------------------------------------------------- */
   useEffect(() => {
@@ -606,14 +666,13 @@ export function StageDesigner() {
     };
   }, [isDraggingFloatbar]);
 
+  const [leftTab, setLeftTab] = useState<'layouts' | 'layers'>('layouts');
+
   return (
     <div className="dz-app">
       <header className="dz-topbar">
         <div className="dz-topbar-left">
-          {/* The way out, in the same place and with the same words as the
-              slide editor's. The main process closes the window rather than
-              hiding it, so Back and the red button ask the same question about
-              unsaved work. */}
+          {/* The way out, matching Pro Slides and Theme Studio */}
           <button
             type="button"
             className="dz-back"
@@ -624,35 +683,49 @@ export function StageDesigner() {
             Back to app
           </button>
           <span className="dz-sep" />
-          <span className="dz-brand">Stage Layout</span>
-          <input
-            className="dz-name"
-            value={layout.name}
-            spellCheck={false}
-            onChange={(event) => {
-              const nameVal = event.target.value;
-              setLayout((current) => ({ ...current, name: nameVal }), { coalesceKey: 'name' });
-            }}
-            aria-label="Layout name"
-          />
-          <span className="dz-dirty" data-on={(dirty || isUnsaved) || undefined}>
+          <div className="dz-brand-badge">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#FF5500' }}>
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            <span className="dz-brand">Stage Studio</span>
+          </div>
+          <div className="dz-name-wrapper">
+            <input
+              className="dz-name"
+              value={layout.name}
+              spellCheck={false}
+              onChange={(event) => {
+                const nameVal = event.target.value;
+                setLayout((current) => ({ ...current, name: nameVal }), { coalesceKey: 'name' });
+              }}
+              aria-label="Layout name"
+              placeholder="Layout name..."
+            />
+          </div>
+          <span className={`dz-dirty-badge ${dirty || isUnsaved ? 'dz-dirty-on' : 'dz-dirty-saved'}`}>
+            <span className="dz-dirty-dot" />
             {isUnsaved ? 'Unsaved' : dirty ? 'Edited' : 'Saved'}
           </span>
         </div>
 
         <div className="dz-topbar-right">
-          <button type="button" onClick={history.undo} disabled={!history.canUndo} title="Undo (Cmd+Z)" aria-label="Undo"><Undo /></button>
-          <button type="button" onClick={history.redo} disabled={!history.canRedo} title="Redo (Shift+Cmd+Z)" aria-label="Redo"><Redo /></button>
+          <div className="dz-history-group">
+            <button type="button" className="dz-icon-btn" onClick={history.undo} disabled={!history.canUndo} title="Undo (Cmd+Z)" aria-label="Undo"><Undo /></button>
+            <button type="button" className="dz-icon-btn" onClick={history.redo} disabled={!history.canRedo} title="Redo (Shift+Cmd+Z)" aria-label="Redo"><Redo /></button>
+          </div>
           <span className="dz-sep" />
-          <label className="dz-toggle" title="Push every edit to the stage as you make it">
+          <label className="dz-toggle-live" title="Push every edit to the stage as you make it">
             <input type="checkbox" checked={live} onChange={(event) => setLive(event.currentTarget.checked)} />
-            <span>Live</span>
+            <span className="dz-live-indicator" data-live={live || undefined} />
+            <span>Live Stage</span>
           </label>
-          <button type="button" onClick={() => { pushLayout(layout); setStatus({ text: 'Sent to the stage', tone: 'ok' }); }}>
+          <button type="button" className="dz-btn-secondary" onClick={() => { pushLayout(layout); setStatus({ text: 'Sent to the stage', tone: 'ok' }); }}>
             Send to stage
           </button>
           <span className="dz-sep" />
-          <button type="button" onClick={() => void commit(true)}>Save as new</button>
+          <button type="button" className="dz-btn-ghost" onClick={() => void commit(true)}>Save as new</button>
           <button
             type="button"
             className="dz-primary"
@@ -667,76 +740,190 @@ export function StageDesigner() {
 
       <div className="dz-body">
         <aside className="dz-rail dz-rail-left">
-          <section className="dz-library">
-            <h2 className="dz-panel-title">Presets</h2>
-            <p className="dz-note dz-note-tight">Read-only. Opening one gives you a copy to edit.</p>
-            <ul className="dz-library-list">
-              {LAYOUT_IDS.map((id) => (
-                <li key={id}>
-                  <button
-                    type="button"
-                    className="dz-library-item"
-                    onClick={() => openLayout(
-                      cloneLayout(LAYOUTS[id], { name: nextCopyName(`${LAYOUTS[id].name} copy`, library.layouts) }),
-                      null,
-                      `Copied the ${LAYOUTS[id].name} preset`,
-                    )}
-                  >
-                    <span>{LAYOUTS[id].name}</span>
-                    <span className="dz-library-meta">{plural(LAYOUTS[id].zones.length, 'zone')}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+          {/* Segmented top switcher for Left Rail: Layouts vs Layers */}
+          <div className="dz-left-tabs">
+            <button
+              type="button"
+              className={`dz-left-tab ${leftTab === 'layouts' ? 'active' : ''}`}
+              onClick={() => setLeftTab('layouts')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+              <span>Layouts</span>
+            </button>
+            <button
+              type="button"
+              className={`dz-left-tab ${leftTab === 'layers' ? 'active' : ''}`}
+              onClick={() => setLeftTab('layers')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                <polyline points="2 17 12 22 22 17"/>
+                <polyline points="2 12 12 17 22 12"/>
+              </svg>
+              <span>Layers</span>
+              <span className="dz-left-tab-badge">{layout.zones.length}</span>
+            </button>
+          </div>
 
-            <h2 className="dz-panel-title">
-              My layouts
-              <span className="dz-panel-count">{library.layouts.length}</span>
-            </h2>
-            {library.loaded && library.layouts.length === 0 && (
-              <p className="dz-note">Nothing saved yet. Save this one to start a library.</p>
-            )}
-            <ul className="dz-library-list">
-              {library.layouts.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    className="dz-library-item"
-                    data-active={item.id === sourceId || undefined}
-                    onClick={() => openLayout(item, item.id, `Opened “${item.name}”`)}
-                  >
-                    <span>{item.name}</span>
-                    <span className="dz-library-meta">{plural(item.zones.length, 'zone')}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="dz-library-delete"
-                    title={`Delete “${item.name}”`}
-                    onClick={() => void deleteFromLibrary(item.id, item.name)}
-                  >✕</button>
-                </li>
-              ))}
-            </ul>
+          {leftTab === 'layouts' ? (
+            <div className="dz-library-scroll">
+              <section className="dz-library">
+                <div className="dz-section-header">
+                  <h2 className="dz-panel-title">Presets</h2>
+                  <span className="dz-panel-count">{LAYOUT_IDS.length}</span>
+                </div>
+                <p className="dz-note dz-note-tight">Click to switch or tweak. Custom changes are remembered.</p>
+                <div className="dz-library-grid">
+                  {LAYOUT_IDS.map((id) => {
+                    const hasCustomized = hasLayoutOverride(id);
+                    const effective = getEffectiveLayout(id, library.layouts);
+                    const isCurrent = sourceId === id || layout.id === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className="dz-preset-card"
+                        data-active={isCurrent || undefined}
+                        onClick={() => {
+                          if (layout && layout.id) {
+                            saveLayoutOverride(layout);
+                            if (sourceId && sourceId !== layout.id) {
+                              saveLayoutOverride({ ...layout, id: sourceId });
+                            }
+                          }
+                          const nextEff = getEffectiveLayout(id, library.layouts);
+                          openLayout(
+                            nextEff,
+                            id,
+                            `Opened ${LAYOUTS[id]?.name || id}${hasLayoutOverride(id) ? ' (customized)' : ''}`,
+                          );
+                        }}
+                      >
+                        <div className="dz-preset-card-top">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                            <span className="dz-preset-name">{LAYOUTS[id]?.name || id}</span>
+                            {hasCustomized && (
+                              <span
+                                style={{
+                                  color: '#FF5500',
+                                  fontSize: 13,
+                                  fontWeight: 900,
+                                  lineHeight: 1,
+                                }}
+                                title="Customized preset"
+                              >
+                                *
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            <span className="dz-preset-tag">{plural(effective.zones.length, 'zone')}</span>
+                            {hasCustomized && (
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                className="dz-preset-reset-btn"
+                                title={`Reset ${LAYOUTS[id]?.name || id} to original preset default`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeLayoutOverride(id);
+                                  const original = JSON.parse(JSON.stringify(LAYOUTS[id] || LAYOUTS.default));
+                                  if (sourceId === id || layout.id === id) {
+                                    openLayout(original, id, `Reset ${LAYOUTS[id]?.name || id} to default`);
+                                  } else {
+                                    setStatus({ text: `Reset ${LAYOUTS[id]?.name || id} to default`, tone: 'ok' });
+                                  }
+                                }}
+                              >
+                                Reset
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
-            <div className="dz-btn-row">
-              <button type="button" onClick={() => openLayout(blankLayout(), null, 'Started a new layout')}>
-                New layout
-              </button>
+                <div className="dz-section-header" style={{ marginTop: 16 }}>
+                  <h2 className="dz-panel-title">
+                    My layouts
+                  </h2>
+                  <span className="dz-panel-count">{library.layouts.length}</span>
+                </div>
+                {library.loaded && library.layouts.length === 0 && (
+                  <div className="dz-empty-library">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="12" y1="18" x2="12" y2="12"/>
+                      <line x1="9" y1="15" x2="15" y2="15"/>
+                    </svg>
+                    <p className="dz-note" style={{ margin: '6px 0 0', padding: 0 }}>Nothing saved yet.<br/>Save this one to start a library.</p>
+                  </div>
+                )}
+                <ul className="dz-library-list">
+                  {library.layouts.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className="dz-library-item"
+                        data-active={item.id === sourceId || undefined}
+                        onClick={() => {
+                          if (layout && layout.id) {
+                            saveLayoutOverride(layout);
+                            if (sourceId && sourceId !== layout.id) {
+                              saveLayoutOverride({ ...layout, id: sourceId });
+                            }
+                          }
+                          const eff = getEffectiveLayout(item.id, library.layouts);
+                          openLayout(eff, item.id, `Opened “${item.name}”`);
+                        }}
+                      >
+                        <div className="dz-library-item-content">
+                          <span className="dz-library-title">{item.name}</span>
+                          <span className="dz-library-meta">{plural(item.zones.length, 'zone')}</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="dz-library-delete"
+                        title={`Delete “${item.name}”`}
+                        onClick={() => void deleteFromLibrary(item.id, item.name)}
+                      >✕</button>
+                    </li>
+                  ))}
+                </ul>
+
+
+                <div className="dz-btn-row" style={{ marginTop: 14 }}>
+                  <button type="button" className="dz-btn-new-layout" onClick={() => openLayout(blankLayout(), null, 'Started a new layout')}>
+                    <Plus />
+                    New blank layout
+                  </button>
+                </div>
+              </section>
             </div>
-          </section>
-
-          <LayerList
-            zones={layout.zones}
-            selection={selection}
-            hiddenTypes={hiddenTypes}
-            onSelect={(id, additive) => selectZones(
-              !additive
-                ? [id]
-                : selection.includes(id) ? selection.filter((item) => item !== id) : [...selection, id],
-            )}
-            onToggle={toggleZoneFlag}
-            onReorder={moveZone}
-          />
+          ) : (
+            <div className="dz-layers-scroll">
+              <LayerList
+                zones={layout.zones}
+                selection={selection}
+                hiddenTypes={hiddenTypes}
+                onSelect={(id, additive) => selectZones(
+                  !additive
+                    ? [id]
+                    : selection.includes(id) ? selection.filter((item) => item !== id) : [...selection, id],
+                )}
+                onToggle={toggleZoneFlag}
+                onReorder={moveZone}
+              />
+            </div>
+          )}
         </aside>
 
         <main className="dz-main">
@@ -767,8 +954,8 @@ export function StageDesigner() {
                 }}
                 title="Drag to move toolbar"
               >
-                <div style={{ width: 24, height: 2.5, background: 'rgba(255, 255, 255, 0.25)', borderRadius: 2, marginBottom: 2 }} />
-                <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255, 255, 255, 0.55)', letterSpacing: '0.01em' }}>Add to layout</span>
+                <div style={{ width: 24, height: 2.5, background: 'var(--dz-line-strong)', borderRadius: 2, marginBottom: 2 }} />
+                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--dz-faint)', letterSpacing: '0.01em' }}>Add to layout</span>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -964,16 +1151,22 @@ export function StageDesigner() {
           <Inspector
             zone={selectedZone}
             selectionCount={selection.length}
+            layout={layout}
+            theme={currentLayoutTheme}
             onChange={(patch, coalesceKey) => {
               if (selection.length === 1) patchZone(selection[0], patch, coalesceKey);
             }}
+            onLayoutChange={handleLayoutChange}
+            onThemeChange={handleThemeChange}
             onDuplicate={duplicateSelection}
             onDelete={deleteSelection}
             onAlign={align}
             onDistribute={distribute}
             onFill={fillStage}
+            onAddZone={addZone}
           />
         </aside>
+
       </div>
     </div>
   );

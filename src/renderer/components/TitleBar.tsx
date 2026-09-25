@@ -1,16 +1,14 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
-import { type, fontSize, fontWeight } from '../styles/type';
-import { DOCKS, DOCK_SECTIONS, getDockTitle, type DockId } from './dock/docks';
+import { fontSize, fontWeight } from '../styles/type';
+import { DOCK_SECTIONS, getDockTitle } from './dock/docks';
 import { toggleDock } from './dock/dockController';
 import { resetDockLayout } from './dock/DockHost';
 import { useI18n } from '../../i18n/useI18n';
 
 export function TitleBar() {
   const { t } = useI18n();
-  const mode = useAppStore((s) => s.display.mode);
   const currentScene = useAppStore((s) => s.display.currentScene);
-  const previewScene = useAppStore((s) => s.display.previewScene);
   const setExternalDisplay = useAppStore((s) => s.setExternalDisplay);
   const isExternalDisplayActive = useAppStore((s) => s.display.isExternalDisplayActive);
   const activeAlert = useAppStore((s) => s.activeAlert);
@@ -29,13 +27,6 @@ export function TitleBar() {
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
   const workspaceBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  /* Blackout lives in the store, not in this component.
-   *
-   * It was `useState` here, which is why the button did nothing: the title bar
-   * turned red and no surface ever heard about it. ProgramSurface has always
-   * drawn `state.blackout`, and the display window and NDI feed have always
-   * been fed from the store — the one thing missing was the button writing
-   * there. */
   const setCurrentScene = useAppStore((s) => s.setCurrentScene);
   const clearProgram = useAppStore((s) => s.clearProgram);
   const standbyMedia = useAppStore((s) => s.standbyMedia);
@@ -46,15 +37,28 @@ export function TitleBar() {
   const uiThemeMode = useAppStore((s) => s.uiThemeMode);
   const toggleUIThemeMode = useAppStore((s) => s.toggleUIThemeMode);
 
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const isStudio = mode === 'studio';
+  const [stageOpen, setStageOpen] = useState(false);
+  const [stageBusy, setStageBusy] = useState(false);
 
   useEffect(() => {
-    if (window.BSP) {
-      window.BSP.window.isFullScreen().then(setIsFullScreen);
-      window.BSP.window.onFullScreenChange(setIsFullScreen);
-    }
+    let alive = true;
+    window.BSP?.isStageDisplayOpen?.().then((open) => { if (alive) setStageOpen(open); }).catch(() => {});
+    const off = window.BSP?.onStageDisplayState?.((open) => setStageOpen(open));
+    return () => { alive = false; off?.(); };
   }, []);
+
+  const toggleStageDisplay = useCallback(async () => {
+    if (stageBusy) return;
+    setStageBusy(true);
+    try {
+      if (stageOpen) await window.BSP?.closeStageDisplay?.();
+      else await window.BSP?.openStageDisplay?.();
+    } catch {
+      /* Broadcast is source of truth */
+    } finally {
+      setStageBusy(false);
+    }
+  }, [stageOpen, stageBusy]);
 
   const [ndiStatus, setNdiStatus] = useState<{ running: boolean; connections: number } | null>(null);
 
@@ -64,16 +68,19 @@ export function TitleBar() {
     };
     checkNdi();
     const timer = setInterval(checkNdi, 2500);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+    };
   }, []);
 
   // Global Logo Hotkey (Ctrl+L / Cmd+L)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
-        const target = e.target as HTMLElement | null;
-        const tag = target?.tagName?.toLowerCase();
-        if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) return;
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) {
+          return;
+        }
         e.preventDefault();
         clearProgram();
         notify({
@@ -85,157 +92,45 @@ export function TitleBar() {
         });
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [clearProgram, standbyMedia, notify]);
 
-  // Click-outside and escape listener for Workspace Dropdown
+  // Close workspace dropdown on outside click
   useEffect(() => {
-    if (!workspaceMenuOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node | null;
+    const handleClickOutside = (e: MouseEvent) => {
       if (
+        workspaceMenuOpen &&
         workspaceMenuRef.current &&
-        !workspaceMenuRef.current.contains(target) &&
+        !workspaceMenuRef.current.contains(e.target as Node) &&
         workspaceBtnRef.current &&
-        !workspaceBtnRef.current.contains(target)
+        !workspaceBtnRef.current.contains(e.target as Node)
       ) {
         setWorkspaceMenuOpen(false);
       }
     };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setWorkspaceMenuOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', handleClick);
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('mousedown', handleClick);
-      window.removeEventListener('keydown', handleKey);
-    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [workspaceMenuOpen]);
+
+  const toggleBlackout = () => {
+    setBlackout(!isBlackout);
+  };
 
   const toggleNdi = async () => {
     if (ndiStatus?.running) {
       await window.BSP?.ndi?.stop?.();
-      notify({
-        id: `ndi-${Date.now()}`,
-        text: t('app.ndiStopped'),
-        type: 'info',
-        duration: 3,
-        animation: 'slideDown',
-      });
+      setNdiStatus((s) => s ? { ...s, running: false } : null);
     } else {
-      const res = await window.BSP?.ndi?.start?.();
-      if (res?.ok) {
-        notify({
-          id: `ndi-${Date.now()}`,
-          text: t('app.ndiLive'),
-          type: 'info',
-          duration: 4,
-          animation: 'slideDown',
-        });
-      } else if (res?.error) {
-        notify({
-          id: `ndi-${Date.now()}`,
-          text: t('app.ndiError', { error: res.error }),
-          type: 'warning',
-          duration: 5,
-          animation: 'slideDown',
-        });
-      }
+      await window.BSP?.ndi?.start?.({ name: 'Bible Song Pro Studio', fps: 30, width: 1920, height: 1080 });
+      setNdiStatus((s) => s ? { ...s, running: true } : { running: true, connections: 0 });
     }
-    window.BSP?.ndi?.status?.().then((st) => setNdiStatus(st ? { running: Boolean(st.running), connections: st.connections || 0 } : null)).catch(() => {});
   };
-
-
-  const toggleBlackout = () => {
-    const next = !isBlackout;
-    setBlackout(next);
-    /* The operator's own confirmation. It must not go out as a room alert —
-       painting "BLACKOUT ACTIVE" across the screen you just blacked out is
-       the one thing blackout exists to prevent. */
-    notify({
-      id: `blackout-${Date.now()}`,
-      text: next ? t('app.blackoutActive') : t('app.blackoutCleared'),
-      type: next ? 'warning' : 'info',
-      duration: 3,
-      animation: 'slideDown',
-    });
-  };
-
-  const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
-  const [isModalDragging, setIsModalDragging] = useState(false);
-  const modalPosRef = useRef({ x: 0, y: 0 });
-  modalPosRef.current = modalPosition;
-  const isDraggingRef = useRef(false);
-  const dragStartRef = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    if (showAlertModal) {
-      setModalPosition({ x: 0, y: 0 });
-    }
-  }, [showAlertModal]);
-
-  useEffect(() => {
-    if (!showAlertModal) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowAlertModal(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAlertModal]);
-
-  const handleModalMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (target.closest('button, input, select, textarea, a, [role="button"]')) return;
-
-    setIsModalDragging(true);
-    isDraggingRef.current = true;
-    dragStartRef.current = {
-      x: e.clientX - modalPosRef.current.x,
-      y: e.clientY - modalPosRef.current.y,
-    };
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!isDraggingRef.current) return;
-      const newX = moveEvent.clientX - dragStartRef.current.x;
-      const newY = moveEvent.clientY - dragStartRef.current.y;
-      setModalPosition({ x: newX, y: newY });
-    };
-
-    const handleMouseUp = () => {
-      setIsModalDragging(false);
-      isDraggingRef.current = false;
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  }, []);
 
   const handleSendAlert = () => {
     if (!alertText.trim()) return;
-    triggerAlert({
-      id: String(Date.now()),
-      text: alertText.trim(),
-      type: alertType,
-      position: alertPosition,
-      duration: alertDuration,
-      animation: 'slideDown',
-    });
-    notify({
-      id: `alert-sent-${Date.now()}`,
-      text: `Alert broadcast to screens: "${alertText.trim()}"`,
-      type: 'info',
-      duration: 3,
-      animation: 'slideDown',
-    });
+    triggerAlert({ id: `alert-${Date.now()}`, text: alertText.trim(), type: alertType, position: alertPosition, duration: alertDuration });
+    setShowAlertModal(false);
   };
 
   return (
@@ -243,7 +138,6 @@ export function TitleBar() {
       {/* Left: window drag region and the dock pill tabs */}
       <div className="titlebar-drag" style={styles.dragLeft}>
         <div style={styles.brand}>
-          {/* The small cut: at 24px the six-element mark collapses into a blob. */}
           <img src="./bible-song-pro-icon-small.svg" alt="" style={styles.logo} />
           <span style={styles.wordmark}>
             Bible Song Pro<sup style={styles.sup}>Studio</sup>
@@ -267,7 +161,7 @@ export function TitleBar() {
               border: '1px solid',
               borderColor: workspaceMenuOpen ? 'var(--border-primary, rgba(255, 255, 255, 0.18))' : 'transparent',
               borderRadius: 4,
-              color: 'var(--text-secondary, #d4d4d8)',
+              color: 'var(--text-dim)',
               fontSize: 11,
               fontWeight: 600,
               letterSpacing: '0.04em',
@@ -299,6 +193,33 @@ export function TitleBar() {
             </svg>
           </button>
 
+          {/* Workspace Layout Lock Button next to Docks */}
+          <button
+            className="titlebar-icon-btn"
+            style={{
+              ...styles.toolbarBtn,
+              marginLeft: 4,
+              background: isWorkspaceLocked ? 'rgba(234, 179, 8, 0.16)' : 'transparent',
+              borderColor: isWorkspaceLocked ? 'rgba(234, 179, 8, 0.4)' : 'transparent',
+              color: isWorkspaceLocked ? '#EAB308' : 'var(--text-dim)',
+            }}
+            onClick={toggleWorkspaceLocked}
+            title={isWorkspaceLocked ? 'Workspace Locked — Layout and docks cannot be moved (Click to Unlock)' : 'Lock Workspace Layout to prevent accidental moves'}
+            aria-label="Lock Workspace"
+          >
+            {isWorkspaceLocked ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+              </svg>
+            )}
+          </button>
+
           {workspaceMenuOpen && (
             <div
               ref={workspaceMenuRef}
@@ -327,45 +248,40 @@ export function TitleBar() {
                   {section.docks.map((dock) => {
                     const isPopped = poppedOutDockIds.includes(dock.id);
                     const isOpen = isPopped || openDockIds.includes(dock.id);
-                    const title = getDockTitle(dock.id);
                     return (
                       <button
                         key={dock.id}
                         type="button"
-                        className="workspace-menu-item"
                         onClick={() => {
-                          if (isPopped) {
-                            void window.BSP?.dock?.focusPopout?.(dock.id);
-                          } else {
-                            toggleDock(dock.id as DockId);
-                          }
+                          toggleDock(dock.id);
                         }}
                         style={{
-                          width: '100%',
-                          height: 28,
-                          padding: '0 14px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
+                          width: '100%',
+                          padding: '6px 12px',
                           background: 'transparent',
                           border: 'none',
-                          color: isOpen ? '#38bdf8' : '#e4e4e7',
+                          color: isOpen ? '#ffffff' : 'var(--text-secondary, #a1a1aa)',
                           fontSize: 12,
-                          fontWeight: isOpen ? 500 : 400,
+                          fontWeight: isOpen ? 600 : 400,
                           cursor: 'pointer',
                           textAlign: 'left',
                           transition: 'background 0.1s',
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                          e.currentTarget.style.color = '#ffffff';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = isOpen ? '#ffffff' : 'var(--text-secondary, #a1a1aa)';
                         }}
                       >
-                        <span>{title}</span>
+                        <span>{getDockTitle(dock.id)}</span>
                         {isOpen && (
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent, #6366f1)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="20 6 9 17 4 12" />
                           </svg>
                         )}
@@ -376,24 +292,22 @@ export function TitleBar() {
               ))}
 
               <div style={{ height: 1, background: 'rgba(255, 255, 255, 0.08)', margin: '6px 0' }} />
-
               <button
                 type="button"
-                className="workspace-menu-item"
                 onClick={() => {
                   setWorkspaceMenuOpen(false);
                   resetDockLayout();
                 }}
                 style={{
-                  width: '100%',
-                  height: 28,
-                  padding: '0 14px',
                   display: 'flex',
                   alignItems: 'center',
+                  width: '100%',
+                  padding: '6px 12px',
                   background: 'transparent',
                   border: 'none',
                   color: 'var(--text-secondary, #a1a1aa)',
-                  fontSize: 12,
+                  fontSize: 11,
+                  fontWeight: 500,
                   cursor: 'pointer',
                   textAlign: 'left',
                   transition: 'background 0.1s',
@@ -414,6 +328,119 @@ export function TitleBar() {
         </div>
       </div>
 
+      {/* Center: Outputs & Displays Toolbar (Audience, Stage, NDI) */}
+      <div
+        className="titlebar-center"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          flexShrink: 0,
+          ...({ WebkitAppRegion: 'no-drag' } as any),
+        }}
+      >
+        {/* Audience Display Button */}
+        <button
+          type="button"
+          className="titlebar-icon-btn titlebar-display-btn"
+          style={{
+            ...styles.displayOutputBtn,
+            background: isExternalDisplayActive ? 'rgba(99, 102, 241, 0.16)' : 'transparent',
+            borderColor: isExternalDisplayActive ? 'rgba(99, 102, 241, 0.4)' : 'transparent',
+            color: isExternalDisplayActive ? 'var(--accent, #6366F1)' : 'var(--text-dim)',
+          }}
+          onClick={async () => {
+            if (isExternalDisplayActive) {
+              await window.BSP?.display.close();
+              setExternalDisplay(false);
+            } else {
+              await window.BSP?.display.open();
+              setExternalDisplay(true);
+            }
+          }}
+          title={isExternalDisplayActive ? 'Audience Display Active (Projector/Screen) — Click to Close' : 'Open Audience Display Window (Projector/Screen)'}
+          aria-label="Audience Display"
+        >
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            {isExternalDisplayActive && (
+              <span style={{ position: 'absolute', top: -2, right: -5, width: 5, height: 5, borderRadius: '50%', background: 'var(--tally-preview, #22c55e)', boxShadow: '0 0 6px var(--tally-preview, #22c55e)' }} />
+            )}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.03em', lineHeight: 1 }}>
+            Audience
+          </span>
+        </button>
+
+        {/* Stage Display Button */}
+        <button
+          type="button"
+          className="titlebar-icon-btn titlebar-display-btn"
+          style={{
+            ...styles.displayOutputBtn,
+            background: stageOpen ? 'rgba(255, 85, 0, 0.16)' : 'transparent',
+            borderColor: stageOpen ? 'rgba(255, 85, 0, 0.4)' : 'transparent',
+            color: stageOpen ? 'var(--tally-program, #FF5500)' : 'var(--text-dim)',
+            cursor: stageBusy ? 'progress' : 'pointer',
+            opacity: stageBusy ? 0.7 : 1,
+          }}
+          onClick={toggleStageDisplay}
+          title={stageOpen ? 'Stage Display Active (Confidence Monitor) — Click to Close' : 'Open Stage Display Window (Confidence Monitor)'}
+          aria-label="Stage Display"
+          aria-pressed={stageOpen}
+        >
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="12" rx="2" />
+              <path d="M2 20h20" />
+              <path d="M7 16l-2 4" />
+              <path d="M17 16l2 4" />
+            </svg>
+            {stageOpen && (
+              <span style={{ position: 'absolute', top: -2, right: -5, width: 5, height: 5, borderRadius: '50%', background: 'var(--tally-program, #FF5500)', boxShadow: '0 0 6px rgba(255,85,0,0.8)' }} />
+            )}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.03em', lineHeight: 1 }}>
+            Stage
+          </span>
+        </button>
+
+        {/* NDI Quick Toggle Button */}
+        <button
+          type="button"
+          className="titlebar-icon-btn titlebar-display-btn"
+          style={{
+            ...styles.displayOutputBtn,
+            background: ndiStatus?.running ? 'rgba(59, 130, 246, 0.16)' : 'transparent',
+            borderColor: ndiStatus?.running ? 'rgba(59, 130, 246, 0.4)' : 'transparent',
+            color: ndiStatus?.running ? 'var(--tally-link, #3b82f6)' : 'var(--text-dim)',
+          }}
+          onClick={toggleNdi}
+          title={ndiStatus?.running ? `NDI Streaming Active (${ndiStatus.connections} receiver connected) - Click to Stop` : 'Start NDI Stream for OBS / vMix'}
+          aria-label="NDI Stream"
+        >
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 16.1A5 5 0 0 1 5.9 20" />
+              <path d="M2 12.05A9 9 0 0 1 9.95 20" />
+              <path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+              <line x1="2" y1="20" x2="2.01" y2="20" strokeWidth="2.5" />
+            </svg>
+            {ndiStatus?.running && (
+              <span style={{ position: 'absolute', top: -2, right: -5, width: 5, height: 5, borderRadius: '50%', background: 'var(--tally-preview, #22c55e)', boxShadow: '0 0 6px var(--tally-preview, #22c55e)' }} />
+            )}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.03em', lineHeight: 1 }}>
+            NDI
+          </span>
+        </button>
+      </div>
+
       {/* Right Controls: Live status, Black, Toolbar & Window Actions */}
       <div style={styles.controlsRight}>
         {/* Live / Standby / Blackout Dynamic Status Pill */}
@@ -427,12 +454,12 @@ export function TitleBar() {
               ? 'rgba(239, 68, 68, 0.15)'
               : currentScene
               ? 'var(--bsp-signal-wash)'
-              : 'var(--chrome-control)',
+              : 'transparent',
             borderColor: isBlackout
               ? 'rgba(239, 68, 68, 0.4)'
               : currentScene
               ? 'var(--bsp-signal-glow)'
-              : 'var(--border-primary)',
+              : 'transparent',
             color: isBlackout
               ? '#EF4444'
               : currentScene
@@ -474,9 +501,9 @@ export function TitleBar() {
           className="titlebar-logo-btn"
           style={{
             ...styles.blackBtn,
-            background: !currentScene && standbyMedia ? 'rgba(99, 102, 241, 0.2)' : 'var(--chrome-control)',
-            borderColor: !currentScene && standbyMedia ? 'var(--accent)' : 'var(--border-primary)',
-            color: !currentScene && standbyMedia ? 'var(--accent)' : 'var(--text-secondary)',
+            background: !currentScene && standbyMedia ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+            borderColor: !currentScene && standbyMedia ? 'var(--accent)' : 'transparent',
+            color: !currentScene && standbyMedia ? 'var(--accent)' : 'var(--text-dim)',
           }}
           onClick={() => {
             clearProgram();
@@ -498,9 +525,9 @@ export function TitleBar() {
           className="titlebar-black-btn"
           style={{
             ...styles.blackBtn,
-            background: isBlackout ? 'var(--tally-fault)' : 'var(--chrome-control)',
-            borderColor: isBlackout ? 'var(--tally-fault)' : 'var(--border-primary)',
-            color: isBlackout ? '#ffffff' : 'var(--text-secondary)',
+            background: isBlackout ? 'var(--tally-fault)' : 'transparent',
+            borderColor: isBlackout ? 'var(--tally-fault)' : 'transparent',
+            color: isBlackout ? '#ffffff' : 'var(--text-dim)',
           }}
           onClick={toggleBlackout}
           title={isBlackout ? 'Blackout is ON — click to restore the audience screens' : 'Black out every audience screen'}
@@ -511,345 +538,171 @@ export function TitleBar() {
 
         <div style={styles.divider} />
 
-        {/* Quick Toolbar Action Buttons: Outputs, NDI, Alerts, Settings */}
+        {/* Quick Toolbar Action Buttons: Alerts, Settings, Theme */}
         <div style={styles.toolbarGroup}>
-          {/* Workspace Layout Lock Button */}
-          <button
-            className="titlebar-icon-btn"
-            style={{
-              ...styles.toolbarBtn,
-              background: isWorkspaceLocked ? 'rgba(234, 179, 8, 0.18)' : styles.toolbarBtn.background,
-              borderColor: isWorkspaceLocked ? '#EAB308' : 'var(--border-primary)',
-              color: isWorkspaceLocked ? '#EAB308' : 'var(--text-secondary)',
-            }}
-            onClick={toggleWorkspaceLocked}
-            title={isWorkspaceLocked ? 'Workspace Locked — Layout and docks cannot be moved (Click to Unlock)' : 'Lock Workspace Layout to prevent accidental moves'}
-            aria-label="Lock Workspace"
-          >
-            {isWorkspaceLocked ? (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            ) : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-              </svg>
-            )}
-          </button>
-
-          {/* Audience Display Button */}
-          <button
-            className="titlebar-icon-btn"
-            style={{
-              ...styles.toolbarBtn,
-              background: isExternalDisplayActive ? 'rgba(99, 102, 241, 0.18)' : styles.toolbarBtn.background,
-              borderColor: isExternalDisplayActive ? 'var(--accent)' : 'var(--border-primary)',
-              color: isExternalDisplayActive ? 'var(--accent)' : 'var(--text-secondary)',
-            }}
-            onClick={async () => {
-              if (isExternalDisplayActive) {
-                await window.BSP?.display.close();
-                setExternalDisplay(false);
-              } else {
-                await window.BSP?.display.open();
-                setExternalDisplay(true);
-              }
-            }}
-            title={isExternalDisplayActive ? 'Audience Display Active (Projector/Screen) — Click to Close' : 'Open Audience Display Window (Projector/Screen)'}
-            aria-label="Audience Display"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" />
-              <line x1="8" y1="21" x2="16" y2="21" />
-              <line x1="12" y1="17" x2="12" y2="21" />
-            </svg>
-            {isExternalDisplayActive && (
-              <span style={{ position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: '50%', background: 'var(--tally-preview)', boxShadow: '0 0 6px var(--tally-preview)' }} />
-            )}
-          </button>
-
-          {/* NDI Quick Toggle Button */}
-          <button
-            className="titlebar-icon-btn"
-            style={{
-              ...styles.toolbarBtn,
-              background: ndiStatus?.running ? 'rgba(59, 130, 246, 0.18)' : styles.toolbarBtn.background,
-              borderColor: ndiStatus?.running ? 'var(--tally-link)' : 'var(--border-primary)',
-              color: ndiStatus?.running ? 'var(--tally-link)' : 'var(--text-secondary)',
-            }}
-            onClick={toggleNdi}
-            title={ndiStatus?.running ? `NDI Streaming Active (${ndiStatus.connections} receiver connected) - Click to Stop` : 'Start NDI Stream for OBS / vMix'}
-            aria-label="NDI Stream"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 16.1A5 5 0 0 1 5.9 20" />
-              <path d="M2 12.05A9 9 0 0 1 9.95 20" />
-              <path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
-              <line x1="2" y1="20" x2="2.01" y2="20" strokeWidth="2.5" />
-            </svg>
-            {ndiStatus?.running && (
-              <span style={{ position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: '50%', background: 'var(--tally-preview)', boxShadow: '0 0 6px var(--tally-preview)' }} />
-            )}
-          </button>
-
           {/* Alerts Button */}
           <button
-            className="titlebar-icon-btn"
+            type="button"
+            className="titlebar-icon-btn titlebar-display-btn"
             style={{
-              ...styles.toolbarBtn,
-              background: activeAlert ? 'rgba(255, 85, 0, 0.2)' : styles.toolbarBtn.background,
-              borderColor: activeAlert ? '#FF5500' : 'var(--border-primary)',
-              color: activeAlert ? '#FF5500' : 'var(--text-secondary)',
+              ...styles.toolbarActionBtn,
+              background: activeAlert || showAlertModal ? 'rgba(255, 85, 0, 0.16)' : 'transparent',
+              borderColor: activeAlert || showAlertModal ? 'rgba(255, 85, 0, 0.4)' : 'transparent',
+              color: activeAlert || showAlertModal ? '#FF5500' : 'var(--text-dim)',
             }}
             onClick={() => setShowAlertModal((v) => !v)}
             title={activeAlert ? `Alert ON AIR: "${activeAlert.text}" — Click to manage` : 'Broadcast On-Screen Alert to Display Screens'}
             aria-label="Alerts"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            {activeAlert && (
-              <span style={{ position: 'absolute', top: 4, right: 4, width: 5, height: 5, borderRadius: '50%', background: '#FF5500', boxShadow: '0 0 6px #FF5500' }} />
-            )}
-          </button>
-
-          {/* Setlists & Service Schedule Manager Button */}
-          <button
-            className="titlebar-icon-btn"
-            style={styles.toolbarBtn}
-            onClick={() => window.dispatchEvent(new CustomEvent('bsp:open-setlists'))}
-            title="Service Setlists & Schedules Manager"
-            aria-label="Service Setlists"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
-          </button>
-
-          {/* Keyboard Shortcuts Button */}
-          <button
-            className="titlebar-icon-btn"
-            style={styles.toolbarBtn}
-            onClick={() => useAppStore.getState().openShortcuts()}
-            title="Keyboard Shortcuts Cheat Sheet (? / ⌘/ / F1)"
-            aria-label="Keyboard Shortcuts"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {activeAlert && (
+                <span style={{ position: 'absolute', top: -2, right: -5, width: 5, height: 5, borderRadius: '50%', background: '#FF5500', boxShadow: '0 0 6px #FF5500' }} />
+              )}
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.03em', lineHeight: 1 }}>
+              Alerts
+            </span>
           </button>
 
           {/* Settings Button */}
           <button
-            className="titlebar-icon-btn"
-            style={styles.toolbarBtn}
+            type="button"
+            className="titlebar-icon-btn titlebar-display-btn"
+            style={styles.toolbarActionBtn}
             onClick={() => useAppStore.getState().openSettings('output')}
             title={t('app.openSettings')}
             aria-label={t('common.settings')}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.03em', lineHeight: 1 }}>
+              Settings
+            </span>
           </button>
 
           {/* UI Theme Switcher Button (Brand Identity Light / Dark Mode) */}
           <button
-            className="titlebar-icon-btn"
+            type="button"
+            className="titlebar-icon-btn titlebar-display-btn"
             style={{
-              ...styles.toolbarBtn,
-              color: uiThemeMode === 'light' ? 'var(--accent)' : 'var(--text-secondary)',
+              ...styles.toolbarActionBtn,
+              color: 'var(--text-dim)',
             }}
             onClick={toggleUIThemeMode}
             title={uiThemeMode === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
             aria-label="Toggle UI Theme"
           >
-            {uiThemeMode === 'dark' ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {uiThemeMode === 'dark' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" />
+                  <line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              )}
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.03em', lineHeight: 1 }}>
+              Theme
+            </span>
           </button>
         </div>
-
-        {/* No window controls here — the OS frame already draws them. */}
       </div>
 
-      {/* On-Screen Display Alert Trigger Modal Dialog */}
+      {/* Broadcast Alerts Modal */}
       {showAlertModal && (
         <div
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            inset: 0,
             background: 'transparent',
             pointerEvents: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 9999,
-            padding: 20,
+            zIndex: 999999,
           }}
         >
           <div
             style={{
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-primary)',
+              width: 440,
+              background: '#18181b',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
               borderRadius: 12,
-              padding: 24,
-              maxWidth: 480,
-              width: '100%',
-              boxShadow: '0 16px 36px rgba(0, 0, 0, 0.6)',
+              boxShadow: '0 24px 48px rgba(0, 0, 0, 0.8)',
+              padding: 20,
               display: 'flex',
               flexDirection: 'column',
               gap: 16,
+              color: '#FFF',
+              fontFamily: 'var(--font-ui)',
               pointerEvents: 'auto',
-              transform: `translate3d(${modalPosition.x}px, ${modalPosition.y}px, 0px)`,
             }}
           >
-            {/* Header (Draggable Handle) */}
-            <div
-              onMouseDown={handleModalMouseDown}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: isModalDragging ? 'grabbing' : 'grab',
-                userSelect: 'none',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: 'rgba(255, 85, 0, 0.15)',
-                    border: '1px solid rgba(255, 85, 0, 0.4)',
-                    color: '#FF5500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                    Project On-Screen Alert
-                  </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: 12, color: 'var(--text-dim)' }}>
-                    Broadcast a ticker alert to audience and stage display screens
-                  </p>
-                </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                <span style={{ fontSize: 15, fontWeight: 700 }}>Broadcast Screen Alert</span>
               </div>
               <button
                 onClick={() => setShowAlertModal(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-dim)',
-                  fontSize: 16,
-                  cursor: 'pointer',
-                  padding: 4,
-                }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 16 }}
               >
                 ✕
               </button>
             </div>
 
-            {/* Active Alert Banner if running */}
-            {activeAlert && (
-              <div
-                style={{
-                  padding: '10px 14px',
-                  background: 'rgba(255, 85, 0, 0.12)',
-                  border: '1px solid rgba(255, 85, 0, 0.4)',
-                  borderRadius: 8,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                }}
-              >
-                <div style={{ fontSize: 13, color: '#FF5500', fontWeight: 600 }}>
-                  Active On Air: <strong>"{activeAlert.text}"</strong>
-                </div>
-                <button
-                  className="btn btn-sm"
-                  onClick={() => dismissAlert()}
-                  style={{
-                    background: '#EF4444',
-                    color: '#FFF',
-                    fontSize: 12,
-                    padding: '4px 10px',
-                    borderRadius: 4,
-                    border: 'none',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Clear Alert
-                </button>
-              </div>
-            )}
-
-            {/* Input Message */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)' }}>
                 Alert Message
               </label>
               <input
+                type="text"
                 className="input"
                 value={alertText}
                 onChange={(e) => setAlertText(e.target.value)}
-                placeholder="Enter alert text..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSendAlert();
+                }}
+                placeholder="e.g. Nursery Alert: #402 please come to nursery"
+                autoFocus
                 style={{
                   height: 38,
-                  padding: '0 12px',
+                  padding: '0 10px',
                   fontSize: 13,
                   borderRadius: 6,
                   border: '1px solid var(--border-primary)',
                   background: 'var(--chrome-control)',
                   color: 'var(--text-primary)',
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSendAlert();
-                  }
-                }}
               />
             </div>
 
-            {/* Alert Controls Row 1: Severity & Position */}
+            {/* Alert Controls Row 1: Type & Position */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Alert Style / Severity
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)' }}>
+                  Banner Type
                 </label>
                 <select
                   className="input"
@@ -872,7 +725,7 @@ export function TitleBar() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)' }}>
                   Screen Position
                 </label>
                 <select
@@ -897,7 +750,7 @@ export function TitleBar() {
 
             {/* Alert Controls Row 2: Duration */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)' }}>
                 Display Duration
               </label>
               <select
@@ -969,7 +822,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 54,
+    height: 60,
     padding: '0 16px',
     background: 'var(--bg-primary)',
     borderBottom: '1px solid var(--block-line)',
@@ -1013,78 +866,26 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 0,
     color: 'var(--text-dim)',
   },
-  pillContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    height: 32,
-    background: 'var(--chrome-control)',
-    borderRadius: 7,
-    padding: 2,
-    gap: 2,
-    border: '1px solid var(--border-primary)',
-    boxSizing: 'border-box',
-  },
-  pillGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 2,
-    height: '100%',
-  },
-  /* A hairline break between groups */
-  pillDivider: {
-    width: 1,
-    height: 16,
-    margin: '0 4px',
-    background: 'var(--block-line)',
-    opacity: 0.8,
-    flexShrink: 0,
-  },
-  pillBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 26,
-    padding: '0 11px',
-    border: '1px solid transparent',
-    borderRadius: 5,
-    fontSize: 12,
-    letterSpacing: '-0.01em',
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-    fontFamily: 'var(--font-ui)',
-    boxSizing: 'border-box',
-    userSelect: 'none',
-  },
   controlsRight: {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 10,
-  },
-  takeGroup: {
-    display: 'flex',
-    gap: 6,
-  },
-  takeBtn: {
-    height: 32,
-    padding: '0 12px',
-    fontSize: 12,
-    fontWeight: 600,
-    borderRadius: 7,
-    boxSizing: 'border-box',
+    flex: 1,
   },
   liveBadge: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    height: 32,
-    padding: '0 11px',
+    height: 28,
+    padding: '0 10px',
     fontSize: 11,
     fontWeight: 700,
     color: 'var(--text-primary)',
-    borderRadius: 7,
-    background: 'var(--chrome-control)',
-    border: '1px solid var(--border-primary)',
+    borderRadius: 4,
+    background: 'transparent',
+    border: '1px solid transparent',
     letterSpacing: '0.06em',
     boxSizing: 'border-box',
     fontFamily: 'var(--font-ui)',
@@ -1101,10 +902,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 32,
-    padding: '0 12px',
-    border: '1px solid var(--border-primary)',
-    borderRadius: 7,
+    height: 28,
+    padding: '0 10px',
+    border: '1px solid transparent',
+    background: 'transparent',
+    borderRadius: 4,
     fontSize: 11,
     fontWeight: 700,
     cursor: 'pointer',
@@ -1116,30 +918,65 @@ const styles: Record<string, React.CSSProperties> = {
   toolbarGroup: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+  },
+    toolbarActionBtn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    padding: '3px 8px',
+    border: '1px solid transparent',
+    background: 'transparent',
+    borderRadius: 5,
+    cursor: 'pointer',
+    color: 'var(--text-dim)',
+    transition: 'all 0.12s ease',
+    flexShrink: 0,
+    boxSizing: 'border-box',
+    gap: 4,
+    position: 'relative',
+  },
+  displayOutputBtn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    padding: '3px 10px',
+    border: '1px solid transparent',
+    background: 'transparent',
+    borderRadius: 5,
+    cursor: 'pointer',
+    color: 'var(--text-dim)',
+    transition: 'all 0.12s ease',
+    flexShrink: 0,
+    boxSizing: 'border-box',
+    gap: 4,
   },
   toolbarBtn: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 24,
     padding: 0,
-    border: '1px solid var(--border-primary)',
-    background: 'var(--chrome-control)',
-    borderRadius: 7,
+    border: '1px solid transparent',
+    background: 'transparent',
+    borderRadius: 4,
     cursor: 'pointer',
-    color: 'var(--text-secondary)',
-    transition: 'all 0.15s ease',
+    color: 'var(--text-dim)',
+    transition: 'all 0.12s ease',
     flexShrink: 0,
     boxSizing: 'border-box',
     position: 'relative',
   },
   divider: {
     width: 1,
-    height: 20,
-    background: 'var(--block-line)',
-    margin: '0 2px',
+    height: 16,
+    background: 'rgba(255, 255, 255, 0.12)',
+    margin: '0 4px',
     flexShrink: 0,
   },
 };
