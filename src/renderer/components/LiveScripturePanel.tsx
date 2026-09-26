@@ -39,9 +39,10 @@ export function LiveScripturePanel() {
   const setTranscription = useAppStore((s) => s.setTranscription);
   const projectScene = useAppStore((s) => s.projectScene);
   const songs = useAppStore((s) => s.songs);
+  const currentBibleVersion = useAppStore((s) => s.currentBibleVersion);
 
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
-  const [version, setVersion] = useState('KJV');
+  const [version, setVersion] = useState('follow_bible');
   const [versions, setVersions] = useState<Array<{ id: string; abbreviation: string; name: string }>>([]);
   const [engine, setEngine] = useState<'local' | 'deepgram'>('local');
   const engineRef = useRef<'local' | 'deepgram'>('local');
@@ -304,7 +305,10 @@ export function LiveScripturePanel() {
     }
 
     const versionRequest = isFinal ? detectVersionRequest(cleaned, versions) : null;
-    let detectionVersion = version;
+    const effectiveVersion = (version === 'follow_bible' || !version)
+      ? (currentBibleVersion?.id || currentBibleVersion?.abbreviation || 'KJV')
+      : version;
+    let detectionVersion = effectiveVersion;
     if (versionRequest) {
       if (prefsBeforeDetection.autoVersionSwitch) {
         detectionVersion = versionRequest.versionId;
@@ -711,12 +715,16 @@ export function LiveScripturePanel() {
     setVersion(targetVersionId);
     setLive({ requestedVersion: null });
 
+    const effectiveTargetVersion = (targetVersionId === 'follow_bible')
+      ? (currentBibleVersion?.id || currentBibleVersion?.abbreviation || 'KJV')
+      : targetVersionId;
+
     const currentHit = live.bestHit || candidateStabilityRef.current.retainedHit;
     if (!currentHit) return;
 
     try {
       const chapterRes = await window.BSP?.bible?.getChapter({
-        versionId: targetVersionId,
+        versionId: effectiveTargetVersion,
         book: currentHit.book,
         chapter: currentHit.chapter,
       }).catch(() => null);
@@ -728,7 +736,7 @@ export function LiveScripturePanel() {
       const updatedHit: BibleSearchResult = {
         ...currentHit,
         text: newText,
-        version: targetVersionId,
+        version: effectiveTargetVersion,
       };
 
       setLive({ bestHit: updatedHit });
@@ -745,15 +753,15 @@ export function LiveScripturePanel() {
           prevSuggestions.map(async (sug) => {
             if (sug.book === currentHit.book && sug.chapter === currentHit.chapter) {
               const v = verses.find((x) => Number(x.verse) === Number(sug.verse));
-              return { ...sug, text: v?.text || sug.text, version: targetVersionId };
+              return { ...sug, text: v?.text || sug.text, version: effectiveTargetVersion };
             }
             const chRes = await window.BSP?.bible?.getChapter({
-              versionId: targetVersionId,
+              versionId: effectiveTargetVersion,
               book: sug.book,
               chapter: sug.chapter,
             }).catch(() => null);
             const v = extractVerses(chRes).find((x) => Number(x.verse) === Number(sug.verse));
-            return { ...sug, text: v?.text || sug.text, version: targetVersionId };
+            return { ...sug, text: v?.text || sug.text, version: effectiveTargetVersion };
           })
         );
         setLive({ suggestions: updatedSuggestions });
@@ -1534,10 +1542,16 @@ export function LiveScripturePanel() {
                   onChange={(val) => {
                     handleVersionChange(val);
                   }}
-                  options={(versions.length ? versions : [{ id: 'KJV', abbreviation: 'KJV', name: 'King James Version' }]).map((v) => ({
-                    value: v.id,
-                    label: `${v.abbreviation} - ${v.name}`,
-                  }))}
+                  options={[
+                    {
+                      value: 'follow_bible',
+                      label: `Follow Bible (${currentBibleVersion?.abbreviation || 'KJV'})`,
+                    },
+                    ...(versions.length ? versions : [{ id: 'KJV', abbreviation: 'KJV', name: 'King James Version' }]).map((v) => ({
+                      value: v.id,
+                      label: `${v.abbreviation} - ${v.name}`,
+                    })),
+                  ]}
                   buttonStyle={{ width: 220, justifyContent: 'space-between' }}
                   title="Select Bible Version"
                 />
@@ -1712,15 +1726,22 @@ export function LiveScripturePanel() {
             )}
             bodyStyle={{ display: 'flex', flexDirection: 'column' }}
           >
-            {live.bestHit ? (
-              <button style={styles.hit} onClick={() => sendHit(live.bestHit!, { goLive: true, confidence: rankedDetections[0]?.confidence, sourceMode: rankedDetections[0]?.mode })}>
-                <div style={styles.primaryReferenceRow}>
-                  <strong style={styles.primaryReference}>{live.bestHit.reference}</strong>
-                  <span style={styles.versionBadge}>{live.bestHit.version || version}</span>
-                </div>
-                <span style={styles.primaryText}>{live.bestHit.text}</span>
-              </button>
-            ) : <div style={styles.placeholder}>Top detected verse will appear here.</div>}
+            {(() => {
+              const effectiveDisplayVersion = (version === 'follow_bible' || !version) ? (currentBibleVersion?.abbreviation || 'KJV') : version;
+              return (
+                <>
+                  {live.bestHit ? (
+                    <button style={styles.hit} onClick={() => sendHit(live.bestHit!, { goLive: true, confidence: rankedDetections[0]?.confidence, sourceMode: rankedDetections[0]?.mode })}>
+                      <div style={styles.primaryReferenceRow}>
+                        <strong style={styles.primaryReference}>{live.bestHit.reference}</strong>
+                        <span style={styles.versionBadge}>{live.bestHit.version || effectiveDisplayVersion}</span>
+                      </div>
+                      <span style={styles.primaryText}>{live.bestHit.text}</span>
+                    </button>
+                  ) : <div style={styles.placeholder}>Top detected verse will appear here.</div>}
+                </>
+              );
+            })()}
             {rankedDetections[0] && (
               <div style={styles.primaryMetrics}>
                 <Metric label="Confidence" value={`${confidencePercent(rankedDetections[0].confidence)}%`} />
@@ -1753,6 +1774,7 @@ export function LiveScripturePanel() {
                 {live.suggestions.slice(1).map((hit, index) => {
                   const detection = rankedDetections[index + 1];
                   const confidence = detection?.confidence;
+                  const effectiveDisplayVersion = (version === 'follow_bible' || !version) ? (currentBibleVersion?.abbreviation || 'KJV') : version;
                   return (
                     <button key={`${hit.reference}-${index}`} style={styles.suggestionCard} onClick={() => sendHit(hit, { goLive: true, confidence: detection?.confidence, sourceMode: detection?.mode })}>
                       <div style={styles.candidateTopRow}>
@@ -1761,7 +1783,7 @@ export function LiveScripturePanel() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', flexShrink: 0 }}>
                           {confidence != null && <span style={styles.candidateConfidence}>{confidencePercent(confidence)}%</span>}
                           <span style={styles.abbrevBadge}>{formatMatchModeAbbrev(detection?.mode || 'search')}</span>
-                          <span style={styles.candidateVersionBadge}>{hit.version || version}</span>
+                          <span style={styles.candidateVersionBadge}>{hit.version || effectiveDisplayVersion}</span>
                         </div>
                       </div>
                       <span style={styles.suggestionText}>

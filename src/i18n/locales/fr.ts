@@ -65,7 +65,7 @@ export const fr: MessageCatalog = {
 
   'settings.cat.system': 'Système',
   'settings.cat.bible': 'Options Bible',
-  'settings.cat.scripture': 'IA Écriture live',
+  'settings.cat.scripture': 'IA Live',
   'settings.cat.songs': 'Chants & CCLI',
   'settings.cat.audio': 'Entrée audio (micro)',
   'settings.cat.output': 'Sorties (écrans & NDI)',

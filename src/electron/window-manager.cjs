@@ -311,6 +311,9 @@ function createStageDisplayWindow(targetDisplay, options = {}) {
         const stState = getStageState();
         if (Object.keys(stState).length > 0) stageDisplayWindow.webContents.send('stage:message', stState);
       } else {
+        if (stageDisplayWindow.isFullScreen()) {
+          stageDisplayWindow.setFullScreen(false);
+        }
         stageDisplayWindow.hide();
       }
       broadcastStageWindows();

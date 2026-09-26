@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { AppleToggle } from './AppleToggle';
 import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, LocalModelStatus, NdiStatus, SermonLanguage, BibleDisplayOptions, NdiOutputFeed, NdiContentFilter, NdiRenderMode, NdiFeedStatus } from '../types';
-import { SongPacks } from './settings/SongPacks';
 import { BackupSystem } from './settings/BackupSystem';
 import { createDefaultTheme } from '../utils/defaultTheme';
 import { useI18n } from '../../i18n/useI18n';
@@ -12,11 +11,8 @@ export type SettingsCategory =
   | 'system'
   | 'bible'
   | 'scripture'
-  | 'songs'
   | 'audio'
   | 'output'
-  | 'fullscreen'
-  | 'lowerthird'
   | 'help'
   | 'feedback'
   | 'support'
@@ -60,17 +56,6 @@ const categoryDefs: CategoryItem[] = [
     ),
   },
   {
-    id: 'songs',
-    labelKey: 'settings.cat.songs',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 18V5l12-2v13" />
-        <circle cx="6" cy="18" r="3" />
-        <circle cx="18" cy="16" r="3" />
-      </svg>
-    ),
-  },
-  {
     id: 'audio',
     labelKey: 'settings.cat.audio',
     icon: (
@@ -90,24 +75,6 @@ const categoryDefs: CategoryItem[] = [
         <rect x="2" y="3" width="20" height="14" rx="2" />
         <line x1="8" y1="21" x2="16" y2="21" />
         <line x1="12" y1="17" x2="12" y2="21" />
-      </svg>
-    ),
-  },
-  {
-    id: 'fullscreen',
-    labelKey: 'settings.cat.fullscreen',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-      </svg>
-    ),
-  },
-  {
-    id: 'lowerthird',
-    labelKey: 'settings.cat.lowerthird',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="14" width="18" height="7" rx="2" />
       </svg>
     ),
   },
@@ -152,7 +119,7 @@ const categoryDefs: CategoryItem[] = [
     labelKey: 'settings.cat.feedback',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       </svg>
     ),
   },
@@ -161,11 +128,7 @@ const categoryDefs: CategoryItem[] = [
     labelKey: 'settings.cat.support',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
-        <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
-        <line x1="6" y1="1" x2="6" y2="4" />
-        <line x1="10" y1="1" x2="10" y2="4" />
-        <line x1="14" y1="1" x2="14" y2="4" />
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
       </svg>
     ),
   },
@@ -862,85 +825,10 @@ export function SettingsModal() {
               </div>
             )}
 
-            {/* 2. Scripture View */}
+            {/* 2. Live AI View */}
             {activeCategory === 'scripture' && (
               <div>
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.scripture.verseModeTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.scripture.verseModeSub')}</div>
-                  </div>
-                  <div style={modalStyles.pillGroup}>
-                    <button
-                      style={{
-                        ...modalStyles.pillBtn,
-                        background: live.autoProject ? '#FF5500' : 'transparent',
-                        color: live.autoProject ? '#ffffff' : 'var(--text-secondary)',
-                      }}
-                      onClick={() => setLive({ autoProject: true })}
-                    >
-                      {t('settings.scripture.auto')}
-                    </button>
-                    <button
-                      style={{
-                        ...modalStyles.pillBtn,
-                        background: !live.autoProject ? '#FF5500' : 'transparent',
-                        color: !live.autoProject ? '#ffffff' : 'var(--text-secondary)',
-                      }}
-                      onClick={() => setLive({ autoProject: false })}
-                    >
-                      {t('settings.scripture.manual')}
-                    </button>
-                  </div>
-                </div>
-
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.scripture.wordStudyTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.scripture.wordStudySub')}</div>
-                  </div>
-                  <AppleToggle checked={wordStudy} onChange={setWordStudy} />
-                </div>
-
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.scripture.syncBibleTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.scripture.syncBibleSub')}</div>
-                  </div>
-                  <AppleToggle
-                    checked={live.syncBibleOnDetection ?? true}
-                    onChange={(checked) => setLive({ syncBibleOnDetection: checked })}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* 3. Songs — packs move here; the workspace no longer carries a
-                   Song Library panel. */}
-            {activeCategory === 'songs' && (
-              <div>
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>Display Song Credits</div>
-                    <div style={modalStyles.rowSub}>Show Author, CCLI, and Copyright credits at the bottom of song display output</div>
-                  </div>
-                  <AppleToggle
-                    checked={showSongCredits}
-                    onChange={setShowSongCredits}
-                  />
-                </div>
-
-                <div style={{ ...modalStyles.sectionIntro, marginTop: 16 }}>
-                  <div style={modalStyles.rowTitle}>{t('settings.songs.packsTitle')}</div>
-                  <div style={modalStyles.rowSub}>{t('settings.songs.packsSub')}</div>
-                </div>
-                <SongPacks />
-              </div>
-            )}
-
-            {/* 4. Audio & Speech AI View */}
-            {activeCategory === 'audio' && (
-              <div>
+                {/* 1. Transcription Mode */}
                 <div style={modalStyles.formRow}>
                   <div>
                     <div style={modalStyles.rowTitle}>{t('settings.audio.transcriptionTitle')}</div>
@@ -1031,40 +919,7 @@ export function SettingsModal() {
                   </div>
                 )}
 
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.audio.micTitle')}</div>
-                    <div style={modalStyles.rowSub}>
-                      {micNamesHidden
-                        ? t('settings.audio.micNamesHidden', { count: audioDevices.length })
-                        : audioDevices.length === 0
-                        ? t('settings.audio.micNone')
-                        : audioDevices.length === 1
-                        ? t('settings.audio.micAvailableOne', { count: audioDevices.length })
-                        : t('settings.audio.micAvailableMany', { count: audioDevices.length })}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {micNamesHidden && (
-                      <button style={modalStyles.actionBtn} onClick={revealMicNames}>
-                        {t('settings.audio.showNames')}
-                      </button>
-                    )}
-                    <select
-                      style={modalStyles.selectInput}
-                      value={live.selectedInputId || 'default'}
-                      onChange={(e) => setLive({ selectedInputId: e.target.value })}
-                    >
-                      <option value="default">{t('settings.audio.defaultMic')}</option>
-                      {audioDevices.map((d) => (
-                        <option key={d.deviceId} value={d.deviceId}>
-                          {d.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
+                {/* 2. Deepgram API Key */}
                 <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
@@ -1096,6 +951,114 @@ export function SettingsModal() {
                     >
                       {t('settings.audio.saveKey')}
                     </button>
+                  </div>
+                </div>
+
+                {/* 3. Original Languages Word Study */}
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>{t('settings.scripture.wordStudyTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.scripture.wordStudySub')}</div>
+                  </div>
+                  <AppleToggle checked={wordStudy} onChange={setWordStudy} />
+                </div>
+
+                {/* 4. Sync live scripture with Bible panel */}
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>{t('settings.scripture.syncBibleTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.scripture.syncBibleSub')}</div>
+                  </div>
+                  <AppleToggle
+                    checked={live.syncBibleOnDetection ?? true}
+                    onChange={(checked) => setLive({ syncBibleOnDetection: checked })}
+                  />
+                </div>
+
+                {/* 5. Auto project direct references */}
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Auto project direct references</div>
+                    <div style={modalStyles.rowSub}>Automatically project scripture references when detected</div>
+                  </div>
+                  <AppleToggle
+                    checked={live.autoProject}
+                    onChange={(checked) => setLive({ autoProject: checked })}
+                  />
+                </div>
+
+                {/* 6. Project quoted matches */}
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Project quoted matches</div>
+                    <div style={modalStyles.rowSub}>Project verbatim spoken matches in continuous speech</div>
+                  </div>
+                  <AppleToggle
+                    checked={live.autoProjectQuoted}
+                    onChange={(checked) => setLive({ autoProjectQuoted: checked })}
+                  />
+                </div>
+
+                {/* 7. Auto Version Switch */}
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Auto Version Switch</div>
+                    <div style={modalStyles.rowSub}>Automatically switch Bible version when spoken in speech</div>
+                  </div>
+                  <AppleToggle
+                    checked={live.autoVersionSwitch}
+                    onChange={(checked) => setLive({ autoVersionSwitch: checked })}
+                  />
+                </div>
+
+                {/* 8. Paraphrase & Semantic Matching */}
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Paraphrase & Semantic Matching</div>
+                    <div style={modalStyles.rowSub}>Detect topical and semantic paraphrases when scriptures are not quoted verbatim</div>
+                  </div>
+                  <AppleToggle
+                    checked={live.allowParaphrase !== false}
+                    onChange={(checked) => setLive({ allowParaphrase: checked })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 3. Audio View */}
+            {activeCategory === 'audio' && (
+              <div>
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>{t('settings.audio.micTitle')}</div>
+                    <div style={modalStyles.rowSub}>
+                      {micNamesHidden
+                        ? t('settings.audio.micNamesHidden', { count: audioDevices.length })
+                        : audioDevices.length === 0
+                        ? t('settings.audio.micNone')
+                        : audioDevices.length === 1
+                        ? t('settings.audio.micAvailableOne', { count: audioDevices.length })
+                        : t('settings.audio.micAvailableMany', { count: audioDevices.length })}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {micNamesHidden && (
+                      <button style={modalStyles.actionBtn} onClick={revealMicNames}>
+                        {t('settings.audio.showNames')}
+                      </button>
+                    )}
+                    <select
+                      style={modalStyles.selectInput}
+                      value={live.selectedInputId || 'default'}
+                      onChange={(e) => setLive({ selectedInputId: e.target.value })}
+                    >
+                      <option value="default">{t('settings.audio.defaultMic')}</option>
+                      {audioDevices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -1205,6 +1168,16 @@ export function SettingsModal() {
             {/* 4. Displays & NDI Output */}
             {activeCategory === 'output' && (
               <div>
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Display Song Credits</div>
+                    <div style={modalStyles.rowSub}>Show Author, CCLI, and Copyright credits at the bottom of song display output</div>
+                  </div>
+                  <AppleToggle
+                    checked={showSongCredits}
+                    onChange={setShowSongCredits}
+                  />
+                </div>
                 <div style={modalStyles.formRow}>
                   <div>
                     <div style={modalStyles.rowTitle}>{t('settings.output.primaryTitle')}</div>
@@ -1535,163 +1508,6 @@ export function SettingsModal() {
                       {ndiStatus.lastError}
                     </div>
                   )}
-                </div>
-              </div>
-            )}
-
-            {/* 5. Full Screen Mode (FS) */}
-            {activeCategory === 'fullscreen' && (
-              <div>
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.fs.refFontTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.fs.refFontSub')}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button
-                      style={modalStyles.actionBtn}
-                      onClick={() => patchFullScreen({ referenceFontSize: Math.max(10, (activeTheme?.fullScreen.referenceFontSize || 30) - 2) })}
-                    >
-                      -
-                    </button>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', width: 36, textAlign: 'center' }}>
-                      {activeTheme?.fullScreen.referenceFontSize || 30}pt
-                    </span>
-                    <button
-                      style={modalStyles.actionBtn}
-                      onClick={() => patchFullScreen({ referenceFontSize: Math.min(200, (activeTheme?.fullScreen.referenceFontSize || 30) + 2) })}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.fs.mainFontTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.fs.mainFontSub')}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button
-                      style={modalStyles.actionBtn}
-                      onClick={() => patchFullScreen({ fontSize: Math.max(10, (activeTheme?.fullScreen.fontSize || 50) - 2) })}
-                    >
-                      -
-                    </button>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', width: 36, textAlign: 'center' }}>
-                      {activeTheme?.fullScreen.fontSize || 50}pt
-                    </span>
-                    <button
-                      style={modalStyles.actionBtn}
-                      onClick={() => patchFullScreen({ fontSize: Math.min(200, (activeTheme?.fullScreen.fontSize || 50) + 2) })}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.fs.autoResizeTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.fs.autoResizeSub')}</div>
-                  </div>
-                  <select
-                    style={modalStyles.selectInput}
-                    value={activeTheme?.fullScreen.autoResize || 'shrink'}
-                    onChange={(e) => patchFullScreen({ autoResize: e.target.value as 'none' | 'shrink' | 'grow' })}
-                  >
-                    <option value="none">{t('settings.fs.autoResizeNone')}</option>
-                    <option value="shrink">{t('settings.fs.autoResizeShrink')}</option>
-                    <option value="grow">{t('settings.fs.autoResizeGrow')}</option>
-                  </select>
-                </div>
-
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.fs.alignmentTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.fs.alignmentSub')}</div>
-                  </div>
-                  <div style={modalStyles.pillGroup}>
-                    <button
-                      style={{
-                        ...modalStyles.pillBtn,
-                        background: (activeTheme?.fullScreen.textAlign || 'center') === 'left' ? '#FF5500' : 'transparent',
-                        color: (activeTheme?.fullScreen.textAlign || 'center') === 'left' ? '#ffffff' : 'var(--text-secondary)',
-                      }}
-                      onClick={() => patchFullScreen({ textAlign: 'left' })}
-                    >
-                      {t('settings.fs.alignLeft')}
-                    </button>
-                    <button
-                      style={{
-                        ...modalStyles.pillBtn,
-                        background: (activeTheme?.fullScreen.textAlign || 'center') === 'center' ? '#FF5500' : 'transparent',
-                        color: (activeTheme?.fullScreen.textAlign || 'center') === 'center' ? '#ffffff' : 'var(--text-secondary)',
-                      }}
-                      onClick={() => patchFullScreen({ textAlign: 'center' })}
-                    >
-                      {t('settings.fs.alignCenter')}
-                    </button>
-                  </div>
-                </div>
-
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.fs.fontColorTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.fs.fontColorSub')}</div>
-                  </div>
-                  <input
-                    type="color"
-                    value={activeTheme?.fullScreen.fontColor || '#ffffff'}
-                    onChange={(e) => patchFullScreen({ fontColor: e.target.value })}
-                    style={{ width: 40, height: 30, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* 6. Lower Third Mode (LT) */}
-            {activeCategory === 'lowerthird' && (
-              <div>
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.lt.fontTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.lt.fontSub')}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button
-                      style={modalStyles.actionBtn}
-                      onClick={() => patchLowerThird({ fontSize: Math.max(10, (activeTheme?.lowerThird.fontSize || 32) - 2) })}
-                    >
-                      -
-                    </button>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', width: 36, textAlign: 'center' }}>
-                      {activeTheme?.lowerThird.fontSize || 32}pt
-                    </span>
-                    <button
-                      style={modalStyles.actionBtn}
-                      onClick={() => patchLowerThird({ fontSize: Math.min(120, (activeTheme?.lowerThird.fontSize || 32) + 2) })}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                <div style={modalStyles.formRow}>
-                  <div>
-                    <div style={modalStyles.rowTitle}>{t('settings.lt.positionTitle')}</div>
-                    <div style={modalStyles.rowSub}>{t('settings.lt.positionSub')}</div>
-                  </div>
-                  <select
-                    style={modalStyles.selectInput}
-                    value={activeTheme?.lowerThird.position || 'bottom-center'}
-                    onChange={(e) => patchLowerThird({ position: e.target.value as any })}
-                  >
-                    <option value="bottom-center">{t('settings.lt.bottomCenter')}</option>
-                    <option value="bottom-left">{t('settings.lt.bottomLeft')}</option>
-                    <option value="bottom-right">{t('settings.lt.bottomRight')}</option>
-                    <option value="top-center">{t('settings.lt.topCenter')}</option>
-                  </select>
                 </div>
               </div>
             )}

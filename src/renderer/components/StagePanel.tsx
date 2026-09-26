@@ -64,8 +64,13 @@ export function StagePanel() {
     if (stageBusy) return;
     setStageBusy(true);
     try {
-      if (stageOpen) await window.BSP?.closeStageDisplay?.();
-      else await window.BSP?.openStageDisplay?.();
+      if (stageOpen) {
+        setStageOpen(false);
+        await window.BSP?.closeStageDisplay?.();
+      } else {
+        setStageOpen(true);
+        await window.BSP?.openStageDisplay?.();
+      }
     } catch {
       /* The broadcast is the source of truth either way — nothing to repair. */
     } finally {

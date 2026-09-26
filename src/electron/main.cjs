@@ -1177,6 +1177,9 @@ function createStageDisplayWindow(targetDisplay, options = {}) {
         stageDisplayWindow.webContents.send('display:message', { type: 'display:update', state: displayState });
         if (Object.keys(stageState).length > 0) stageDisplayWindow.webContents.send('stage:message', stageState);
       } else {
+        if (stageDisplayWindow.isFullScreen()) {
+          stageDisplayWindow.setFullScreen(false);
+        }
         stageDisplayWindow.hide();
       }
       broadcastStageWindows();
@@ -1755,7 +1758,19 @@ app.whenReady().then(async () => {
      lamp for "the stage is up", so the off state it promises has to be the
      whole of it. `close`, not `destroy` — the window's own teardown runs. */
   ipcMain.handle('stage-display:close', () => {
-    for (const win of [...liveStageWindows()]) win.close();
+    if (stageDisplayWindow && !stageDisplayWindow.isDestroyed()) {
+      if (stageDisplayWindow.isFullScreen()) {
+        stageDisplayWindow.setFullScreen(false);
+      }
+      stageDisplayWindow.hide();
+    }
+    for (const win of [...liveStageWindows()]) {
+      if (win && !win.isDestroyed()) {
+        if (win.isFullScreen()) win.setFullScreen(false);
+        win.hide();
+      }
+    }
+    broadcastStageWindows();
     return { ok: true, open: false };
   });
   ipcMain.handle('stage-display:isOpen', () => liveStageWindows().size > 0);

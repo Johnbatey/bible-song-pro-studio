@@ -110,10 +110,18 @@ function registerDisplayIpc({
   ipc.handle('stage-display:close', () => {
     const stageWin = windowManager?.getStageDisplayWindow();
     if (stageWin && !stageWin.isDestroyed()) {
+      if (stageWin.isFullScreen?.()) stageWin.setFullScreen(false);
       stageWin.hide();
     }
+    const liveStages = windowManager?.liveStageWindows() || [];
+    for (const win of [...liveStages]) {
+      if (win && !win.isDestroyed()) {
+        if (win.isFullScreen?.()) win.setFullScreen(false);
+        win.hide();
+      }
+    }
     broadcastStageWindows?.();
-    return { ok: true };
+    return { ok: true, open: false };
   });
 
   ipc.handle('stage-display:isOpen', () => {
