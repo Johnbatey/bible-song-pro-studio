@@ -43,7 +43,8 @@ export function LiveScripturePanel() {
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [version, setVersion] = useState('KJV');
   const [versions, setVersions] = useState<Array<{ id: string; abbreviation: string; name: string }>>([]);
-  const [engine, setEngine] = useState<'local' | 'deepgram'>('deepgram');
+  const [engine, setEngine] = useState<'local' | 'deepgram'>('local');
+  const engineRef = useRef<'local' | 'deepgram'>('local');
   const [aiStatus, setAiStatus] = useState<LocalModelStatus | null>(null);
   const [sttStatus, setSttStatus] = useState<SttStatus | null>(null);
   const [keyConfigured, setKeyConfigured] = useState(false);
@@ -129,6 +130,8 @@ export function LiveScripturePanel() {
      not be re-created — and re-rendering the panel every time Settings is
      touched would restart the recogniser mid-service. */
   const sermonLanguageRef = useRef<string>('auto');
+  const startLiveRef = useRef<(dspOverride?: AudioDspOptions) => Promise<void>>(() => Promise.resolve());
+  const stopLiveRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     refreshInputs();
@@ -138,13 +141,13 @@ export function LiveScripturePanel() {
       if (!settingsData) return;
       const isKeySet = Boolean(settingsData.deepgramApiKeySet);
       setKeyConfigured(isKeySet);
-      if (settingsData.sttEngine) {
-        setEngine(settingsData.sttEngine === 'deepgram' ? 'deepgram' : 'local');
-      } else {
-        setEngine(isKeySet ? 'deepgram' : 'local');
-      }
+      const chosenEngine = settingsData.sttEngine
+        ? (settingsData.sttEngine === 'deepgram' ? 'deepgram' : 'local')
+        : (isKeySet ? 'deepgram' : 'local');
+      setEngine(chosenEngine);
+      engineRef.current = chosenEngine;
       if (settingsData.sermonLanguage) sermonLanguageRef.current = settingsData.sermonLanguage;
-      if (isKeySet || settingsData.sttEngine === 'local') {
+      if (isKeySet || chosenEngine === 'local') {
         setNotice((prev) => (prev.text.includes('API key') || prev.text.includes('Deepgram') ? { text: '', tone: 'info' } : prev));
       }
     };
@@ -184,10 +187,22 @@ export function LiveScripturePanel() {
     });
 
     const startFromTranscriptPanel = () => {
-      if (!useAppStore.getState().liveScripture.isActive) startLive();
+      const sync = useAppStore.getState().syncTranscriptWithLive;
+      if (sync) {
+        if (!useAppStore.getState().liveScripture.isActive) startLiveRef.current();
+      } else {
+        if (!captureRef.current) startLiveRef.current();
+      }
     };
     const stopFromTranscriptPanel = () => {
-      stopLive();
+      const sync = useAppStore.getState().syncTranscriptWithLive;
+      if (sync) {
+        stopLiveRef.current();
+      } else {
+        if (!useAppStore.getState().liveScripture.isActive) {
+          stopLiveRef.current();
+        }
+      }
       setTranscription({ isActive: false, text: '', interimText: '' });
     };
     window.addEventListener('bsp:live-transcription-start', startFromTranscriptPanel);
@@ -241,7 +256,7 @@ export function LiveScripturePanel() {
     setLive({ transcript: combined });
     // Sent apart so the panel can hold settled text still and only redraw the
     // tail the engine is still revising.
-    if (useAppStore.getState().syncTranscriptWithLive) {
+    if (useAppStore.getState().syncTranscriptWithLive || useAppStore.getState().transcription.isActive) {
       setTranscription({
         isActive: true,
         text: finalTranscriptRef.current,
@@ -483,11 +498,21 @@ export function LiveScripturePanel() {
   }
 
   async function startLive(dspOverride?: AudioDspOptions) {
-    window.BSP?.settings?.get().then((res) => {
-      if (res?.ok && res.settings.sermonLanguage) {
-        sermonLanguageRef.current = res.settings.sermonLanguage;
+    try {
+      const res = await window.BSP?.settings?.get().catch(() => null);
+      if (res?.ok && res.settings) {
+        if (res.settings.sermonLanguage) {
+          sermonLanguageRef.current = res.settings.sermonLanguage;
+        }
+        if (res.settings.sttEngine) {
+          const currentEng = res.settings.sttEngine === 'deepgram' ? 'deepgram' : 'local';
+          engineRef.current = currentEng;
+          setEngine(currentEng);
+        }
       }
-    }).catch(() => {});
+    } catch {}
+
+    const currentEngine = engineRef.current;
     setNotice({ text: '', tone: 'info' });
     finalTranscriptRef.current = '';
     interimTranscriptRef.current = '';
@@ -505,7 +530,7 @@ export function LiveScripturePanel() {
     if (detectTimerRef.current) clearTimeout(detectTimerRef.current);
     detectTimerRef.current = null;
 
-    if (engine === 'deepgram') {
+    if (currentEngine === 'deepgram') {
       const started = await window.BSP?.stt?.start({});
       if (!started?.ok) {
         reportFault(started?.error || 'Could not connect to Deepgram — check your API key in Settings.');
@@ -543,7 +568,7 @@ export function LiveScripturePanel() {
           });
         },
         onAudio: (frames) => {
-          if (engine === 'deepgram') {
+          if (engineRef.current === 'deepgram') {
             window.BSP?.stt?.sendAudio(toPcm16Buffer(frames));
           } else {
             localBufferRef.current.push(frames);
@@ -553,14 +578,14 @@ export function LiveScripturePanel() {
         },
         onError: (err) => reportFault(err.message),
       });
-      setLive({ isActive: true, provider: engine });
-      const provider = useAppStore.getState().aiProviders.find((entry) => entry.type === (engine === 'deepgram' ? 'deepgram' : 'local')) || null;
+      setLive({ isActive: true, provider: currentEngine });
+      const provider = useAppStore.getState().aiProviders.find((entry) => entry.type === (currentEngine === 'deepgram' ? 'deepgram' : 'local')) || null;
       if (useAppStore.getState().syncTranscriptWithLive) {
         setTranscription({ isActive: true, provider });
       }
     } catch (err) {
       reportFault(err instanceof Error ? err.message : 'Could not open the microphone');
-      if (engine === 'deepgram') window.BSP?.stt?.stop();
+      if (engineRef.current === 'deepgram') window.BSP?.stt?.stop();
     }
   }
 
@@ -589,7 +614,7 @@ export function LiveScripturePanel() {
 
   function stopLive() {
     teardownCapture();
-    if (engine === 'deepgram') {
+    if (engineRef.current === 'deepgram') {
       window.BSP?.stt?.stop()
         .then(() => window.BSP?.stt?.status().then(setSttStatus))
         .catch(() => {});
@@ -599,6 +624,9 @@ export function LiveScripturePanel() {
       setTranscription({ isActive: false });
     }
   }
+
+  startLiveRef.current = startLive;
+  stopLiveRef.current = stopLive;
 
   function sendHit(hit: BibleSearchResult, options: { goLive?: boolean; confidence?: number; sourceMode?: string } = {}) {
     const scene: Scene = {
@@ -1414,12 +1442,14 @@ export function LiveScripturePanel() {
                         onChange={async (val) => {
                           if (val === 'deepgram') {
                             setEngine('deepgram');
+                            engineRef.current = 'deepgram';
                             setLive({ provider: 'deepgram' });
                             await window.BSP?.settings?.set({ sttEngine: 'deepgram' }).catch(() => {});
                             await window.BSP?.ai?.setEngine?.('deepgram').catch(() => {});
                           } else if (val.startsWith('local:')) {
                             const modelKey = val.replace('local:', '');
                             setEngine('local');
+                            engineRef.current = 'local';
                             setLive({ provider: 'local' });
                             await window.BSP?.settings?.set({ sttEngine: 'local', sttLocalModel: modelKey }).catch(() => {});
                             await window.BSP?.ai?.setEngine?.('local').catch(() => {});

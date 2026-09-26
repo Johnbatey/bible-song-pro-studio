@@ -38,6 +38,11 @@ export function StudioSlider({
   const safeVal = Number.isFinite(value) ? value : min;
   const [draft, setDraft] = useState(String(safeVal));
 
+  const isDraggingValRef = useRef(false);
+  const startXRef = useRef(0);
+  const startValRef = useRef(0);
+  const hasMovedRef = useRef(false);
+
   useEffect(() => {
     if (!isEditing) {
       setDraft(String(safeVal));
@@ -62,7 +67,42 @@ export function StudioSlider({
     if (defaultValue !== undefined) {
       onChange(defaultValue);
     } else {
-      onChange(min);
+      onChange(min <= 0 && max >= 0 ? 0 : min);
+    }
+  };
+
+  const handleValuePointerDown = (e: React.PointerEvent<HTMLSpanElement>) => {
+    isDraggingValRef.current = true;
+    hasMovedRef.current = false;
+    startXRef.current = e.clientX;
+    startValRef.current = safeVal;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleValuePointerMove = (e: React.PointerEvent<HTMLSpanElement>) => {
+    if (!isDraggingValRef.current) return;
+    const dx = e.clientX - startXRef.current;
+    if (Math.abs(dx) > 2) {
+      hasMovedRef.current = true;
+    }
+    const multiplier = e.shiftKey ? 10 : 1;
+    const delta = Math.round((dx / 2) * step * multiplier);
+    let nextVal = startValRef.current + delta;
+    nextVal = Math.max(min, Math.min(hardMax, nextVal));
+    onChange(nextVal);
+  };
+
+  const handleValuePointerUp = (e: React.PointerEvent<HTMLSpanElement>) => {
+    if (!isDraggingValRef.current) return;
+    isDraggingValRef.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    if (!hasMovedRef.current) {
+      setDraft(String(safeVal));
+      setIsEditing(true);
     }
   };
 
@@ -100,12 +140,12 @@ export function StudioSlider({
         ) : (
           <span
             className="studio-slider-value"
-            onClick={() => {
-              setDraft(String(safeVal));
-              setIsEditing(true);
-            }}
-            title="Click to type exact value (up to 5000px)"
-            style={{ cursor: 'pointer' }}
+            onPointerDown={handleValuePointerDown}
+            onPointerMove={handleValuePointerMove}
+            onPointerUp={handleValuePointerUp}
+            onPointerCancel={handleValuePointerUp}
+            title="Drag left/right to adjust, click to type exact value"
+            style={{ cursor: 'ew-resize', userSelect: 'none' }}
           >
             {displayValue ?? `${safeVal}${unit}`}
           </span>
@@ -1511,6 +1551,7 @@ export function ThemeEditorForm({
             min={1.0}
             max={2.4}
             step={0.05}
+            defaultValue={1.35}
             unit="x"
             displayValue={`${(values.lineHeight ?? 1.35).toFixed(2)}x`}
             onChange={(val) => onChange({ lineHeight: val })}
@@ -1567,6 +1608,7 @@ export function ThemeEditorForm({
               value={values.textShadowBlur ?? 8}
               min={0}
               max={40}
+              defaultValue={8}
               unit="px"
               onChange={(val) => onChange({ textShadowBlur: safeInt(val, 8) })}
             />
@@ -1613,6 +1655,7 @@ export function ThemeEditorForm({
           min={0}
           max={1}
           step={0.05}
+          defaultValue={surface === 'lt' ? 0.95 : 1}
           unit="%"
           displayValue={`${Math.round(currentOpacity * 100)}%`}
           onChange={(val) => onChange({ backgroundOpacity: val })}
@@ -1829,6 +1872,7 @@ export function ThemeEditorForm({
               value={values.width ?? 75}
               min={20}
               max={100}
+              defaultValue={75}
               unit="%"
               onChange={(val) => onChange({ width: val })}
             />
@@ -1839,6 +1883,7 @@ export function ThemeEditorForm({
               value={values.borderRadius ?? 6}
               min={0}
               max={40}
+              defaultValue={6}
               unit="px"
               onChange={(val) => onChange({ borderRadius: val })}
             />
@@ -1849,28 +1894,65 @@ export function ThemeEditorForm({
               value={values.padding ?? 20}
               min={0}
               max={60}
+              defaultValue={20}
               unit="px"
               onChange={(val) => onChange({ padding: val })}
             />
 
-            {/* Banner Position */}
+            {/* Banner Screen Location: Top / Bottom */}
             <div className="studio-field-box">
-              <span className="studio-field-label">Position</span>
+              <span className="studio-field-label">Screen Location</span>
               <div className="studio-button-group">
                 {[
-                  { val: 'bottom-center', label: 'Center' },
-                  { val: 'bottom-left', label: 'Left' },
-                  { val: 'bottom-right', label: 'Right' },
-                ].map((pos) => (
-                  <button
-                    key={pos.val}
-                    type="button"
-                    className={`studio-group-btn ${(values.position || 'bottom-center') === pos.val ? 'active' : ''}`}
-                    onClick={() => onChange({ position: pos.val })}
-                  >
-                    {pos.label}
-                  </button>
-                ))}
+                  { val: 'bottom', label: 'Bottom' },
+                  { val: 'top', label: 'Top' },
+                ].map((loc) => {
+                  const curPos = values.position || 'bottom-center';
+                  const isTop = curPos.startsWith('top');
+                  const isActive = loc.val === 'top' ? isTop : !isTop;
+                  return (
+                    <button
+                      key={loc.val}
+                      type="button"
+                      className={`studio-group-btn ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        const horiz = curPos.includes('left') ? 'left' : curPos.includes('right') ? 'right' : 'center';
+                        onChange({ position: `${loc.val}-${horiz}` });
+                      }}
+                    >
+                      {loc.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Banner Horizontal Alignment: Left / Center / Right */}
+            <div className="studio-field-box">
+              <span className="studio-field-label">Horizontal Position</span>
+              <div className="studio-button-group">
+                {[
+                  { val: 'left', label: 'Left' },
+                  { val: 'center', label: 'Center' },
+                  { val: 'right', label: 'Right' },
+                ].map((align) => {
+                  const curPos = values.position || 'bottom-center';
+                  const isTop = curPos.startsWith('top');
+                  const curAlign = curPos.includes('left') ? 'left' : curPos.includes('right') ? 'right' : 'center';
+                  return (
+                    <button
+                      key={align.val}
+                      type="button"
+                      className={`studio-group-btn ${curAlign === align.val ? 'active' : ''}`}
+                      onClick={() => {
+                        const vert = isTop ? 'top' : 'bottom';
+                        onChange({ position: `${vert}-${align.val}` });
+                      }}
+                    >
+                      {align.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </>
@@ -1900,8 +1982,9 @@ export function ThemeEditorForm({
         <StudioSlider
           label="Offset X"
           value={values.offsetX ?? 0}
-          min={-200}
-          max={200}
+          min={-500}
+          max={500}
+          defaultValue={0}
           unit="px"
           onChange={(val) => onChange({ offsetX: val })}
         />
@@ -1909,8 +1992,9 @@ export function ThemeEditorForm({
         <StudioSlider
           label="Offset Y"
           value={values.offsetY ?? 0}
-          min={-200}
-          max={200}
+          min={-500}
+          max={500}
+          defaultValue={0}
           unit="px"
           onChange={(val) => onChange({ offsetY: val })}
         />

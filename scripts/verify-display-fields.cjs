@@ -56,7 +56,12 @@ const scene = (background) => ({
 
 const ground = (fields) => ({ bgVideo: fields.bgVideo, bgCustomImage: fields.bgCustomImage, bgFill: fields.bgFill });
 
-console.log('Background fields for the browser display:');
+/* --- No scene on air (takedown / clear): the display is completely transparent. --- */
+check(
+  'cleared/takedown scene produces transparent blank ground',
+  ground(backgroundFieldsFor(null, themeWith({ background: '', backgroundColor: '#123456' }), 'fullscreen')),
+  { bgVideo: '', bgCustomImage: '', bgFill: 'transparent' },
+);
 
 /* --- No scene background: the theme is the ground. --- */
 check(

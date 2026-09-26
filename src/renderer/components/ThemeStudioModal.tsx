@@ -278,6 +278,7 @@ export function ThemeStudioModal() {
   const activeTheme = useAppStore((s) => s.activeTheme);
   const setActiveTheme = useAppStore((s) => s.setActiveTheme);
   const addTheme = useAppStore((s) => s.addTheme);
+  const setThemes = useAppStore((s) => s.setThemes);
   const updateTheme = useAppStore((s) => s.updateTheme);
   const removeTheme = useAppStore((s) => s.removeTheme);
   const pushNotice = useAppStore((s) => s.notify);
@@ -506,17 +507,106 @@ export function ThemeStudioModal() {
     showReference: true,
   }), [canvasScene, effectivePreviewTheme, surfaceTab]);
 
-  // Keyboard shortcut: Escape to close
+  // Undo / Redo history state
+  interface ThemeStudioSnapshot {
+    themes: Theme[];
+    selectedThemeId: string;
+  }
+  const [past, setPast] = useState<ThemeStudioSnapshot[]>([]);
+  const [future, setFuture] = useState<ThemeStudioSnapshot[]>([]);
+  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
+  const lastRecordTimeRef = useRef<number>(0);
+
+  const recordSnapshot = useCallback(() => {
+    const currentThemes = useAppStore.getState().themes;
+    const currentSelectedId = selectedThemeId;
+    setPast((prev) => [...prev.slice(-40), { themes: currentThemes.map((t) => ({ ...t })), selectedThemeId: currentSelectedId }]);
+    setFuture([]);
+  }, [selectedThemeId]);
+
+  const handleUndo = useCallback(() => {
+    if (past.length === 0) return;
+    const previousSnapshot = past[past.length - 1];
+    const newPast = past.slice(0, -1);
+    const currentThemes = useAppStore.getState().themes;
+    const currentSelectedId = selectedThemeId;
+
+    setFuture((prev) => [{ themes: currentThemes.map((t) => ({ ...t })), selectedThemeId: currentSelectedId }, ...prev]);
+    setPast(newPast);
+
+    setThemes(previousSnapshot.themes);
+    setSelectedThemeId(previousSnapshot.selectedThemeId);
+
+    const active = useAppStore.getState().activeTheme;
+    if (active) {
+      const restoredActive = previousSnapshot.themes.find((t) => t.id === active.id);
+      if (restoredActive) {
+        setActiveTheme(restoredActive);
+      }
+    }
+
+    pushNotice({
+      id: `theme-undo-${Date.now()}`,
+      text: 'Action undone',
+      type: 'info',
+      duration: 1.5,
+      animation: 'slideDown',
+    });
+  }, [past, selectedThemeId, setThemes, setActiveTheme, pushNotice]);
+
+  const handleRedo = useCallback(() => {
+    if (future.length === 0) return;
+    const nextSnapshot = future[0];
+    const newFuture = future.slice(1);
+    const currentThemes = useAppStore.getState().themes;
+    const currentSelectedId = selectedThemeId;
+
+    setPast((prev) => [...prev, { themes: currentThemes.map((t) => ({ ...t })), selectedThemeId: currentSelectedId }]);
+    setFuture(newFuture);
+
+    setThemes(nextSnapshot.themes);
+    setSelectedThemeId(nextSnapshot.selectedThemeId);
+
+    const active = useAppStore.getState().activeTheme;
+    if (active) {
+      const restoredActive = nextSnapshot.themes.find((t) => t.id === active.id);
+      if (restoredActive) {
+        setActiveTheme(restoredActive);
+      }
+    }
+
+    pushNotice({
+      id: `theme-redo-${Date.now()}`,
+      text: 'Action redone',
+      type: 'info',
+      duration: 1.5,
+      animation: 'slideDown',
+    });
+  }, [future, selectedThemeId, setThemes, setActiveTheme, pushNotice]);
+
+  // Keyboard shortcut: Escape to close, Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z / Cmd/Ctrl+Y redo
   useEffect(() => {
     if (!isThemeStudioOpen) return;
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         closeThemeStudio();
+        return;
+      }
+      const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && !isInput) {
+        if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          handleUndo();
+        } else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          handleRedo();
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isThemeStudioOpen, closeThemeStudio]);
+  }, [isThemeStudioOpen, closeThemeStudio, handleUndo, handleRedo]);
 
   const filteredThemes = allThemes.filter((th) => {
     const matchesSearch = th.name.toLowerCase().includes(themeSearch.toLowerCase());
@@ -532,6 +622,8 @@ export function ThemeStudioModal() {
   const isLinked = selectedTheme.linkBibleSong !== false;
 
   const toggleLinkBibleSong = () => {
+    recordSnapshot();
+    setAppliedTemplateId(null);
     if (isLinked) {
       // Unlink: duplicate current fullScreen & lowerThird into bible and song specific properties
       const updated: Theme = {
@@ -580,6 +672,54 @@ export function ThemeStudioModal() {
     }
   };
 
+  const handleSelectTheme = (targetTheme: Theme) => {
+    setAppliedTemplateId(targetTheme.id);
+    if (isLinked) {
+      setSelectedThemeId(targetTheme.id);
+      return;
+    }
+
+    recordSnapshot();
+    // Unlinked / Independent mode: Apply targetTheme template styling ONLY to the active content mode (Bible or Song)
+    if (sampleType === 'song') {
+      const targetFs = targetTheme.songFullScreen || targetTheme.fullScreen;
+      const targetLt = targetTheme.songLowerThird || targetTheme.lowerThird;
+      const updated: Theme = {
+        ...selectedTheme,
+        linkBibleSong: false,
+        songFullScreen: { ...targetFs },
+        songLowerThird: { ...targetLt },
+      };
+      updateTheme(selectedTheme.id, updated);
+      pushNotice({
+        id: `theme-apply-song-${Date.now()}`,
+        text: `Applied "${targetTheme.name}" template to Song style`,
+        type: 'info',
+        duration: 2.5,
+        animation: 'slideDown',
+      });
+    } else {
+      const targetFs = targetTheme.bibleFullScreen || targetTheme.fullScreen;
+      const targetLt = targetTheme.bibleLowerThird || targetTheme.lowerThird;
+      const updated: Theme = {
+        ...selectedTheme,
+        linkBibleSong: false,
+        fullScreen: { ...targetFs },
+        lowerThird: { ...targetLt },
+        bibleFullScreen: { ...targetFs },
+        bibleLowerThird: { ...targetLt },
+      };
+      updateTheme(selectedTheme.id, updated);
+      pushNotice({
+        id: `theme-apply-bible-${Date.now()}`,
+        text: `Applied "${targetTheme.name}" template to Bible style`,
+        type: 'info',
+        duration: 2.5,
+        animation: 'slideDown',
+      });
+    }
+  };
+
   const handleApplyTheme = () => {
     setActiveTheme(selectedTheme);
     pushNotice({
@@ -592,6 +732,7 @@ export function ThemeStudioModal() {
   };
 
   const handleCreateNewTheme = () => {
+    recordSnapshot();
     const newId = `theme-${Date.now()}`;
     const newTheme: Theme = {
       ...createDefaultTheme(),
@@ -611,6 +752,7 @@ export function ThemeStudioModal() {
 
   const handleDuplicateTheme = (themeToDup?: Theme, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    recordSnapshot();
     const target = themeToDup || selectedTheme;
     const newId = `theme-${Date.now()}`;
     const newTheme: Theme = {
@@ -635,6 +777,7 @@ export function ThemeStudioModal() {
     const isCustomTarget = themes.some((th) => th.id === idToDelete && !PRESET_THEMES.some((p) => p.id === th.id));
     if (!isCustomTarget) return;
 
+    recordSnapshot();
     removeTheme(idToDelete);
     if (selectedThemeId === idToDelete) {
       if (allThemes.length > 1) {
@@ -654,6 +797,12 @@ export function ThemeStudioModal() {
   };
 
   const handleUpdateCurrentTheme = (updates: any) => {
+    const now = Date.now();
+    if (now - lastRecordTimeRef.current > 600) {
+      recordSnapshot();
+      lastRecordTimeRef.current = now;
+    }
+
     const isSurfaceFull = surfaceTab === 'full';
 
     if (isLinked) {
@@ -715,7 +864,90 @@ export function ThemeStudioModal() {
     }
   }, [selectedTheme, surfaceTab, sampleType, isLinked]);
 
+  // Canvas direct drag & center alignment guide state
+  const [isDraggingCanvasContent, setIsDraggingCanvasContent] = useState(false);
+  const [guideSnapX, setGuideSnapX] = useState(false);
+  const [guideSnapY, setGuideSnapY] = useState(false);
+  const canvasDragRef = useRef<{
+    startX: number;
+    startY: number;
+    initOffsetX: number;
+    initOffsetY: number;
+  } | null>(null);
+
+  const handleCanvasDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const currentX = typeof currentFormValues.offsetX === 'number' ? currentFormValues.offsetX : 0;
+    const currentY = typeof currentFormValues.offsetY === 'number' ? currentFormValues.offsetY : 0;
+
+    canvasDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initOffsetX: currentX,
+      initOffsetY: currentY,
+    };
+    setIsDraggingCanvasContent(true);
+    setGuideSnapX(false);
+    setGuideSnapY(false);
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      if (!canvasDragRef.current) return;
+      const scaleFactor = scale || 1;
+      // 1 screen pixel on 960x540 board scaled by 'scale' corresponds to (2 / scale) pixels on 1920x1080 stage
+      const dx = ((moveEvent.clientX - canvasDragRef.current.startX) / scaleFactor) * 2;
+      const dy = ((moveEvent.clientY - canvasDragRef.current.startY) / scaleFactor) * 2;
+
+      let rawOffsetX = Math.round(canvasDragRef.current.initOffsetX + dx);
+      let rawOffsetY = Math.round(canvasDragRef.current.initOffsetY + dy);
+
+      // Center snap (within +/-15px threshold)
+      const snapThreshold = 15;
+      if (Math.abs(rawOffsetX) <= snapThreshold) {
+        rawOffsetX = 0;
+        setGuideSnapX(true);
+      } else {
+        setGuideSnapX(false);
+      }
+
+      if (Math.abs(rawOffsetY) <= snapThreshold) {
+        rawOffsetY = 0;
+        setGuideSnapY(true);
+      } else {
+        setGuideSnapY(false);
+      }
+
+      // Clamp to +/-500px limit
+      rawOffsetX = Math.max(-500, Math.min(500, rawOffsetX));
+      rawOffsetY = Math.max(-500, Math.min(500, rawOffsetY));
+
+      handleUpdateCurrentTheme({
+        offsetX: rawOffsetX,
+        offsetY: rawOffsetY,
+      });
+    };
+
+    const onPointerUp = () => {
+      canvasDragRef.current = null;
+      setIsDraggingCanvasContent(false);
+      setGuideSnapX(false);
+      setGuideSnapY(false);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
+
   const handleRenameTheme = (name: string) => {
+    const now = Date.now();
+    if (now - lastRecordTimeRef.current > 600) {
+      recordSnapshot();
+      lastRecordTimeRef.current = now;
+    }
     updateTheme(selectedTheme.id, {
       ...selectedTheme,
       name,
@@ -776,6 +1008,63 @@ export function ThemeStudioModal() {
             <span style={{ fontSize: 13, fontWeight: fontWeight.bold, letterSpacing: '0.04em' }}>
               Theme Studio
             </span>
+          </div>
+
+          <div style={{ width: 1, height: 18, background: 'var(--border-primary, #262628)' }} />
+
+          {/* Undo / Redo Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              type="button"
+              disabled={past.length === 0}
+              onClick={handleUndo}
+              style={{
+                width: 28,
+                height: 28,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-primary)',
+                borderRadius: 4,
+                color: past.length > 0 ? 'var(--text-primary)' : 'var(--text-dim)',
+                cursor: past.length > 0 ? 'pointer' : 'not-allowed',
+                opacity: past.length > 0 ? 1 : 0.45,
+                transition: 'all 0.15s ease',
+              }}
+              title="Undo (⌘/Ctrl+Z)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 14 4 9l5-5" />
+                <path d="M4 9h11a6 6 0 0 1 0 12h-3" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              disabled={future.length === 0}
+              onClick={handleRedo}
+              style={{
+                width: 28,
+                height: 28,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-primary)',
+                borderRadius: 4,
+                color: future.length > 0 ? 'var(--text-primary)' : 'var(--text-dim)',
+                cursor: future.length > 0 ? 'pointer' : 'not-allowed',
+                opacity: future.length > 0 ? 1 : 0.45,
+                transition: 'all 0.15s ease',
+              }}
+              title="Redo (⌘/Ctrl+Shift+Z or Ctrl+Y)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m15 14 5-5-5-5" />
+                <path d="M20 9H9a6 6 0 0 0 0 12h3" />
+              </svg>
+            </button>
           </div>
 
           <div style={{ width: 1, height: 18, background: 'var(--border-primary, #262628)' }} />
@@ -956,15 +1245,26 @@ export function ThemeStudioModal() {
               </div>
             ) : (
               filteredThemes.map((theme) => {
-                const isSelected = theme.id === selectedTheme.id;
+                const isSelected = isLinked
+                  ? theme.id === selectedTheme.id
+                  : (appliedTemplateId ? theme.id === appliedTemplateId : theme.id === selectedTheme.id);
                 const isActive = activeTheme?.id === theme.id;
                 const isCustomItem = themes.some((th) => th.id === theme.id && !PRESET_THEMES.some((p) => p.id === th.id));
 
-                const fs = theme.fullScreen;
-                const isTransparent =
-                  fs.backgroundType === 'transparent' ||
-                  fs.backgroundColor === 'transparent' ||
-                  fs.background === 'transparent';
+                const isLt = surfaceTab === 'lt';
+                const ltSurf = isLt
+                  ? (sampleType === 'song' ? (theme.songLowerThird || theme.lowerThird) : (theme.bibleLowerThird || theme.lowerThird))
+                  : null;
+                const fsSurf = !isLt
+                  ? (sampleType === 'song' ? (theme.songFullScreen || theme.fullScreen) : (theme.bibleFullScreen || theme.fullScreen))
+                  : null;
+                const surf = ltSurf || fsSurf || theme.fullScreen;
+
+                const isTransparent = isLt ||
+                  surf.backgroundType === 'transparent' ||
+                  surf.backgroundColor === 'transparent' ||
+                  surf.background === 'transparent' ||
+                  surf.backgroundOpacity === 0;
 
                 const thumbStyle: React.CSSProperties = isTransparent
                   ? {
@@ -977,52 +1277,234 @@ export function ThemeStudioModal() {
                       backgroundSize: '12px 12px',
                       backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0px',
                     }
-                  : fs.backgroundMediaType === 'image' && fs.backgroundMediaUrl
+                  : surf.backgroundMediaType === 'image' && surf.backgroundMediaUrl
                   ? {
                       backgroundColor: '#0c0e14',
-                      backgroundImage: `url("${(fs.backgroundMediaUrl.startsWith('http') ? fs.backgroundMediaUrl : `${assetBaseUrl.replace(/\/$/, '')}/${fs.backgroundMediaUrl.replace(/^\//, '')}`).replace(/"/g, '%22')}")`,
-                      backgroundSize: fs.backgroundFit === 'fill' ? '100% 100%' : (fs.backgroundFit || 'cover'),
+                      backgroundImage: `url("${(surf.backgroundMediaUrl.startsWith('http') ? surf.backgroundMediaUrl : `${assetBaseUrl.replace(/\/$/, '')}/${surf.backgroundMediaUrl.replace(/^\//, '')}`).replace(/"/g, '%22')}")`,
+                      backgroundSize: surf.backgroundFit === 'fill' ? '100% 100%' : (surf.backgroundFit || 'cover'),
                       backgroundPosition: 'center',
                       backgroundRepeat: 'no-repeat',
                     }
-                  : fs.background && fs.background.includes('gradient')
+                  : surf.background && surf.background.includes('gradient')
                   ? {
-                      backgroundImage: fs.background,
+                      backgroundImage: surf.background,
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                     }
                   : {
-                      backgroundColor: fs.backgroundColor || fs.background || '#0c0e14',
+                      backgroundColor: surf.backgroundColor || surf.background || '#0c0e14',
                     };
+
+                const ltPos = ltSurf?.position || (ltSurf as any)?.location || 'bottom-center';
+                const isTopLt = isLt && (ltPos.startsWith('top') || (ltSurf as any)?.anchor === 'top');
+                const isLeftLt = isLt && ltPos.includes('left');
+                const isRightLt = isLt && ltPos.includes('right');
 
                 return (
                   <div
                     key={theme.id}
-                    onClick={() => setSelectedThemeId(theme.id)}
+                    onClick={() => handleSelectTheme(theme)}
                     className={`studio-theme-card ${isSelected ? 'selected' : ''}`}
                   >
                     {/* Miniature 16:9 Thumbnail */}
                     <div
                       className="studio-theme-thumb"
-                      style={thumbStyle}
+                      style={{
+                        ...thumbStyle,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: isLt ? (isTopLt ? 'flex-start' : 'flex-end') : 'center',
+                        alignItems: isLt ? (isLeftLt ? 'flex-start' : isRightLt ? 'flex-end' : 'center') : (surf.textAlign === 'left' ? 'flex-start' : surf.textAlign === 'right' ? 'flex-end' : 'center'),
+                        padding: isLt ? (isTopLt ? '3px 4px 0 4px' : '0 4px 3px 4px') : '4px 6px',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        boxSizing: 'border-box',
+                      }}
                     >
-                      <span
-                        style={{
-                          fontFamily: theme.fullScreen.fontFamily || 'sans-serif',
-                          fontSize: 9.5,
-                          fontWeight: theme.fullScreen.fontWeight || 700,
-                          color: theme.fullScreen.fontColor || '#ffffff',
-                          textAlign: 'center',
-                          lineHeight: 1.25,
-                          overflow: 'hidden',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          textShadow: '0 1px 3px rgba(0, 0, 0, 0.8)',
-                        }}
-                      >
-                        {theme.name}
-                      </span>
+                      {isLt && ltSurf ? (
+                        <div
+                          style={{
+                            width: `${Math.min(96, Math.max(35, ltSurf.width ?? 75))}%`,
+                            padding: '2.5px 5px',
+                            borderRadius: Math.min(4, Math.max(1, (ltSurf.borderRadius ?? 6) / 3)),
+                            background: ltSurf.backgroundType === 'transparent' || ltSurf.backgroundColor === 'transparent'
+                              ? 'transparent'
+                              : (ltSurf.background && ltSurf.background.includes('gradient')
+                                  ? ltSurf.background
+                                  : (ltSurf.backgroundColor || ltSurf.background || '#0f172a')),
+                            opacity: ltSurf.backgroundOpacity ?? 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: ltSurf.textAlign === 'right' ? 'flex-end' : (ltSurf.textAlign === 'center' ? 'center' : 'flex-start'),
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.6)',
+                            overflow: 'hidden',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {sampleType === 'bible' ? (
+                            <>
+                              <span
+                                style={{
+                                  fontFamily: ltSurf.fontFamily || 'sans-serif',
+                                  fontSize: 5,
+                                  fontWeight: ltSurf.fontWeight || 600,
+                                  color: ltSurf.fontColor || '#ffffff',
+                                  textAlign: ltSurf.textAlign || 'left',
+                                  lineHeight: 1.18,
+                                  overflow: 'hidden',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  width: '100%',
+                                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.9)',
+                                }}
+                              >
+                                For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.
+                              </span>
+                              <span
+                                style={{
+                                  fontFamily: ltSurf.fontFamily || 'sans-serif',
+                                  fontSize: 4.2,
+                                  fontWeight: 700,
+                                  color: ltSurf.referenceColor || ltSurf.accentColor || '#FF5500',
+                                  textAlign: ltSurf.textAlign || 'left',
+                                  lineHeight: 1.1,
+                                  marginTop: 1.5,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  width: '100%',
+                                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.9)',
+                                }}
+                              >
+                                John 3:16 (KJV)
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span
+                                style={{
+                                  fontFamily: ltSurf.fontFamily || 'sans-serif',
+                                  fontSize: 5,
+                                  fontWeight: ltSurf.fontWeight || 600,
+                                  color: ltSurf.fontColor || '#ffffff',
+                                  textAlign: ltSurf.textAlign || 'left',
+                                  lineHeight: 1.18,
+                                  overflow: 'hidden',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  width: '100%',
+                                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.9)',
+                                }}
+                              >
+                                Amazing grace! How sweet the sound that saved a wretch like me!
+                              </span>
+                              <span
+                                style={{
+                                  fontFamily: ltSurf.fontFamily || 'sans-serif',
+                                  fontSize: 3.8,
+                                  color: 'rgba(255, 255, 255, 0.65)',
+                                  textAlign: ltSurf.textAlign || 'left',
+                                  lineHeight: 1.1,
+                                  marginTop: 1.5,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  width: '100%',
+                                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.9)',
+                                }}
+                              >
+                                John Newton · Public Domain
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            width: '100%',
+                            alignItems: surf.textAlign === 'left' ? 'flex-start' : surf.textAlign === 'right' ? 'flex-end' : 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {sampleType === 'bible' ? (
+                            <>
+                              <span
+                                style={{
+                                  fontFamily: surf.fontFamily || 'sans-serif',
+                                  fontSize: 4.8,
+                                  fontWeight: 700,
+                                  color: (surf as any).referenceColor || (surf as any).accentColor || '#FF5500',
+                                  textAlign: surf.textAlign || 'center',
+                                  lineHeight: 1.2,
+                                  marginBottom: 2,
+                                  textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+                                  width: '100%',
+                                }}
+                              >
+                                John 3:16 (KJV)
+                              </span>
+                              <span
+                                style={{
+                                  fontFamily: surf.fontFamily || 'sans-serif',
+                                  fontSize: 5.8,
+                                  fontWeight: surf.fontWeight || 600,
+                                  color: surf.fontColor || '#ffffff',
+                                  textAlign: surf.textAlign || 'center',
+                                  lineHeight: 1.22,
+                                  overflow: 'hidden',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 3,
+                                  WebkitBoxOrient: 'vertical',
+                                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.8)',
+                                  width: '100%',
+                                }}
+                              >
+                                For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span
+                                style={{
+                                  fontFamily: surf.fontFamily || 'sans-serif',
+                                  fontSize: 5.8,
+                                  fontWeight: surf.fontWeight || 600,
+                                  color: surf.fontColor || '#ffffff',
+                                  textAlign: surf.textAlign || 'center',
+                                  lineHeight: 1.22,
+                                  overflow: 'hidden',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 3,
+                                  WebkitBoxOrient: 'vertical',
+                                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.8)',
+                                  width: '100%',
+                                }}
+                              >
+                                Amazing grace! How sweet the sound that saved a wretch like me!
+                              </span>
+                              <span
+                                style={{
+                                  fontFamily: surf.fontFamily || 'sans-serif',
+                                  fontSize: 4,
+                                  color: 'rgba(255, 255, 255, 0.65)',
+                                  textAlign: surf.textAlign || 'center',
+                                  lineHeight: 1.1,
+                                  marginTop: 2,
+                                  width: '100%',
+                                  textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+                                }}
+                              >
+                                John Newton · Public Domain
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Info Row: Title & Action Icons */}
@@ -1183,6 +1665,7 @@ export function ThemeStudioModal() {
                       height: 1080,
                       transformOrigin: 'top left',
                       transform: 'scale(0.5)',
+                      pointerEvents: 'none',
                     }}
                   >
                     <ProgramSurface
@@ -1190,6 +1673,91 @@ export function ThemeStudioModal() {
                       preview={false}
                       assetBaseUrl={assetBaseUrl}
                     />
+                  </div>
+
+                  {/* Direct Drag & Center Guide Overlay */}
+                  <div
+                    onPointerDown={handleCanvasDragStart}
+                    title="Drag on canvas to reposition text / lower third (snaps to center)"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      zIndex: 20,
+                      cursor: isDraggingCanvasContent ? 'grabbing' : 'grab',
+                      pointerEvents: 'auto',
+                    }}
+                  >
+                    {/* Vertical Center Alignment Guide */}
+                    {guideSnapX && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left: '50%',
+                          width: 2,
+                          transform: 'translateX(-50%)',
+                          background: '#00e5ff',
+                          boxShadow: '0 0 10px #00e5ff, 0 0 4px #fff',
+                          zIndex: 50,
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    )}
+
+                    {/* Horizontal Center Alignment Guide */}
+                    {guideSnapY && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          top: '50%',
+                          height: 2,
+                          transform: 'translateY(-50%)',
+                          background: '#00e5ff',
+                          boxShadow: '0 0 10px #00e5ff, 0 0 4px #fff',
+                          zIndex: 50,
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    )}
+
+                    {/* Live Positioning Coordinate Badge */}
+                    {isDraggingCanvasContent && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 14,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          background: 'rgba(15, 23, 42, 0.92)',
+                          backdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(0, 229, 255, 0.4)',
+                          borderRadius: 20,
+                          padding: '4px 14px',
+                          color: '#00e5ff',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                          zIndex: 60,
+                          pointerEvents: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                        }}
+                      >
+                        <span>Offset X: {currentFormValues.offsetX ?? 0}px</span>
+                        <span style={{ opacity: 0.35 }}>|</span>
+                        <span>Offset Y: {currentFormValues.offsetY ?? 0}px</span>
+                        {(guideSnapX || guideSnapY) && (
+                          <span style={{ color: '#10b981', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            Centered
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

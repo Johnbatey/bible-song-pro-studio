@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import type { WordStudyEntry, Scene } from '../types';
+import type { WordStudyEntry, Scene, BibleVerse } from '../types';
 import { useAppStore } from '../stores/appStore';
 import { annotateTextWithStrongsSync } from '../services/lexicon-annotator';
 
 interface WordStudyCardProps {
   entry: WordStudyEntry;
+  sourceVerse?: BibleVerse;
   onClose?: () => void;
 }
 
@@ -19,6 +20,14 @@ const sectionIconProps = {
   strokeLinejoin: 'round' as const,
   'aria-hidden': true as const,
 };
+
+function toSuperscript(num: number | string): string {
+  const map: Record<string, string> = {
+    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+  };
+  return String(num).split('').map((ch) => map[ch] || ch).join('');
+}
 
 function IconLink() {
   return (
@@ -57,7 +66,7 @@ function IconMonitor() {
   );
 }
 
-export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
+export function WordStudyCard({ entry, sourceVerse, onClose }: WordStudyCardProps) {
   const projectScene = useAppStore((s) => s.projectScene);
   const currentScene = useAppStore((s) => s.display.currentScene);
   const setCurrentScene = useAppStore((s) => s.setCurrentScene);
@@ -104,8 +113,31 @@ export function WordStudyCard({ entry, onClose }: WordStudyCardProps) {
 
   const handleProject = () => {
     if (isProjected) {
-      setCurrentScene(null);
-      setPreviewScene(null);
+      if (sourceVerse) {
+        const verseText = `${toSuperscript(sourceVerse.verse)}\u00A0${sourceVerse.text}`;
+        const scene: Scene = {
+          id: `bible-${sourceVerse.book}-${sourceVerse.chapter}-${sourceVerse.verse}`,
+          name: sourceVerse.reference,
+          type: 'bible',
+          background: undefined,
+          content: {
+            text: verseText,
+            reference: `${sourceVerse.reference} (${sourceVerse.version || 'KJV'})`,
+            version: sourceVerse.version || 'KJV',
+          },
+          transition: { type: 'fade', duration: 0.15 },
+        };
+        projectScene(scene, { direct: true });
+        window.BSP?.display?.sendState?.({
+          mode: 'lowerThird',
+          outputMode: 'lowerThird',
+          lowerThirdText: `${sourceVerse.reference} (${sourceVerse.version || 'KJV'})`,
+          lowerThirdSub: sourceVerse.text,
+        });
+      } else {
+        setCurrentScene(null);
+        setPreviewScene(null);
+      }
       return;
     }
     const scene: Scene = {

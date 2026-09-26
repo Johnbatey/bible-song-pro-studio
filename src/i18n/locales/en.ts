@@ -471,8 +471,8 @@ export const en: MessageCatalog = {
 
   'transcript.title': 'Live transcript',
   'transcript.openLive': 'Open Live Scripture',
-  'transcript.start': 'Start transcribing',
-  'transcript.stop': 'Stop transcribing',
+  'transcript.start': 'Start Transcribing',
+  'transcript.stop': 'Stop Transcribing',
   'transcript.recording': 'Recording',
   'transcript.idle': 'Idle',
   'transcript.listening': 'Listening…',

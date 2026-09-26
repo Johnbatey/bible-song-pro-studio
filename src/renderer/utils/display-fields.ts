@@ -56,6 +56,17 @@ export function displayFieldsFor(theme: Theme | null, outputMode: 'fullscreen' |
  * each update — an explicit empty string is what clears a previous background.
  */
 export function backgroundFieldsFor(scene: Scene | null, theme: Theme | null, outputMode: 'fullscreen' | 'lowerThird') {
+  if (!scene) {
+    return {
+      bgVideo: '',
+      bgCustomImage: '',
+      bgFill: 'transparent',
+      bgFit: 'cover',
+      bgOpacity: 1,
+      bgVideoLoop: false,
+    };
+  }
+
   const bg = scene?.background;
   const themeFs = theme?.fullScreen;
   const fields = {

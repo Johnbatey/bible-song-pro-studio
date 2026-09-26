@@ -361,11 +361,11 @@
   right: 4%;
   bottom: 5%;
   z-index: 2;
-  padding: 24px 34px;
+  padding: 0;
   overflow: hidden;
   border-radius: var(--bsp-r-base, 4px);
   background: transparent;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .36);
+  box-shadow: none;
 }
 
 .program-lt-media,

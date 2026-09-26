@@ -21,6 +21,7 @@ import { useStoreSync } from './hooks/useStoreSync';
 export { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
 import { displayFieldsFor, backgroundFieldsFor } from './utils/display-fields';
 import { ensureTheme } from './utils/defaultTheme';
+import { resolveEffectiveTheme } from './components/display/ProgramSurface';
 import { resolveEffectiveOutputMode } from './utils/outputMode';
 import { sanitizeForIpc } from './utils/sanitize-ipc';
 import { setUiLocale as applyI18nLocale } from '../i18n';
@@ -270,12 +271,14 @@ export function App() {
     if (!window.BSP?.display?.sendState) return;
     const sendState = () => {
       const state = useAppStore.getState();
-      const activeTheme = ensureTheme(state.activeTheme);
+      const isStudio = state.display.mode === 'studio';
+      const rawTheme = ensureTheme((isStudio && state.liveTheme) ? state.liveTheme : state.activeTheme);
+      const effectiveTheme = resolveEffectiveTheme(rawTheme, state.display.currentScene?.type) || rawTheme;
       const effectiveOutputMode = resolveEffectiveOutputMode(state.display.currentScene, state.display);
       window.BSP.display.sendState(sanitizeForIpc({
         scene: state.display.currentScene,
         outputMode: effectiveOutputMode,
-        theme: activeTheme,
+        theme: effectiveTheme,
         /* Only a room announcement travels. Operator notices live in
            `state.notice` and are deliberately absent from this payload. */
         activeAlert: state.activeAlert,
@@ -289,8 +292,8 @@ export function App() {
           ? state.display.videoTransport
           : null,
         fxAnimation: state.fxSettings,
-        ...displayFieldsFor(activeTheme, effectiveOutputMode),
-        ...backgroundFieldsFor(state.display.currentScene, activeTheme, effectiveOutputMode),
+        ...displayFieldsFor(effectiveTheme, effectiveOutputMode),
+        ...backgroundFieldsFor(state.display.currentScene, effectiveTheme, effectiveOutputMode),
       })).then((nextState) => {
         useAppStore.getState().setOutputStatus({
           updatedAt: nextState?.updatedAt || Date.now(),
@@ -301,10 +304,12 @@ export function App() {
     const unsubscribe = useAppStore.subscribe((state, prev) => {
       if (
         state.display.currentScene !== prev.display.currentScene ||
+        state.display.mode !== prev.display.mode ||
         state.display.outputMode !== prev.display.outputMode ||
         state.display.bibleOutputMode !== prev.display.bibleOutputMode ||
         state.display.songOutputMode !== prev.display.songOutputMode ||
         state.activeTheme !== prev.activeTheme ||
+        state.liveTheme !== prev.liveTheme ||
         state.fxSettings !== prev.fxSettings ||
         state.activeAlert !== prev.activeAlert ||
         state.display.blackout !== prev.display.blackout ||

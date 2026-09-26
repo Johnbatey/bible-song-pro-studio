@@ -113,6 +113,37 @@ function StudioSlider({
     }
   };
 
+  const handleScrubMouseDown = (e: React.MouseEvent<HTMLSpanElement>) => {
+    if (isEditing) return;
+    const startX = e.clientX;
+    const startVal = safeVal;
+    let didMove = false;
+
+    const onPointerMove = (moveEvt: MouseEvent) => {
+      const diffX = moveEvt.clientX - startX;
+      if (Math.abs(diffX) > 2) {
+        didMove = true;
+      }
+      const multiplier = moveEvt.shiftKey ? 5 : 1;
+      const stepVal = step || 1;
+      const delta = Math.round(diffX / 2) * stepVal * multiplier;
+      const next = Math.max(min, Math.min(hardMax, startVal + delta));
+      onChange(next);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('mousemove', onPointerMove);
+      window.removeEventListener('mouseup', onPointerUp);
+      if (!didMove) {
+        setDraft(String(safeVal));
+        setIsEditing(true);
+      }
+    };
+
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+  };
+
   return (
     <div className="studio-slider-row">
       <div className="studio-slider-labels">
@@ -147,12 +178,9 @@ function StudioSlider({
         ) : (
           <span
             className="studio-slider-value"
-            onClick={() => {
-              setDraft(String(safeVal));
-              setIsEditing(true);
-            }}
-            title="Click to type exact value (up to 5000px)"
-            style={{ cursor: 'pointer' }}
+            onMouseDown={handleScrubMouseDown}
+            title="Drag left/right to adjust, click to type exact value"
+            style={{ cursor: 'ew-resize', userSelect: 'none' }}
           >
             {displayValue ?? `${Math.round(safeVal * 10) / 10}${unit}`}
           </span>
@@ -1403,7 +1431,28 @@ export function Inspector({
                 <div className="studio-section-content">
                   <div className="studio-grid-2">
                     <div className="studio-field-box">
-                      <span className="studio-field-label">X Position</span>
+                      <span
+                        className="studio-field-label"
+                        onMouseDown={(e) => {
+                          const startX = e.clientX;
+                          const startVal = zone.x;
+                          const onMove = (mEvt: MouseEvent) => {
+                            const diff = mEvt.clientX - startX;
+                            const next = Math.max(0, Math.min(100, Math.round((startVal + (diff / 4) * 0.5) * 10) / 10));
+                            onChange({ x: next }, `x:${zone.id}`);
+                          };
+                          const onUp = () => {
+                            window.removeEventListener('mousemove', onMove);
+                            window.removeEventListener('mouseup', onUp);
+                          };
+                          window.addEventListener('mousemove', onMove);
+                          window.addEventListener('mouseup', onUp);
+                        }}
+                        style={{ cursor: 'ew-resize', userSelect: 'none' }}
+                        title="Drag left/right to adjust"
+                      >
+                        X Position
+                      </span>
                       <div className="studio-input-wrap">
                         <input
                           type="number"
@@ -1422,7 +1471,28 @@ export function Inspector({
                     </div>
 
                     <div className="studio-field-box">
-                      <span className="studio-field-label">Y Position</span>
+                      <span
+                        className="studio-field-label"
+                        onMouseDown={(e) => {
+                          const startX = e.clientX;
+                          const startVal = zone.y;
+                          const onMove = (mEvt: MouseEvent) => {
+                            const diff = mEvt.clientX - startX;
+                            const next = Math.max(0, Math.min(100, Math.round((startVal + (diff / 4) * 0.5) * 10) / 10));
+                            onChange({ y: next }, `y:${zone.id}`);
+                          };
+                          const onUp = () => {
+                            window.removeEventListener('mousemove', onMove);
+                            window.removeEventListener('mouseup', onUp);
+                          };
+                          window.addEventListener('mousemove', onMove);
+                          window.addEventListener('mouseup', onUp);
+                        }}
+                        style={{ cursor: 'ew-resize', userSelect: 'none' }}
+                        title="Drag left/right to adjust"
+                      >
+                        Y Position
+                      </span>
                       <div className="studio-input-wrap">
                         <input
                           type="number"
@@ -1441,7 +1511,28 @@ export function Inspector({
                     </div>
 
                     <div className="studio-field-box">
-                      <span className="studio-field-label">Width</span>
+                      <span
+                        className="studio-field-label"
+                        onMouseDown={(e) => {
+                          const startX = e.clientX;
+                          const startVal = zone.w;
+                          const onMove = (mEvt: MouseEvent) => {
+                            const diff = mEvt.clientX - startX;
+                            const next = Math.max(3, Math.min(100, Math.round((startVal + (diff / 4) * 0.5) * 10) / 10));
+                            onChange({ w: next }, `w:${zone.id}`);
+                          };
+                          const onUp = () => {
+                            window.removeEventListener('mousemove', onMove);
+                            window.removeEventListener('mouseup', onUp);
+                          };
+                          window.addEventListener('mousemove', onMove);
+                          window.addEventListener('mouseup', onUp);
+                        }}
+                        style={{ cursor: 'ew-resize', userSelect: 'none' }}
+                        title="Drag left/right to adjust"
+                      >
+                        Width
+                      </span>
                       <div className="studio-input-wrap">
                         <input
                           type="number"
@@ -1460,7 +1551,28 @@ export function Inspector({
                     </div>
 
                     <div className="studio-field-box">
-                      <span className="studio-field-label">Height</span>
+                      <span
+                        className="studio-field-label"
+                        onMouseDown={(e) => {
+                          const startX = e.clientX;
+                          const startVal = zone.h;
+                          const onMove = (mEvt: MouseEvent) => {
+                            const diff = mEvt.clientX - startX;
+                            const next = Math.max(3, Math.min(100, Math.round((startVal + (diff / 4) * 0.5) * 10) / 10));
+                            onChange({ h: next }, `h:${zone.id}`);
+                          };
+                          const onUp = () => {
+                            window.removeEventListener('mousemove', onMove);
+                            window.removeEventListener('mouseup', onUp);
+                          };
+                          window.addEventListener('mousemove', onMove);
+                          window.addEventListener('mouseup', onUp);
+                        }}
+                        style={{ cursor: 'ew-resize', userSelect: 'none' }}
+                        title="Drag left/right to adjust"
+                      >
+                        Height
+                      </span>
                       <div className="studio-input-wrap">
                         <input
                           type="number"

@@ -488,6 +488,10 @@ function backgroundStyle(state: ProgramSurfaceState, mode: 'fullscreen' | 'lower
   if (mode === 'lowerThird') {
     return { backgroundColor: 'transparent', backgroundImage: 'none' };
   }
+  // When cleared or taken down (no active scene), keep background completely transparent/blank
+  if (!state.scene && !state.bgCustomImage && (!state.bgFill || state.bgFill === 'transparent')) {
+    return { backgroundColor: 'transparent', backgroundImage: 'none' };
+  }
   const activeTheme = resolveEffectiveTheme(state.theme, state.scene?.type);
   if (!state.scene && !activeTheme) {
     return { backgroundColor: 'transparent', backgroundImage: 'none' };
@@ -903,11 +907,33 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     width: '100%',
   };
 
-  const ltOffsetX = activeTheme?.lowerThird?.offsetX || 0;
-  const ltOffsetY = activeTheme?.lowerThird?.offsetY || 0;
+  const ltPos = activeTheme?.lowerThird?.position || 'bottom-center';
+  const isTop = ltPos.startsWith('top') || activeTheme?.lowerThird?.anchor === 'top';
+  const isLeft = ltPos.includes('left');
+  const isRight = ltPos.includes('right');
+  const isCentered = !isLeft && !isRight;
+
+  const ltOffsetX = activeTheme?.lowerThird?.offsetX ?? 0;
+  const ltOffsetY = activeTheme?.lowerThird?.offsetY ?? 0;
   const ltWidth = activeTheme?.lowerThird?.width ?? 75;
+
+  let ltLeft: string | undefined = undefined;
+  let ltRight: string | undefined = undefined;
+  let baseTranslateX = '';
+
+  if (isCentered) {
+    ltLeft = '50%';
+    baseTranslateX = 'translateX(-50%)';
+  } else if (isLeft) {
+    ltLeft = '4%';
+    ltRight = 'auto';
+  } else if (isRight) {
+    ltRight = '4%';
+    ltLeft = 'auto';
+  }
+
   const ltTransform = [
-    ltWidth ? 'translateX(-50%)' : '',
+    baseTranslateX,
     ltOffsetX ? `translateX(${ltOffsetX}px)` : '',
     ltOffsetY ? `translateY(${ltOffsetY}px)` : '',
   ].filter(Boolean).join(' ') || undefined;
@@ -1005,21 +1031,23 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
         <div
           className="program-lower-third"
           style={{
-            borderRadius: activeTheme?.lowerThird?.borderRadius,
+            borderRadius: typeof activeTheme?.lowerThird?.borderRadius === 'number' ? `${activeTheme.lowerThird.borderRadius}px` : undefined,
             width: ltWidth ? `${ltWidth}%` : undefined,
-            left: ltWidth ? '50%' : undefined,
-            right: ltWidth ? 'auto' : undefined,
+            left: ltLeft,
+            right: ltRight,
+            top: isTop ? '5%' : undefined,
+            bottom: isTop ? 'auto' : '5%',
             transform: ltTransform,
             textAlign: isCompare ? dualTextAlign : textAlign,
             background: 'transparent',
-            padding: activeTheme?.lowerThird?.padding ? `${activeTheme.lowerThird.padding}px` : undefined,
+            padding: typeof activeTheme?.lowerThird?.padding === 'number' ? `${activeTheme.lowerThird.padding}px` : undefined,
           }}
         >
           <div
             key={fxAnim.animateBg ? (scene?.id ? `${scene.id}-lt-bg` : 'lt-bg') : 'static-lt-bg'}
             className="program-lt-bg-layer"
             style={{
-              borderRadius: activeTheme?.lowerThird?.borderRadius,
+              borderRadius: typeof activeTheme?.lowerThird?.borderRadius === 'number' ? `${activeTheme.lowerThird.borderRadius}px` : undefined,
               ...lowerThirdBandStyle(activeTheme?.lowerThird, scene?.background, assetBaseUrl),
               ...(fxAnim.animateBg ? { animation: fxAnim.css } : { animation: 'none' }),
             }}

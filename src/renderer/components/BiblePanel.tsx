@@ -11,6 +11,7 @@ import { useBarPosition, MoveBarButton } from '../hooks/useBarPosition';
 import { Block, BlockButton } from './Block';
 import { useI18n } from '../../i18n/useI18n';
 import { BackgroundPicker, BackgroundPopover, getBackgroundFromTheme } from './BackgroundPicker';
+import { resolveEffectiveTheme } from './display/ProgramSurface';
 import { FxAnimationPopover } from './FxAnimationPopover';
 import { BibleGridPicker } from './BibleGridPicker';
 
@@ -334,7 +335,8 @@ export function BiblePanel() {
   const fxSettings = useAppStore((s) => s.fxSettings);
 
   const currentBibleEffectiveBackground = useMemo(() => {
-    return getBackgroundFromTheme(activeTheme, bibleOutputMode);
+    const effTheme = resolveEffectiveTheme(activeTheme, 'bible') || activeTheme;
+    return getBackgroundFromTheme(effTheme, bibleOutputMode);
   }, [activeTheme, bibleOutputMode]);
 
   const [isFxPopoverOpen, setIsFxPopoverOpen] = useState(false);
@@ -358,8 +360,8 @@ export function BiblePanel() {
   const [lexiconResult, setLexiconResult] = useState<WordStudyEntry | null>(null);
   const [showStrongs, setShowStrongs] = useState(false);
   const [enableHoverLookup, setEnableHoverLookup] = useState(true);
-  const [hoveredStrongs, setHoveredStrongs] = useState<{ entry: WordStudyEntry; x: number; y: number } | null>(null);
-  const [pinnedStrongs, setPinnedStrongs] = useState<{ entry: WordStudyEntry; x: number; y: number } | null>(null);
+  const [hoveredStrongs, setHoveredStrongs] = useState<{ entry: WordStudyEntry; x: number; y: number; verse?: BibleVerse } | null>(null);
+  const [pinnedStrongs, setPinnedStrongs] = useState<{ entry: WordStudyEntry; x: number; y: number; verse?: BibleVerse } | null>(null);
   const [importing, setImporting] = useState(false);
   const [pendingOverwrite, setPendingOverwrite] = useState<{
     versionId: string;
@@ -1890,13 +1892,13 @@ export function BiblePanel() {
                         onHoverStrongs={(entry, e) => {
                           if (pinnedStrongs || !enableHoverLookup) return;
                           if (entry && e) {
-                            setHoveredStrongs({ entry, x: e.clientX, y: e.clientY });
+                            setHoveredStrongs({ entry, x: e.clientX, y: e.clientY, verse });
                           } else {
                             setHoveredStrongs(null);
                           }
                         }}
                         onContextMenuStrongs={(entry, e) => {
-                          setPinnedStrongs({ entry, x: e.clientX, y: e.clientY });
+                          setPinnedStrongs({ entry, x: e.clientX, y: e.clientY, verse });
                           setHoveredStrongs(null);
                         }}
                         onClickStrongs={(entry, e) => {
@@ -1909,12 +1911,7 @@ export function BiblePanel() {
                             activeScene?.id === `wordstudy-${entry.strongs}`;
 
                           if (isAlreadyActive) {
-                            if (goesLive) {
-                              setCurrentScene(null);
-                              setPreviewScene(null);
-                            } else {
-                              setPreviewScene(null);
-                            }
+                            void sendVerse(verse, { direct: isDoubleClick, forceUpdate: true });
                             setPinnedStrongs(null);
                             setHoveredStrongs(null);
                             return;
@@ -2074,7 +2071,7 @@ export function BiblePanel() {
                 </button>
               </div>
             )}
-            <WordStudyCard entry={activePopover.entry} />
+            <WordStudyCard entry={activePopover.entry} sourceVerse={activePopover.verse} />
           </div>
         );
       })()}

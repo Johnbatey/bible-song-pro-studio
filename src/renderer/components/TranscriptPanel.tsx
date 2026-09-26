@@ -60,6 +60,8 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(na
 export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
   const transcription = useAppStore((s) => s.transcription);
   const setTranscription = useAppStore((s) => s.setTranscription);
+  const syncTranscriptWithLive = useAppStore((s) => s.syncTranscriptWithLive);
+  const setSyncTranscriptWithLive = useAppStore((s) => s.setSyncTranscriptWithLive);
   const aiProviders = useAppStore((s) => s.aiProviders);
   const enabledProvider = aiProviders.find((p) => p.enabled);
 
@@ -664,13 +666,17 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
     liveSessionIdRef.current = finalId;
     setViewMode('live');
 
-    onOpenLiveScripture?.();
+    if (syncTranscriptWithLive) {
+      onOpenLiveScripture?.();
+    }
+    setTranscription({ isActive: true });
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent('bsp:live-transcription-start'));
     }, 100);
   }
 
   function stopTranscription() {
+    setTranscription({ isActive: false });
     window.dispatchEvent(new CustomEvent('bsp:live-transcription-stop'));
     liveSessionIdRef.current = null;
   }
@@ -1072,26 +1078,75 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
       flush
       bodyStyle={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}
       footer={(
-        <>
-          {transcription.isActive ? (
-            <button style={styles.stopBtn} onClick={stopTranscription}>
-              <span style={styles.stopDot} />
-              Stop transcribing
-            </button>
-          ) : (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {transcription.isActive ? (
+              <button style={styles.stopBtn} onClick={stopTranscription}>
+                <span style={styles.stopDot} />
+                Stop Transcribing
+              </button>
+            ) : (
+              <button
+                style={{ ...styles.startBtn, opacity: enabledProvider ? 1 : 0.6 }}
+                onClick={handleStartClick}
+                disabled={!enabledProvider}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                </svg>
+                <span style={styles.startLabel}>Start Transcribing</span>
+              </button>
+            )}
+
+            {/* Sync / Unsync Toggle Button beside Start/Stop transcribing */}
             <button
-              style={{ ...styles.startBtn, opacity: enabledProvider ? 1 : 0.6 }}
-              onClick={handleStartClick}
-              disabled={!enabledProvider}
+              type="button"
+              onClick={() => {
+                const next = !syncTranscriptWithLive;
+                setSyncTranscriptWithLive(next);
+                showToast(next ? 'Synced with Live Window' : 'Unsynced from Live Window');
+              }}
+              style={{
+                height: 24,
+                padding: '0 8px',
+                fontSize: 11,
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: syncTranscriptWithLive ? 'rgba(34, 197, 94, 0.14)' : 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid',
+                borderColor: syncTranscriptWithLive ? 'var(--tally-preview, #22c55e)' : 'rgba(255, 255, 255, 0.12)',
+                borderRadius: 4,
+                color: syncTranscriptWithLive ? 'var(--tally-preview, #22c55e)' : 'var(--text-dim)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-ui)',
+                transition: 'all 0.15s ease',
+              }}
+              title={
+                syncTranscriptWithLive
+                  ? 'Sync to Live Window: ON (Transcription starts/stops with Live detection play button) — Click to Unsync'
+                  : 'Sync to Live Window: OFF (Transcribe independently without syncing Live window play/stop) — Click to Sync'
+              }
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--tally-preview)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-              <span style={styles.startLabel}>Start transcribing</span>
+              {syncTranscriptWithLive ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.5 2v6h-6" />
+                  <path d="M2 12a10 10 0 0 1 18.78-4.5" />
+                  <path d="M22 12a10 10 0 0 1-18.78 4.5" />
+                  <line x1="2" y1="2" x2="22" y2="22" strokeWidth="2" />
+                </svg>
+              )}
+              <span>{syncTranscriptWithLive ? 'Sync' : 'Unsynced'}</span>
             </button>
-          )}
+          </div>
+
           <span
             style={{
               ...styles.recDot,
@@ -1099,7 +1154,7 @@ export function TranscriptPanel({ onOpenLiveScripture }: TranscriptPanelProps) {
             }}
             title={transcription.isActive ? 'Recording' : 'Idle'}
           />
-        </>
+        </div>
       )}
     >
       {/* Feedback Toast Notification */}
@@ -1662,15 +1717,16 @@ const styles: Record<string, React.CSSProperties> = {
   startBtn: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    padding: '5px 10px',
+    gap: 6,
+    padding: '3px 8px',
+    height: 24,
     background: 'transparent',
     border: '1px solid var(--block-line)',
-    borderRadius: 6,
+    borderRadius: 4,
     cursor: 'pointer',
   },
   startLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     color: 'var(--text-primary)',
   },
@@ -1686,12 +1742,13 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    padding: '5px 10px',
+    padding: '3px 8px',
+    height: 24,
     background: 'rgba(239, 68, 68, 0.12)',
     border: '1px solid rgba(239, 68, 68, 0.3)',
-    borderRadius: 6,
+    borderRadius: 4,
     color: 'var(--tally-fault)',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: 'pointer',
   },

@@ -216,7 +216,7 @@ function ScrubbableInput({
   precision = 0,
   style,
   inputStyle,
-  badge = '⤌⤍',
+  badge,
   suffix,
   title,
 }: ScrubbableInputProps) {
@@ -254,14 +254,18 @@ function ScrubbableInput({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    if (isFocused) return;
     isDraggingRef.current = true;
+    let didMove = false;
     startXRef.current = e.clientX;
     startValRef.current = value || 0;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isDraggingRef.current) return;
       const diffX = moveEvent.clientX - startXRef.current;
+      if (Math.abs(diffX) > 2) {
+        didMove = true;
+      }
       const multiplier = moveEvent.shiftKey ? 10 : 1;
       const deltaAmount = Math.round(diffX / 3) * step * multiplier;
 
@@ -276,10 +280,14 @@ function ScrubbableInput({
       setLocalText(String(nextVal));
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (upEvent: MouseEvent) => {
       isDraggingRef.current = false;
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      if (!didMove && (upEvent.target as HTMLElement)?.tagName === 'INPUT') {
+        setIsFocused(true);
+        (upEvent.target as HTMLInputElement).focus();
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -335,7 +343,7 @@ function ScrubbableInput({
         onChange={handleInputChange}
         onBlur={handleBlur}
         onWheel={handleWheel}
-        style={{ ...styles.iconInput, ...inputStyle }}
+        style={{ ...styles.iconInput, cursor: isFocused ? 'text' : 'ew-resize', ...inputStyle }}
       />
       {suffix && <span style={{ fontSize: 10, color: 'var(--text-dim)', paddingRight: 6, flexShrink: 0 }}>{suffix}</span>}
     </div>
@@ -1855,7 +1863,6 @@ export function SlideEditorRightSidebar({
                         max={5.0}
                         step={0.05}
                         precision={2}
-                        badge="⤌⤍"
                       />
                     </div>
                     <div className="studio-field-box">
@@ -1867,7 +1874,6 @@ export function SlideEditorRightSidebar({
                         max={80}
                         step={1}
                         precision={0}
-                        badge="⤌⤍"
                         suffix="px"
                       />
                     </div>

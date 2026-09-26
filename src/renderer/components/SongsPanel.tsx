@@ -8,6 +8,7 @@ import { AppleToggle } from './AppleToggle';
 import { PanelSplitter } from './PanelSplitter';
 import { SongDeck } from './song/SongDeck';
 import { BackgroundPicker, BackgroundPopover, getBackgroundFromTheme } from './BackgroundPicker';
+import { resolveEffectiveTheme } from './display/ProgramSurface';
 import { backgroundSwatchCss } from '../utils/background';
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
 import { isFocusedDock } from './dock/dockFocus';
@@ -91,7 +92,8 @@ export function SongsPanel() {
   const isThemeStudioOpen = useAppStore((s) => s.isThemeStudioOpen);
 
   const currentSongEffectiveBackground = useMemo(() => {
-    return getBackgroundFromTheme(activeTheme, songOutputMode);
+    const effTheme = resolveEffectiveTheme(activeTheme, 'song') || activeTheme;
+    return getBackgroundFromTheme(effTheme, songOutputMode);
   }, [activeTheme, songOutputMode]);
 
   const [bgOpen, setBgOpen] = useState(false);

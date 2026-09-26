@@ -181,6 +181,7 @@ interface AppState {
   setActiveTheme: (theme: Theme | null) => void;
   commitThemeToLive: () => void;
   addTheme: (theme: Theme) => void;
+  setThemes: (themes: Theme[]) => void;
   updateTheme: (id: string, updates: Partial<Theme>) => void;
   removeTheme: (id: string) => void;
 
@@ -872,6 +873,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     liveTheme: s.display.mode === 'basic' ? (theme ? { ...theme } : null) : (s.liveTheme || s.activeTheme),
   })),
   addTheme: (theme) => set((s) => ({ themes: [...s.themes, theme] })),
+  setThemes: (themes) => set({ themes }),
   updateTheme: (id, updates) =>
     set((s) => {
       const exists = s.themes.some((t) => t.id === id);

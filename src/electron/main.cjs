@@ -1008,7 +1008,8 @@ function broadcastDisplayList() {
  */
 function broadcastStageWindows() {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('stage-display:state', { open: liveStageWindows().size > 0 });
+    const isOpen = Boolean((stageDisplayWindow && !stageDisplayWindow.isDestroyed() && stageDisplayWindow.isVisible()) || [...liveStageWindows()].some((w) => w.isVisible()));
+    mainWindow.webContents.send('stage-display:state', { open: isOpen });
   }
 }
 
@@ -1024,6 +1025,8 @@ function resizableOutputBounds(bounds) {
     height: Math.round(fittedHeight),
   };
 }
+
+let stageDisplayWindow = null;
 
 function createDisplayWindow(targetOrBounds, options = {}) {
   const primary = screen.getPrimaryDisplay();
@@ -1053,12 +1056,15 @@ function createDisplayWindow(targetOrBounds, options = {}) {
     } else {
       if (isFullScreen) {
         displayWindow.setBounds(targetDisplay.bounds);
+        try { displayWindow.setContentBounds(targetDisplay.bounds); } catch {}
       } else {
         displayWindow.setBounds(explicitBounds || resizableOutputBounds(targetDisplay.bounds));
       }
-      if (options.show !== undefined) {
-        if (options.show) displayWindow.show();
-        else displayWindow.hide();
+      if (options.show !== false) {
+        displayWindow.show();
+        broadcastDisplayState();
+      } else {
+        displayWindow.hide();
       }
       return displayWindow;
     }
@@ -1085,6 +1091,7 @@ function createDisplayWindow(targetOrBounds, options = {}) {
     transparent: true,
     backgroundColor: '#00000000',
     show: showWindow,
+    enableLargerThanScreen: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -1095,7 +1102,10 @@ function createDisplayWindow(targetOrBounds, options = {}) {
 
   displayWindow.__isFrameless = isFullScreen;
 
-  if (!isFullScreen) {
+  if (isFullScreen) {
+    displayWindow.setBounds(targetDisplay.bounds);
+    try { displayWindow.setContentBounds(targetDisplay.bounds); } catch {}
+  } else {
     displayWindow.setResizable(true);
     displayWindow.setMinimumSize(640, 360);
     displayWindow.setAspectRatio(16 / 9);
@@ -1103,8 +1113,19 @@ function createDisplayWindow(targetOrBounds, options = {}) {
 
   displayWindow.loadURL(isDev ? 'http://localhost:5173/audience-display.html' : `file://${path.join(__dirname, '../../dist/audience-display.html')}`);
   displayWindow.setMenuBarVisibility(false);
+  // Audio Isolation: Secondary display/capture surfaces never output duplicate audio to system speakers
+  displayWindow.webContents.setAudioMuted(true);
 
-  // Crash Resilience & Auto-Recovery (OBS Parity: Display never stays down)
+  displayWindow.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      activeDisplayId = null;
+      displayWindow.hide();
+      broadcastDisplayState();
+    }
+  });
+
+  // Crash Resilience & Auto-Recovery
   displayWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('[DisplayWindow] Renderer process crash detected:', details);
     if (displayWindow && !displayWindow.isDestroyed()) {
@@ -1136,6 +1157,32 @@ function createStageDisplayWindow(targetDisplay, options = {}) {
   const target = targetDisplay || chooseDisplay('auto') || primary;
   const isFullScreen = options.fullscreen !== undefined ? options.fullscreen : true;
   const bounds = isFullScreen ? target.bounds : resizableOutputBounds(target.bounds || screen.getPrimaryDisplay().workArea || screen.getPrimaryDisplay().bounds);
+  const showWindow = options.show !== false;
+
+  if (stageDisplayWindow && !stageDisplayWindow.isDestroyed()) {
+    const isCurrentlyFrameless = Boolean(stageDisplayWindow.__isFrameless);
+    if (isCurrentlyFrameless !== isFullScreen) {
+      stageDisplayWindow.close();
+      stageDisplayWindow = null;
+    } else {
+      if (isFullScreen) {
+        stageDisplayWindow.setBounds(target.bounds);
+        try { stageDisplayWindow.setContentBounds(target.bounds); } catch {}
+      } else {
+        stageDisplayWindow.setBounds(bounds);
+      }
+      stageWindows.add(stageDisplayWindow);
+      if (showWindow) {
+        stageDisplayWindow.show();
+        stageDisplayWindow.webContents.send('display:message', { type: 'display:update', state: displayState });
+        if (Object.keys(stageState).length > 0) stageDisplayWindow.webContents.send('stage:message', stageState);
+      } else {
+        stageDisplayWindow.hide();
+      }
+      broadcastStageWindows();
+      return stageDisplayWindow;
+    }
+  }
 
   const win = new BrowserWindow({
     x: bounds.x,
@@ -1150,8 +1197,10 @@ function createStageDisplayWindow(targetDisplay, options = {}) {
     maximizable: true,
     fullscreenable: true,
     thickFrame: !isFullScreen,
+    enableLargerThanScreen: true,
     backgroundColor: '#000000',
     title: 'BSP Stage Display',
+    show: showWindow,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -1160,13 +1209,35 @@ function createStageDisplayWindow(targetDisplay, options = {}) {
       backgroundThrottling: false,
     },
   });
+
+  win.__isFrameless = isFullScreen;
+
+  if (isFullScreen) {
+    win.setBounds(target.bounds);
+    try {
+      win.setContentBounds(target.bounds);
+    } catch {}
+  }
+
+  stageDisplayWindow = win;
   win.loadURL(isDev ? 'http://localhost:5173/stage-display.html' : `file://${path.join(__dirname, '../../dist/stage-display.html')}`);
   win.setMenuBarVisibility(false);
+  win.webContents.setAudioMuted(true);
 
   stageWindows.add(win);
   broadcastStageWindows();
+
+  win.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      win.hide();
+      broadcastStageWindows();
+    }
+  });
+
   win.on('closed', () => {
     stageWindows.delete(win);
+    if (stageDisplayWindow === win) stageDisplayWindow = null;
     broadcastStageWindows();
   });
 
@@ -1204,48 +1275,44 @@ function createStageDisplayWindow(targetDisplay, options = {}) {
  * second call focuses the one already open rather than opening a rival editor
  * onto the same layouts.
  */
-function createStageDesignerWindow() {
-  for (const existing of liveStageDesignerWindows()) {
-    if (existing.isMinimized()) existing.restore();
-    existing.focus();
-    return existing;
-  }
-  const win = new BrowserWindow({
-    width: 1440, height: 920, minWidth: 1040, minHeight: 640,
-    resizable: true, maximizable: true, fullscreenable: true, thickFrame: true,
-    backgroundColor: '#0b0d12', title: 'BSP Stage Layout Designer',
-    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true },
-  });
-  win.loadURL(isDev ? 'http://localhost:5173/stage-designer.html' : `file://${path.join(__dirname, '../../dist/stage-designer.html')}`);
-  win.setMenuBarVisibility(false);
+let prewarmedStageDesignerWindow = null;
 
-  stageDesignerWindows.add(win);
-
-  /* Captured now, not read later. By the time `closed` fires the window is
-     destroyed and `win.webContents` is gone, so reaching through it there
-     throws — and an uncaught throw in the main process puts up Electron's
-     own modal error box, which blocks the projector and the stage along with
-     everything else. The id is a number; hold the number. */
+function setupStageDesignerEvents(win) {
   const contentsId = win.webContents.id;
+
   win.on('closed', () => {
     stageDesignerWindows.delete(win);
     dirtyDesigners.delete(contentsId);
+    if (prewarmedStageDesignerWindow === win) {
+      prewarmedStageDesignerWindow = null;
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
   });
 
-  /* An hour of layout work is not something to lose to a stray Cmd+W. The
-     renderer keeps this flag current; the check has to live up here because a
-     renderer cannot hold a window open long enough to ask a question.
-
-     Asked asynchronously, and that is not a style preference.
-     showMessageBoxSync blocks the main process — every timer, every IPC hop,
-     the projector feed and the stage feed with it — for as long as the prompt
-     is on screen. A confirmation about one window is not worth freezing the
-     service running on the other two, so the close is cancelled, the question
-     is asked, and the window closes again on the answer. */
   let closeConfirmed = false;
   win.on('close', (event) => {
-    if (closeConfirmed || !dirtyDesigners.get(contentsId)) return;
+    if (closeConfirmed || !dirtyDesigners.get(contentsId)) {
+      if (!app.isQuitting) {
+        event.preventDefault();
+        stageDesignerWindows.delete(win);
+        dirtyDesigners.delete(contentsId);
+        win.hide();
+        prewarmedStageDesignerWindow = win;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.focus();
+        }
+      }
+      return;
+    }
     event.preventDefault();
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
     dialog.showMessageBox(win, {
       type: 'warning',
       buttons: ['Cancel', 'Discard changes'],
@@ -1254,22 +1321,101 @@ function createStageDesignerWindow() {
       message: 'This layout has unsaved changes.',
       detail: 'Closing the designer now will discard them.',
     }).then(({ response }) => {
-      if (response !== 1 || win.isDestroyed()) return;
+      if (response !== 1 || win.isDestroyed()) {
+        if (win && !win.isDestroyed()) {
+          win.focus();
+        }
+        return;
+      }
       closeConfirmed = true;
       dirtyDesigners.delete(contentsId);
-      win.close();
-    }).catch(() => { /* the window went away while we were asking */ });
+      if (!app.isQuitting) {
+        win.hide();
+        stageDesignerWindows.delete(win);
+        prewarmedStageDesignerWindow = win;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.focus();
+        }
+      } else {
+        win.close();
+      }
+    }).catch(() => {});
   });
 
-  /* The designer draws the real stage, so it needs the real feeds — the same
-     catch-up a stage window gets, for the same reason. A designer opened
-     mid-service should be laying out over what is actually on the screen. */
-  win.webContents.once('did-finish-load', () => {
+  win.webContents.on('did-finish-load', () => {
     win.webContents.send('display:message', { type: 'display:update', state: displayState });
     if (Object.keys(stageState).length > 0) win.webContents.send('stage:message', stageState);
   });
 
   if (isDev) win.webContents.openDevTools({ mode: 'detach' });
+}
+
+function prewarmStageDesignerWindow() {
+  if (prewarmedStageDesignerWindow && !prewarmedStageDesignerWindow.isDestroyed()) return;
+  try {
+    const win = new BrowserWindow({
+      width: 1440,
+      height: 920,
+      minWidth: 1040,
+      minHeight: 640,
+      resizable: true,
+      maximizable: true,
+      fullscreenable: true,
+      thickFrame: true,
+      show: false,
+      backgroundColor: '#0b0d12',
+      title: 'BSP Stage Layout Designer',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.cjs'),
+        nodeIntegration: false,
+        contextIsolation: true,
+        webSecurity: true,
+        backgroundThrottling: false,
+      },
+    });
+    win.loadURL(isDev ? 'http://localhost:5173/stage-designer.html' : `file://${path.join(__dirname, '../../dist/stage-designer.html')}`);
+    win.setMenuBarVisibility(false);
+    setupStageDesignerEvents(win);
+    prewarmedStageDesignerWindow = win;
+  } catch (e) {
+    console.warn('[StageDesigner] Prewarm failed:', e);
+  }
+}
+
+function createStageDesignerWindow() {
+  for (const existing of liveStageDesignerWindows()) {
+    if (existing.isVisible()) {
+      if (existing.isMinimized()) existing.restore();
+      existing.focus();
+      return existing;
+    }
+  }
+
+  if (prewarmedStageDesignerWindow && !prewarmedStageDesignerWindow.isDestroyed()) {
+    const win = prewarmedStageDesignerWindow;
+    stageDesignerWindows.add(win);
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    win.webContents.send('display:message', { type: 'display:update', state: displayState });
+    if (Object.keys(stageState).length > 0) win.webContents.send('stage:message', stageState);
+    broadcastStageLayouts();
+    return win;
+  }
+
+  const win = new BrowserWindow({
+    width: 1440, height: 920, minWidth: 1040, minHeight: 640,
+    resizable: true, maximizable: true, fullscreenable: true, thickFrame: true,
+    backgroundColor: '#0b0d12', title: 'BSP Stage Layout Designer',
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: true, backgroundThrottling: false },
+  });
+  win.loadURL(isDev ? 'http://localhost:5173/stage-designer.html' : `file://${path.join(__dirname, '../../dist/stage-designer.html')}`);
+  win.setMenuBarVisibility(false);
+  setupStageDesignerEvents(win);
+  stageDesignerWindows.add(win);
+  win.show();
+  win.focus();
   return win;
 }
 
@@ -1556,12 +1702,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('display:close', () => {
     activeDisplayId = null;
     if (displayWindow && !displayWindow.isDestroyed()) {
-      if (ndiService && ndiService.status().running) {
-        displayWindow.hide();
-      } else {
-        displayWindow.close();
-        displayWindow = null;
-      }
+      displayWindow.hide();
     }
     return { ok: true };
   });
@@ -2464,6 +2605,7 @@ app.whenReady().then(async () => {
       } catch (_) {}
     }
     splash = null;
+    setTimeout(prewarmStageDesignerWindow, 1500);
   };
   const handOverAfterFloor = () => {
     setTimeout(handOver, Math.max(0, SPLASH_FLOOR_MS - (Date.now() - splashUpAt)));
@@ -2495,6 +2637,10 @@ app.whenReady().then(async () => {
   // Fullscreen events
   mainWindow.on('enter-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', true));
   mainWindow.on('leave-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', false));
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
 });
 
 app.on('second-instance', () => {

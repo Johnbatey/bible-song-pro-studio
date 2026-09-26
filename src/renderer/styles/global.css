@@ -134,6 +134,18 @@
   box-sizing: border-box;
 }
 
+/* Suppress native number input spin buttons across the entire app for clean UI */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 html, body, #root {
   width: 100%;
   height: 100%;
