@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { QueueItem } from '../../types';
+import type { QueueItem, Song } from '../../types';
 
 export interface SavedSetlist {
   id: string;
@@ -8,6 +8,7 @@ export interface SavedSetlist {
   createdAt: number;
   updatedAt: number;
   items: QueueItem[];
+  bundledSongs?: Song[];
 }
 
 interface SetlistManagerModalProps {
@@ -18,7 +19,7 @@ interface SetlistManagerModalProps {
   onSaveSetlist: (name: string) => void;
   onLoadSetlist: (setlist: SavedSetlist, mode: 'replace' | 'append') => void;
   onDeleteSetlist: (id: string, name: string) => void;
-  onExportSetlist: (setlist: SavedSetlist | { name: string; items: QueueItem[] }) => void;
+  onExportSetlist: (setlist: SavedSetlist | { name: string; items: QueueItem[]; bundledSongs?: Song[] }) => void;
   onImportFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 

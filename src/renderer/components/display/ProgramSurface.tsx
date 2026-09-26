@@ -770,6 +770,12 @@ function contentFromScene(scene: Scene | null | undefined) {
  */
 export const ProgramSurface = memo(function ProgramSurface({ state, preview = false, assetBaseUrl = '', className = '', onVideoClock, onVideoPlayState }: ProgramSurfaceProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoLoadError, setVideoLoadError] = useState(false);
+  const video = videoSource(state, assetBaseUrl);
+
+  useEffect(() => {
+    setVideoLoadError(false);
+  }, [video]);
   const transport = state.videoTransport;
 
   /* Play state follows the operator. Chromium rejects play() if the element is
@@ -847,7 +853,6 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   const secondaryRef = isCompare
     ? formatBibleReference(secondaryVerse?.reference || baseRef, secondaryVersionTag, refOptions)
     : (secondaryVerse?.reference ? formatBibleReference(secondaryVerse.reference, secondaryVersionTag, refOptions) : undefined);
-  const video = videoSource(state, assetBaseUrl);
   const fontFamily = state.fontFamily || themeSection?.fontFamily || defaultTheme.fontFamily;
   const fontWeight = state.fontWeight || themeSection?.fontWeight || defaultTheme.fontWeight;
   const fontColor = state.fontColor || themeSection?.fontColor || defaultTheme.fontColor;
@@ -955,7 +960,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           }}
         />
       )}
-      {mode === 'fullscreen' && showStageBackground && video && (
+      {mode === 'fullscreen' && showStageBackground && video && !videoLoadError && (
         <video
           key={fxAnim.animateBg ? (scene?.id ? `${scene.id}-fs-video` : 'fs-video') : 'static-fs-video'}
           ref={videoRef}
@@ -964,6 +969,10 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           autoPlay
           loop={state.bgVideoLoop !== false}
           playsInline
+          onError={(e) => {
+            console.warn('[ProgramSurface] Failed to load background video source, gracefully falling back to theme ground:', video, e);
+            setVideoLoadError(true);
+          }}
           onPlay={() => onVideoPlayState?.(true)}
           onPause={(e) => {
             const el = e.currentTarget;

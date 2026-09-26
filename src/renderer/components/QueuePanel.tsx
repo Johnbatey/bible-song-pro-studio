@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '../stores/appStore';
 import { Block, BlockButton } from './Block';
 import { useI18n } from '../../i18n/useI18n';
-import type { QueueItem } from '../types';
+import type { QueueItem, Song, Scene } from '../types';
 import { SetlistManagerModal, type SavedSetlist } from './setlist/SetlistManagerModal';
 
 const STORAGE_KEY_SETLISTS = 'bsp_saved_setlists';
@@ -57,6 +58,10 @@ function syncQueueItemToPanel(item: QueueItem) {
 export function QueuePanel() {
   const { t } = useI18n();
   const queue = useAppStore((s) => s.queue);
+  const songs = useAppStore((s) => s.songs);
+  const setSongs = useAppStore((s) => s.setSongs);
+  const addSong = useAppStore((s) => s.addSong);
+  const updateQueueItem = useAppStore((s) => s.updateQueueItem);
   const removeFromQueue = useAppStore((s) => s.removeFromQueue);
   const clearQueue = useAppStore((s) => s.clearQueue);
   const setQueue = useAppStore((s) => s.setQueue);
@@ -70,6 +75,49 @@ export function QueuePanel() {
   const triggerAlert = useAppStore((s) => s.triggerAlert);
   const dismissAlert = useAppStore((s) => s.dismissAlert);
   const pushNotice = useAppStore((s) => s.notify);
+
+  // Installed Bibles cache for translation matching
+  const [installedBibles, setInstalledBibles] = useState<{ id: string; name: string; abbreviation?: string }[]>([]);
+
+  useEffect(() => {
+    window.BSP?.bible?.getVersions?.().then((versions: any) => {
+      if (Array.isArray(versions) && versions.length > 0) {
+        setInstalledBibles(versions);
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    item: QueueItem;
+    index: number;
+  } | null>(null);
+
+  const [activeSubmenu, setActiveSubmenu] = useState<'bible' | null>(null);
+  const relinkMediaInputRef = useRef<HTMLInputElement>(null);
+
+  // Close context menu on outside click or escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleGlobalClick = () => {
+      setContextMenu(null);
+      setActiveSubmenu(null);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null);
+        setActiveSubmenu(null);
+      }
+    };
+    window.addEventListener('click', handleGlobalClick);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('click', handleGlobalClick);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu]);
 
   // Setlist Management State
   const [savedSetlists, setSavedSetlists] = useState<SavedSetlist[]>(() => {
@@ -107,6 +155,78 @@ export function QueuePanel() {
 
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  // Helper to check if a bible translation is installed
+  const isBibleVersionInstalled = (versionStr?: string) => {
+    if (!versionStr || installedBibles.length === 0) return true;
+    const v = versionStr.trim().toLowerCase();
+    return installedBibles.some(
+      (b) => b.id.toLowerCase() === v || (b.abbreviation && b.abbreviation.toLowerCase() === v)
+    );
+  };
+
+  // Auto-heal missing Bible versions across setlist imports
+  const autoHealMissingBibles = async (items: QueueItem[], availableBibles = installedBibles): Promise<QueueItem[]> => {
+    if (!availableBibles || availableBibles.length === 0) return items;
+    const fallbackVersion = availableBibles[0];
+    let healedCount = 0;
+    const updatedItems = [...items];
+
+    for (let i = 0; i < updatedItems.length; i++) {
+      const it = updatedItems[i];
+      if (it.type === 'bible' || it.scene?.type === 'bible') {
+        const ver = it.scene?.content?.version || it.reference?.match(/\(([A-Za-z0-9_-]+)\)/)?.[1];
+        const isInstalled = isBibleVersionInstalled(ver);
+        if (!isInstalled && fallbackVersion) {
+          const cleanRef = (it.reference || it.scene?.name || it.scene?.content?.reference || '')
+            .replace(/\s*\([^)]*\)\s*$/, '')
+            .trim();
+          const versionLabel = fallbackVersion.abbreviation || fallbackVersion.id.toUpperCase();
+          try {
+            const res = await window.BSP?.bible?.search({
+              versionId: fallbackVersion.id,
+              query: cleanRef,
+              limit: 1,
+            });
+            if (res && res.length > 0) {
+              const newVerse = res[0];
+              const updatedRef = `${newVerse.reference} (${versionLabel})`;
+              const newSceneId = `bible-${fallbackVersion.id}-${newVerse.reference}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
+              const updatedScene: Scene = {
+                ...it.scene,
+                id: newSceneId,
+                name: updatedRef,
+                content: {
+                  ...it.scene?.content,
+                  reference: newVerse.reference,
+                  version: versionLabel,
+                  text: newVerse.text,
+                },
+              };
+              updatedItems[i] = {
+                ...it,
+                reference: updatedRef,
+                text: newVerse.text,
+                scene: updatedScene,
+              };
+              healedCount++;
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    if (healedCount > 0) {
+      pushNotice({
+        id: `bible-autoheal-${Date.now()}`,
+        text: `Auto-healed ${healedCount} verse(s) to installed translation (${fallbackVersion.abbreviation || fallbackVersion.name})`,
+        type: 'info',
+        duration: 4,
+        animation: 'slideDown',
+      });
+    }
+    return updatedItems;
+  };
+
   // Persist setlists
   const persistSetlists = (updated: SavedSetlist[]) => {
     setSavedSetlists(updated);
@@ -123,7 +243,7 @@ export function QueuePanel() {
   }, []);
 
   /** Live wins over staged, matching how the rows colour themselves. */
-  const activeSceneId = queue.some((q) => q.scene.id === currentScene?.id)
+  const activeSceneId = queue.some((q) => q.scene?.id === currentScene?.id)
     ? currentScene?.id
     : previewScene?.id;
 
@@ -140,12 +260,29 @@ export function QueuePanel() {
       return;
     }
 
+    // Collect bundled songs
+    const songIds = new Set<string>();
+    const bundledSongs: Song[] = [];
+    queue.forEach((it) => {
+      if (it.type === 'song' || it.scene?.type === 'song') {
+        const rawSongId = it.songId || (it.scene?.id?.startsWith('song-') ? it.scene.id.split('-')[1] : undefined);
+        const title = it.scene?.name?.split(' - ')[0] || it.reference?.split(' · ')[0] || '';
+        const match = (rawSongId && songs.find((s) => s.id === rawSongId || s.id === `song-${rawSongId}`)) ||
+                      (title && songs.find((s) => s.title.trim().toLowerCase() === title.trim().toLowerCase()));
+        if (match && !songIds.has(match.id)) {
+          songIds.add(match.id);
+          bundledSongs.push(match);
+        }
+      }
+    });
+
     const newSetlist: SavedSetlist = {
       id: `setlist-${Date.now()}`,
       name: cleanName,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       items: [...queue],
+      bundledSongs: bundledSongs.length > 0 ? bundledSongs : undefined,
     };
 
     const updated = [newSetlist, ...savedSetlists.filter((s) => s.name.toLowerCase() !== cleanName.toLowerCase())];
@@ -153,13 +290,29 @@ export function QueuePanel() {
     pushNotice({ id: `setlist-save-${Date.now()}`, text: `Saved setlist "${cleanName}" (${queue.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
   };
 
-  const handleLoadSetlist = (setlist: SavedSetlist, mode: 'replace' | 'append' = 'replace') => {
+  const handleLoadSetlist = async (setlist: SavedSetlist, mode: 'replace' | 'append' = 'replace') => {
+    // Auto-restore bundled songs into song library if missing
+    if (setlist.bundledSongs && Array.isArray(setlist.bundledSongs) && setlist.bundledSongs.length > 0) {
+      const currentSongs = useAppStore.getState().songs;
+      const toAdd: Song[] = [];
+      setlist.bundledSongs.forEach((bs) => {
+        if (bs && bs.title && !currentSongs.some((s) => s.id === bs.id || s.title.trim().toLowerCase() === bs.title.trim().toLowerCase())) {
+          toAdd.push(bs);
+        }
+      });
+      if (toAdd.length > 0) {
+        setSongs([...currentSongs, ...toAdd]);
+      }
+    }
+
+    const healedItems = await autoHealMissingBibles(setlist.items);
+
     if (mode === 'replace') {
-      setQueue(setlist.items);
-      pushNotice({ id: `setlist-load-${Date.now()}`, text: `Loaded setlist "${setlist.name}" (${setlist.items.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
+      setQueue(healedItems);
+      pushNotice({ id: `setlist-load-${Date.now()}`, text: `Loaded setlist "${setlist.name}" (${healedItems.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
     } else {
-      setQueue([...queue, ...setlist.items]);
-      pushNotice({ id: `setlist-append-${Date.now()}`, text: `Appended setlist "${setlist.name}" (+${setlist.items.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
+      setQueue([...queue, ...healedItems]);
+      pushNotice({ id: `setlist-append-${Date.now()}`, text: `Appended setlist "${setlist.name}" (+${healedItems.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
     }
     setShowSetlistModal(false);
   };
@@ -170,14 +323,34 @@ export function QueuePanel() {
     pushNotice({ id: `setlist-del-${Date.now()}`, text: `Deleted setlist "${name}"`, type: 'info', duration: 3, animation: 'slideDown' });
   };
 
-  const handleExportSetlist = (setlist: SavedSetlist | { name: string; items: QueueItem[] }) => {
+  const handleExportSetlist = (setlist: SavedSetlist | { name: string; items: QueueItem[]; bundledSongs?: Song[] }) => {
+    const allSongs = useAppStore.getState().songs;
+    const songIds = new Set<string>();
+    const bundledSongs: Song[] = (setlist as any).bundledSongs ? [...(setlist as any).bundledSongs] : [];
+
+    (setlist.items || []).forEach((it) => {
+      if (it.type === 'song' || it.scene?.type === 'song') {
+        const rawSongId = it.songId || (it.scene?.id?.startsWith('song-') ? it.scene.id.split('-')[1] : undefined);
+        const title = it.scene?.name?.split(' - ')[0] || it.reference?.split(' · ')[0] || '';
+        const match = (rawSongId && allSongs.find((s) => s.id === rawSongId || s.id === `song-${rawSongId}`)) ||
+                      (title && allSongs.find((s) => s.title.trim().toLowerCase() === title.trim().toLowerCase()));
+        if (match && !songIds.has(match.id)) {
+          songIds.add(match.id);
+          if (!bundledSongs.some((b) => b.id === match.id)) {
+            bundledSongs.push(match);
+          }
+        }
+      }
+    });
+
     const exportData = {
-      version: '1.0',
+      version: '1.1',
       type: 'bspsetlist',
       name: setlist.name,
       exportedAt: new Date().toISOString(),
       itemsCount: setlist.items.length,
       items: setlist.items,
+      bundledSongs: bundledSongs.length > 0 ? bundledSongs : undefined,
     };
 
     const json = JSON.stringify(exportData, null, 2);
@@ -190,7 +363,7 @@ export function QueuePanel() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    pushNotice({ id: `setlist-exp-${Date.now()}`, text: `Exported "${setlist.name}.bspsetlist"`, type: 'info', duration: 4, animation: 'slideDown' });
+    pushNotice({ id: `setlist-exp-${Date.now()}`, text: `Exported "${setlist.name}.bspsetlist" (with bundled songs & assets)`, type: 'info', duration: 4, animation: 'slideDown' });
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,16 +371,107 @@ export function QueuePanel() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const text = event.target?.result as string;
         const data = JSON.parse(text);
         if (data && Array.isArray(data.items) && data.items.length > 0) {
-          const importedItems: QueueItem[] = data.items.map((it: any) => ({
+          const rawItems: QueueItem[] = data.items.map((it: any) => ({
             ...it,
             id: `queue-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             timestamp: Date.now(),
           }));
+
+          // 1. Auto-restore bundled songs into destination library
+          if (Array.isArray(data.bundledSongs) && data.bundledSongs.length > 0) {
+            const existingSongs = useAppStore.getState().songs;
+            const toAdd: Song[] = [];
+            data.bundledSongs.forEach((bs: Song) => {
+              if (bs && bs.title && !existingSongs.some((s) => s.id === bs.id || s.title.trim().toLowerCase() === bs.title.trim().toLowerCase())) {
+                toAdd.push(bs);
+              }
+            });
+            if (toAdd.length > 0) {
+              setSongs([...existingSongs, ...toAdd]);
+            }
+          }
+
+          // 2. Auto-heal any missing Bible versions dynamically
+          const healedItems = await autoHealMissingBibles(rawItems);
+
+          // 3. Auto-pull any missing songs from Online Lyrics
+          healedItems.forEach((item) => {
+            if (item.type === 'song' || item.scene?.type === 'song') {
+              const currentSongs = useAppStore.getState().songs;
+              const rawSongId = item.songId || (item.scene?.id?.startsWith('song-') ? item.scene.id.split('-')[1] : undefined);
+              const songTitle = item.scene?.name?.split(' - ')[0] || item.reference?.split(' · ')[0] || '';
+              const exists = (rawSongId && currentSongs.some((s) => s.id === rawSongId || s.id === `song-${rawSongId}`)) ||
+                             (songTitle && currentSongs.some((s) => s.title.trim().toLowerCase() === songTitle.trim().toLowerCase()));
+
+              if (!exists && songTitle) {
+                window.BSP?.song?.searchOnline?.({ query: songTitle }).then(async (res: any) => {
+                  if (res?.ok && res.results && res.results.length > 0) {
+                    const match = res.results[0];
+                    const lyrics = match.plainLyrics || item.text || '';
+                    let slides: any[] = [];
+                    try {
+                      const arrRes = await window.BSP?.song?.arrangeText?.({ text: lyrics });
+                      if (arrRes?.ok && arrRes.sections?.length) {
+                        slides = arrRes.sections.map((sec: any, idx: number) => ({
+                          id: `slide-${Date.now()}-${idx + 1}`,
+                          label: sec.name || `Verse ${idx + 1}`,
+                          text: sec.lines.join('\n'),
+                        }));
+                      }
+                    } catch (_) {}
+                    if (slides.length === 0 && lyrics.trim()) {
+                      const paras = lyrics.split(/\n\s*\n/).filter((p: string) => p.trim());
+                      slides = paras.map((p: string, idx: number) => ({
+                        id: `slide-${Date.now()}-${idx + 1}`,
+                        label: `Verse ${idx + 1}`,
+                        text: p.trim(),
+                      }));
+                    }
+                    if (slides.length === 0) {
+                      slides = [{ id: `slide-${Date.now()}-1`, label: 'Verse 1', text: item.text || lyrics }];
+                    }
+                    const newSong: Song = {
+                      id: item.songId || `song-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                      title: match.title || songTitle,
+                      artist: match.artist || '',
+                      slides,
+                    };
+                    addSong(newSong);
+                    pushNotice({
+                      id: `song-autofetch-${Date.now()}`,
+                      text: `Auto-pulled "${newSong.title}" from Online Library into Songs`,
+                      type: 'info',
+                      duration: 4,
+                      animation: 'slideDown',
+                    });
+                  } else if (item.text) {
+                    const fallbackSong: Song = {
+                      id: item.songId || `song-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                      title: songTitle,
+                      artist: '',
+                      slides: [{ id: `slide-${Date.now()}-1`, label: 'Verse 1', text: item.text }],
+                    };
+                    addSong(fallbackSong);
+                  }
+                }).catch(() => {
+                  if (item.text) {
+                    const fallbackSong: Song = {
+                      id: item.songId || `song-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                      title: songTitle,
+                      artist: '',
+                      slides: [{ id: `slide-${Date.now()}-1`, label: 'Verse 1', text: item.text }],
+                    };
+                    addSong(fallbackSong);
+                  }
+                });
+              }
+            }
+          });
 
           const name = data.name || file.name.replace(/\.(bspsetlist|json)$/i, '');
           const newSetlist: SavedSetlist = {
@@ -215,12 +479,13 @@ export function QueuePanel() {
             name,
             createdAt: Date.now(),
             updatedAt: Date.now(),
-            items: importedItems,
+            items: healedItems,
+            bundledSongs: data.bundledSongs,
           };
 
           persistSetlists([newSetlist, ...savedSetlists]);
-          setQueue(importedItems);
-          pushNotice({ id: `setlist-imp-${Date.now()}`, text: `Imported setlist "${name}" (${importedItems.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
+          setQueue(healedItems);
+          pushNotice({ id: `setlist-imp-${Date.now()}`, text: `Imported setlist "${name}" (${healedItems.length} items)`, type: 'info', duration: 4, animation: 'slideDown' });
           setShowSetlistModal(false);
         } else {
           pushNotice({ id: `setlist-err-${Date.now()}`, text: 'Invalid setlist file: no valid items found.', type: 'warning', duration: 4, animation: 'slideDown' });
@@ -231,6 +496,254 @@ export function QueuePanel() {
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  // Bible translation switcher for single queue item
+  const handleSwitchBibleVersion = async (targetItem: QueueItem, targetVersion: { id: string; name: string; abbreviation?: string }) => {
+    const cleanRef = (targetItem.reference || targetItem.scene?.name || targetItem.scene?.content?.reference || '')
+      .replace(/\s*\([^)]*\)\s*$/, '')
+      .trim();
+    const versionLabel = targetVersion.abbreviation || targetVersion.id.toUpperCase();
+
+    try {
+      const res = await window.BSP?.bible?.search({
+        versionId: targetVersion.id,
+        query: cleanRef,
+        limit: 1,
+      });
+
+      if (res && res.length > 0) {
+        const newVerse = res[0];
+        const updatedRef = `${newVerse.reference} (${versionLabel})`;
+        const newSceneId = `bible-${targetVersion.id}-${newVerse.reference}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
+
+        const updatedScene: Scene = {
+          ...targetItem.scene,
+          id: newSceneId,
+          name: updatedRef,
+          content: {
+            ...targetItem.scene.content,
+            reference: newVerse.reference,
+            version: versionLabel,
+            text: newVerse.text,
+          },
+        };
+
+        updateQueueItem(targetItem.id, {
+          reference: updatedRef,
+          text: newVerse.text,
+          scene: updatedScene,
+        });
+
+        pushNotice({
+          id: `bible-upd-${Date.now()}`,
+          text: `Updated "${newVerse.reference}" to ${targetVersion.name || versionLabel}`,
+          type: 'info',
+          duration: 3,
+          animation: 'slideDown',
+        });
+      } else {
+        pushNotice({
+          id: `bible-err-${Date.now()}`,
+          text: `Could not find verse "${cleanRef}" in ${versionLabel}`,
+          type: 'warning',
+          duration: 4,
+          animation: 'slideDown',
+        });
+      }
+    } catch (err: any) {
+      pushNotice({
+        id: `bible-err-${Date.now()}`,
+        text: `Error updating Bible translation: ${err?.message || 'Unknown error'}`,
+        type: 'warning',
+        duration: 4,
+        animation: 'slideDown',
+      });
+    }
+    setContextMenu(null);
+    setActiveSubmenu(null);
+  };
+
+  // Bible batch switcher for all missing verses in queue
+  const handleSwitchAllMissingBibles = async (targetVersion: { id: string; name: string; abbreviation?: string }) => {
+    const missingItems = queue.filter(
+      (q) => q.type === 'bible' && !isBibleVersionInstalled(q.scene?.content?.version || q.reference.match(/\(([A-Za-z0-9_-]+)\)/)?.[1])
+    );
+    if (missingItems.length === 0) return;
+
+    let updatedCount = 0;
+    for (const it of missingItems) {
+      const cleanRef = (it.reference || it.scene?.name || it.scene?.content?.reference || '')
+        .replace(/\s*\([^)]*\)\s*$/, '')
+        .trim();
+      const versionLabel = targetVersion.abbreviation || targetVersion.id.toUpperCase();
+      try {
+        const res = await window.BSP?.bible?.search({
+          versionId: targetVersion.id,
+          query: cleanRef,
+          limit: 1,
+        });
+        if (res && res.length > 0) {
+          const newVerse = res[0];
+          const updatedRef = `${newVerse.reference} (${versionLabel})`;
+          const newSceneId = `bible-${targetVersion.id}-${newVerse.reference}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
+          const updatedScene: Scene = {
+            ...it.scene,
+            id: newSceneId,
+            name: updatedRef,
+            content: {
+              ...it.scene.content,
+              reference: newVerse.reference,
+              version: versionLabel,
+              text: newVerse.text,
+            },
+          };
+          updateQueueItem(it.id, {
+            reference: updatedRef,
+            text: newVerse.text,
+            scene: updatedScene,
+          });
+          updatedCount++;
+        }
+      } catch (_) {}
+    }
+
+    pushNotice({
+      id: `bible-batch-${Date.now()}`,
+      text: `Updated ${updatedCount} missing verse(s) to ${targetVersion.name || targetVersion.abbreviation || targetVersion.id}`,
+      type: 'info',
+      duration: 4,
+      animation: 'slideDown',
+    });
+    setContextMenu(null);
+    setActiveSubmenu(null);
+  };
+
+  // Fetch / re-sync single song from online lyrics
+  const handleFetchOnlineSong = async (item: QueueItem) => {
+    const songTitle = (item.scene?.name || item.reference || '').split(' - ')[0].split(' · ')[0].trim();
+    if (!songTitle) return;
+
+    pushNotice({
+      id: `song-searching-${Date.now()}`,
+      text: `Searching online lyrics for "${songTitle}"...`,
+      type: 'info',
+      duration: 3,
+      animation: 'slideDown',
+    });
+
+    try {
+      const res = await window.BSP?.song?.searchOnline({ query: songTitle });
+      if (res?.ok && res.results && res.results.length > 0) {
+        const match = res.results[0];
+        const lyrics = match.plainLyrics || item.text || '';
+        let slides: any[] = [];
+        try {
+          const arrRes = await window.BSP?.song?.arrangeText({ text: lyrics });
+          if (arrRes?.ok && arrRes.sections?.length) {
+            slides = arrRes.sections.map((sec: any, idx: number) => ({
+              id: `slide-${Date.now()}-${idx + 1}`,
+              label: sec.name || `Verse ${idx + 1}`,
+              text: sec.lines.join('\n'),
+            }));
+          }
+        } catch (_) {}
+        if (slides.length === 0 && lyrics.trim()) {
+          const paras = lyrics.split(/\n\s*\n/).filter((p: string) => p.trim());
+          slides = paras.map((p: string, idx: number) => ({
+            id: `slide-${Date.now()}-${idx + 1}`,
+            label: `Verse ${idx + 1}`,
+            text: p.trim(),
+          }));
+        }
+        if (slides.length === 0) {
+          slides = [{ id: `slide-${Date.now()}-1`, label: 'Verse 1', text: item.text || lyrics }];
+        }
+
+        const newSong: Song = {
+          id: item.songId || `song-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          title: match.title || songTitle,
+          artist: match.artist || '',
+          slides,
+        };
+
+        addSong(newSong);
+        pushNotice({
+          id: `song-saved-${Date.now()}`,
+          text: `Saved "${newSong.title}" (${slides.length} slides) into Song Library`,
+          type: 'info',
+          duration: 4,
+          animation: 'slideDown',
+        });
+      } else {
+        if (item.text) {
+          const fallbackSong: Song = {
+            id: item.songId || `song-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            title: songTitle,
+            artist: '',
+            slides: [{ id: `slide-${Date.now()}-1`, label: 'Verse 1', text: item.text }],
+          };
+          addSong(fallbackSong);
+          pushNotice({
+            id: `song-saved-${Date.now()}`,
+            text: `Restored "${songTitle}" into Song Library from Queue text`,
+            type: 'info',
+            duration: 4,
+            animation: 'slideDown',
+          });
+        } else {
+          pushNotice({
+            id: `song-err-${Date.now()}`,
+            text: `No online lyrics found for "${songTitle}"`,
+            type: 'warning',
+            duration: 4,
+            animation: 'slideDown',
+          });
+        }
+      }
+    } catch (err: any) {
+      pushNotice({
+        id: `song-err-${Date.now()}`,
+        text: `Error fetching song: ${err?.message || 'Unknown error'}`,
+        type: 'warning',
+        duration: 4,
+        animation: 'slideDown',
+      });
+    }
+    setContextMenu(null);
+    setActiveSubmenu(null);
+  };
+
+  // Relink media handler
+  const handleRelinkMediaFile = (file: File) => {
+    if (!contextMenu?.item) return;
+    const newUrl = URL.createObjectURL(file);
+    const updatedScene: Scene = {
+      ...contextMenu.item.scene,
+      background: {
+        ...contextMenu.item.scene.background,
+        type: file.type.startsWith('video') ? 'video' : 'image',
+        mediaUrl: newUrl,
+        fit: contextMenu.item.scene.background?.fit || 'cover',
+      },
+      content: {
+        ...contextMenu.item.scene.content,
+        mediaUrl: newUrl,
+        mediaType: file.type.startsWith('video') ? 'video' : 'image',
+      },
+    };
+    updateQueueItem(contextMenu.item.id, {
+      scene: updatedScene,
+    });
+    pushNotice({
+      id: `media-relink-${Date.now()}`,
+      text: `Relinked media to "${file.name}"`,
+      type: 'info',
+      duration: 3,
+      animation: 'slideDown',
+    });
+    setContextMenu(null);
+    setActiveSubmenu(null);
   };
 
   const renderTypeIcon = (type: string) => {
@@ -628,6 +1141,11 @@ export function QueuePanel() {
               window.addEventListener('pointerup', handlePointerUp);
             };
 
+            const itemBibleVersion = item.type === 'bible'
+              ? (item.scene?.content?.version || item.reference.match(/\(([A-Za-z0-9_-]+)\)/)?.[1] || 'KJV')
+              : undefined;
+            const isMissingBibleVersion = item.type === 'bible' && !isBibleVersionInstalled(itemBibleVersion);
+
             return (
               <React.Fragment key={item.id}>
                 {externalDropIndex === index && renderDropIndicator()}
@@ -637,6 +1155,21 @@ export function QueuePanel() {
                   onPointerDown={handlePointerDown}
                   onMouseEnter={() => setHoveredItemId(item.id)}
                   onMouseLeave={() => setHoveredItemId(null)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const menuWidth = 230;
+                    const menuHeight = 280;
+                    const x = Math.max(10, Math.min(e.clientX, window.innerWidth - menuWidth - 10));
+                    const y = Math.max(10, Math.min(e.clientY, window.innerHeight - menuHeight - 10));
+                    setContextMenu({
+                      x,
+                      y,
+                      item,
+                      index,
+                    });
+                    setActiveSubmenu(null);
+                  }}
                   onDoubleClick={() => {
                     handleTakeLive();
                   }}
@@ -696,7 +1229,7 @@ export function QueuePanel() {
                   </svg>
                 </div>
 
-                {/* Left Meta Group (Type Icon + Reference Title) */}
+                {/* Left Meta Group (Type Icon + Reference Title + Missing Version Badge) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: 1, overflow: 'hidden' }}>
                   <span style={{ color: isLive ? 'var(--accent, #FF5500)' : 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
                     {renderTypeIcon(item.type)}
@@ -704,6 +1237,32 @@ export function QueuePanel() {
                   <span style={{ fontSize: 13, fontWeight: 600, color: isLive ? 'var(--accent, #FF5500)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>
                     {item.reference}
                   </span>
+                  {isMissingBibleVersion && (
+                    <span
+                      title={`Translation "${itemBibleVersion}" is not installed on this PC. Right-click to switch to an installed Bible version.`}
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        color: '#ff6b6b',
+                        border: '1px solid rgba(239, 68, 68, 0.35)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        flexShrink: 0,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span>{itemBibleVersion} missing</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* Right Action Icons & Up/Down Reorder */}
@@ -837,6 +1396,411 @@ export function QueuePanel() {
           {externalDropIndex === queue.length && renderDropIndicator()}
         </div>
       )}
+
+      {/* Invisible file input for media relinking */}
+      <input
+        ref={relinkMediaInputRef}
+        type="file"
+        accept="image/*,video/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleRelinkMediaFile(file);
+          e.target.value = '';
+        }}
+      />
+
+      {/* Right-Click Context Menu for Queue Items */}
+      {contextMenu && (() => {
+        const isNearRightEdge = contextMenu.x + 230 + 210 > window.innerWidth;
+        const isNearBottomEdge = contextMenu.y + 300 > window.innerHeight;
+
+        return createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: contextMenu.y,
+              left: contextMenu.x,
+              zIndex: 999999,
+              minWidth: 230,
+              backgroundColor: 'var(--bsp-surface, #1e1e24)',
+              border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.16))',
+              borderRadius: 8,
+              boxShadow: '0 16px 40px rgba(0, 0, 0, 0.55)',
+              padding: 4,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              color: 'var(--text-primary, #ffffff)',
+              fontSize: 12,
+              backdropFilter: 'blur(12px)',
+              animation: 'fadeIn 0.1s ease-out',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header / Reference */}
+            <div
+              style={{
+                padding: '6px 10px',
+                fontSize: 11,
+                fontWeight: 700,
+                color: 'var(--text-dim, #888)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                marginBottom: 2,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {contextMenu.item.reference || contextMenu.item.scene?.name || 'Queue Item'}
+            </div>
+
+            {/* Bible-Specific Actions */}
+            {contextMenu.item.type === 'bible' && (
+              <>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveSubmenu(activeSubmenu === 'bible' ? null : 'bible');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      backgroundColor: activeSubmenu === 'bible' ? 'var(--chrome-control, #2c2c34)' : 'transparent',
+                      border: 'none',
+                      borderRadius: 5,
+                      color: 'var(--text-primary, #fff)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chrome-control, #2c2c34)'; }}
+                    onMouseLeave={(e) => { if (activeSubmenu !== 'bible') e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                      </svg>
+                      <span>Change Bible Version</span>
+                    </div>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      {isNearRightEdge ? (
+                        <polyline points="15 18 9 12 15 6" />
+                      ) : (
+                        <polyline points="9 18 15 12 9 6" />
+                      )}
+                    </svg>
+                  </button>
+
+                  {/* Submenu for installed translations (Edge-aware: opens to the left when near right edge) */}
+                  {activeSubmenu === 'bible' && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: isNearBottomEdge ? 'auto' : 0,
+                        bottom: isNearBottomEdge ? 0 : 'auto',
+                        left: isNearRightEdge ? 'auto' : '100%',
+                        right: isNearRightEdge ? '100%' : 'auto',
+                        marginLeft: isNearRightEdge ? 0 : 4,
+                        marginRight: isNearRightEdge ? 4 : 0,
+                        minWidth: 210,
+                        maxWidth: 260,
+                        maxHeight: 280,
+                        overflowY: 'auto',
+                        backgroundColor: 'var(--bsp-surface, #1e1e24)',
+                        border: '1px solid var(--border-primary, rgba(255, 255, 255, 0.16))',
+                        borderRadius: 8,
+                        boxShadow: '0 16px 40px rgba(0, 0, 0, 0.55)',
+                        padding: 4,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2,
+                        zIndex: 1000000,
+                      }}
+                    >
+                      <div style={{ padding: '4px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-dim, #777)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Installed Translations ({installedBibles.length})
+                      </div>
+                      {installedBibles.length === 0 ? (
+                        <div style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-dim)' }}>
+                          No installed Bibles found
+                        </div>
+                      ) : (
+                        installedBibles.map((ver) => {
+                          const currentVer = contextMenu.item.scene?.content?.version || contextMenu.item.reference.match(/\(([A-Za-z0-9_-]+)\)/)?.[1];
+                          const isCurrent = currentVer && (currentVer.toLowerCase() === ver.id.toLowerCase() || (ver.abbreviation && currentVer.toLowerCase() === ver.abbreviation.toLowerCase()));
+                          return (
+                            <button
+                              key={ver.id}
+                              type="button"
+                              onClick={() => handleSwitchBibleVersion(contextMenu.item, ver)}
+                              style={{
+                                width: '100%',
+                                padding: '6px 10px',
+                                fontSize: 12,
+                                backgroundColor: isCurrent ? 'rgba(255, 85, 0, 0.15)' : 'transparent',
+                                border: 'none',
+                                borderRadius: 5,
+                                color: isCurrent ? 'var(--accent, #FF5500)' : 'var(--text-primary, #fff)',
+                                fontWeight: isCurrent ? 700 : 500,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                textAlign: 'left',
+                                gap: 6,
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isCurrent ? 'rgba(255, 85, 0, 0.25)' : 'var(--chrome-control, #2c2c34)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isCurrent ? 'rgba(255, 85, 0, 0.15)' : 'transparent'; }}
+                            >
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {ver.name || ver.id} {ver.abbreviation ? `(${ver.abbreviation})` : ''}
+                              </span>
+                              {isCurrent && (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Batch update missing verses if any */}
+                {installedBibles.length > 0 && queue.some((q) => q.type === 'bible' && !isBibleVersionInstalled(q.scene?.content?.version || q.reference.match(/\(([A-Za-z0-9_-]+)\)/)?.[1])) && (
+                  <button
+                    type="button"
+                    onClick={() => handleSwitchAllMissingBibles(installedBibles[0])}
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderRadius: 5,
+                      color: '#ffaa44',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chrome-control, #2c2c34)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                    </svg>
+                    <span>Update All Missing to {installedBibles[0].abbreviation || installedBibles[0].name}</span>
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* Song-Specific Actions */}
+            {contextMenu.item.type === 'song' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleFetchOnlineSong(contextMenu.item)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: 5,
+                    color: 'var(--text-primary, #fff)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chrome-control, #2c2c34)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="2" y1="12" x2="22" y2="12" />
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  <span>Pull / Update from Online Lyrics</span>
+                </button>
+              </>
+            )}
+
+            {/* Media-Specific Actions */}
+            {contextMenu.item.type === 'media' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => relinkMediaInputRef.current?.click()}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: 5,
+                    color: 'var(--text-primary, #fff)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chrome-control, #2c2c34)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                  </svg>
+                  <span>Relink / Replace Media File...</span>
+                </button>
+              </>
+            )}
+
+            <div style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.08)', margin: '3px 0' }} />
+
+            {/* Send to Preview / Take Live */}
+            <button
+              type="button"
+              onClick={() => {
+                const fx = useAppStore.getState().fxSettings;
+                const sceneToProject = {
+                  ...contextMenu.item.scene,
+                  transition: contextMenu.item.scene.transition || {
+                    type: fx.transitionType || 'fade',
+                    duration: fx.duration || 0.4,
+                    easing: 'ease',
+                    animateBackground: fx.animateBackground ?? false,
+                  },
+                  animateBackground: contextMenu.item.scene.animateBackground ?? fx.animateBackground ?? false,
+                };
+                projectScene(sceneToProject);
+                syncQueueItemToPanel(contextMenu.item);
+                setContextMenu(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                fontSize: 12,
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: 5,
+                color: 'var(--text-primary, #fff)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--chrome-control, #2c2c34)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <span>Send to Preview</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const fx = useAppStore.getState().fxSettings;
+                const sceneToProject = {
+                  ...contextMenu.item.scene,
+                  transition: contextMenu.item.scene.transition || {
+                    type: fx.transitionType || 'fade',
+                    duration: fx.duration || 0.4,
+                    easing: 'ease',
+                    animateBackground: fx.animateBackground ?? false,
+                  },
+                  animateBackground: contextMenu.item.scene.animateBackground ?? fx.animateBackground ?? false,
+                };
+                projectScene(sceneToProject, { direct: true });
+                syncQueueItemToPanel(contextMenu.item);
+                setContextMenu(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                fontSize: 12,
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: 5,
+                color: 'var(--accent, #FF5500)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 85, 0, 0.15)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              <span>Take Live Directly</span>
+            </button>
+
+            <div style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.08)', margin: '3px 0' }} />
+
+            {/* Remove from Queue */}
+            <button
+              type="button"
+              onClick={() => {
+                removeFromQueue(contextMenu.item.id);
+                setContextMenu(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                fontSize: 12,
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: 5,
+                color: 'var(--tally-fault, #ef4444)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              <span>Remove from Queue</span>
+            </button>
+          </div>,
+          document.body
+        );
+      })()}
     </Block>
   );
 }

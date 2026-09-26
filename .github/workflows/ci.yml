@@ -1,0 +1,34 @@
+name: CI Quality Gate
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-and-typecheck:
+    name: Typecheck & Vitest Quality Suite
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run TypeScript Typecheck
+        run: npm run typecheck
+
+      - name: Run Vitest Unit Tests & Coverage
+        run: npm run test
+
+      - name: Run Display Fields Parity Verification
+        run: npm run verify:display-fields

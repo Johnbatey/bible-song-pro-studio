@@ -159,6 +159,7 @@ interface AppState {
   setFxSettings: (settings: Partial<FxAnimationSettings> | ((prev: FxAnimationSettings) => Partial<FxAnimationSettings>)) => void;
   slideFxSettings: FxAnimationSettings;
   setSlideFxSettings: (settings: Partial<FxAnimationSettings> | ((prev: FxAnimationSettings) => Partial<FxAnimationSettings>)) => void;
+  setStageDisplayFxEnabled: (enabled: boolean) => void;
 
   // Themes & Bible Ground
   bibleBackground?: Background;
@@ -220,6 +221,7 @@ interface AppState {
   queue: QueueItem[];
   addToQueue: (item: Omit<QueueItem, 'id' | 'timestamp'>) => void;
   insertIntoQueue: (item: Omit<QueueItem, 'id' | 'timestamp'>, atIndex?: number) => void;
+  updateQueueItem: (id: string, patch: Partial<QueueItem>) => void;
   removeFromQueue: (id: string) => void;
   clearQueue: () => void;
   setQueue: (items: QueueItem[]) => void;
@@ -848,6 +850,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     transitionType: 'fade',
     duration: 0.8,
     animateBackground: false,
+    stageDisplayFxEnabled: true,
   },
   setFxSettings: (settings) =>
     set((s) => ({
@@ -858,10 +861,17 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     transitionType: 'fade',
     duration: 0.5,
     animateBackground: false,
+    stageDisplayFxEnabled: true,
   },
   setSlideFxSettings: (settings) =>
     set((s) => ({
       slideFxSettings: typeof settings === 'function' ? { ...s.slideFxSettings, ...settings(s.slideFxSettings) } : { ...s.slideFxSettings, ...settings },
+    })),
+
+  setStageDisplayFxEnabled: (enabled: boolean) =>
+    set((s) => ({
+      fxSettings: { ...s.fxSettings, stageDisplayFxEnabled: enabled },
+      slideFxSettings: { ...s.slideFxSettings, stageDisplayFxEnabled: enabled },
     })),
 
   themes: [],
@@ -981,6 +991,10 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       }
       return { queue: updated };
     }),
+  updateQueueItem: (id, patch) =>
+    set((s) => ({
+      queue: s.queue.map((q) => (q.id === id ? { ...q, ...patch } : q)),
+    })),
   removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
   clearQueue: () => set({ queue: [] }),
   setQueue: (items) => set({ queue: items }),

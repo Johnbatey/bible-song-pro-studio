@@ -238,28 +238,44 @@ export function OnlineLyricsModal({ isOpen, onClose, onSongImported }: OnlineLyr
 
   const handleImportAndQueue = () => {
     const newSong = createSongObject();
-    addSong(newSong);
-    const formatted = getFormattedSlides(newSong, linesPerSlide);
-    if (formatted.length > 0) {
-      formatted.forEach((slide) => {
-        const scene = buildSongScene(newSong, slide, {
-          includeCredits: showSongCredits && linesPerSlide === 'auto',
-          target: newSong.isBilingual ? 'bilingual' : 'primary',
-        });
-        addToQueue({
-          reference: `${newSong.title} · ${slide.label}`,
-          text: slide.text,
-          type: 'song',
-          source: 'Manual',
-          scene,
-          songId: newSong.id,
-          slideId: slide.id,
-          linesPerSlide,
-        });
-      });
+    
+    // Check if song already exists with same title
+    const existingIndex = songs.findIndex((s) => s.title.toLowerCase() === newSong.title.toLowerCase());
+    let songToQueue = newSong;
+    if (existingIndex >= 0) {
+      const updated = [...songs];
+      songToQueue = { ...newSong, id: songs[existingIndex].id };
+      updated[existingIndex] = songToQueue;
+      setSongs(updated);
+      pushNotice({ id: `song-import-${Date.now()}`, text: `Updated "${newSong.title}" in song library`, type: 'info', duration: 4, animation: 'slideDown' });
+    } else {
+      addSong(newSong);
+      pushNotice({ id: `song-import-${Date.now()}`, text: `Imported "${newSong.title}" to song library`, type: 'info', duration: 4, animation: 'slideDown' });
     }
-    pushNotice({ id: `song-queue-${Date.now()}`, text: `Imported "${newSong.title}" and added to queue`, type: 'info', duration: 4, animation: 'slideDown' });
-    if (onSongImported) onSongImported(newSong);
+
+    const formatted = getFormattedSlides(songToQueue, linesPerSlide);
+    const firstSlide = formatted[0] || songToQueue.slides?.[0] || { id: 'slide-1', label: 'Verse 1', text: songToQueue.title };
+    const firstSlideText = (typeof firstSlide === 'object' && firstSlide ? firstSlide.text : (typeof firstSlide === 'string' ? firstSlide : '')) || '';
+
+    const scene = buildSongScene(songToQueue, firstSlide || firstSlideText, {
+      includeCredits: showSongCredits && linesPerSlide === 'auto',
+      target: songToQueue.isBilingual ? 'bilingual' : 'primary',
+    });
+
+    // Add a single unified song queue item so all verses can be accessed cleanly in the song view
+    addToQueue({
+      reference: songToQueue.title,
+      text: firstSlideText,
+      type: 'song',
+      source: 'Manual',
+      scene,
+      songId: songToQueue.id,
+      slideId: firstSlide.id,
+      linesPerSlide,
+    });
+
+    pushNotice({ id: `song-queue-${Date.now()}`, text: `Added "${songToQueue.title}" to queue`, type: 'info', duration: 4, animation: 'slideDown' });
+    if (onSongImported) onSongImported(songToQueue);
     onClose();
   };
 
