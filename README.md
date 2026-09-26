@@ -54,12 +54,11 @@ One operator machine drives an audience projector, an on-stage confidence monito
 
 Official v3.4.0 production installers are available on the [GitHub Releases Page](https://github.com/Johnbatey/bible-song-pro-studio/releases/tag/v3.4.0):
 
-- **Mac (Apple Silicon M1/M2/M3/M4)**: `Bible Song Pro Studio-3.4.0-arm64.dmg`
-- **Mac (Intel)**: `Bible Song Pro Studio-3.4.0-x64.dmg`
-- **Mac (Universal)**: `Bible Song Pro Studio-3.4.0-universal.dmg`
-- **Windows (Setup Wizard Installer)**: `Bible Song Pro Studio Setup 3.4.0.exe`
-- **Linux (AppImage)**: `Bible Song Pro Studio-3.4.0.AppImage`
-- **Linux (Debian/Ubuntu)**: `bible-song-pro-studio_3.4.0_amd64.deb`
+- **Mac (Apple Silicon M1/M2/M3/M4)**: `Bible.Song.Pro.Studio-3.4.0-mac-arm64.dmg` (or `.zip`)
+- **Mac (Intel x64)**: `Bible.Song.Pro.Studio-3.4.0-mac-x64.dmg` (or `.zip`)
+- **Windows (Setup Wizard Installer)**: `Bible.Song.Pro.Studio-3.4.0-win-x64.exe`
+- **Linux (AppImage)**: `Bible.Song.Pro.Studio-3.4.0-linux-x86_64.AppImage`
+- **Linux (Debian/Ubuntu)**: `Bible.Song.Pro.Studio-3.4.0-linux-amd64.deb`
 
 ---
 
