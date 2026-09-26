@@ -10,24 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.4.0] - 2026-09-26
 
 ### Added
-- **Interactive Drag-Scrubbing Controls**: Numerical controls across Theme Studio, Stage Designer Inspector (X, Y Position, Width, Height), and Studio Sliders now support mouse drag-scrubbing. Drag left/right to adjust values smoothly (hold Shift for 5x speed) or click to type exact values.
-- **Enhanced Queue & Service Schedule Engine**: Comprehensive queue management supporting drag-and-drop reordering, quick queueing of Bibles, songs, media assets, notes, announcements, and alerts directly into live production queue.
-- **Automatic Online Song & Bible Recovery**: Smart setlist resolution that detects missing songs or Bible translations when loading setlists from other computers and automatically queries online providers or allows 1-click fallback assignment.
-- **Cross-Platform Audio Output Routing & Fallbacks**: Advanced Web Audio API and HTML5 `<audio>` device routing (`setSinkId`) with automatic graceful fallbacks to default audio output whenever hardware devices disconnect or reject routing.
-- **Comprehensive Vitest Unit Test Suite**: Integrated Vitest unit testing framework covering IPC protocol registry, scripture detection algorithms, audio routing, display surface utilities, and component UI states.
-- **GitHub Actions CI Integration**: Automated CI pipeline (`.github/workflows/ci.yml`) for linting, TypeScript typechecking, licensing compliance, and test suite execution on every push.
+- **Theme Studio & Pro Theme Engine Upgrade**: Complete visual redesign of Theme Studio console with real-time live preview rendering, typography controls (font family, line height, letter spacing, transform, alignment), glassmorphism backdrop blur, opacity, stroke customization, zero-width borders, corner radii, and shadow/glow effects.
+- **Interactive Drag-Scrubbing Controls**: Drag left/right on numerical input labels and sliders across Theme Studio, Stage Designer Inspector (X, Y Position, Width, Height), and Studio Sliders to scrub values smoothly in real time (hold Shift for 5x speed) or click to type exact values up to 5000px.
+- **Pro Slide Editor & Stage Designer Enhancements**: Visual slide designer with precision grid snapping, dynamic alignment guides, vector shape layers (rectangles, rounded cards, circles, ellipses, stars, triangles), multi-zone stage layout designer (clock, speaker timers, next slide preview, chord notes, message banners), and dockable popout windows.
+- **DAW-Grade Audio DSP & Studio FX Engine**: Real-time Zoom/Meet-grade adaptive spectral noise suppression, Web Audio DSP filter nodes, real-time Voice Activity Detection (VAD) badge, dual L/R stereo VU meters, post-DSP headphone monitoring with de-zippering automation, mic hot-swapping, preamp gain controls, and bypass mode.
+- **Multi-Feed NDI Broadcast Output & Media Engine**: Multi-feed NDI engine supporting dedicated Lower-Third isolation feeds and Full-Screen program feeds for OBS Studio, vMix, and Tricaster. Added media aspect ratio transforms (Fit to Screen, Fill, Stretch to Fit, Center Crop) and custom Standby Screen Cover media loops.
+- **Service Setlist Manager & Online Lyrics Search Engine**: Built-in setlist creation, saving, loading, importing, and exporting. Integrated online lyrics search modal supporting instant lyric fetching and library import. Added automatic online song & Bible recovery for missing setlist assets.
+- **Fluid 120fps Animated Queue**: Smooth drag-and-drop reordering, title truncation, hover action buttons, and direct queueing of Bibles, songs, media, announcements, and notes.
+- **Program Surface Chrome Bar & Shortcuts**: Moved Cut & Fade transition buttons directly onto Program display chrome bar for instantaneous operator access. Added smooth 60fps crossfades and global hotkeys (`Space`, `Esc`, `F5`, `Ctrl+F`).
+- **Comprehensive Vitest Unit Test Suite**: 61 tests across 11 test suites validating IPC protocol registry, scripture detection, audio routing fallbacks, queue state, and display surface fields.
+- **GitHub Actions CI/CD Integration**: Automated CI pipeline (`.github/workflows/ci.yml`) for automated linting, TypeScript typechecking, licensing compliance, and test suite execution on every push.
 
 ### Changed
 - **Redesigned Settings Console Layout**: Overhauled Settings modal with clean tabbed section navigation, polished contrast, responsive input layouts, and zero text clipping.
 - **Modular Main Process IPC Architecture**: Refactored Electron IPC handlers into decoupled modules (`bible-ipc.cjs`, `display-ipc.cjs`, `media-ipc.cjs`, `window-ipc.cjs`) backed by a safe IPC registry wrapper and structured error envelopes.
 - **Multilingual Localization Update**: Fully updated translations across English (`en`), Spanish (`es`), French (`fr`), and Portuguese (`pt`) for all new 3.4.0 features and controls.
-- **Enhanced Theme Studio & Display Surface Parity**: Optimized Program Surface and Audience Display rendering with full backdrop blur, shadow controls, shape layer positioning, and smooth transitions.
 
 ### Fixed
 - **Fixed Text & Song Importing Issues**: Resolved issue where imported text files appeared as "untitled" or failed to index for hymn number searches.
 - **Fixed Song & Bible Setlist Missing Asset Crashes**: Prevented setlist load failures when referenced Bibles or songs are missing from local library.
 - **Fixed Audio Device Sink Disconnection Edge Cases**: Ensured audio playback automatically resumes on default output if a custom audio device target becomes unavailable.
 - **Fixed Input Field Dragging & Focus Errors**: Corrected mouse drag handling on numerical input labels in Stage Designer and Theme Studio to prevent unwanted text selection or focus traps.
+- **Fixed Startup Blank Window & Taskbar Focus**: Added resilient Zustand hydration fallbacks and multi-tick focus handoff across macOS, Windows, and Linux.
 
 ---
 
