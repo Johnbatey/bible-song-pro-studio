@@ -1505,17 +1505,32 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
 
       {state.activeAlert && (
         state.activeAlert.animation === 'crawl' ? (
-          <div className={`program-alert program-alert-ticker program-alert-${state.activeAlert.type} program-alert-${state.activeAlert.position || 'bottom'}`}>
-            <div className="program-alert-track">
-              <span
-                className="program-alert-text"
-                style={{
-                  animationDuration: `${16 / (state.activeAlert.speed || 1)}s`,
-                }}
-              >
-                {state.activeAlert.text}
-              </span>
-            </div>
+          <div
+            className={`program-alert program-alert-ticker program-alert-${state.activeAlert.direction === 'vertical' ? 'vertical' : 'horizontal'} program-alert-${state.activeAlert.type} program-alert-${state.activeAlert.position || 'bottom'}`}
+          >
+            {state.activeAlert.direction === 'vertical' ? (
+              <div className="program-alert-track-vertical">
+                <span
+                  className="program-alert-text-vertical"
+                  style={{
+                    animationDuration: `${Math.max(4, 10 / (state.activeAlert.speed || 1))}s`,
+                  }}
+                >
+                  {state.activeAlert.text}
+                </span>
+              </div>
+            ) : (
+              <div className="program-alert-track">
+                <span
+                  className="program-alert-text"
+                  style={{
+                    animationDuration: `${Math.max(6, 18 / (state.activeAlert.speed || 1))}s`,
+                  }}
+                >
+                  {state.activeAlert.text}
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           <div className={`program-alert-badge program-alert-badge-${state.activeAlert.type} program-alert-badge-${state.activeAlert.position || 'top'}`}>

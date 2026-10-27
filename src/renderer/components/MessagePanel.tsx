@@ -54,6 +54,7 @@ export function MessagePanel() {
   const [durationSec, setDurationSec] = useState<number>(15);
   const [speed, setSpeed] = useState<number>(1);
   const [cycles, setCycles] = useState<number>(2);
+  const [direction, setDirection] = useState<'horizontal' | 'vertical'>('horizontal');
 
   // Saved Notes state
   const [savedNotes, setSavedNotes] = useState<SavedNote[]>(() => {
@@ -222,6 +223,7 @@ export function MessagePanel() {
       text: messageText.trim(),
       type: alertType,
       position: position,
+      direction: direction,
       speed: speed,
       cycles: cycles,
       duration: cycles > 0 ? cycles * (16 / speed) : 0,
@@ -304,6 +306,7 @@ export function MessagePanel() {
       text: targetText.trim(),
       type: alertType,
       position: position,
+      direction: direction,
       speed: speed,
       cycles: cycles,
       duration: cycles > 0 ? cycles * (16 / speed) : 0,
@@ -463,6 +466,7 @@ export function MessagePanel() {
       text: note.content.trim(),
       type: alertType,
       position: position,
+      direction: direction,
       speed: speed,
       cycles: cycles,
       duration: cycles > 0 ? cycles * (16 / speed) : 0,
@@ -828,7 +832,7 @@ export function MessagePanel() {
 
             {/* Overlay Parameters (Only visible in Ticker Mode) */}
             {mode === 'overlay' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)', alignItems: 'center' }}>
                 <div>
                   <label style={{ ...type.caption, fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Style</label>
                   <select
@@ -857,17 +861,38 @@ export function MessagePanel() {
                 </div>
 
                 <div>
-                  <label style={{ ...type.caption, fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Speed</label>
+                  <label style={{ ...type.caption, fontSize: 10, color: 'var(--text-dim)', display: 'block', marginBottom: 2 }}>Direction</label>
                   <select
                     className="input"
-                    value={speed}
-                    onChange={(e) => setSpeed(Number(e.target.value))}
+                    value={direction}
+                    onChange={(e) => setDirection(e.target.value as 'horizontal' | 'vertical')}
                     style={{ height: 24, fontSize: 11, padding: '0 4px', width: '100%' }}
                   >
-                    <option value={0.7}>Slow (0.7x)</option>
-                    <option value={1}>Normal (1.0x)</option>
-                    <option value={1.4}>Fast (1.4x)</option>
+                    <option value="horizontal">Horizontal Crawl</option>
+                    <option value="vertical">Vertical Roll</option>
                   </select>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                    <label style={{ ...type.caption, fontSize: 10, color: 'var(--text-dim)' }}>Speed</label>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#FF5500' }}>{speed.toFixed(1)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.3"
+                    max="3.0"
+                    step="0.1"
+                    value={speed}
+                    onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                    style={{
+                      width: '100%',
+                      height: 18,
+                      accentColor: '#FF5500',
+                      cursor: 'pointer',
+                    }}
+                    title={`Ticker Speed: ${speed.toFixed(1)}x`}
+                  />
                 </div>
 
                 <div>

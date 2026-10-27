@@ -753,6 +753,7 @@ export interface Alert {
   position?: 'top' | 'bottom';
   speed?: number;
   cycles?: number;
+  direction?: 'horizontal' | 'vertical';
 }
 
 /**
