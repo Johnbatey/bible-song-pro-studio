@@ -115,6 +115,12 @@ export const fr: MessageCatalog = {
   'settings.bibleOpt.showVerseNumbersSub': 'Inclure les numéros de versets en exposant dans le texte affiché',
   'settings.bibleOpt.versionSwitchTitle': 'Changement de version met à jour la sortie',
   'settings.bibleOpt.versionSwitchSub': 'Changer de version biblique met à jour immédiatement l’affichage live en mode Basic',
+  'settings.bibleOpt.shrinkToFitTitle': 'Réduire pour ajuster (Auto-ajustement)',
+  'settings.bibleOpt.shrinkToFitSub': 'Réduit automatiquement la taille du texte quand les longs versets dépassent l’écran pour éviter tout débordement',
+  'settings.bibleOpt.dualLayoutTitle': 'Disposition Bible parallèle',
+  'settings.bibleOpt.dualLayoutSub': 'Choisir comment les traductions parallèles sont disposées à l’écran',
+  'settings.bibleOpt.dualLayoutVertical': 'Côte à côte',
+  'settings.bibleOpt.dualLayoutHorizontal': 'Empilées (Haut et Bas)',
 
   'settings.scripture.verseModeTitle': 'Mode d’affichage des versets',
   'settings.scripture.verseModeSub': 'Comment afficher les versets détectés ?',

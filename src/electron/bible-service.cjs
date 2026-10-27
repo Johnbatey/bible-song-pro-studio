@@ -568,6 +568,36 @@ function clearUserBibles() {
   return { ok: true };
 }
 
+function deleteVersion(versionId) {
+  if (!versionId) return { ok: false, error: 'No version specified' };
+  const userDir = getUserBibleDir();
+  const versions = getAllVersionMeta();
+  const target = versions.find((v) => v.id.toLowerCase() === String(versionId).toLowerCase() && v.isUser);
+  if (!target) {
+    return { ok: false, error: 'Cannot delete bundled translation or version not found' };
+  }
+  try {
+    if (target.userPath && fs.existsSync(target.userPath)) {
+      fs.unlinkSync(target.userPath);
+    } else {
+      const candidates = [
+        path.join(userDir, `${versionId}.json`),
+        path.join(userDir, `${versionId}.xml`),
+        path.join(userDir, `${target.id}.json`),
+        path.join(userDir, `${target.id}.xml`),
+      ];
+      for (const p of candidates) {
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      }
+    }
+    cache = null;
+    bibleSearchCache.delete(versionId);
+    return { ok: true, versionId };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 module.exports = {
   getData,
   getVersions,
@@ -579,5 +609,6 @@ module.exports = {
   normalizeReferenceQuery,
   normalizeSearchText,
   importBibleFile,
+  deleteVersion,
   clearUserBibles,
 };

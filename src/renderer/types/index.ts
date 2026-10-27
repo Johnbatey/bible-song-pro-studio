@@ -37,8 +37,10 @@ export interface SceneContent {
   mediaType?: 'image' | 'video' | 'youtube';
   slides?: Slide[];
   slideId?: string;
-  /** Second translation, rendered side by side with the primary text. */
+  /** Second translation, rendered side by side or stacked with the primary text. */
   secondaryVerse?: SecondaryVerse;
+  /** Layout orientation for dual parallel bible translations ('vertical' = side-by-side, 'horizontal' = stacked rows). */
+  dualLayout?: 'vertical' | 'horizontal';
   /** Shown as a small footer on song scenes — required by most CCLI licences. */
   songCredit?: SongCredit;
   /** The slide itself, for scenes that project a designed slide rather than
@@ -326,6 +328,7 @@ export interface LowerThirdTheme {
   backgroundMediaType?: 'image' | 'video';
   backgroundFit?: 'cover' | 'contain' | 'fill';
   backgroundLoop?: boolean;
+  autoResize?: 'none' | 'shrink' | 'grow';
 }
 
 export interface FullScreenTheme {
@@ -380,11 +383,15 @@ export interface SlideTheme {
 }
 
 export interface BibleDisplayOptions {
-  showVersion: boolean;
-  shortenVersions: boolean;
-  shortenBooks: boolean;
-  showVerseNumbers: boolean;
-  versionSwitchUpdatesOutput: boolean;
+  showVersion?: boolean;
+  shortenVersions?: boolean;
+  shortenBooks?: boolean;
+  showVerseNumbers?: boolean;
+  versionSwitchUpdatesOutput?: boolean;
+  /** Layout orientation for dual translation display ('vertical' = side-by-side, 'horizontal' = stacked rows). */
+  dualLayout?: 'vertical' | 'horizontal';
+  /** Automatically shrink text if verse exceeds display container bounds. */
+  autoShrink?: boolean;
 }
 
 export interface SongDisplayOptions {
@@ -597,6 +604,8 @@ export interface BibleVersion {
   abbreviation: string;
   language: string;
   books: BibleBook[];
+  isUser?: boolean;
+  userPath?: string;
 }
 
 export interface BibleBook {
@@ -845,6 +854,7 @@ declare global {
         search: (payload: { versionId: string; query: string; limit?: number; book?: string }) => Promise<BibleSearchResult[]>;
         pick: (payload?: any) => Promise<{ ok: boolean; filePaths?: string[]; canceled?: boolean }>;
         importFile: (payload: { filePath: string; overwrite?: boolean }) => Promise<{ ok: boolean; exists?: boolean; imported?: boolean; versionId?: string; versionName?: string; filePath?: string; error?: string }>;
+        deleteVersion: (payload: { versionId: string } | string) => Promise<{ ok: boolean; error?: string }>;
       };
 
       verse: {

@@ -328,6 +328,7 @@ export function BiblePanel() {
   const setBibleOutputMode = useAppStore((s) => s.setBibleOutputMode);
   const operatingMode = useAppStore((s) => s.display.mode);
   const activeTheme = useAppStore((s) => s.activeTheme);
+  const updateTheme = useAppStore((s) => s.updateTheme);
   const isThemeFsLtLinked = useAppStore((s) => s.isThemeFsLtLinked);
   const toggleThemeFsLtLinked = useAppStore((s) => s.toggleThemeFsLtLinked);
   const setThemeBackground = useAppStore((s) => s.setThemeBackground);
@@ -347,6 +348,14 @@ export function BiblePanel() {
   const [selectedVersion, setSelectedVersion] = useState('KJV');
   const [secondaryVersion, setSecondaryVersion] = useState('ASV');
   const [dualVersion, setDualVersion] = useState(false);
+  const [dualLayout, setDualLayout] = useState<'vertical' | 'horizontal'>(activeTheme?.bibleOptions?.dualLayout || 'vertical');
+  const [showManageTranslations, setShowManageTranslations] = useState(false);
+
+  useEffect(() => {
+    if (activeTheme?.bibleOptions?.dualLayout) {
+      setDualLayout(activeTheme.bibleOptions.dualLayout);
+    }
+  }, [activeTheme?.bibleOptions?.dualLayout]);
   const [selectedBook, setSelectedBook] = useState('Genesis');
   const [chapter, setChapter] = useState(1);
   const [query, setQuery] = useState('');
@@ -438,6 +447,17 @@ export function BiblePanel() {
     } finally {
       setPendingOverwrite(null);
       setImporting(false);
+    }
+  };
+
+  const handleDeleteVersion = async (versionId: string) => {
+    try {
+      const res = await window.BSP?.bible?.deleteVersion(versionId);
+      if (res && res.ok) {
+        await reloadVersions('KJV');
+      }
+    } catch (err) {
+      console.error('Failed to remove Bible translation:', err);
     }
   };
   /* Keyed by reference, not verse number: search results span books, so verse
@@ -755,9 +775,9 @@ export function BiblePanel() {
     return () => window.removeEventListener('bsp:sync-bible', handleSync);
   }, [bookOptions, selectedVersion]);
 
-  function bibleSceneId(verse: BibleVerse, isDual = dualVersion, secVer = secondaryVersion) {
+  function bibleSceneId(verse: BibleVerse, isDual = dualVersion, secVer = secondaryVersion, layout = dualLayout) {
     return isDual
-      ? `bible-${verse.version}-${verse.reference}-dual-${secVer}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '')
+      ? `bible-${verse.version}-${verse.reference}-dual-${secVer}-${layout}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '')
       : `bible-${verse.version}-${verse.reference}`.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9:._/-]/g, '');
   }
 
@@ -765,12 +785,14 @@ export function BiblePanel() {
     verse: BibleVerse,
     opts: { direct?: boolean; forceUpdate?: boolean } = {},
     customSecondaryVer?: string,
-    overrideDual?: boolean
+    overrideDual?: boolean,
+    overrideLayout?: 'vertical' | 'horizontal'
   ) {
     const isDualActive = overrideDual !== undefined ? overrideDual : dualVersion;
+    const layoutToUse = overrideLayout !== undefined ? overrideLayout : dualLayout;
     const secVerToUse = customSecondaryVer || secondaryVersion;
     const secondaryVerse = isDualActive ? await fetchSecondary(verse, secVerToUse, isDualActive) : undefined;
-    const sceneId = bibleSceneId(verse, isDualActive, secVerToUse);
+    const sceneId = bibleSceneId(verse, isDualActive, secVerToUse, layoutToUse);
     const goesLive = opts.direct || operatingMode === 'basic';
     const activeScene = goesLive ? currentScene : previewScene;
 
@@ -795,6 +817,7 @@ export function BiblePanel() {
         text: verseText,
         reference: `${verse.reference} (${primaryVer})`,
         version: primaryVer,
+        dualLayout: isDualActive ? layoutToUse : undefined,
         secondaryVerse: secondaryVerse
           ? {
               ...secondaryVerse,
@@ -814,6 +837,35 @@ export function BiblePanel() {
     };
     addVerseToHistory(verse);
     projectScene(scene, { direct: opts.direct });
+  }
+
+  function handleDualLayoutToggle(nextLayout: 'vertical' | 'horizontal') {
+    setDualLayout(nextLayout);
+    if (activeTheme?.id) {
+      updateTheme(activeTheme.id, {
+        bibleOptions: {
+          ...(activeTheme.bibleOptions || {}),
+          dualLayout: nextLayout,
+        },
+      });
+    }
+    if (operatingMode === 'basic' && currentScene?.type === 'bible' && dualVersion) {
+      const activeRef = currentScene.name;
+      const visibleVerses = results.length ? results : chapterVerses;
+      const activeVerse = visibleVerses.find((v) => v.reference === activeRef || activeRef.includes(v.reference));
+      if (activeVerse) {
+        void sendVerse(activeVerse, { direct: true, forceUpdate: true }, undefined, true, nextLayout);
+      } else if (currentScene.content) {
+        const updatedDualScene: Scene = {
+          ...currentScene,
+          content: {
+            ...currentScene.content,
+            dualLayout: nextLayout,
+          },
+        };
+        projectScene(updatedDualScene, { direct: true });
+      }
+    }
   }
 
   function handleDualVersionToggle(isDual: boolean) {
@@ -842,6 +894,7 @@ export function BiblePanel() {
             content: {
               ...currentScene.content,
               secondaryVerse: undefined,
+              dualLayout: undefined,
             },
           };
           projectScene(singleScene, { direct: true });
@@ -852,7 +905,7 @@ export function BiblePanel() {
             const sec = await fetchSecondary(dummyVerse, secVerToUse, true);
             const dualScene: Scene = {
               ...currentScene,
-              id: `bible-${currentScene.content?.version || selectedVersion}-${currentScene.name}-dual-${secVerToUse}`,
+              id: `bible-${currentScene.content?.version || selectedVersion}-${currentScene.name}-dual-${secVerToUse}-${dualLayout}`,
               background: undefined,
               transition: {
                 type: fxSettings.transitionType,
@@ -863,6 +916,7 @@ export function BiblePanel() {
               animateBackground: fxSettings.animateBackground,
               content: {
                 ...currentScene.content,
+                dualLayout: dualLayout,
                 secondaryVerse: sec
                   ? {
                       ...sec,
@@ -1360,6 +1414,41 @@ export function BiblePanel() {
           </svg>
         </button>
 
+        {dualVersion && (
+          <button
+            type="button"
+            onClick={() => handleDualLayoutToggle(dualLayout === 'vertical' ? 'horizontal' : 'vertical')}
+            style={{
+              height: 38,
+              width: 38,
+              padding: 0,
+              background: 'var(--chrome-control)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 6,
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+            }}
+            title={dualLayout === 'horizontal' ? 'Dual Layout: Side-by-Side (Click to switch to Stacked)' : 'Dual Layout: Stacked (Click to switch to Side-by-Side)'}
+          >
+            {dualLayout === 'horizontal' ? (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="8" height="16" rx="1.5" />
+                <rect x="13" y="4" width="8" height="16" rx="1.5" />
+              </svg>
+            ) : (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="3" width="16" height="8" rx="1.5" />
+                <rect x="4" y="13" width="16" height="8" rx="1.5" />
+              </svg>
+            )}
+          </button>
+        )}
+
         {/* 4. Single Background Dropdown Popover Button */}
         <div style={{ position: 'relative', display: 'inline-flex' }}>
           <button
@@ -1684,6 +1773,9 @@ export function BiblePanel() {
             </BlockButton>
             <BlockButton onClick={() => { void handlePickImport(); }} disabled={importing} title={t('bible.importTitle')}>
               {importing ? t('panel.importing') : t('panel.import')}
+            </BlockButton>
+            <BlockButton onClick={() => setShowManageTranslations(true)} title="Manage and remove Bible translations">
+              Manage
             </BlockButton>
             <span style={{ ...type.caption, color: 'var(--text-dim)', lineHeight: 1 }}>
               {currentVersion?.name || selectedVersion}
@@ -2168,6 +2260,157 @@ export function BiblePanel() {
                 }}
               >
                 Overwrite Translation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Bible Translations Modal */}
+      {showManageTranslations && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 20,
+          }}
+          onClick={() => setShowManageTranslations(false)}
+        >
+          <div
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 12,
+              padding: 24,
+              maxWidth: 520,
+              width: '100%',
+              maxHeight: '80vh',
+              boxShadow: '0 16px 32px rgba(0, 0, 0, 0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-primary)', paddingBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF5500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Manage Bible Translations
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowManageTranslations(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-dim)',
+                  fontSize: 18,
+                  cursor: 'pointer',
+                  padding: 4,
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
+              View installed translations and remove any custom Bibles you have imported into the app:
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', maxHeight: 360, paddingRight: 4 }}>
+              {versions.map((ver) => (
+                <div
+                  key={ver.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 12px',
+                    background: 'var(--chrome-control)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 8,
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>
+                        {ver.name}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)', background: 'rgba(255, 255, 255, 0.06)', padding: '1px 6px', borderRadius: 4 }}>
+                        {ver.id}
+                      </span>
+                      {ver.isUser ? (
+                        <span style={{ fontSize: 10, color: '#3b82f6', background: 'rgba(59, 130, 246, 0.15)', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                          Imported
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 10, color: 'var(--text-dim)', background: 'rgba(255, 255, 255, 0.04)', padding: '1px 6px', borderRadius: 4 }}>
+                          Standard
+                        </span>
+                      )}
+                    </div>
+                    {ver.language && (
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                        Language: {ver.language}
+                      </span>
+                    )}
+                  </div>
+
+                  {ver.isUser ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(`Are you sure you want to delete the imported translation "${ver.name}" (${ver.id})?`)) {
+                          void handleDeleteVersion(ver.id);
+                        }
+                      }}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: '#ff4d4f',
+                        background: 'rgba(255, 77, 79, 0.1)',
+                        border: '1px solid rgba(255, 77, 79, 0.3)',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      Delete
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', paddingRight: 4 }}>
+                      Built-in
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid var(--border-primary)' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowManageTranslations(false)}
+                style={{ padding: '8px 18px', fontSize: 13, borderRadius: 6, cursor: 'pointer' }}
+              >
+                Close
               </button>
             </div>
           </div>

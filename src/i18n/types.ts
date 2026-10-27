@@ -124,6 +124,12 @@ export type MessageKey =
   | 'settings.bibleOpt.showVerseNumbersSub'
   | 'settings.bibleOpt.versionSwitchTitle'
   | 'settings.bibleOpt.versionSwitchSub'
+  | 'settings.bibleOpt.shrinkToFitTitle'
+  | 'settings.bibleOpt.shrinkToFitSub'
+  | 'settings.bibleOpt.dualLayoutTitle'
+  | 'settings.bibleOpt.dualLayoutSub'
+  | 'settings.bibleOpt.dualLayoutVertical'
+  | 'settings.bibleOpt.dualLayoutHorizontal'
   /* Settings → Live Scripture */
   | 'settings.scripture.verseModeTitle'
   | 'settings.scripture.verseModeSub'

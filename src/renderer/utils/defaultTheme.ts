@@ -81,6 +81,8 @@ export function createDefaultTheme(): Theme {
       shortenBooks: false,
       showVerseNumbers: false,
       versionSwitchUpdatesOutput: true,
+      dualLayout: 'vertical',
+      autoShrink: true,
     },
     songOptions: {
       textTransform: 'none',
@@ -114,6 +116,8 @@ export function ensureTheme(theme: Theme | null | undefined): Theme {
       shortenBooks: theme.bibleOptions?.shortenBooks ?? def.bibleOptions!.shortenBooks,
       showVerseNumbers: theme.bibleOptions?.showVerseNumbers ?? def.bibleOptions!.showVerseNumbers,
       versionSwitchUpdatesOutput: theme.bibleOptions?.versionSwitchUpdatesOutput ?? def.bibleOptions!.versionSwitchUpdatesOutput,
+      dualLayout: theme.bibleOptions?.dualLayout ?? def.bibleOptions!.dualLayout ?? 'vertical',
+      autoShrink: theme.bibleOptions?.autoShrink ?? def.bibleOptions!.autoShrink ?? true,
     },
     songOptions: {
       textTransform: theme.songOptions?.textTransform ?? def.songOptions!.textTransform,

@@ -115,6 +115,12 @@ export const pt: MessageCatalog = {
   'settings.bibleOpt.showVerseNumbersSub': 'Incluir números de versículo em sobrescrito no texto apresentado',
   'settings.bibleOpt.versionSwitchTitle': 'Mudança de versão atualiza saída',
   'settings.bibleOpt.versionSwitchSub': 'Mudar versão bíblica atualiza de imediato o ecrã ao vivo em modo Basic',
+  'settings.bibleOpt.shrinkToFitTitle': 'Reduzir para ajustar (Autoajuste)',
+  'settings.bibleOpt.shrinkToFitSub': 'Reduz automaticamente o tamanho do texto quando versículos longos excedem os limites do ecrã',
+  'settings.bibleOpt.dualLayoutTitle': 'Disposição da Bíblia paralela',
+  'settings.bibleOpt.dualLayoutSub': 'Escolha como as traduções paralelas são organizadas no ecrã',
+  'settings.bibleOpt.dualLayoutVertical': 'Lado a lado',
+  'settings.bibleOpt.dualLayoutHorizontal': 'Empilhadas (Cima e Baixo)',
 
   'settings.scripture.verseModeTitle': 'Modo de apresentação de versículos',
   'settings.scripture.verseModeSub': 'Como quer mostrar os versículos detetados?',

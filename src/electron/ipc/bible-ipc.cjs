@@ -38,6 +38,7 @@ function registerBibleIpc({
   });
   
   ipc.handle('bible:importFile', (_, p) => bibleService?.importBibleFile(p || {}));
+  ipc.handle('bible:deleteVersion', (_, p) => bibleService?.deleteVersion(p?.versionId || p));
 
   ipc.handle('verse:detect', (_, p) => verseDetectionService?.detect(p?.text, p?.options || {}));
   ipc.handle('verse:warmIndex', (_, p) => verseDetectionService?.warmIndex(p?.versionId || 'KJV'));

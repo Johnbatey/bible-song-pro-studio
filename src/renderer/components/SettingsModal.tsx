@@ -583,6 +583,8 @@ export function SettingsModal() {
         shortenBooks: patch.shortenBooks ?? current.shortenBooks,
         showVerseNumbers: patch.showVerseNumbers ?? current.showVerseNumbers,
         versionSwitchUpdatesOutput: patch.versionSwitchUpdatesOutput ?? current.versionSwitchUpdatesOutput,
+        dualLayout: patch.dualLayout ?? current.dualLayout ?? 'vertical',
+        autoShrink: patch.autoShrink ?? current.autoShrink ?? true,
       },
     });
   }
@@ -860,6 +862,46 @@ export function SettingsModal() {
                     checked={activeTheme?.bibleOptions?.versionSwitchUpdatesOutput !== false}
                     onChange={(checked) => patchBibleOptions({ versionSwitchUpdatesOutput: checked })}
                   />
+                </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>{t('settings.bibleOpt.shrinkToFitTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.bibleOpt.shrinkToFitSub')}</div>
+                  </div>
+                  <AppleToggle
+                    checked={activeTheme?.bibleOptions?.autoShrink !== false}
+                    onChange={(checked) => patchBibleOptions({ autoShrink: checked })}
+                  />
+                </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>{t('settings.bibleOpt.dualLayoutTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.bibleOpt.dualLayoutSub')}</div>
+                  </div>
+                  <div style={modalStyles.pillGroup}>
+                    <button
+                      style={{
+                        ...modalStyles.pillBtn,
+                        background: (activeTheme?.bibleOptions?.dualLayout || 'vertical') === 'vertical' ? '#FF5500' : 'transparent',
+                        color: (activeTheme?.bibleOptions?.dualLayout || 'vertical') === 'vertical' ? '#ffffff' : 'var(--text-secondary)',
+                      }}
+                      onClick={() => patchBibleOptions({ dualLayout: 'vertical' })}
+                    >
+                      {t('settings.bibleOpt.dualLayoutVertical')}
+                    </button>
+                    <button
+                      style={{
+                        ...modalStyles.pillBtn,
+                        background: activeTheme?.bibleOptions?.dualLayout === 'horizontal' ? '#FF5500' : 'transparent',
+                        color: activeTheme?.bibleOptions?.dualLayout === 'horizontal' ? '#ffffff' : 'var(--text-secondary)',
+                      }}
+                      onClick={() => patchBibleOptions({ dualLayout: 'horizontal' })}
+                    >
+                      {t('settings.bibleOpt.dualLayoutHorizontal')}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

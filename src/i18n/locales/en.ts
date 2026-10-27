@@ -115,6 +115,12 @@ export const en: MessageCatalog = {
   'settings.bibleOpt.showVerseNumbersSub': 'Include superscript verse numbers in displayed Scripture text',
   'settings.bibleOpt.versionSwitchTitle': 'Version Switch Updates Output',
   'settings.bibleOpt.versionSwitchSub': 'Switching Bible version immediately updates the live display in Basic mode',
+  'settings.bibleOpt.shrinkToFitTitle': 'Shrink to Fit (Auto-Fit Text)',
+  'settings.bibleOpt.shrinkToFitSub': 'Automatically scales down Scripture text size when long verses exceed screen bounds so text never overflows',
+  'settings.bibleOpt.dualLayoutTitle': 'Dual Bible Layout',
+  'settings.bibleOpt.dualLayoutSub': 'Choose how parallel translations are arranged on screen',
+  'settings.bibleOpt.dualLayoutVertical': 'Side-by-Side',
+  'settings.bibleOpt.dualLayoutHorizontal': 'Stacked (Top & Bottom)',
 
   'settings.scripture.verseModeTitle': 'Verse display Mode',
   'settings.scripture.verseModeSub': 'How do you want detected verses to display?',

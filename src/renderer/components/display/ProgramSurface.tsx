@@ -1,6 +1,6 @@
 import type { Alert, Scene, SourceDocument, FullScreenTheme, LowerThirdTheme, Theme, VideoTransport, AppSettings, Background } from '../../types';
 import type { SceneTransitionType } from '../../types/transition';
-import { memo, useEffect, useRef, useState, useMemo, Fragment } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState, useMemo, Fragment } from 'react';
 import type React from 'react';
 import { SlideStage } from './SlideStage';
 import { attachAudioOutputSink } from '../../utils/audio-output';
@@ -412,6 +412,8 @@ export interface ProgramSurfaceState {
   showTranslation?: boolean;
   showReference?: boolean;
   dualVersionTextAlign?: 'left' | 'center' | 'right';
+  dualLayout?: 'vertical' | 'horizontal';
+  autoResize?: 'none' | 'shrink' | 'grow';
   bgVideo?: string;
   bgCustomImage?: string;
   bgFill?: string;
@@ -773,20 +775,35 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   const [videoLoadError, setVideoLoadError] = useState(false);
   const video = videoSource(state, assetBaseUrl);
 
+  const fsContainerRef = useRef<HTMLDivElement | null>(null);
+  const fsInnerRef = useRef<HTMLDivElement | null>(null);
+  const [fsScale, setFsScale] = useState(1);
+
+  const ltRef = useRef<HTMLDivElement | null>(null);
+  const ltInnerRef = useRef<HTMLDivElement | null>(null);
+  const [ltScale, setLtScale] = useState(1);
+
   useEffect(() => {
     setVideoLoadError(false);
   }, [video]);
   const transport = state.videoTransport;
 
-  /* Play state follows the operator. Chromium rejects play() if the element is
-     not ready yet; the rejection is expected and carries no information the
-     operator could act on, so it is swallowed rather than surfaced. */
+  /* Play state follows the operator. Ensured video playback for both preview and program */
   useEffect(() => {
     const el = videoRef.current;
-    if (!el || !transport) return;
-    if (transport.playing) void el.play().catch(() => {});
-    else el.pause();
-  }, [transport?.playing, transport?.target]);
+    if (!el) return;
+    if (!transport || transport.playing) {
+      void el.play().catch(() => {
+        // Fallback to muted playback if browser policies block unmuted autoplay
+        if (!el.muted) {
+          el.muted = true;
+          void el.play().catch(() => {});
+        }
+      });
+    } else {
+      el.pause();
+    }
+  }, [transport?.playing, transport?.target, video]);
 
   /* Seeks fire on the nonce, not the value: dropping the playhead on the same
      second twice has to move the video twice. */
@@ -943,6 +960,81 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     ltOffsetY ? `translateY(${ltOffsetY}px)` : '',
   ].filter(Boolean).join(' ') || undefined;
 
+  const isHorizontalDual = (scene?.content?.dualLayout || state.dualLayout || activeTheme?.bibleOptions?.dualLayout) === 'horizontal';
+  const autoResizeSetting = state.autoResize
+    || (mode === 'lowerThird' ? activeTheme?.lowerThird?.autoResize : activeTheme?.fullScreen?.autoResize)
+    || (activeTheme?.bibleOptions?.autoShrink !== false ? 'shrink' : 'none');
+
+  useLayoutEffect(() => {
+    if (autoResizeSetting === 'none' || mode !== 'fullscreen') {
+      setFsScale(1);
+      return;
+    }
+    const container = fsContainerRef.current;
+    const inner = fsInnerRef.current;
+    if (!container || !inner) return;
+
+    inner.style.transform = 'none';
+    const availH = container.clientHeight - 64;
+    const availW = container.clientWidth - 100;
+    const scrollH = inner.scrollHeight;
+    const scrollW = inner.scrollWidth;
+
+    if (availH > 0 && availW > 0 && (scrollH > availH || scrollW > availW)) {
+      const scaleH = availH / scrollH;
+      const scaleW = availW / scrollW;
+      const factor = Math.min(scaleH, scaleW, 1);
+      setFsScale(Math.max(0.35, Math.floor(factor * 96) / 100));
+    } else {
+      setFsScale(1);
+    }
+  }, [
+    content?.text,
+    secondaryVerse?.text,
+    formattedRef,
+    mode,
+    isCompare,
+    isHorizontalDual,
+    state.fontSize,
+    autoResizeSetting,
+    activeTheme?.fullScreen?.fontSize,
+  ]);
+
+  useLayoutEffect(() => {
+    if (autoResizeSetting === 'none' || mode !== 'lowerThird') {
+      setLtScale(1);
+      return;
+    }
+    const container = ltRef.current;
+    const inner = ltInnerRef.current;
+    if (!container || !inner) return;
+
+    inner.style.transform = 'none';
+    const availH = container.clientHeight - 12;
+    const availW = container.clientWidth - 24;
+    const scrollH = inner.scrollHeight;
+    const scrollW = inner.scrollWidth;
+
+    if (availH > 0 && availW > 0 && (scrollH > availH || scrollW > availW)) {
+      const scaleH = availH / scrollH;
+      const scaleW = availW / scrollW;
+      const factor = Math.min(scaleH, scaleW, 1);
+      setLtScale(Math.max(0.4, Math.floor(factor * 96) / 100));
+    } else {
+      setLtScale(1);
+    }
+  }, [
+    content?.text,
+    secondaryVerse?.text,
+    formattedRef,
+    mode,
+    isCompare,
+    isHorizontalDual,
+    state.fontSize,
+    autoResizeSetting,
+    activeTheme?.lowerThird?.fontSize,
+  ]);
+
   const dualTextAlign = state.dualVersionTextAlign || 'left';
   const transStyle = state.transition?.active
     ? getTransitionStyle(state.transition.type, state.transition.progress)
@@ -1038,6 +1130,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
 
       {scene && mode === 'lowerThird' && !content?.wordStudy && (
         <div
+          ref={ltRef}
           className="program-lower-third"
           style={{
             borderRadius: typeof activeTheme?.lowerThird?.borderRadius === 'number' ? `${activeTheme.lowerThird.borderRadius}px` : undefined,
@@ -1063,6 +1156,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           />
           {lowerThirdBandMedia(activeTheme?.lowerThird, scene?.background, assetBaseUrl, fxAnim.animateBg, fxAnim.css)}
           <div
+            ref={ltInnerRef}
             key={scene?.id ? `${scene.id}-lt-content` : 'lt-content'}
             className="program-lt-content"
             style={{
@@ -1070,21 +1164,32 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
               width: '100%',
               position: 'relative',
               zIndex: 1,
+              transform: ltScale < 1 ? `scale(${ltScale})` : undefined,
+              transformOrigin: isTop ? 'top center' : 'bottom center',
+              transition: 'transform 0.12s ease-out',
             }}
           >
             {isCompare ? (
               <div
-                className="program-compare-lt"
+                className={`program-compare-lt ${isHorizontalDual ? 'program-compare-lt-horizontal' : ''}`}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '2cqw',
+                  gridTemplateColumns: isHorizontalDual ? '1fr' : '1fr 1fr',
+                  gap: isHorizontalDual ? '0.6cqw' : '2cqw',
                   width: '100%',
                   alignItems: 'start',
                   textAlign: dualTextAlign,
                 }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', borderRight: '1px solid rgba(255,255,255,0.18)', paddingRight: '1.5cqw' }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4cqw',
+                  borderRight: isHorizontalDual ? 'none' : '1px solid rgba(255,255,255,0.18)',
+                  borderBottom: isHorizontalDual ? '1px solid rgba(255,255,255,0.18)' : 'none',
+                  paddingRight: isHorizontalDual ? 0 : '1.5cqw',
+                  paddingBottom: isHorizontalDual ? '0.5cqw' : 0,
+                }}>
                   {showReference && primaryRef && (
                     <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign: dualTextAlign }}>
                       {primaryRef}
@@ -1096,7 +1201,13 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
                     <div className="program-lt-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{content?.text || ''}</div>
                   )}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4cqw', paddingLeft: '0.5cqw' }}>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4cqw',
+                  paddingLeft: isHorizontalDual ? 0 : '0.5cqw',
+                  paddingTop: isHorizontalDual ? '0.4cqw' : 0,
+                }}>
                   {showReference && secondaryRef && (
                     <div className="program-lt-ref" style={{ color: referenceColor, fontSize: refStyle.fontSize, textAlign: dualTextAlign }}>
                       {secondaryRef}
@@ -1324,58 +1435,71 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
       )}
 
       {scene && mode === 'fullscreen' && !content?.slide && !content?.wordStudy && (
-        <div key={scene?.id ? `${scene.id}-fs-content` : 'fs-content'} className="program-fullscreen-content" style={fullscreenStyle}>
-          {content?.html ? (
-            <div className="program-slide-html" dangerouslySetInnerHTML={{ __html: content.html }} />
-          ) : isCompare ? (
-            <div className="program-compare" style={{ textAlign: dualTextAlign }}>
-              <div className="program-compare-pane" style={{ textAlign: dualTextAlign }}>
-                <div className="program-ref-row" style={{ ...refRowStyle, justifyContent: alignmentJustify(dualTextAlign), textAlign: dualTextAlign }}>
-                  {showReference && primaryRef && <span style={{ ...refStyle, textAlign: dualTextAlign }}>{primaryRef}</span>}
-                </div>
-                {fxAnim.isWordType ? (
-                  <TypedWordText text={content?.text || ''} duration={fxAnim.durationSec} style={{ ...textStyle, textAlign: dualTextAlign }} textAlign={dualTextAlign} />
-                ) : (
-                  <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{content?.text || ''}</div>
-                )}
-              </div>
-              <div className="program-compare-divider" />
-              <div className="program-compare-pane" style={{ textAlign: dualTextAlign }}>
-                <div className="program-ref-row" style={{ ...refRowStyle, justifyContent: alignmentJustify(dualTextAlign), textAlign: dualTextAlign }}>
-                  {showReference && secondaryRef && <span style={{ ...refStyle, textAlign: dualTextAlign }}>{secondaryRef}</span>}
-                </div>
-                {fxAnim.isWordType ? (
-                  <TypedWordText text={secondaryVerse?.text || ''} duration={fxAnim.durationSec} style={{ ...textStyle, textAlign: dualTextAlign }} textAlign={dualTextAlign} />
-                ) : (
-                  <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{secondaryVerse?.text || ''}</div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              {showReference && formattedRef && (
-                <div className="program-ref-row" style={refRowStyle}>
-                  <span style={refStyle}>{formattedRef}</span>
-                </div>
-              )}
-              {fxAnim.isWordType ? (
-                <TypedWordText text={content?.text || ''} duration={fxAnim.durationSec} style={textStyle} textAlign={textAlign} />
-              ) : (
-                <div className="program-main-text" style={textStyle}>
-                  {content?.text?.includes('\n\n') ? (
-                    content.text.split(/\n\n+/).map((para, i) => (
-                      <div key={i} className="program-text-paragraph">
-                        {para}
-                      </div>
-                    ))
+        <div key={scene?.id ? `${scene.id}-fs-content` : 'fs-content'} ref={fsContainerRef} className="program-fullscreen-content" style={fullscreenStyle}>
+          <div
+            ref={fsInnerRef}
+            style={{
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              transform: fsScale < 1 ? `scale(${fsScale})` : undefined,
+              transformOrigin: 'center center',
+              transition: 'transform 0.12s ease-out',
+            }}
+          >
+            {content?.html ? (
+              <div className="program-slide-html" dangerouslySetInnerHTML={{ __html: content.html }} />
+            ) : isCompare ? (
+              <div className={`program-compare ${isHorizontalDual ? 'program-compare-horizontal' : ''}`} style={{ textAlign: dualTextAlign }}>
+                <div className="program-compare-pane" style={{ textAlign: dualTextAlign }}>
+                  <div className="program-ref-row" style={{ ...refRowStyle, justifyContent: alignmentJustify(dualTextAlign), textAlign: dualTextAlign }}>
+                    {showReference && primaryRef && <span style={{ ...refStyle, textAlign: dualTextAlign }}>{primaryRef}</span>}
+                  </div>
+                  {fxAnim.isWordType ? (
+                    <TypedWordText text={content?.text || ''} duration={fxAnim.durationSec} style={{ ...textStyle, textAlign: dualTextAlign }} textAlign={dualTextAlign} />
                   ) : (
-                    content?.text || ''
+                    <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{content?.text || ''}</div>
                   )}
                 </div>
-              )}
-              {songCredit(scene) && <div className="program-song-credit">{songCredit(scene)}</div>}
-            </>
-          )}
+                <div className="program-compare-divider" />
+                <div className="program-compare-pane" style={{ textAlign: dualTextAlign }}>
+                  <div className="program-ref-row" style={{ ...refRowStyle, justifyContent: alignmentJustify(dualTextAlign), textAlign: dualTextAlign }}>
+                    {showReference && secondaryRef && <span style={{ ...refStyle, textAlign: dualTextAlign }}>{secondaryRef}</span>}
+                  </div>
+                  {fxAnim.isWordType ? (
+                    <TypedWordText text={secondaryVerse?.text || ''} duration={fxAnim.durationSec} style={{ ...textStyle, textAlign: dualTextAlign }} textAlign={dualTextAlign} />
+                  ) : (
+                    <div className="program-main-text" style={{ ...textStyle, textAlign: dualTextAlign }}>{secondaryVerse?.text || ''}</div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                {showReference && formattedRef && (
+                  <div className="program-ref-row" style={refRowStyle}>
+                    <span style={refStyle}>{formattedRef}</span>
+                  </div>
+                )}
+                {fxAnim.isWordType ? (
+                  <TypedWordText text={content?.text || ''} duration={fxAnim.durationSec} style={textStyle} textAlign={textAlign} />
+                ) : (
+                  <div className="program-main-text" style={textStyle}>
+                    {content?.text?.includes('\n\n') ? (
+                      content.text.split(/\n\n+/).map((para, i) => (
+                        <div key={i} className="program-text-paragraph">
+                          {para}
+                        </div>
+                      ))
+                    ) : (
+                      content?.text || ''
+                    )}
+                  </div>
+                )}
+                {songCredit(scene) && <div className="program-song-credit">{songCredit(scene)}</div>}
+              </>
+            )}
+          </div>
         </div>
       )}
 

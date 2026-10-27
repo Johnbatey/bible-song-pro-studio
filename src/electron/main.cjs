@@ -1934,6 +1934,7 @@ app.whenReady().then(async () => {
     return { ok: true, filePaths: res.filePaths };
   });
   ipcMain.handle('bible:importFile', (_, p) => bibleService.importBibleFile(p || {}));
+  ipcMain.handle('bible:deleteVersion', (_, p) => bibleService.deleteVersion(p?.versionId || p));
 
   ipcMain.handle('verse:detect', (_, p) => verseDetectionService.detect(p?.text, p?.options || {}));
   ipcMain.handle('verse:warmIndex', (_, p) => verseDetectionService.warmIndex(p?.versionId || 'KJV'));

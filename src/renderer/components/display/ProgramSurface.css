@@ -337,6 +337,11 @@
   width: 100%;
 }
 
+.program-compare.program-compare-horizontal {
+  flex-direction: column;
+  gap: 24px;
+}
+
 .program-compare-pane {
   flex: 1 1 0;
   min-width: 0;
@@ -345,6 +350,11 @@
 .program-compare-divider {
   width: 1px;
   background: rgba(255, 255, 255, .2);
+}
+
+.program-compare.program-compare-horizontal .program-compare-divider {
+  width: 100%;
+  height: 1px;
 }
 
 .program-surface-lt {

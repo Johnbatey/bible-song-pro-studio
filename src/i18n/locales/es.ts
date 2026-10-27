@@ -115,6 +115,12 @@ export const es: MessageCatalog = {
   'settings.bibleOpt.showVerseNumbersSub': 'Incluir números de versículo en superíndice en el texto mostrado',
   'settings.bibleOpt.versionSwitchTitle': 'Cambio de versión actualiza salida',
   'settings.bibleOpt.versionSwitchSub': 'Cambiar versión bíblica actualiza de inmediato la pantalla en vivo en modo Basic',
+  'settings.bibleOpt.shrinkToFitTitle': 'Reducir para ajustar (Autoajuste)',
+  'settings.bibleOpt.shrinkToFitSub': 'Reduce automáticamente el tamaño del texto bíblico cuando los versículos largos exceden los límites de pantalla',
+  'settings.bibleOpt.dualLayoutTitle': 'Diseño de Biblia paralela',
+  'settings.bibleOpt.dualLayoutSub': 'Elija cómo se organizan las traducciones paralelas en pantalla',
+  'settings.bibleOpt.dualLayoutVertical': 'Lado a lado',
+  'settings.bibleOpt.dualLayoutHorizontal': 'Apiladas (Arriba y Abajo)',
 
   'settings.scripture.verseModeTitle': 'Modo de visualización de versículos',
   'settings.scripture.verseModeSub': '¿Cómo quieres mostrar los versículos detectados?',
