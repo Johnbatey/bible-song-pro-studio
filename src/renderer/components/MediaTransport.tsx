@@ -149,6 +149,9 @@ export function MediaTransport() {
   const setVideoSpeed = useAppStore((s) => s.setVideoSpeed);
   const setVideoLoop = useAppStore((s) => s.setVideoLoop);
   const setVideoMuted = useAppStore((s) => s.setVideoMuted);
+  const setVideoVolume = useAppStore((s) => s.setVideoVolume);
+  const currentVolume = transport.volume !== undefined ? transport.volume : 1.0;
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
 
   const isMuted = useAppStore((s) => {
     if (s.display.videoTransport.muted !== undefined) return s.display.videoTransport.muted;
@@ -364,19 +367,79 @@ export function MediaTransport() {
           >
             <LoopGlyph />
           </button>
-          <button
-            type="button"
-            onClick={() => setVideoMuted(!isMuted)}
-            title={isMuted ? 'Muted — click to unmute audio' : 'Audio On — click to mute audio'}
-            aria-label="Mute Audio"
-            aria-pressed={isMuted}
-            style={{
-              ...glyphButton,
-              color: isMuted ? '#EF4444' : 'var(--text-primary)',
-            }}
+          <div
+            style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+            onMouseEnter={() => setShowVolumeSlider(true)}
+            onMouseLeave={() => setShowVolumeSlider(false)}
           >
-            {isMuted ? <MuteOnGlyph /> : <MuteOffGlyph />}
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isMuted) {
+                  setVideoMuted(false);
+                  if (currentVolume <= 0) setVideoVolume(1);
+                } else {
+                  setVideoMuted(true);
+                }
+              }}
+              title={isMuted ? 'Muted — click to unmute' : `Volume: ${Math.round(currentVolume * 100)}% — click to mute`}
+              aria-label="Volume"
+              aria-pressed={isMuted}
+              style={{
+                ...glyphButton,
+                color: isMuted ? '#EF4444' : 'var(--text-primary)',
+              }}
+            >
+              {isMuted || currentVolume === 0 ? <MuteOnGlyph /> : <MuteOffGlyph />}
+            </button>
+
+            {showVolumeSlider && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  marginBottom: 6,
+                  padding: '8px 10px',
+                  background: 'var(--bg-secondary, #1e1e24)',
+                  border: '1px solid var(--border-primary, #333)',
+                  borderRadius: 6,
+                  boxShadow: '0 8px 18px rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 4,
+                  zIndex: 9999,
+                  minWidth: 84,
+                }}
+              >
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#FF5500' }}>
+                  {isMuted ? 'Muted' : `${Math.round(currentVolume * 100)}%`}
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isMuted ? 0 : currentVolume}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setVideoVolume(val);
+                    if (val > 0 && isMuted) setVideoMuted(false);
+                    if (val === 0 && !isMuted) setVideoMuted(true);
+                  }}
+                  style={{
+                    width: 70,
+                    height: 14,
+                    accentColor: '#FF5500',
+                    cursor: 'pointer',
+                  }}
+                  title={`Volume: ${Math.round(currentVolume * 100)}%`}
+                />
+              </div>
+            )}
+          </div>
         </>
       )}
 

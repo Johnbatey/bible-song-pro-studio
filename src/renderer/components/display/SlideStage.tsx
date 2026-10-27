@@ -87,6 +87,7 @@ export function SlideStage({ projection, className = '' }: { projection: SlidePr
             width={width}
             dynamicAutofit
             textFallbackColor={projection.textFallbackColor}
+            revealCount={projection.revealCount}
           />
         ) : projection.previewDataUrl ? (
           /* Nothing parsed — the import's own picture of the slide is all

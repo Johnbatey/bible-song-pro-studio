@@ -32,3 +32,13 @@ export function assetUrl(value: string | undefined, assetBaseUrl = '') {
   if (!base) return value;
   return `${base}/${value}`;
 }
+
+export function parseYouTubeId(url?: string | null): string | null {
+  if (!url) return null;
+  const str = url.trim();
+  const match = str.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/i);
+  if (match) return match[1];
+  if (/^[\w-]{11}$/.test(str)) return str;
+  return null;
+}
+

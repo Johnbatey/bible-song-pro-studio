@@ -392,8 +392,36 @@ export function PresentationPanel() {
     updatePresentationDeck(selectedDeck.id, updatedDeck);
   }
 
+  function getSlideParagraphCount(slide: PresentationSlide | ParsedSlide): number {
+    if (!slide) return 1;
+    if ('shapes' in slide || 'parsed' in slide) {
+      const pSlide = slide as ParsedSlide;
+      const shapes = (pSlide.shapes as ParsedShape[]) || [];
+      let max = 1;
+      shapes.forEach((shape) => {
+        if (shape.paragraphs && shape.paragraphs.length > max) {
+          max = shape.paragraphs.length;
+        }
+      });
+      return max;
+    }
+    if ('body' in slide) {
+      const pSlide = slide as PresentationSlide;
+      if (pSlide.body) {
+        const lines = pSlide.body.split('\n').filter((l) => l.trim().length > 0);
+        return Math.max(1, lines.length);
+      }
+    }
+    return 1;
+  }
+
   /* Builds a presentation Scene for a given slide within a deck */
-  function buildSlideScene(deck: any, slide: PresentationSlide | ParsedSlide, index: number): { scene: Scene; text: string } {
+  function buildSlideScene(
+    deck: any,
+    slide: PresentationSlide | ParsedSlide,
+    index: number,
+    customReveal?: number
+  ): { scene: Scene; text: string } {
     const sceneId = `deck-${deck.id}-slide-${index}`;
     let text = '';
     let bg: Scene['background'];
@@ -430,6 +458,9 @@ export function PresentationPanel() {
       projection = { kind: 'native', elements: [] };
     }
 
+    const activeReveal = customReveal !== undefined ? customReveal : (progressiveReveal ? revealStep : undefined);
+    projection.revealCount = activeReveal;
+
     const scene: Scene = {
       id: sceneId,
       name: t('pres.sceneName', { deck: deck.title, num: index + 1 }),
@@ -438,6 +469,7 @@ export function PresentationPanel() {
         text,
         slide: projection,
         slideId: String(index),
+        revealCount: activeReveal,
         slides: deck.slides?.map((s: any, idx: number) => ({
           id: s.id || String(idx),
           text: s.body || s.title || s.label || slideLabel(idx + 1),
@@ -457,10 +489,15 @@ export function PresentationPanel() {
   }
 
   /* Projects a slide live onto Program / Output display */
-  function handleProjectSlide(slide: PresentationSlide | ParsedSlide, index: number, direct = false) {
+  function handleProjectSlide(
+    slide: PresentationSlide | ParsedSlide,
+    index: number,
+    direct = false,
+    customReveal?: number
+  ) {
     if (!selectedDeck) return;
 
-    const { scene } = buildSlideScene(selectedDeck, slide, index);
+    const { scene } = buildSlideScene(selectedDeck, slide, index, customReveal);
 
     /* A designed slide only paints in fullscreen. Leaving lower-third on would
        show `content.text` (often just the slide title) on the projector while
@@ -472,7 +509,7 @@ export function PresentationPanel() {
     /* Re-clicking the live slide takes Program down (standby), same idea as
        the queue play/pause toggle. */
     const goesLive = direct || !isStudio;
-    if (goesLive && isSlideLive(index)) {
+    if (goesLive && isSlideLive(index) && customReveal === undefined) {
       clearProgram();
       return;
     }
@@ -710,12 +747,34 @@ export function PresentationPanel() {
      this deck is live yet, stepping starts from slide 0. */
   const lastStepPos = useRef(-1);
 
+  const [progressiveReveal, setProgressiveReveal] = useState(false);
+  const [revealStep, setRevealStep] = useState(1);
+
   function stepSlide(delta: 1 | -1) {
     const list = filteredPage2Slides;
     if (list.length === 0) return;
     const livePos = list.findIndex((entry) => isSlideLive(entry.index));
     const cuedPos = list.findIndex((entry) => isSlideCued(entry.index));
     const currentActivePos = isStudio && cuedPos >= 0 ? cuedPos : (livePos >= 0 ? livePos : lastStepPos.current);
+
+    if (progressiveReveal && currentActivePos >= 0 && currentActivePos < list.length) {
+      const currentTarget = list[currentActivePos];
+      const maxParagraphs = getSlideParagraphCount(currentTarget.slide);
+
+      if (maxParagraphs > 1) {
+        if (delta === 1 && revealStep < maxParagraphs) {
+          const nextStep = revealStep + 1;
+          setRevealStep(nextStep);
+          handleProjectSlide(currentTarget.slide, currentTarget.index, false, nextStep);
+          return;
+        } else if (delta === -1 && revealStep > 1) {
+          const nextStep = revealStep - 1;
+          setRevealStep(nextStep);
+          handleProjectSlide(currentTarget.slide, currentTarget.index, false, nextStep);
+          return;
+        }
+      }
+    }
 
     let nextPos: number;
     if (currentActivePos < 0) {
@@ -726,7 +785,9 @@ export function PresentationPanel() {
     }
     lastStepPos.current = nextPos;
     const target = list[nextPos];
-    handleProjectSlide(target.slide, target.index, false);
+    const initialStep = delta === -1 && progressiveReveal ? getSlideParagraphCount(target.slide) : 1;
+    setRevealStep(initialStep);
+    handleProjectSlide(target.slide, target.index, false, progressiveReveal ? initialStep : undefined);
   }
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1001,6 +1062,44 @@ export function PresentationPanel() {
                   </svg>
                 </button>
               </div>
+
+              {/* Line-by-Line Progressive Reveal Toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  const nextMode = !progressiveReveal;
+                  setProgressiveReveal(nextMode);
+                  setRevealStep(1);
+                  const activeSlide = filteredPage2Slides.find(
+                    (entry) => isSlideLive(entry.index) || (isStudio && isSlideCued(entry.index))
+                  );
+                  if (activeSlide) {
+                    handleProjectSlide(activeSlide.slide, activeSlide.index, false, nextMode ? 1 : undefined);
+                  }
+                }}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  border: progressiveReveal ? '1px solid var(--accent, #FF5500)' : '1px solid var(--block-line, #27272a)',
+                  background: progressiveReveal ? 'rgba(255, 85, 0, 0.15)' : 'transparent',
+                  color: progressiveReveal ? 'var(--accent, #FF5500)' : 'var(--text-secondary, #a1a1aa)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease',
+                }}
+                title={progressiveReveal ? "Line-by-Line reveal active: Press Arrow Right/Down to reveal bullets one by one" : "Enable Line-by-Line progressive bullet reveal"}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 6h16" />
+                  <path d="M4 12h10" />
+                  <path d="M4 18h6" />
+                </svg>
+                <span>Line-by-Line</span>
+              </button>
             </div>
           )}
           bodyStyle={dynamicProjectSlidesGridStyle}
@@ -1068,8 +1167,14 @@ export function PresentationPanel() {
                     transition: 'all 0.15s ease',
                     gap: 12,
                   }}
-                  onClick={() => handleProjectSlide(slide, index, false)}
-                  onDoubleClick={() => handleProjectSlide(slide, index, true)}
+                  onClick={() => {
+                    if (progressiveReveal) setRevealStep(1);
+                    handleProjectSlide(slide, index, false, progressiveReveal ? 1 : undefined);
+                  }}
+                  onDoubleClick={() => {
+                    if (progressiveReveal) setRevealStep(1);
+                    handleProjectSlide(slide, index, true, progressiveReveal ? 1 : undefined);
+                  }}
                   title={isStudio ? t('pres.slideTooltipStudio') : t('pres.slideTooltipBasic')}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
@@ -1165,8 +1270,14 @@ export function PresentationPanel() {
                     ? '0 0 10px rgba(34, 197, 94, 0.28)'
                     : undefined,
                 }}
-                onClick={() => handleProjectSlide(slide, index, false)}
-                onDoubleClick={() => handleProjectSlide(slide, index, true)}
+                onClick={() => {
+                  if (progressiveReveal) setRevealStep(1);
+                  handleProjectSlide(slide, index, false, progressiveReveal ? 1 : undefined);
+                }}
+                onDoubleClick={() => {
+                  if (progressiveReveal) setRevealStep(1);
+                  handleProjectSlide(slide, index, true, progressiveReveal ? 1 : undefined);
+                }}
                 title={isStudio
                   ? t('pres.slideTooltipStudio')
                   : t('pres.slideTooltipBasic')}

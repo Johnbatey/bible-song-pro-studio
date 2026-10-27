@@ -275,6 +275,7 @@ function TextShape({
   editable,
   onRunEdit,
   textFallbackColor,
+  revealCount,
 }: {
   shape: ParsedShape;
   boardH: number;
@@ -283,6 +284,7 @@ function TextShape({
   editable?: boolean;
   onRunEdit?: (run: ParsedRun, value: string) => void;
   textFallbackColor?: string;
+  revealCount?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const box = (shape.textBoxLayout as TextBodyLayout | undefined) || ({} as TextBodyLayout);
@@ -296,23 +298,49 @@ function TextShape({
   return (
     <div ref={ref} data-shape-id={shape.id} style={{ ...outerStyle, ...visual.style, ...textBodyStyle(shape, box, boardH) }}>
       {visual.svg ? <ShapeSvg spec={visual.svg} /> : null}
-      {(shape.paragraphs || []).map((pRuns, i) => (
-        <Paragraph
-          key={i}
-          pRuns={pRuns}
-          counters={counters}
-          fallbackColor={fallback}
-          wrapNone={box.wrap === 'none'}
-          counterFlip={flip}
-          editable={editable && shape.editable !== false}
-          onRunEdit={onRunEdit}
-        />
-      ))}
+      {(shape.paragraphs || []).map((pRuns, i) => {
+        const isHidden = revealCount !== undefined && shape.paragraphs && shape.paragraphs.length > 1 && i >= revealCount;
+        return (
+          <div
+            key={i}
+            style={{
+              opacity: isHidden ? 0 : 1,
+              transition: 'opacity 0.25s ease-in-out',
+            }}
+          >
+            <Paragraph
+              pRuns={pRuns}
+              counters={counters}
+              fallbackColor={fallback}
+              wrapNone={box.wrap === 'none'}
+              counterFlip={flip}
+              editable={editable && shape.editable !== false}
+              onRunEdit={onRunEdit}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit, textFallbackColor }: { shape: ParsedShape; boardH: number; dynamicAutofit: boolean; editable?: boolean; onRunEdit?: (run: ParsedRun, value: string) => void; textFallbackColor?: string }) {
+function Shape({
+  shape,
+  boardH,
+  dynamicAutofit,
+  editable,
+  onRunEdit,
+  textFallbackColor,
+  revealCount,
+}: {
+  shape: ParsedShape;
+  boardH: number;
+  dynamicAutofit: boolean;
+  editable?: boolean;
+  onRunEdit?: (run: ParsedRun, value: string) => void;
+  textFallbackColor?: string;
+  revealCount?: number;
+}) {
   const outer: CSSProperties = {
     position: 'absolute',
     left: `${shape.left}%`,
@@ -357,7 +385,18 @@ function Shape({ shape, boardH, dynamicAutofit, editable, onRunEdit, textFallbac
     );
   }
 
-  return <TextShape shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} outerStyle={outer} editable={editable} onRunEdit={onRunEdit} textFallbackColor={textFallbackColor} />;
+  return (
+    <TextShape
+      shape={shape}
+      boardH={boardH}
+      dynamicAutofit={dynamicAutofit}
+      outerStyle={outer}
+      editable={editable}
+      onRunEdit={onRunEdit}
+      textFallbackColor={textFallbackColor}
+      revealCount={revealCount}
+    />
+  );
 }
 
 export interface SlideCanvasProps {
@@ -383,6 +422,8 @@ export interface SlideCanvasProps {
   revision?: number;
   className?: string;
   style?: CSSProperties;
+  /** Line-by-line progressive reveal count for slide paragraphs. */
+  revealCount?: number;
 }
 
 function SlideCanvasImpl({
@@ -395,6 +436,7 @@ function SlideCanvasImpl({
   textFallbackColor,
   className,
   style,
+  revealCount,
 }: SlideCanvasProps) {
   const boardH = boardHeight(slideSizeEmu);
   const scale = (width ?? BOARD_W) / BOARD_W;
@@ -422,7 +464,16 @@ function SlideCanvasImpl({
     >
       {slide?.parsed
         ? ((slide.shapes as ParsedShape[]) || []).map((shape) => (
-          <Shape key={shape.id} shape={shape} boardH={boardH} dynamicAutofit={dynamicAutofit} editable={editable} onRunEdit={onRunEdit} textFallbackColor={textFallbackColor} />
+          <Shape
+            key={shape.id}
+            shape={shape}
+            boardH={boardH}
+            dynamicAutofit={dynamicAutofit}
+            editable={editable}
+            onRunEdit={onRunEdit}
+            textFallbackColor={textFallbackColor}
+            revealCount={revealCount}
+          />
         ))
         : null}
     </div>

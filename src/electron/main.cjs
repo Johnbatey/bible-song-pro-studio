@@ -136,6 +136,7 @@ const stageDesignerWindows = new Set();
 /** webContents id → does that designer hold unsaved work. */
 const dirtyDesigners = new Map();
 let wss = null;
+let httpServer = null;
 /* The asset server's port. Not a constant: a conflict walks up the range, and
    everything that builds a URL reads this rather than the base. */
 const HTTP_PORT_BASE = 8942;
@@ -892,6 +893,7 @@ function startHttpServer() {
     },
   });
 
+  httpServer = server;
   wss = new WebSocketServer({ server, perMessageDeflate: false });
   wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ type: 'display:update', state: displayState }));
@@ -2697,7 +2699,23 @@ app.whenReady().then(async () => {
       if (win && !win.isDestroyed()) win.close();
     }
     ndiFeedWindows.clear();
+    for (const win of stageWindows) {
+      if (win && !win.isDestroyed()) win.close();
+    }
+    stageWindows.clear();
+    for (const win of dockPopoutWindows.values()) {
+      if (win && !win.isDestroyed()) win.close();
+    }
+    dockPopoutWindows.clear();
+    for (const win of stageDesignerWindows) {
+      if (win && !win.isDestroyed()) win.close();
+    }
+    stageDesignerWindows.clear();
     if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
+    displayWindow = null;
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
   });
 
   // Fullscreen events
@@ -2739,7 +2757,16 @@ app.on('window-all-closed', () => {
   }
   ndiFeedWindows.clear();
   sessionHistory?.endSession();
-  if (process.platform !== 'darwin') app.quit();
+  try {
+    wss?.close();
+    httpServer?.close();
+  } catch (_) {}
+  if (process.platform !== 'darwin') {
+    app.quit();
+    setTimeout(() => {
+      try { process.exit(0); } catch (_) {}
+    }, 350).unref();
+  }
 });
 app.on('will-quit', () => {
   appStoreService?.flush();
@@ -2751,5 +2778,14 @@ app.on('will-quit', () => {
   }
   ndiFeedWindows.clear();
   sessionHistory?.endSession();
+  try {
+    wss?.close();
+    httpServer?.close();
+  } catch (_) {}
+  if (process.platform !== 'darwin') {
+    setTimeout(() => {
+      try { process.exit(0); } catch (_) {}
+    }, 350).unref();
+  }
 });
 app.on('activate', () => { if (!mainWindow) mainWindow = createMainWindow(); });

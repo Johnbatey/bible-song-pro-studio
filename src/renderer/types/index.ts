@@ -48,6 +48,8 @@ export interface SceneContent {
   slide?: SlideProjection;
   /** Detailed original language Word Study entry for audience display projection. */
   wordStudy?: WordStudyEntry;
+  /** Line-by-line progressive reveal count for slide paragraphs. */
+  revealCount?: number;
 }
 
 /**
@@ -76,6 +78,8 @@ export interface SlideProjection {
   elements?: SlideElement[];
   /** kind 'native': the slide's background. */
   background?: SlideBackground;
+  /** Line-by-line progressive reveal count for slide paragraphs. */
+  revealCount?: number;
 }
 
 export interface SecondaryVerse {
@@ -679,6 +683,7 @@ export interface VideoTransport {
   currentTime?: number;
   sourceId?: string;
   speed?: number;
+  volume?: number;
 }
 
 /** What the playing surface reports back. Duration is 0 until metadata lands. */

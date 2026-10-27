@@ -143,6 +143,7 @@ interface AppState {
   reportVideoClock: (clock: { currentTime: number; duration: number }) => void;
   setVideoLoop: (loop: boolean) => void;
   setVideoMuted: (muted: boolean) => void;
+  setVideoVolume: (volume: number) => void;
   cutToScene: (scene: Scene) => void;
   transitionToScene: (scene: Scene, transitionType?: string) => void;
   /** Clear Program (and matching Preview) so the output returns to standby. */
@@ -519,6 +520,16 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
         scenes: s.scenes.map((sc) => (sc.id === next.id ? next : sc)),
       };
     }),
+  setVideoVolume: (volume) =>
+    set((s) => ({
+      display: {
+        ...s.display,
+        videoTransport: {
+          ...s.display.videoTransport,
+          volume: Math.max(0, Math.min(1, volume)),
+        },
+      },
+    })),
 
   reportVideoClock: (clock) =>
     set((s) => (

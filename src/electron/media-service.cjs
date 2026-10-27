@@ -329,11 +329,14 @@ function createMediaService({ app }) {
     const raw = String(key || '');
     if (!raw) return null;
     const items = readIndex();
-    const byId = items.find((item) => item.id === raw);
+    const idCandidate = raw.replace(/\.[a-zA-Z0-9]+$/, '');
+    const byId = items.find((item) => item.id === raw || item.id === idCandidate);
     if (byId) return locate(byId);
     const safe = path.basename(raw);
-    const byFile = items.find((item) => item.file && item.file === safe);
-    return byFile ? locate(byFile) : null;
+    const byFile = items.find((item) => item.file && (item.file === safe || item.file === raw));
+    if (byFile) return locate(byFile);
+    const byPath = items.find((item) => item.sourcePath && (item.sourcePath === raw || path.basename(item.sourcePath) === safe));
+    return byPath ? locate(byPath) : null;
   }
 
   function clearAll() {

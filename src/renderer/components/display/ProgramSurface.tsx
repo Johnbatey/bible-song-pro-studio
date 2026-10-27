@@ -5,10 +5,10 @@ import type React from 'react';
 import { SlideStage } from './SlideStage';
 import { attachAudioOutputSink } from '../../utils/audio-output';
 import { formatBibleReference } from '../../utils/bible-abbreviations';
-import { assetUrl } from '../../utils/asset-url';
+import { assetUrl, parseYouTubeId } from '../../utils/asset-url';
 import './ProgramSurface.css';
 
-export { assetUrl };
+export { assetUrl, parseYouTubeId };
 
 export interface TypedWordTextProps {
   text: string;
@@ -682,6 +682,18 @@ function lowerThirdBandMedia(
 ) {
   const animStyle = animateBg ? { animation: animCss } : { animation: 'none' };
   if (sceneBg && sceneBg.type === 'video' && sceneBg.mediaUrl) {
+    const ytId = parseYouTubeId(sceneBg.mediaUrl);
+    if (ytId) {
+      return (
+        <iframe
+          key={animateBg ? `${sceneBg.mediaUrl}-lt-yt` : 'static-lt-yt'}
+          className="program-lt-media"
+          src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=1&loop=1&playlist=${ytId}&controls=0`}
+          title="Motion Background"
+          style={{ border: 'none', pointerEvents: 'none', opacity: typeof sceneBg.opacity === 'number' ? sceneBg.opacity : 1, ...animStyle }}
+        />
+      );
+    }
     const mediaUrl = assetUrl(sceneBg.mediaUrl, assetBaseUrl);
     const fit = sceneBg.fit === 'contain' ? 'contain' : sceneBg.fit === 'fill' ? 'fill' : 'cover';
     return (
@@ -690,9 +702,11 @@ function lowerThirdBandMedia(
         className="program-lt-media"
         src={mediaUrl}
         autoPlay
+        preload="auto"
         muted
         loop={sceneBg.loop !== false}
         playsInline
+        onCanPlay={(e) => { void e.currentTarget.play().catch(() => {}); }}
         style={{ objectFit: fit, opacity: typeof sceneBg.opacity === 'number' ? sceneBg.opacity : 1, ...animStyle }}
       />
     );
@@ -702,18 +716,33 @@ function lowerThirdBandMedia(
     return null;
   }
 
-  const mediaUrl = lt?.backgroundMediaUrl ? assetUrl(lt.backgroundMediaUrl, assetBaseUrl) : '';
-  if (!mediaUrl || lt?.backgroundMediaType !== 'video') return null;
-  const fit = lt.backgroundFit === 'contain' ? 'contain' : lt.backgroundFit === 'fill' ? 'fill' : 'cover';
+  const rawUrl = lt?.backgroundMediaUrl ? assetUrl(lt.backgroundMediaUrl, assetBaseUrl) : '';
+  if (!rawUrl || lt?.backgroundMediaType !== 'video') return null;
+  const ytId = parseYouTubeId(rawUrl);
+  if (ytId) {
+    return (
+      <iframe
+        key={animateBg ? `${rawUrl}-lt-yt` : 'static-lt-yt'}
+        className="program-lt-media"
+        src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&mute=1&loop=1&playlist=${ytId}&controls=0`}
+        title="Motion Background"
+        style={{ border: 'none', pointerEvents: 'none', opacity: typeof lt?.backgroundOpacity === 'number' ? lt.backgroundOpacity : 1, ...animStyle }}
+      />
+    );
+  }
+  const mediaUrl = rawUrl;
+  const fit = lt?.backgroundFit === 'contain' ? 'contain' : lt?.backgroundFit === 'fill' ? 'fill' : 'cover';
   return (
     <video
       key={animateBg ? `${mediaUrl}-lt-video` : 'static-lt-video'}
       className="program-lt-media"
       src={mediaUrl}
       autoPlay
+      preload="auto"
       muted
-      loop={lt.backgroundLoop !== false}
+      loop={lt?.backgroundLoop !== false}
       playsInline
+      onCanPlay={(e) => { void e.currentTarget.play().catch(() => {}); }}
       style={{ objectFit: fit, opacity: typeof lt?.backgroundOpacity === 'number' ? lt.backgroundOpacity : 1, ...animStyle }}
     />
   );
@@ -831,11 +860,13 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     attachAudioOutputSink(el, targetDeviceId);
 
     const masterVol = (state.settings?.audioMasterVolume ?? 100) / 100;
-    el.volume = Math.max(0, Math.min(1, masterVol));
+    const transportVol = transport?.volume !== undefined ? transport.volume : 1.0;
+    el.volume = Math.max(0, Math.min(1, masterVol * transportVol));
   }, [
     preview,
     scene?.background?.muted,
     transport?.muted,
+    transport?.volume,
     state.settings?.audioOutputDeviceId,
     state.settings?.audioCueDeviceId,
     state.settings?.audioMasterVolume,
@@ -1053,46 +1084,71 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
         />
       )}
       {mode === 'fullscreen' && showStageBackground && video && !videoLoadError && (
-        <video
-          key={fxAnim.animateBg ? (scene?.id ? `${scene.id}-fs-video` : 'fs-video') : 'static-fs-video'}
-          ref={videoRef}
-          className="program-surface-video"
-          src={video}
-          autoPlay
-          loop={state.bgVideoLoop !== false}
-          playsInline
-          onError={(e) => {
-            console.warn('[ProgramSurface] Failed to load background video source, gracefully falling back to theme ground:', video, e);
-            setVideoLoadError(true);
-          }}
-          onPlay={() => onVideoPlayState?.(true)}
-          onPause={(e) => {
-            const el = e.currentTarget;
-            const ranOut = el.ended
-              || (Number.isFinite(el.duration) && el.duration > 0 && el.currentTime >= el.duration - 0.25);
-            if (ranOut || !transport?.playing) {
-              onVideoPlayState?.(false);
-              return;
-            }
-            void el.play().catch(() => {});
-          }}
-          onLoadedMetadata={(e) => onVideoClock?.({
-            currentTime: e.currentTarget.currentTime,
-            duration: Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0,
-          })}
-          onTimeUpdate={(e) => onVideoClock?.({
-            currentTime: e.currentTarget.currentTime,
-            duration: Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0,
-          })}
-          style={{
-            objectFit: (state.bgFit || state.scene?.background?.fit || (state.scene?.type === 'media' ? 'contain' : 'cover')) === 'contain'
-              ? 'contain'
-              : (state.bgFit || state.scene?.background?.fit || (state.scene?.type === 'media' ? 'contain' : 'cover')) === 'fill'
-              ? 'fill'
-              : 'cover',
-            ...(fxAnim.animateBg ? { animation: fxAnim.css } : { animation: 'none' }),
-          }}
-        />
+        parseYouTubeId(video) ? (
+          <iframe
+            key={fxAnim.animateBg ? (scene?.id ? `${scene.id}-fs-yt` : 'fs-yt') : 'static-fs-yt'}
+            className="program-surface-video"
+            src={`https://www.youtube-nocookie.com/embed/${parseYouTubeId(video)}?autoplay=1&mute=${(preview || transport?.muted || scene?.background?.muted) ? 1 : 0}&loop=1&playlist=${parseYouTubeId(video)}&controls=0&modestbranding=1&rel=0&iv_load_policy=3`}
+            title="Motion Background Video"
+            allow="autoplay; encrypted-media"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              pointerEvents: 'none',
+              objectFit: 'cover',
+              zIndex: 1,
+              ...(fxAnim.animateBg ? { animation: fxAnim.css } : { animation: 'none' }),
+            }}
+          />
+        ) : (
+          <video
+            key={fxAnim.animateBg ? (scene?.id ? `${scene.id}-fs-video` : 'fs-video') : 'static-fs-video'}
+            ref={videoRef}
+            className="program-surface-video"
+            src={video}
+            autoPlay
+            preload="auto"
+            loop={state.bgVideoLoop !== false}
+            playsInline
+            onCanPlay={(e) => {
+              void e.currentTarget.play().catch(() => {});
+            }}
+            onError={(e) => {
+              console.warn('[ProgramSurface] Failed to load background video source, gracefully falling back to theme ground:', video, e);
+              setVideoLoadError(true);
+            }}
+            onPlay={() => onVideoPlayState?.(true)}
+            onPause={(e) => {
+              const el = e.currentTarget;
+              const ranOut = el.ended
+                || (Number.isFinite(el.duration) && el.duration > 0 && el.currentTime >= el.duration - 0.25);
+              if (ranOut || !transport?.playing) {
+                onVideoPlayState?.(false);
+                return;
+              }
+              void el.play().catch(() => {});
+            }}
+            onLoadedMetadata={(e) => onVideoClock?.({
+              currentTime: e.currentTarget.currentTime,
+              duration: Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0,
+            })}
+            onTimeUpdate={(e) => onVideoClock?.({
+              currentTime: e.currentTarget.currentTime,
+              duration: Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0,
+            })}
+            style={{
+              objectFit: (state.bgFit || state.scene?.background?.fit || (state.scene?.type === 'media' ? 'contain' : 'cover')) === 'contain'
+                ? 'contain'
+                : (state.bgFit || state.scene?.background?.fit || (state.scene?.type === 'media' ? 'contain' : 'cover')) === 'fill'
+                ? 'fill'
+                : 'cover',
+              ...(fxAnim.animateBg ? { animation: fxAnim.css } : { animation: 'none' }),
+            }}
+          />
+        )
       )}
 
       {!scene && Boolean(state.standbyMedia?.url) && (
