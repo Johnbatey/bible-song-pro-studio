@@ -65,6 +65,7 @@ export function createDefaultTheme(): Theme {
       lineHeight: 1.25,
       verticalAlign: 'middle',
       autoResize: 'shrink',
+      width: 92,
     },
     slideTheme: {
       backgroundColor: '#0f172a',

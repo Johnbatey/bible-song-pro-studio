@@ -1957,25 +1957,38 @@ export function ThemeEditorForm({
             </div>
           </>
         ) : (
-          <div className="studio-field-box">
-            <span className="studio-field-label">Vertical Alignment</span>
-            <div className="studio-button-group">
-              {[
-                { val: 'top', label: 'Top' },
-                { val: 'center', label: 'Center' },
-                { val: 'bottom', label: 'Bottom' },
-              ].map((v) => (
-                <button
-                  key={v.val}
-                  type="button"
-                  className={`studio-group-btn ${(values.verticalAlign || 'center') === v.val ? 'active' : ''}`}
-                  onClick={() => onChange({ verticalAlign: v.val })}
-                >
-                  {v.label}
-                </button>
-              ))}
+          <>
+            {/* Full Screen Content Width Slider */}
+            <StudioSlider
+              label="Content Width"
+              value={values.width ?? 92}
+              min={40}
+              max={100}
+              defaultValue={92}
+              unit="%"
+              onChange={(val) => onChange({ width: val })}
+            />
+
+            <div className="studio-field-box">
+              <span className="studio-field-label">Vertical Alignment</span>
+              <div className="studio-button-group">
+                {[
+                  { val: 'top', label: 'Top' },
+                  { val: 'center', label: 'Center' },
+                  { val: 'bottom', label: 'Bottom' },
+                ].map((v) => (
+                  <button
+                    key={v.val}
+                    type="button"
+                    className={`studio-group-btn ${(values.verticalAlign || 'center') === v.val ? 'active' : ''}`}
+                    onClick={() => onChange({ verticalAlign: v.val })}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {/* Offset X & Offset Y Sliders */}

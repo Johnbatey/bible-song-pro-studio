@@ -372,6 +372,7 @@ export interface FullScreenTheme {
   lineHeight?: number;
   verticalAlign?: 'top' | 'middle' | 'bottom';
   autoResize?: 'none' | 'shrink' | 'grow';
+  width?: number;
   offsetX?: number;
   offsetY?: number;
 }

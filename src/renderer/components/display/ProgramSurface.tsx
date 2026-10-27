@@ -920,6 +920,7 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   const showReference = state.showReference !== false && scene?.type !== 'presentation' && scene?.type !== 'song';
   const showStageBackground = !scene || mode === 'fullscreen';
 
+  const fsWidth = activeTheme?.fullScreen?.width ?? 92;
   const textStyle: React.CSSProperties = {
     fontFamily,
     fontSize: displayFontSize({ ...state, fontSize: state.fontSize ?? themeSection?.fontSize ?? 0, outputMode: mode }, preview),
@@ -928,6 +929,9 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     textAlign,
     textShadow: shadowCss,
     lineHeight: mode === 'fullscreen' ? activeTheme?.fullScreen?.lineHeight : undefined,
+    width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
   };
   const themeRefFontSize = mode === 'lowerThird' ? activeTheme?.lowerThird?.referenceFontSize : activeTheme?.fullScreen?.referenceFontSize;
   const refStyle: React.CSSProperties = {
@@ -992,9 +996,12 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
   ].filter(Boolean).join(' ') || undefined;
 
   const isHorizontalDual = (scene?.content?.dualLayout || state.dualLayout || activeTheme?.bibleOptions?.dualLayout) === 'horizontal';
-  const autoResizeSetting = state.autoResize
-    || (mode === 'lowerThird' ? activeTheme?.lowerThird?.autoResize : activeTheme?.fullScreen?.autoResize)
-    || (activeTheme?.bibleOptions?.autoShrink !== false ? 'shrink' : 'none');
+  const isBibleScene = scene?.type === 'bible';
+  const autoResizeSetting = isBibleScene && activeTheme?.bibleOptions?.autoShrink === false
+    ? 'none'
+    : (state.autoResize
+      || (mode === 'lowerThird' ? activeTheme?.lowerThird?.autoResize : activeTheme?.fullScreen?.autoResize)
+      || (activeTheme?.bibleOptions?.autoShrink !== false ? 'shrink' : 'none'));
 
   useLayoutEffect(() => {
     if (autoResizeSetting === 'none' || mode !== 'fullscreen') {
@@ -1028,7 +1035,10 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
     isHorizontalDual,
     state.fontSize,
     autoResizeSetting,
+    fsWidth,
     activeTheme?.fullScreen?.fontSize,
+    activeTheme?.fullScreen?.width,
+    activeTheme?.bibleOptions?.autoShrink,
   ]);
 
   useLayoutEffect(() => {
@@ -1495,7 +1505,8 @@ export const ProgramSurface = memo(function ProgramSurface({ state, preview = fa
           <div
             ref={fsInnerRef}
             style={{
-              width: '100%',
+              width: `${fsWidth}%`,
+              maxWidth: '100%',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',

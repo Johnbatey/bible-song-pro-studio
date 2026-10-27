@@ -306,10 +306,10 @@
 
 .program-main-text {
   width: 100%;
-  max-width: 1740px;
+  max-width: 100%;
   line-height: 1.24;
   white-space: pre-line;
-  text-wrap: balance;
+  text-wrap: pretty;
   display: flex;
   flex-direction: column;
   gap: 0.42em;
