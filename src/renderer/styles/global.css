@@ -72,6 +72,8 @@
   --font-voice: var(--bsp-font-voice);
   /* Alias kept so existing var(--font-sans) references keep resolving. */
   --font-sans: var(--font-ui);
+  /* Global Typing & Editor Font for lyrics, titles, announcements, tickers, notes, search fields */
+  --font-typing: var(--font-ui);
 
   --fs-display: 20px;   /* transcript readout, session timer — the only large text */
   --fs-title: 15px;     /* panel titles, modal header brand */
@@ -144,6 +146,15 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+/* All user text input, typing, and editing surfaces across the entire app */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+textarea,
+select,
+.input,
+[contenteditable="true"] {
+  font-family: var(--font-typing, var(--font-ui));
 }
 
 html, body, #root {
@@ -1233,7 +1244,7 @@ select option:hover, select option:focus, select option:checked {
   font-size: var(--fs-body);
   font-weight: var(--fw-regular);
   line-height: var(--lh-base);
-  font-family: var(--font-ui);
+  font-family: var(--font-typing, var(--font-ui));
   outline: none;
   transition: border-color 0.2s;
 }

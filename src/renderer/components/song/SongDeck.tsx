@@ -6,6 +6,7 @@ import { Block, BlockButton, BlockSegment } from '../Block';
 import { AppleToggle } from '../AppleToggle';
 import { getFormattedSlides, songSceneId, buildSongScene, type FormattedSlide } from '../../utils/song-slides';
 import { isFocusedDock } from '../dock/dockFocus';
+import { fetchInstalledSystemFonts, type FontOptionItem } from '../../utils/system-fonts';
 
 const SUPPORTED_TRANSLATION_LANGS = [
   { code: 'es', label: 'Spanish (Español)' },
@@ -58,6 +59,15 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
   const setLinesPerSlide = useAppStore((s) => s.setSongLinesPerSlide);
   const doubleClickToGoLive = useAppStore((s) => s.doubleClickToGoLive);
   const fxSettings = useAppStore((s) => s.fxSettings);
+  const typingFont = useAppStore((s) => s.typingFont);
+  const setTypingFont = useAppStore((s) => s.setTypingFont);
+  const [availableFonts, setAvailableFonts] = useState<FontOptionItem[]>([]);
+
+  useEffect(() => {
+    fetchInstalledSystemFonts().then((list) => {
+      setAvailableFonts(list);
+    });
+  }, []);
 
   // Workspace Mode: 'buttons' (slide grid) or 'text' (lyrics editor)
   const [workspaceMode, setWorkspaceMode] = useState<'buttons' | 'text'>('buttons');
@@ -706,6 +716,32 @@ export function SongDeck({ song, title, emptyLabel, targetText, onUpdateSong }: 
                   style={deckStyles.metaInput}
                 />
               </div>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: '1.2 1 160px', minWidth: 140 }}>
+                <label style={deckStyles.fieldLabel}>Typing Font</label>
+                <select
+                  className="input"
+                  value={typingFont || ''}
+                  onChange={(e) => setTypingFont(e.target.value)}
+                  style={{ ...deckStyles.metaInput, cursor: 'pointer' }}
+                  title="Choose font for typing lyrics, titles, and text"
+                >
+                  <option value="">Default (Inter / UI)</option>
+                  {availableFonts.filter((f) => !f.isSystemFont).length > 0 && (
+                    <optgroup label="Bundled Presentation Fonts">
+                      {availableFonts.filter((f) => !f.isSystemFont).map((f) => (
+                        <option key={f.value} value={f.value}>{f.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {availableFonts.filter((f) => f.isSystemFont).length > 0 && (
+                    <optgroup label="Installed PC / System Fonts">
+                      {availableFonts.filter((f) => f.isSystemFont).map((f) => (
+                        <option key={f.value} value={f.value}>{f.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
             </div>
 
             {lyricTab === 'primary' ? (
@@ -1035,7 +1071,7 @@ const deckStyles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     lineHeight: 1.6,
     padding: 12,
-    fontFamily: 'inherit',
+    fontFamily: 'var(--font-typing, inherit)',
     resize: 'none',
     outline: 'none',
   },

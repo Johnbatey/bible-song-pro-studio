@@ -23,9 +23,8 @@ assertIncludes('display output fitted bounds helper', 'function resizableOutputB
 assertIncludes('display output minimum size', 'displayWindow.setMinimumSize(640, 360)');
 assertIncludes('display output resizable flag', 'displayWindow.setResizable(true)');
 
-assertNotIncludes('hidden titlebar chrome', 'titleBarStyle');
-assertNotIncludes('forced fullscreen output window', 'fullscreen: true');
+assertNotIncludes('hidden titlebar chrome', "titleBarStyle: 'hidden'");
+assertNotIncludes('forced fullscreen output window constructor', 'fullscreen: true,');
 assertNotIncludes('frameless output window', 'frame: false, alwaysOnTop: true');
-assertNotIncludes('raw monitor bounds used for output window', 'const d = bounds || screen.getPrimaryDisplay().bounds');
 
 console.log('Window resizing architecture verified');

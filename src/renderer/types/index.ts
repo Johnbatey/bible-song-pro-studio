@@ -1006,6 +1006,9 @@ declare global {
       updates?: {
         check: () => Promise<UpdateCheckResult>;
       };
+      fonts?: {
+        getSystemFonts: () => Promise<string[]>;
+      };
     };
   }
 }

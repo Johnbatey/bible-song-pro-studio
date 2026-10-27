@@ -83,6 +83,11 @@ export const en: MessageCatalog = {
   'settings.language.sermonHint': 'Language the preacher is speaking — used by Live Scripture, not the UI.',
   'settings.language.auto': 'Auto-detect',
   'settings.language.restartHint': 'The interface updates immediately. Some dock titles refresh when panels reopen.',
+  'settings.language.typingFontTitle': 'Typing & Text Editor Font',
+  'settings.language.typingFontHint': 'Font used when typing song lyrics, announcements, tickers, notes, and file names. Exposes all fonts installed on your computer for regional and non-English scripts.',
+  'settings.language.typingFontDefault': 'Default (Inter / System UI)',
+  'settings.language.typingFontTest': 'Interactive Typing Test',
+  'settings.language.typingFontPlaceholder': 'Type in your language to preview the font...',
 
   'settings.closeTitle': 'Close Settings',
 

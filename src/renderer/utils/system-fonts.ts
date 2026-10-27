@@ -71,6 +71,24 @@ const COMMON_PC_FONTS = [
 
 let cachedFonts: FontOptionItem[] | null = null;
 
+/**
+ * Applies the user-selected typing font to the document root as --font-typing.
+ * When set, every text field, textarea, input, and typing surface in the app
+ * uses this font.
+ */
+export function applyTypingFont(fontFamily?: string): void {
+  if (typeof document === 'undefined') return;
+  const font = fontFamily?.trim();
+  if (font && font !== 'default' && font !== 'inherit') {
+    document.documentElement.style.setProperty(
+      '--font-typing',
+      `"${font.replace(/"/g, '')}", var(--font-ui), system-ui, sans-serif`
+    );
+  } else {
+    document.documentElement.style.setProperty('--font-typing', 'var(--font-ui)');
+  }
+}
+
 export async function fetchInstalledSystemFonts(): Promise<FontOptionItem[]> {
   if (cachedFonts && cachedFonts.length > 0) {
     return cachedFonts;
@@ -81,7 +99,23 @@ export async function fetchInstalledSystemFonts(): Promise<FontOptionItem[]> {
   // Mark bundled fonts first
   BUNDLED_FONTS.forEach((f) => fontMap.set(f, false));
 
-  // 1. Try Window Font Access API (queryLocalFonts) supported natively in Electron/Chromium
+  // 1. Try Electron native IPC font scanner if available (queries OS font directories directly)
+  if (typeof window !== 'undefined' && window.BSP?.fonts?.getSystemFonts) {
+    try {
+      const nativeFonts = await window.BSP.fonts.getSystemFonts();
+      if (Array.isArray(nativeFonts)) {
+        for (const fontName of nativeFonts) {
+          if (fontName && !fontMap.has(fontName)) {
+            fontMap.set(fontName, true);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[SystemFonts] Native font scan fallback:', e);
+    }
+  }
+
+  // 2. Try Window Font Access API (queryLocalFonts) supported natively in Electron/Chromium
   if (typeof window !== 'undefined' && 'queryLocalFonts' in window && typeof (window as any).queryLocalFonts === 'function') {
     try {
       const localFonts = await (window as any).queryLocalFonts();
@@ -97,7 +131,7 @@ export async function fetchInstalledSystemFonts(): Promise<FontOptionItem[]> {
     }
   }
 
-  // 2. Check common system fonts with document.fonts.check
+  // 3. Check common system fonts with document.fonts.check
   if (typeof document !== 'undefined' && document.fonts && typeof document.fonts.check === 'function') {
     for (const font of COMMON_PC_FONTS) {
       if (!fontMap.has(font)) {

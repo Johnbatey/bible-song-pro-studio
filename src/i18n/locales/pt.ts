@@ -83,6 +83,11 @@ export const pt: MessageCatalog = {
   'settings.language.sermonHint': 'Idioma falado pelo pregador — para Live Scripture, não a UI.',
   'settings.language.auto': 'Deteção automática',
   'settings.language.restartHint': 'A interface atualiza de imediato. Alguns títulos de docks renovam ao reabrir.',
+  'settings.language.typingFontTitle': 'Fonte de digitação e editor',
+  'settings.language.typingFontHint': 'Fonte usada ao digitar letras de músicas, avisos, letreiros, notas e nomes de arquivos. Expõe todas as fontes instaladas no seu computador.',
+  'settings.language.typingFontDefault': 'Padrão (Inter / Sistema)',
+  'settings.language.typingFontTest': 'Teste de digitação interativo',
+  'settings.language.typingFontPlaceholder': 'Digite no seu idioma para visualizar a fonte...',
 
   'settings.closeTitle': 'Fechar definições',
 

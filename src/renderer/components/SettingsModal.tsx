@@ -6,6 +6,7 @@ import { BackupSystem } from './settings/BackupSystem';
 import { createDefaultTheme } from '../utils/defaultTheme';
 import { useI18n } from '../../i18n/useI18n';
 import { UI_LOCALES, type UiLocale, type MessageKey } from '../../i18n';
+import { fetchInstalledSystemFonts, type FontOptionItem } from '../utils/system-fonts';
 
 export type SettingsCategory =
   | 'system'
@@ -225,6 +226,16 @@ function IconCamera() {
 export function SettingsModal() {
   const { t, locale } = useI18n();
   const setStoreUiLocale = useAppStore((s) => s.setUiLocale);
+  const typingFont = useAppStore((s) => s.typingFont);
+  const setTypingFont = useAppStore((s) => s.setTypingFont);
+  const [fontOptions, setFontOptions] = useState<FontOptionItem[]>([]);
+
+  useEffect(() => {
+    fetchInstalledSystemFonts().then((list) => {
+      setFontOptions(list);
+    });
+  }, []);
+
   /* Read from the running build. A hardcoded version goes stale silently and
      then misreports itself in every bug report. */
   const [appVersion, setAppVersion] = useState('');
@@ -759,6 +770,34 @@ export function SettingsModal() {
                   >
                     {updateChecking ? t('settings.system.checking') : t('settings.system.checkUpdates')}
                   </button>
+                </div>
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>{t('settings.language.typingFontTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.language.typingFontHint')}</div>
+                  </div>
+                  <select
+                    style={modalStyles.selectInput}
+                    value={typingFont || ''}
+                    onChange={(e) => setTypingFont(e.target.value)}
+                  >
+                    <option value="">{t('settings.language.typingFontDefault')}</option>
+                    {fontOptions.filter((f) => !f.isSystemFont).length > 0 && (
+                      <optgroup label="Bundled Presentation Fonts">
+                        {fontOptions.filter((f) => !f.isSystemFont).map((f) => (
+                          <option key={f.value} value={f.value}>{f.label}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {fontOptions.filter((f) => f.isSystemFont).length > 0 && (
+                      <optgroup label="Installed PC / System Fonts">
+                        {fontOptions.filter((f) => f.isSystemFont).map((f) => (
+                          <option key={f.value} value={f.value}>{f.label}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
                 </div>
 
                 <BackupSystem />
@@ -1574,6 +1613,55 @@ export function SettingsModal() {
                     </div>
                   </div>
                 )}
+
+                <div style={modalStyles.formRow}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>{t('settings.language.typingFontTitle')}</div>
+                    <div style={modalStyles.rowSub}>{t('settings.language.typingFontHint')}</div>
+                  </div>
+                  <select
+                    style={modalStyles.selectInput}
+                    value={typingFont || ''}
+                    onChange={(e) => setTypingFont(e.target.value)}
+                  >
+                    <option value="">{t('settings.language.typingFontDefault')}</option>
+                    {fontOptions.filter((f) => !f.isSystemFont).length > 0 && (
+                      <optgroup label="Bundled Presentation Fonts">
+                        {fontOptions.filter((f) => !f.isSystemFont).map((f) => (
+                          <option key={f.value} value={f.value}>{f.label}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {fontOptions.filter((f) => f.isSystemFont).length > 0 && (
+                      <optgroup label="Installed PC / System Fonts">
+                        {fontOptions.filter((f) => f.isSystemFont).map((f) => (
+                          <option key={f.value} value={f.value}>{f.label}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+
+                <div style={{ marginTop: 8, marginBottom: 20, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, border: '1px solid var(--settings-line)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6, fontWeight: 600 }}>
+                    {t('settings.language.typingFontTest')}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder={t('settings.language.typingFontPlaceholder')}
+                    defaultValue="The quick brown fox jumps over the lazy dog • 1234567890"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-primary)',
+                      borderRadius: 4,
+                      color: 'var(--text-primary)',
+                      fontSize: 14,
+                      fontFamily: typingFont ? `"${typingFont}", var(--font-ui), sans-serif` : 'var(--font-ui)',
+                    }}
+                  />
+                </div>
 
                 <div style={{ marginTop: 16 }}>
                   <div style={modalStyles.rowTitle}>{t('settings.bundled.translationsTitle')}</div>

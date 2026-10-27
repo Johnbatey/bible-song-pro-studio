@@ -83,6 +83,11 @@ export const fr: MessageCatalog = {
   'settings.language.sermonHint': 'Langue parlée par le prédicateur — pour Live Scripture, pas l’UI.',
   'settings.language.auto': 'Détection auto',
   'settings.language.restartHint': 'L’interface se met à jour tout de suite. Certains titres de docks se rafraîchissent à la réouverture.',
+  'settings.language.typingFontTitle': 'Police de saisie et d’éditeur',
+  'settings.language.typingFontHint': 'Police utilisée pour saisir les paroles, annonces, bandeaux, notes et noms de fichiers. Prend en charge toutes les polices installées sur votre ordinateur.',
+  'settings.language.typingFontDefault': 'Par défaut (Inter / Système)',
+  'settings.language.typingFontTest': 'Test de saisie interactif',
+  'settings.language.typingFontPlaceholder': 'Tapez dans votre langue pour prévisualiser la police...',
 
   'settings.closeTitle': 'Fermer les réglages',
 

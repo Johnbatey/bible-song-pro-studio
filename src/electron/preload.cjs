@@ -340,4 +340,7 @@ contextBridge.exposeInMainWorld('BSP', {
   dialog: {
     openMediaFile: (filters) => ipcRenderer.invoke('dialog:open-media-file', filters),
   },
+  fonts: {
+    getSystemFonts: () => ipcRenderer.invoke('fonts:getSystemFonts'),
+  },
 });

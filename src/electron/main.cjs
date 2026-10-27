@@ -91,6 +91,7 @@ process.on('unhandledRejection', (reason) => {
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const bibleService = require('./bible-service.cjs');
@@ -1833,6 +1834,55 @@ app.whenReady().then(async () => {
   ipcMain.handle('get:userDataPath', () => app.getPath('userData'));
   ipcMain.handle('get:version', () => app.getVersion());
   ipcMain.handle('get:displayUrl', () => `http://127.0.0.1:${displayPort}/display.html`);
+
+  let cachedSystemFonts = null;
+  ipcMain.handle('fonts:getSystemFonts', async () => {
+    if (cachedSystemFonts && cachedSystemFonts.length > 0) {
+      return cachedSystemFonts;
+    }
+    try {
+      const families = new Set();
+      const platform = process.platform;
+      const dirs = [];
+      if (platform === 'darwin') {
+        dirs.push('/System/Library/Fonts', '/Library/Fonts', path.join(os.homedir(), 'Library/Fonts'));
+      } else if (platform === 'win32') {
+        const winDir = process.env.WINDIR || 'C:\\Windows';
+        dirs.push(path.join(winDir, 'Fonts'));
+      } else {
+        dirs.push('/usr/share/fonts', '/usr/local/share/fonts', path.join(os.homedir(), '.fonts'), path.join(os.homedir(), '.local/share/fonts'));
+      }
+
+      function scan(dir) {
+        try {
+          if (!fs.existsSync(dir)) return;
+          const files = fs.readdirSync(dir, { withFileTypes: true });
+          for (const f of files) {
+            if (f.isDirectory()) {
+              scan(path.join(dir, f.name));
+            } else {
+              const ext = path.extname(f.name).toLowerCase();
+              if (['.ttf', '.otf', '.ttc', '.woff', '.woff2'].includes(ext)) {
+                let name = path.basename(f.name, ext);
+                name = name.replace(/[-_](Regular|Bold|Italic|Light|Medium|Black|SemiBold|ExtraBold|Thin|Heavy|Oblique)/gi, '');
+                name = name.replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+                if (name && name.length > 1 && !name.startsWith('.')) {
+                  families.add(name);
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      dirs.forEach(scan);
+      cachedSystemFonts = Array.from(families).sort((a, b) => a.localeCompare(b));
+      return cachedSystemFonts;
+    } catch (err) {
+      console.warn('[fonts:getSystemFonts] Error querying fonts:', err);
+      return [];
+    }
+  });
 
   /* Opening a link hands control to the operator's browser, so the renderer
      does not get to choose freely: https only, and only hosts we ship links

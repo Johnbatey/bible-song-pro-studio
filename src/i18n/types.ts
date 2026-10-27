@@ -92,6 +92,11 @@ export type MessageKey =
   | 'settings.language.sermonHint'
   | 'settings.language.auto'
   | 'settings.language.restartHint'
+  | 'settings.language.typingFontTitle'
+  | 'settings.language.typingFontHint'
+  | 'settings.language.typingFontDefault'
+  | 'settings.language.typingFontTest'
+  | 'settings.language.typingFontPlaceholder'
   /* Settings → modal chrome */
   | 'settings.closeTitle'
   /* Settings → System */

@@ -25,11 +25,17 @@ import { resolveEffectiveTheme } from './components/display/ProgramSurface';
 import { resolveEffectiveOutputMode } from './utils/outputMode';
 import { sanitizeForIpc } from './utils/sanitize-ipc';
 import { setUiLocale as applyI18nLocale } from '../i18n';
+import { applyTypingFont } from './utils/system-fonts';
 
 export function App() {
   const platform = useAppStore((s) => s.platform);
   const uiThemeMode = useAppStore((s) => s.uiThemeMode);
   const uiLocale = useAppStore((s) => s.uiLocale);
+  const typingFont = useAppStore((s) => s.typingFont);
+
+  useEffect(() => {
+    applyTypingFont(typingFont);
+  }, [typingFont]);
 
   useEffect(() => {
     const mode = uiThemeMode || 'dark';

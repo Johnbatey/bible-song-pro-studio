@@ -11,6 +11,7 @@ import { parseBackgroundInfo } from '../utils/background';
 import { sanitizeForIpc } from '../utils/sanitize-ipc';
 import { mediaGenlock } from '../utils/mediaGenlock';
 import { setUiLocale as applyUiLocale, isUiLocale, detectUiLocale, type UiLocale } from '../../i18n';
+import { applyTypingFont } from '../utils/system-fonts';
 
 /**
  * Persisted slices live in a JSON file under the app's userData dir (via store:* IPC),
@@ -300,6 +301,10 @@ interface AppState {
   /** Operator console language (menus / chrome). Independent of sermonLanguage. */
   uiLocale: UiLocale;
   setUiLocale: (locale: UiLocale) => void;
+
+  /** Chosen typing font for lyrics, titles, announcements, tickers, notes, search fields */
+  typingFont: string;
+  setTypingFont: (font: string) => void;
 }
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -1214,6 +1219,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
     applyUiLocale(uiLocale);
     set({ uiLocale });
   },
+
+  typingFont: '',
+  setTypingFont: (typingFont) => {
+    applyTypingFont(typingFont);
+    set({ typingFont });
+  },
 }), {
   name: 'bsp-app-state',
   version: 1,
@@ -1250,6 +1261,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       syncBibleOnDetection: state.liveScripture.syncBibleOnDetection ?? true,
     },
     uiLocale: state.uiLocale,
+    typingFont: state.typingFont,
     uiThemeMode: state.uiThemeMode,
     fxSettings: state.fxSettings,
     slideFxSettings: state.slideFxSettings,
@@ -1258,6 +1270,9 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
   onRehydrateStorage: () => (state) => {
     if (state?.uiLocale && isUiLocale(state.uiLocale)) {
       applyUiLocale(state.uiLocale);
+    }
+    if (state?.typingFont) {
+      applyTypingFont(state.typingFont);
     }
     if (state?.uiThemeMode) {
       document.documentElement.setAttribute('data-ui-theme', state.uiThemeMode);
@@ -1292,9 +1307,12 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       try {
         localStorage.setItem('bsp_theme_mode', nextTheme);
       } catch {}
+      const typingFont = typeof saved.typingFont === 'string' ? saved.typingFont : current.typingFont;
+      applyTypingFont(typingFont);
       return {
         ...current,
         uiThemeMode: nextTheme,
+        typingFont,
         scenes: (Array.isArray(saved.scenes) ? unpinSceneMedia(saved.scenes) : null) ?? current.scenes,
         presentationDecks: Array.isArray(saved.presentationDecks) ? saved.presentationDecks : current.presentationDecks,
         songLinesPerSlide: (typeof saved.songLinesPerSlide === 'number' || saved.songLinesPerSlide === 'auto') ? saved.songLinesPerSlide : current.songLinesPerSlide,
@@ -1365,6 +1383,7 @@ interface PersistedState {
     'detectionMode' | 'provider' | 'selectedInputId' | 'autoProject' | 'autoVersionSwitch' | 'autoProjectQuoted' | 'syncBibleOnDetection'
   >;
   uiLocale?: UiLocale;
+  typingFont?: string;
   uiThemeMode?: 'dark' | 'light';
   fxSettings?: FxAnimationSettings;
   slideFxSettings?: FxAnimationSettings;
