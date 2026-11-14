@@ -9,7 +9,6 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@9.10.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/Johnbatey/bible-song-pro-studio.git"
@@ -38,6 +37,7 @@
     "verify:display-architecture": "node scripts/verify-display-architecture.cjs",
     "verify:window-resizing": "node scripts/verify-window-resizing.cjs",
     "verify:remote-architecture": "node scripts/verify-remote-architecture.cjs",
+    "verify:remote-auth": "node scripts/verify-remote-auth.cjs",
     "verify:program-surface": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-program-surface.cjs",
     "verify:audience-display": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-audience-display.cjs",
     "verify:display-parity": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-display-parity.cjs",
@@ -52,7 +52,7 @@
     "verify:stage-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-stage-display.cjs",
     "verify:dist-audience-display": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-dist-audience-display.cjs",
     "verify:display-all": "npm run typecheck && npm run verify:display-fields && npm run verify:display-architecture && npm run verify:stage-architecture && npm run verify:port-fallback && npm run verify:window-resizing && npm run verify:display-stack && npm run verify:dist-audience-display && npm run verify:stage-layouts && npm run verify:stage-designer && npm run verify:song-arrange-ui && npm run verify:fonts-render",
-    "verify:all": "npm run verify:bibles && npm run verify:ndi && npm run verify:fonts && npm run verify:media && npm run verify:slide-parity && npm run verify:song-arrange && npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:display-all",
+    "verify:all": "npm run verify:bibles && npm run verify:ndi && npm run verify:fonts && npm run verify:media && npm run verify:slide-parity && npm run verify:song-arrange && npm run test:live-scripture && npm run verify:remote-architecture && npm run verify:remote-auth && npm run verify:display-all",
     "verify:stage-designer": "npm run build:renderer && unset ELECTRON_RUN_AS_NODE && electron scripts/verify-stage-designer.cjs",
     "verify:stage-layouts": "node scripts/verify-stage-layouts.cjs",
     "verify:media": "node scripts/verify-media-library.cjs",
@@ -64,15 +64,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "electron-winstaller",
-      "esbuild",
-      "koffi",
-      "sharp"
-    ]
   },
   "build": {
     "appId": "com.biblesongpro.studio",
@@ -187,16 +178,13 @@
   "dependencies": {
     "@deepgram/sdk": "^3.6.0",
     "@huggingface/transformers": "^3.8.1",
-    "animejs": "^3.2.2",
     "dockview": "^7.0.4",
     "dockview-react": "^7.0.4",
     "jszip": "^3.10.1",
     "koffi": "^3.1.2",
-    "lodash-es": "^4.17.21",
-    "pdfjs-dist": "^6.2.108",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.0.0",
     "sharp": "^0.34.5",
     "sql.js": "^1.14.2",
     "uuid": "^11.0.0",
@@ -221,7 +209,6 @@
     "@electron/notarize": "^3.1.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@types/lodash-es": "^4.17.12",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/uuid": "^10.0.0",

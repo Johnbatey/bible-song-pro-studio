@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Bible Song Pro Studio — Carousel 01</title>
+<style>
+/* ============================================================
+   BIBLE SONG PRO — CAROUSEL 01  ·  v3.5.0
+   1080 × 1350 (4:5), seven slides. Built on tokens.css.
+   Voice  = Source Serif 4 — scripture, one line per surface
+   Inter  = every pixel of interface
+   Signal = Geist Mono — labels, timecode, versions
+   Nothing rounds past 6px. Nothing bounces. One accent, doing work.
+   ============================================================ */
+
+@font-face{
+  font-family:'Source Serif 4';
+  src:url('./fonts/SourceSerif4-latin-var.woff2') format('woff2');
+  font-weight:200 900; font-display:block;
+}
+@font-face{
+  font-family:'Inter';
+  src:url('./fonts/InterVariable.woff2') format('woff2');
+  font-weight:100 900; font-display:block;
+}
+@font-face{
+  font-family:'Geist Mono';
+  src:url('./fonts/GeistMono-latin-400.woff2') format('woff2');
+  font-weight:400; font-display:block;
+}
+
+:root{
+  --booth:#0C0B0B; --ground:#111010; --surface:#161414; --raised:#1D1B1C;
+  --edge:#262628; --mute:#6E6968; --dim:#A8A2A0; --soft:#D9D4D2; --screen:#FFFFFF;
+  --paper:#F4F2EF; --paper-edge:rgba(12,11,11,.13); --ink:#171514; --ink-dim:#5E5854;
+  --signal:#FF5500; --signal-lift:#FF7728;
+  --voice:'Source Serif 4',Georgia,serif;
+  --ui:'Inter',-apple-system,system-ui,sans-serif;
+  --sig:'Geist Mono',ui-monospace,monospace;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html{-webkit-font-smoothing:antialiased;}
+body{background:#151313;font-family:var(--ui);}
+
+/* ---------- the canvas ---------- */
+.slide{
+  position:relative;width:1080px;height:1350px;overflow:hidden;
+  background:var(--booth);color:var(--screen);
+  font-family:var(--ui);letter-spacing:0;
+}
+.slide *{position:relative;}
+
+/* ---------- shared furniture ---------- */
+.head{
+  position:absolute;top:62px;left:72px;right:72px;
+  display:flex;align-items:center;gap:12px;
+  padding-bottom:20px;border-bottom:1px solid var(--edge);
+}
+.mark{width:22px;height:22px;flex:0 0 22px;opacity:.95;}
+.brandline{font-size:15px;font-weight:600;letter-spacing:-.02em;line-height:1;}
+.brandline sup{
+  font-family:var(--sig);font-size:6.9px;font-weight:400;letter-spacing:.14em;
+  text-transform:uppercase;margin-left:.34em;vertical-align:.85em;line-height:0;
+}
+.head .now{margin-left:auto;font-family:var(--sig);font-size:11px;letter-spacing:.14em;
+  color:var(--mute);text-transform:uppercase;}
+.head .now b{color:var(--soft);font-weight:400;}
+
+.label{font-family:var(--sig);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);}
+.label.sig{color:var(--signal);}
+
+.rail{position:absolute;left:72px;right:72px;bottom:58px;height:1px;background:var(--edge);}
+.rail i{position:absolute;inset:0 auto 1px 0;height:2px;background:var(--signal);display:block;}
+
+.h1{font-size:118px;font-weight:600;line-height:.95;letter-spacing:-.042em;}
+.dot{color:var(--signal);}
+.tally{width:7px;height:7px;border-radius:999px;background:var(--signal);
+  box-shadow:0 0 12px 2px rgba(255,85,0,.55);}
+
+/* ============================================================
+   01 — FREE CHURCH PRESENTATION SOFTWARE
+   ============================================================ */
+.free .h1{position:absolute;left:70px;top:238px;font-size:112px;line-height:.95;}
+.free .sub{position:absolute;left:74px;top:600px;font-size:26px;color:var(--dim);letter-spacing:-.012em;}
+.free .btn{
+  position:absolute;left:72px;top:662px;width:340px;height:84px;background:var(--signal);
+  border-radius:4px;display:flex;align-items:center;justify-content:center;gap:12px;
+}
+.free .btn .t{font-size:21px;font-weight:600;color:#0C0B0B;letter-spacing:-.015em;}
+.free .btn .a{font-family:var(--sig);font-size:16px;color:#0C0B0B;}
+.free .plats{position:absolute;left:444px;top:688px;font-family:var(--sig);font-size:12px;
+  letter-spacing:.14em;color:var(--mute);line-height:2;}
+.free .plats b{color:var(--soft);font-weight:400;}
+.free .icon{position:absolute;right:72px;top:692px;width:300px;height:300px;border-radius:66px;
+  box-shadow:0 30px 70px rgba(0,0,0,.62);}
+.free .rule{position:absolute;left:72px;right:72px;top:1054px;height:1px;background:var(--edge);}
+.free .sign{position:absolute;left:72px;bottom:116px;}
+.free .sign .w{font-size:40px;font-weight:600;letter-spacing:-.03em;}
+.free .sign .w sup{font-family:var(--sig);font-size:13px;font-weight:400;letter-spacing:.14em;
+  text-transform:uppercase;margin-left:.38em;vertical-align:1.1em;line-height:0;}
+.free .sign .s{margin-top:14px;font-family:var(--sig);font-size:12px;letter-spacing:.14em;color:var(--mute);}
+.free .url{position:absolute;right:72px;bottom:116px;text-align:right;font-family:var(--sig);
+  font-size:12px;letter-spacing:.12em;color:var(--dim);line-height:2;}
+.free .url b{color:var(--signal);font-weight:400;}
+
+/* ============================================================
+   02 — YOU SPEAK. IT APPEARS.
+   ============================================================ */
+.speak .h1{position:absolute;left:70px;top:296px;font-size:152px;letter-spacing:-.05em;}
+.speak .cuebar{position:absolute;left:0;right:0;top:664px;height:1px;background:var(--edge);}
+.speak .cuebar i{position:absolute;left:0;top:-1px;width:118px;height:3px;background:var(--signal);}
+.speak .cuebar b{position:absolute;left:118px;top:-3px;width:7px;height:7px;background:var(--signal);}
+.speak .sub{position:absolute;left:74px;top:700px;width:600px;font-size:25px;line-height:1.4;
+  color:var(--dim);letter-spacing:-.012em;}
+.speak .program{
+  position:absolute;left:0;right:0;bottom:0;height:482px;background:#0E0D0D;
+  border-top:1px solid var(--edge);padding:44px 72px 96px;
+  display:flex;flex-direction:column;
+}
+.speak .program .tl{display:flex;align-items:center;gap:10px;}
+.speak .program .ver{
+  margin-top:52px;font-family:var(--voice);font-weight:300;font-size:66px;line-height:1.14;
+  letter-spacing:-.018em;color:var(--screen);
+}
+.speak .program .foot{margin-top:auto;display:flex;align-items:baseline;justify-content:space-between;}
+.speak .program .ref{font-family:var(--sig);font-size:13px;letter-spacing:.16em;color:var(--signal);}
+.speak .program .tc{font-family:var(--sig);font-size:13px;letter-spacing:.1em;color:var(--mute);}
+.speak .rail{bottom:44px;}
+
+/* ============================================================
+   03 — NO ONE TYPES THE VERSE
+   ============================================================ */
+.types .h1{position:absolute;left:70px;top:190px;font-size:112px;}
+.types .listening{
+  position:absolute;right:72px;top:214px;display:flex;align-items:center;gap:9px;
+  padding:9px 12px;border:1px solid #332B27;border-radius:2px;background:rgba(255,85,0,.06);
+}
+.types .listening span{font-family:var(--sig);font-size:10px;letter-spacing:.16em;color:var(--signal);}
+.types .panel{
+  position:absolute;left:72px;right:72px;top:566px;height:236px;
+  background:var(--surface);border:1px solid var(--edge);border-radius:4px;
+  padding:24px 30px;
+}
+.types .panel .label{margin-bottom:24px;display:block;}
+.types .line{font-family:var(--sig);font-size:20px;line-height:1.74;color:#7E7876;letter-spacing:-.005em;}
+.types .line.hit{color:var(--screen);}
+.types .line.hit::before{
+  content:"";position:absolute;left:-30px;top:1px;bottom:1px;right:-30px;
+  background:rgba(255,85,0,.12);border-left:2px solid var(--signal);border-radius:2px;
+}
+.types .line.hit span{position:relative;}
+.types .card{
+  position:absolute;left:340px;right:72px;top:836px;height:300px;
+  background:#141313;border:1px solid #332B27;border-radius:4px;
+  padding:26px 30px;box-shadow:0 26px 64px rgba(0,0,0,.6);
+}
+.types .card .ref{font-family:var(--sig);font-size:12px;letter-spacing:.16em;color:var(--signal);}
+.types .card .ver{font-family:var(--voice);font-weight:300;font-size:38px;line-height:1.22;
+  letter-spacing:-.01em;margin-top:12px;}
+.types .card .meta{position:absolute;left:30px;bottom:24px;font-family:var(--sig);font-size:11px;
+  letter-spacing:.14em;color:var(--mute);}
+.types .stats{
+  position:absolute;left:76px;top:872px;width:236px;
+  display:grid;grid-template-columns:1fr 1fr;gap:24px 14px;
+}
+.types .stats .k{font-family:var(--sig);font-size:9px;letter-spacing:.14em;color:var(--mute);text-transform:uppercase;}
+.types .stats .v{font-family:var(--sig);font-size:17px;color:var(--soft);margin-top:7px;}
+
+/* ============================================================
+   04 — ONE LAPTOP. THREE SCREENS.  (paper)
+   ============================================================ */
+.screens{background:var(--paper);color:var(--ink);}
+.screens .head{border-bottom-color:var(--paper-edge);}
+.screens .head .now{color:#8C8480;}
+.screens .head .now b{color:#3A3634;}
+.screens .brandline{color:var(--ink);}
+.screens .h1{position:absolute;left:70px;top:176px;font-size:110px;color:var(--ink);}
+.screens .dot{color:#B23E00;}
+.screens .sub{position:absolute;left:74px;top:432px;font-size:25px;color:var(--ink-dim);letter-spacing:-.012em;}
+.screens .rail{background:var(--paper-edge);}
+
+.frame{
+  position:absolute;background:#0C0B0B;border:1px solid rgba(12,11,11,.55);
+  border-radius:4px;box-shadow:0 24px 54px rgba(12,11,11,.26);overflow:hidden;
+}
+.chip{
+  position:absolute;top:14px;left:14px;z-index:4;background:rgba(12,11,11,.82);
+  border:1px solid rgba(255,255,255,.07);border-radius:2px;padding:4px 7px;
+  font-family:var(--sig);font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--signal);
+}
+.screens .f1{left:72px;top:548px;width:560px;height:315px;}
+.screens .f1 .in{position:absolute;inset:0;padding:92px 44px 0;text-align:center;}
+.screens .f1 .ver{font-family:var(--voice);font-weight:300;font-size:33px;line-height:1.24;color:#fff;letter-spacing:-.01em;}
+.screens .f1 .ref{font-family:var(--sig);font-size:9px;letter-spacing:.16em;color:var(--signal);margin-top:16px;}
+.screens .f2{left:216px;top:780px;width:560px;height:315px;}
+.screens .f2 .z{position:absolute;border-radius:2px;border:1px solid #2A2A2E;}
+.screens .f2 .cur{left:20px;right:20px;top:20px;height:124px;padding:13px 15px;}
+.screens .f2 .k{font-family:var(--sig);font-size:9px;letter-spacing:.16em;color:var(--dim);}
+.screens .f2 .cur .v{font-family:var(--voice);font-weight:300;font-size:25px;line-height:1.2;margin-top:7px;color:#fff;}
+.screens .f2 .nx{left:20px;top:156px;width:300px;height:92px;padding:11px 14px;}
+.screens .f2 .nx .v{font-family:var(--voice);font-size:15px;color:#8F8A88;margin-top:5px;line-height:1.25;}
+.screens .f2 .tm{right:20px;top:156px;width:196px;height:92px;padding:11px 14px;}
+.screens .f2 .tm .v{font-family:var(--sig);font-size:33px;color:#F2B23C;margin-top:2px;letter-spacing:-.02em;}
+.screens .f3{left:360px;top:1055px;width:560px;height:140px;}
+.screens .f3 .in{
+  position:absolute;inset:0;
+  background-image:linear-gradient(45deg,#161515 25%,transparent 25%,transparent 75%,#161515 75%),
+                   linear-gradient(45deg,#161515 25%,#0E0D0D 25%,#0E0D0D 75%,#161515 75%);
+  background-size:18px 18px;background-position:0 0,9px 9px;background-color:#0E0D0D;
+}
+.screens .lt{position:absolute;left:30px;bottom:26px;width:404px;height:60px;background:#0C0B0B;
+  display:flex;align-items:center;padding:0 20px 0 16px;gap:14px;box-shadow:0 12px 30px rgba(0,0,0,.65);}
+.screens .lt .bar{width:3px;height:30px;background:var(--signal);}
+.screens .lt .nm{font-size:17px;font-weight:600;letter-spacing:-.015em;color:#fff;}
+.screens .lt .rl{font-family:var(--sig);font-size:9px;letter-spacing:.16em;color:var(--dim);margin-top:4px;}
+.screens .nl{position:absolute;right:16px;bottom:28px;font-family:var(--sig);font-size:8px;
+  letter-spacing:.16em;color:#5A5452;}
+
+/* ============================================================
+   05 — CONTROL IT FROM YOUR PHONE
+   ============================================================ */
+.phone-slide .h1{position:absolute;left:70px;top:198px;font-size:100px;line-height:.96;}
+.phone-slide .sub{position:absolute;left:74px;top:512px;width:420px;font-size:23px;
+  line-height:1.45;color:var(--dim);letter-spacing:-.01em;}
+.phone-slide .steps{position:absolute;left:72px;top:700px;width:404px;}
+.phone-slide .step{
+  display:flex;align-items:baseline;gap:16px;padding:19px 0;border-top:1px solid var(--edge);
+}
+.phone-slide .step:last-child{border-bottom:1px solid var(--edge);}
+.phone-slide .step .n{font-family:var(--sig);font-size:10px;letter-spacing:.14em;color:var(--signal);}
+.phone-slide .step .t{font-family:var(--sig);font-size:12px;letter-spacing:.16em;
+  color:var(--soft);text-transform:uppercase;}
+.phone-slide .fine{position:absolute;left:74px;top:930px;width:390px;font-size:15px;
+  line-height:1.5;color:var(--mute);letter-spacing:-.005em;}
+
+/* the device */
+.phone{
+  position:absolute;right:88px;top:424px;width:352px;height:768px;border-radius:48px;
+  background:#0A0A0A;border:9px solid #211F1E;
+  box-shadow:0 44px 100px rgba(0,0,0,.75), 0 0 0 1px #3A3634;
+}
+.phone .notch{position:absolute;left:50%;transform:translateX(-50%);top:0;width:96px;height:22px;
+  background:#0C0B0B;border-radius:0 0 12px 12px;}
+.phone .screen{
+  position:absolute;inset:0;border-radius:39px;overflow:hidden;background:#0E0D0D;
+  padding:40px 18px 18px;display:flex;flex-direction:column;
+}
+.phone .status{display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--sig);font-size:9px;letter-spacing:.1em;color:var(--mute);}
+.phone .status .lk{display:flex;align-items:center;gap:5px;color:#22C55E;}
+.phone .status .lk i{width:5px;height:5px;border-radius:999px;background:#22C55E;display:block;}
+.phone .ptitle{margin-top:22px;font-size:31px;font-weight:600;letter-spacing:-.03em;color:#fff;}
+.phone .psearch{margin-top:14px;height:50px;background:#1D1B1C;border:1px solid var(--edge);
+  border-radius:4px;display:flex;align-items:center;padding:0 6px 0 14px;}
+.phone .psearch .q{font-size:15px;color:var(--soft);letter-spacing:-.01em;}
+.phone .psearch .q::after{content:"";display:inline-block;width:1.5px;height:17px;background:var(--signal);
+  margin-left:3px;vertical-align:-3px;}
+.phone .psearch .go{margin-left:auto;height:36px;padding:0 12px;background:var(--signal);border-radius:2px;
+  display:flex;align-items:center;font-family:var(--sig);font-size:9px;letter-spacing:.14em;color:#0C0B0B;}
+.phone .pcard{margin-top:16px;background:#161414;border:1px solid var(--edge);border-radius:4px;
+  padding:14px 14px 12px;}
+.phone .pcard .ref{font-family:var(--sig);font-size:9px;letter-spacing:.16em;color:var(--signal);}
+.phone .pcard .ver{font-family:var(--voice);font-weight:300;font-size:18px;line-height:1.3;
+  color:#fff;margin-top:8px;letter-spacing:-.01em;}
+.phone .pcard .row{margin-top:12px;display:flex;align-items:center;justify-content:space-between;}
+.phone .pcard .proj{height:30px;padding:0 11px;background:var(--signal);border-radius:2px;
+  display:flex;align-items:center;font-family:var(--sig);font-size:9px;letter-spacing:.14em;color:#0C0B0B;}
+.phone .pcard .hint{font-family:var(--sig);font-size:8px;letter-spacing:.12em;color:#5F5A58;}
+.phone .mini{margin-top:10px;background:#111010;border:1px solid #232221;border-radius:4px;padding:12px 14px;}
+.phone .mini .ref{font-family:var(--sig);font-size:9px;letter-spacing:.16em;color:#6E6968;}
+.phone .mini .ver{font-family:var(--voice);font-weight:300;font-size:15px;line-height:1.3;
+  color:#B9B3B1;margin-top:6px;letter-spacing:-.01em;}
+.phone .more{margin-top:14px;text-align:center;font-family:var(--sig);font-size:8px;
+  letter-spacing:.14em;color:#5F5A58;}
+.phone .pnav{margin-top:auto;display:flex;gap:8px;}
+.phone .pnav span{flex:1;height:46px;border:1px solid var(--edge);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--sig);font-size:10px;letter-spacing:.14em;color:var(--soft);}
+.phone .pnav span.on{background:rgba(255,85,0,.12);border-color:#4A2A18;color:var(--signal);}
+
+/* ============================================================
+   06 — READ IT IN THE ORIGINAL
+   ============================================================ */
+.greek .h1{position:absolute;left:70px;top:186px;font-size:96px;line-height:.98;}
+.greek .sub{position:absolute;left:74px;top:506px;width:362px;font-size:23px;line-height:1.44;color:var(--dim);}
+.greek .word{
+  position:absolute;right:44px;top:626px;font-family:var(--voice);font-weight:300;
+  font-size:228px;line-height:.84;letter-spacing:-.012em;color:#FFF;
+}
+.greek .chip{
+  position:absolute;left:74px;top:618px;background:var(--signal);color:#0C0B0B;
+  font-family:var(--sig);font-size:10px;letter-spacing:.14em;padding:6px 9px;border-radius:2px;
+}
+.greek .translit{position:absolute;left:74px;top:662px;font-family:var(--sig);font-size:40px;
+  color:var(--soft);letter-spacing:-.02em;}
+.greek .gloss{position:absolute;left:74px;top:726px;width:196px;font-size:17px;line-height:1.45;
+  color:var(--dim);letter-spacing:-.01em;}
+.greek .rule{position:absolute;left:72px;right:72px;top:906px;height:1px;background:var(--edge);}
+.greek .quote{position:absolute;left:74px;top:948px;width:620px;padding-left:22px;border-left:2px solid var(--signal);}
+.greek .quote .ver{font-family:var(--voice);font-weight:300;font-size:37px;line-height:1.28;color:var(--soft);}
+.greek .quote .ref{font-family:var(--sig);font-size:10px;letter-spacing:.16em;color:var(--signal);margin-top:14px;}
+
+/* ============================================================
+   07 — COMMENT BSP  +  follow footnote
+   ============================================================ */
+.ask .h1{position:absolute;left:70px;top:210px;font-size:142px;line-height:.94;}
+.ask .addlabel{position:absolute;left:74px;top:546px;}
+.ask .field{
+  position:absolute;left:72px;top:574px;width:690px;height:104px;
+  background:var(--surface);border:1px solid var(--edge);border-radius:4px;
+  display:flex;align-items:center;padding:0 18px 0 22px;gap:3px;
+}
+.ask .field .typed{font-size:27px;font-weight:500;color:#fff;letter-spacing:-.012em;}
+.ask .caret{width:2px;height:36px;background:var(--signal);margin-left:2px;}
+.ask .field .send{margin-left:auto;width:56px;height:56px;border-radius:4px;background:var(--signal);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--sig);font-size:22px;color:#0C0B0B;}
+.ask .connector{position:absolute;left:98px;top:694px;width:1px;height:56px;background:#302B29;}
+.ask .connector i{position:absolute;left:-3px;bottom:-3px;width:7px;height:7px;background:var(--signal);}
+.ask .dm{
+  position:absolute;left:72px;top:772px;width:648px;background:#141313;border:1px solid #332B27;
+  border-radius:4px;padding:24px 26px 26px;box-shadow:0 24px 60px rgba(0,0,0,.55);
+}
+.ask .dm .k{font-family:var(--sig);font-size:10px;letter-spacing:.16em;color:var(--signal);}
+.ask .dm .m{margin-top:13px;font-size:23px;line-height:1.4;color:var(--soft);letter-spacing:-.01em;}
+.ask .band{
+  position:absolute;left:0;right:0;bottom:0;height:340px;background:#0E0D0D;
+  border-top:1px solid var(--edge);padding:38px 72px 96px;
+  display:flex;flex-direction:column;
+}
+.ask .band .line{margin-top:15px;font-size:33px;line-height:1.3;color:var(--soft);
+  letter-spacing:-.022em;font-weight:500;width:760px;}
+.ask .band .meta{margin-top:auto;display:flex;justify-content:space-between;
+  font-family:var(--sig);font-size:10px;letter-spacing:.16em;color:var(--mute);text-transform:uppercase;}
+.ask .band .meta b{color:var(--signal);font-weight:400;}
+
+/* ============================================================
+   DECK VIEW (preview only — not part of the export)
+   ============================================================ */
+body.deck{background:#151313;padding:56px 0 80px;}
+body.deck .deckhead{max-width:1560px;margin:0 auto 34px;padding:0 24px;display:flex;
+  align-items:baseline;gap:16px;font-family:var(--sig);font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:#6E6968;}
+body.deck .deckhead b{color:#D9D4D2;font-weight:400;}
+body.deck .wrap{display:flex;flex-wrap:wrap;gap:32px;justify-content:center;align-items:flex-start;}
+body.deck .holder{width:388px;height:485px;position:relative;}
+body.deck .holder .slide{transform:scale(.359);transform-origin:top left;
+  box-shadow:0 18px 50px rgba(0,0,0,.5);border-radius:3px;}
+body.deck .holder .cap{position:absolute;left:0;right:0;bottom:-22px;font-family:var(--sig);
+  font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6E6968;}
+</style>
+</head>
+<body class="deck">
+
+<div class="deckhead"><b>Bible Song Pro Studio</b> <span>·</span> <span>Carousel 01</span> <span>·</span> <span>7 slides · 1080×1350 · v3.5.0</span></div>
+<div class="wrap" id="wrap">
+
+<!-- ═══════════════════ 01 — FREE ═══════════════════ -->
+<div class="holder"><div class="slide free">
+  <div class="head">
+    <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+      <rect x="132" y="186" width="34" height="146" fill="#fff" opacity=".9"/>
+      <rect x="192" y="118" width="38" height="282" fill="#fff"/>
+      <rect x="256" y="166" width="34" height="164" fill="#fff" opacity=".9"/>
+      <rect x="316" y="168" width="126" height="26" fill="#fff" opacity=".9"/>
+      <rect x="316" y="238" width="126" height="30" fill="#FF5500"/>
+      <rect x="316" y="308" width="126" height="26" fill="#fff" opacity=".9"/>
+    </svg>
+    <span class="brandline">Bible Song Pro<sup>Studio</sup></span>
+    <span class="now"><b>01</b> / 07</span>
+  </div>
+
+  <h1 class="h1">Free Church<br>Presentation<br>Software<span class="dot">.</span></h1>
+  <p class="sub">No subscription. No seat fee. One download.</p>
+
+  <div class="btn"><span class="t">Download</span><span class="a">↓</span></div>
+  <div class="plats">
+    <div><b>v3.5.0</b> · GPL-3.0</div>
+    <div>macOS · Windows · Linux</div>
+  </div>
+
+  <img class="icon" src="./assets/bsp-icon.png" alt="Bible Song Pro Studio app icon" />
+
+  <div class="rule"></div>
+
+  <div class="sign">
+    <div class="w">Bible Song Pro<sup>Studio</sup></div>
+    <div class="s">LIVE SCRIPTURE · SONGS · BROADCAST</div>
+  </div>
+  <div class="url">
+    <div>github.com/Johnbatey</div>
+    <div><b>bible-song-pro-studio</b></div>
+  </div>
+
+  <div class="rail"><i style="width:14.3%"></i></div>
+</div><div class="cap">01 — Free church software</div></div>
+
+<!-- ═══════════════════ 02 — YOU SPEAK ═══════════════════ -->
+<div class="holder"><div class="slide speak">
+  <div class="head">
+    <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+      <rect x="132" y="186" width="34" height="146" fill="#fff" opacity=".9"/>
+      <rect x="192" y="118" width="38" height="282" fill="#fff"/>
+      <rect x="256" y="166" width="34" height="164" fill="#fff" opacity=".9"/>
+      <rect x="316" y="168" width="126" height="26" fill="#fff" opacity=".9"/>
+      <rect x="316" y="238" width="126" height="30" fill="#FF5500"/>
+      <rect x="316" y="308" width="126" height="26" fill="#fff" opacity=".9"/>
+    </svg>
+    <span class="brandline">Bible Song Pro<sup>Studio</sup></span>
+    <span class="now"><b>02</b> / 07</span>
+  </div>
+
+  <h1 class="h1">You speak<span class="dot">.</span><br>It appears<span class="dot">.</span></h1>
+
+  <div class="cuebar"><i></i><b></b></div>
+  <p class="sub">Live scripture, songs and broadcast.<br>One console, one operator.</p>
+
+  <div class="program">
+    <div class="tl"><span class="tally"></span><span class="label sig">Program · Live</span></div>
+    <div class="ver">The LORD is my shepherd;<br>I shall not want.</div>
+    <div class="foot">
+      <span class="ref">PSALM 23:1 · KJV</span>
+      <span class="tc">00:04:12</span>
+    </div>
+  </div>
+
+  <div class="rail"><i style="width:28.6%"></i></div>
+</div><div class="cap">02 — You speak</div></div>
+
+<!-- ═══════════════════ 03 — NO ONE TYPES ═══════════════════ -->
+<div class="holder"><div class="slide types">
+  <div class="head">
+    <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+      <rect x="132" y="186" width="34" height="146" fill="#fff" opacity=".9"/>
+      <rect x="192" y="118" width="38" height="282" fill="#fff"/>
+      <rect x="256" y="166" width="34" height="164" fill="#fff" opacity=".9"/>
+      <rect x="316" y="168" width="126" height="26" fill="#fff" opacity=".9"/>
+      <rect x="316" y="238" width="126" height="30" fill="#FF5500"/>
+      <rect x="316" y="308" width="126" height="26" fill="#fff" opacity=".9"/>
+    </svg>
+    <span class="brandline">Bible Song Pro<sup>Studio</sup></span>
+    <span class="now"><b>03</b> / 07</span>
+  </div>
+
+  <h1 class="h1">No one<br>types the<br>verse<span class="dot">.</span></h1>
+
+  <div class="listening"><span class="tally"></span><span>LISTENING</span></div>
+
+  <div class="panel">
+    <span class="label">Live transcript</span>
+    <div class="line">If you look at John chapter three,</div>
+    <div class="line hit"><span>verse sixteen, it says —</span></div>
+    <div class="line">for God so loved the world that</div>
+    <div class="line">he gave his only begotten Son.</div>
+  </div>
+
+  <div class="card">
+    <div class="ref">JOHN 3:16 · KJV</div>
+    <div class="ver">For God so loved the world,<br>that he gave his only<br>begotten Son…</div>
+    <div class="meta">VERBATIM QUOTE</div>
+  </div>
+
+  <div class="stats">
+    <div><div class="k">Confidence</div><div class="v">96%</div></div>
+    <div><div class="k">Tier</div><div class="v">Final</div></div>
+    <div><div class="k">Words</div><div class="v">Direct</div></div>
+    <div><div class="k">Search</div><div class="v">509 ms</div></div>
+  </div>
+
+  <div class="rail"><i style="width:42.9%"></i></div>
+</div><div class="cap">03 — Live detection</div></div>
+
+<!-- ═══════════════════ 04 — THREE SCREENS ═══════════════════ -->
+<div class="holder"><div class="slide screens">
+  <div class="head">
+    <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+      <rect x="132" y="186" width="34" height="146" fill="#171514" opacity=".9"/>
+      <rect x="192" y="118" width="38" height="282" fill="#171514"/>
+      <rect x="256" y="166" width="34" height="164" fill="#171514" opacity=".9"/>
+      <rect x="316" y="168" width="126" height="26" fill="#171514" opacity=".9"/>
+      <rect x="316" y="238" width="126" height="30" fill="#FF5500"/>
+      <rect x="316" y="308" width="126" height="26" fill="#171514" opacity=".9"/>
+    </svg>
+    <span class="brandline">Bible Song Pro<sup>Studio</sup></span>
+    <span class="now"><b>04</b> / 07</span>
+  </div>
+
+  <h1 class="h1">One laptop<span class="dot">.</span><br>Three screens<span class="dot">.</span></h1>
+  <p class="sub">Audience, stage and NDI — from the same click.</p>
+
+  <div class="frame f1">
+    <div class="chip">01 / Audience</div>
+    <div class="in">
+      <div class="ver">Amazing grace,<br>how sweet the sound</div>
+      <div class="ref">AMAZING GRACE · VERSE 1</div>
+    </div>
+  </div>
+
+  <div class="frame f2">
+    <div class="chip">02 / Stage</div>
+    <div class="z cur">
+      <div class="k">CURRENT</div>
+      <div class="v">Twas grace that taught my heart to fear</div>
+    </div>
+    <div class="z nx">
+      <div class="k">NEXT</div>
+      <div class="v">And grace my fears relieved</div>
+    </div>
+    <div class="z tm">
+      <div class="k">TIMER</div>
+      <div class="v">00:12</div>
+    </div>
+  </div>
+
+  <div class="frame f3">
+    <div class="chip">03 / NDI · Alpha</div>
+    <div class="in"></div>
+    <div class="lt">
+      <div class="bar"></div>
+      <div>
+        <div class="nm">Pastor John Adeyemi</div>
+        <div class="rl">FAITH THAT MOVES</div>
+      </div>
+    </div>
+    <div class="nl">TRANSPARENT</div>
+  </div>
+
+  <div class="rail"><i style="width:57.1%"></i></div>
+</div><div class="cap">04 — Three screens</div></div>
+
+<!-- ═══════════════════ 05 — PHONE REMOTE ═══════════════════ -->
+<div class="holder"><div class="slide phone-slide">
+  <div class="head">
+    <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+      <rect x="132" y="186" width="34" height="146" fill="#fff" opacity=".9"/>
+      <rect x="192" y="118" width="38" height="282" fill="#fff"/>
+      <rect x="256" y="166" width="34" height="164" fill="#fff" opacity=".9"/>
+      <rect x="316" y="168" width="126" height="26" fill="#fff" opacity=".9"/>
+      <rect x="316" y="238" width="126" height="30" fill="#FF5500"/>
+      <rect x="316" y="308" width="126" height="26" fill="#fff" opacity=".9"/>
+    </svg>
+    <span class="brandline">Bible Song Pro<sup>Studio</sup></span>
+    <span class="now"><b>05</b> / 07</span>
+  </div>
+
+  <h1 class="h1">Control it<br>from your<br>phone<span class="dot">.</span></h1>
+  <p class="sub">The whole console, in a browser. From the front row, the sound desk, or the back of the room.</p>
+
+  <div class="steps">
+    <div class="step"><span class="n">01</span><span class="t">Pair once</span></div>
+    <div class="step"><span class="n">02</span><span class="t">Search any verse</span></div>
+    <div class="step"><span class="n">03</span><span class="t">Take it live</span></div>
+  </div>
+
+  <p class="fine">Opens on the same network. Nothing to install.</p>
+
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="screen">
+      <div class="status"><span>9:41</span><span class="lk"><i></i>LINKED</span></div>
+      <div class="ptitle">Bible</div>
+      <div class="psearch"><span class="q">shepherd</span><span class="go">SEARCH</span></div>
+      <div class="pcard">
+        <div class="ref">PSALM 23:1</div>
+        <div class="ver">The LORD is my shepherd; I shall not want.</div>
+        <div class="row"><span class="proj">PROJECT</span><span class="hint">HOLD TO PREVIEW</span></div>
+      </div>
+      <div class="mini">
+        <div class="ref">PSALM 23:4</div>
+        <div class="ver">Yea, though I walk through the valley…</div>
+      </div>
+      <div class="mini">
+        <div class="ref">JOHN 10:11</div>
+        <div class="ver">I am the good shepherd…</div>
+      </div>
+      <div class="more">9 MORE RESULTS</div>
+      <div class="pnav"><span class="on">‹ PREV</span><span>NEXT ›</span></div>
+    </div>
+  </div>
+
+  <div class="rail"><i style="width:71.4%"></i></div>
+</div><div class="cap">05 — Phone remote</div></div>
+
+<!-- ═══════════════════ 06 — GREEK ═══════════════════ -->
+<div class="holder"><div class="slide greek">
+  <div class="head">
+    <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+      <rect x="132" y="186" width="34" height="146" fill="#fff" opacity=".9"/>
+      <rect x="192" y="118" width="38" height="282" fill="#fff"/>
+      <rect x="256" y="166" width="34" height="164" fill="#fff" opacity=".9"/>
+      <rect x="316" y="168" width="126" height="26" fill="#fff" opacity=".9"/>
+      <rect x="316" y="238" width="126" height="30" fill="#FF5500"/>
+      <rect x="316" y="308" width="126" height="26" fill="#fff" opacity=".9"/>
+    </svg>
+    <span class="brandline">Bible Song Pro<sup>Studio</sup></span>
+    <span class="now"><b>06</b> / 07</span>
+  </div>
+
+  <h1 class="h1">Read it<br>in the<br>original<span class="dot">.</span></h1>
+  <p class="sub">Greek and Hebrew word study — in the panel, and on the screen.</p>
+
+  <div class="word">πίστις</div>
+
+  <div class="chip">G4102 · GREEK</div>
+  <div class="translit">pistis</div>
+  <div class="gloss">faith · moral conviction</div>
+
+  <div class="rule"></div>
+
+  <div class="quote">
+    <div class="ver">Now faith is the substance of things hoped for.</div>
+    <div class="ref">HEBREWS 11:1 · KJV</div>
+  </div>
+
+  <div class="rail"><i style="width:85.7%"></i></div>
+</div><div class="cap">06 — Original languages</div></div>
+
+<!-- ═══════════════════ 07 — COMMENT BSP ═══════════════════ -->
+<div class="holder"><div class="slide ask">
+  <div class="head">
+    <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+      <rect x="132" y="186" width="34" height="146" fill="#fff" opacity=".9"/>
+      <rect x="192" y="118" width="38" height="282" fill="#fff"/>
+      <rect x="256" y="166" width="34" height="164" fill="#fff" opacity=".9"/>
+      <rect x="316" y="168" width="126" height="26" fill="#fff" opacity=".9"/>
+      <rect x="316" y="238" width="126" height="30" fill="#FF5500"/>
+      <rect x="316" y="308" width="126" height="26" fill="#fff" opacity=".9"/>
+    </svg>
+    <span class="brandline">Bible Song Pro<sup>Studio</sup></span>
+    <span class="now"><b>07</b> / 07</span>
+  </div>
+
+  <h1 class="h1">Comment<br>BSP<span class="dot">.</span></h1>
+
+  <span class="label addlabel">Add a comment</span>
+  <div class="field">
+    <span class="typed">BSP</span><span class="caret"></span>
+    <span class="send">→</span>
+  </div>
+
+  <div class="connector"><i></i></div>
+
+  <div class="dm">
+    <div class="k">NEW DM</div>
+    <div class="m">Here's the v3.5.0 download — macOS, Windows, Linux. Free, as always.</div>
+  </div>
+
+  <div class="band">
+    <span class="label sig">One more thing</span>
+    <div class="line">Follow — otherwise this page won't come back.</div>
+    <div class="meta"><b>v3.5.0</b><span>New releases · tutorials · stage setups</span></div>
+  </div>
+
+  <div class="rail"><i style="width:100%"></i></div>
+</div><div class="cap">07 — Comment BSP</div></div>
+
+</div>
+
+<script>
+  // ?slide=3 renders that one slide full-bleed for PNG export.
+  const n = new URLSearchParams(location.search).get('slide');
+  if (n) {
+    document.body.className = 'single';
+    document.querySelector('.deckhead')?.remove();
+    const holders = [...document.querySelectorAll('.holder')];
+    holders.forEach((h, i) => {
+      if (i + 1 !== Number(n)) h.remove();
+      else {
+        const cap = h.querySelector('.cap'); if (cap) cap.remove();
+        h.style.width = '1080px'; h.style.height = '1350px';
+        h.querySelector('.slide').style.transform = 'none';
+      }
+    });
+    document.body.style.padding = '0';
+    document.getElementById('wrap').style.gap = '0';
+  }
+</script>
+</body>
+</html>

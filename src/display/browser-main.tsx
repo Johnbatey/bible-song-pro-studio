@@ -24,6 +24,14 @@ function assetOrigin(): string {
   return location.origin;
 }
 
+/* The key the app put in the link it handed out. The server also sets an
+   HttpOnly cookie when the page is authorized, so a reload keeps working even
+   if this reads empty — OBS reuses the source URL, and an unattended browser
+   source should not have to be re-authorised mid-service. */
+const AUTH_TOKEN = new URLSearchParams(location.search).get('token') || '';
+const withToken = (url: string): string =>
+  AUTH_TOKEN ? `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(AUTH_TOKEN)}` : url;
+
 function applyPayload(raw: unknown, setDisplayState: (s: ProgramSurfaceState) => void) {
   let msg: any = raw;
   if (typeof raw === 'string') {
@@ -61,7 +69,7 @@ function BrowserDisplayHost() {
     const apiBase = baseUrl;
 
     function pollState() {
-      fetch(`${apiBase}/api/display/state`, { cache: 'no-store' })
+      fetch(withToken(`${apiBase}/api/display/state`), { cache: 'no-store' })
         .then((res) => res.json())
         .then((data) => {
           if (!disposed && data?.state) setDisplayState(data.state);
@@ -78,9 +86,9 @@ function BrowserDisplayHost() {
         const urls = [`${protocol}//${host}${port}`];
         if (host === 'localhost') urls.push(`${protocol}//127.0.0.1${port}`);
         else if (host === '127.0.0.1') urls.push(`${protocol}//localhost${port}`);
-        return urls;
+        return urls.map(withToken);
       } catch {
-        return ['ws://127.0.0.1:8942'];
+        return [withToken('ws://127.0.0.1:8942')];
       }
     }
 

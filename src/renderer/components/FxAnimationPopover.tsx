@@ -17,18 +17,22 @@ export interface FxAnimationPopoverProps {
 
 const POPOVER_WIDTH = 280;
 
+/* Names only. "(Easy Ease)" was never a choice the operator made — every one of
+   these animates on the same curve — and two of the five type-on variants had
+   the same name until the parenthetical told them apart, so the distinguishing
+   word is part of the name now. Same labels the phone remote shows. */
 export const TEXT_TRANSITION_OPTIONS: Array<{ value: FxTransitionType; label: string }> = [
-  { value: 'fade', label: 'Fade (Easy Ease)' },
-  { value: 'zoom', label: 'Zoom (Easy Ease)' },
-  { value: 'slide-up', label: 'Slide Up (Easy Ease)' },
-  { value: 'slide-down', label: 'Slide Down (Easy Ease)' },
-  { value: 'slide-left', label: 'Slide Left (Easy Ease)' },
-  { value: 'slide-right', label: 'Slide Right (Easy Ease)' },
-  { value: 'type', label: 'Type-On (Clip Reveal)' },
-  { value: 'zoom-type', label: 'Zoom + Type-On (Clip Reveal)' },
-  { value: 'type-words', label: 'Type-On (Word by Word)' },
-  { value: 'zoom-type-words', label: 'Zoom + Type-On (Word by Word)' },
-  { value: 'cut', label: 'Cut (Instant)' },
+  { value: 'fade', label: 'Fade' },
+  { value: 'zoom', label: 'Zoom' },
+  { value: 'slide-up', label: 'Slide Up' },
+  { value: 'slide-down', label: 'Slide Down' },
+  { value: 'slide-left', label: 'Slide Left' },
+  { value: 'slide-right', label: 'Slide Right' },
+  { value: 'type', label: 'Type On' },
+  { value: 'zoom-type', label: 'Zoom + Type On' },
+  { value: 'type-words', label: 'Type Words' },
+  { value: 'zoom-type-words', label: 'Zoom + Type Words' },
+  { value: 'cut', label: 'Cut' },
 ];
 
 export const SLIDE_TRANSITION_OPTIONS: Array<{ value: FxTransitionType; label: string }> = [

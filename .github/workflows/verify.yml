@@ -64,5 +64,12 @@ jobs:
       - name: Live scripture parser
         run: npm run test:live-scripture
 
+      # Boots the real main process with `electron` stubbed, so no window and no
+      # display are needed: it asks the running server whether the API, the
+      # projector pages and the WebSocket handshake actually refuse a client
+      # that was never handed the session token.
+      - name: Remote auth gate
+        run: npm run verify:remote-auth
+
       - name: Renderer build
         run: npm run build:renderer

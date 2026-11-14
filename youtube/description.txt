@@ -1,0 +1,26 @@
+Animate any verse in Bible Song Pro Studio — word by word, straight from the slide designer. No After Effects, no PNG sequences, no round trip through Photoshop.
+
+In this tutorial I open the Animation FX panel and show you how to pick a transition, set the timing, and push a verse to Program so it types on while your pastor is still reading it.
+
+TIMESTAMPS
+0:00 What we're making
+0:20 The Animation FX panel
+0:40 Your first verse animates
+1:25 Songs, same treatment
+1:42 Every transition in the list
+2:12 Go transparent for OBS and NDI
+
+Bible Song Pro Studio is free, open-source church presentation software for macOS, Windows and Linux. Live scripture detection, songs, stage display, NDI and broadcast graphics — from one console, one operator.
+
+DOWNLOAD (free, GPL-3.0)
+https://www.biblesongpro.app
+Source and releases: https://github.com/Johnbatey/bible-song-pro-studio
+
+If it saves your team a Sunday, give the repo a star on GitHub — it genuinely helps.
+
+QUESTIONS
+support@biblesongpro.com
+
+Subscribe for more Bible Song Pro Studio tutorials.
+
+#ChurchTech #ChurchMedia #BibleSongProStudio #WorshipTech #ChurchPresentation

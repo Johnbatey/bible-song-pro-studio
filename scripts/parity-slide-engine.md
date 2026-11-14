@@ -1,9 +1,15 @@
 # Slide-engine parity harness
 
 The reference editor's own parser is checked into this repo as a prebuilt bundle
-at `public/slide-editor/slide-editor.bundle.js`. That makes "is our port an exact
-copy?" a test rather than a judgement call: load both in one page and compare
-outputs over the same `.pptx`.
+at `scripts/slide-engine-oracle/slide-editor.bundle.js`. That makes "is our port an
+exact copy?" a test rather than a judgement call: load both in one page and
+compare outputs over the same `.pptx`.
+
+The app ships **one** editor — the in-app React one (`SlideEditorModal` over
+`src/renderer/components/slide-editor`, on the `slide-engine` parser). The
+reference bundle is no longer an editor anyone can open: it sits outside
+`public/`, so it is never copied into a build, and only the harness below loads
+it. Keep it there, for the same reason a gold master stays in the vault.
 
 ## Running it
 
@@ -23,7 +29,7 @@ cp "/Users/explorer02/Downloads/For OBS/Extract Code 3/Technology Consulting | b
 ```js
 // Oracle: the reference parser.
 await new Promise((r, j) => { const s = document.createElement('script');
-  s.src = '/slide-editor/slide-editor.bundle.js'; s.onload = r; s.onerror = j;
+  s.src = '/scripts/slide-engine-oracle/slide-editor.bundle.js'; s.onload = r; s.onerror = j;
   document.head.appendChild(s); });
 
 // JSZip as a UMD global (the bare specifier is not resolvable from the console).

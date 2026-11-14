@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from './stores/appStore';
+import { annotateTextWithStrongsSync, lookupStrongsEntry } from './services/lexicon-annotator';
 import { TitleBar } from './components/TitleBar';
 import { UpdateBanner } from './components/UpdateBanner';
 import { DockHost } from './components/dock/DockHost';
@@ -69,6 +70,17 @@ export function App() {
       }
     }
     init();
+  }, []);
+
+  /* A verse sent from the phone remote reaches the projector from the main
+     process, which means the operator window never saw it happen. Adopt it
+     into the store so the program pane shows what is live and the next
+     full-state push does not take it straight back down. */
+  useEffect(() => {
+    const unsubscribe = window.BSP?.display?.onRemoteProject?.((scene: any) => {
+      useAppStore.getState().setCurrentScene(scene);
+    });
+    return unsubscribe;
   }, []);
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -266,6 +278,48 @@ export function App() {
   useEffect(() => {
     if (!window.BSP?.onBlackoutToggle) return;
     return window.BSP.onBlackoutToggle(() => useAppStore.getState().setBlackout());
+  }, []);
+
+  /* The phone's FS/LT buttons, for the same reason: the store decides what the
+     audience screen is doing and pushes it outward, so the main process asks
+     rather than writes. NDI's per-feed render modes are a separate setting and
+     are never touched from here. */
+  useEffect(() => {
+    if (!window.BSP?.display?.onOutputMode) return;
+    return window.BSP.display.onOutputMode((mode) => useAppStore.getState().setOutputMode(mode));
+  }, []);
+
+  /* FX from the phone lands in the same store the desk's FX panel writes, so a
+     duration chosen on a phone is the duration the desk shows — and the value
+     it pushes back is what the phone's buttons light up with. */
+  useEffect(() => {
+    if (!window.BSP?.display?.onFxSettings) return;
+    return window.BSP.display.onFxSettings((patch) => useAppStore.getState().setFxSettings(patch));
+  }, []);
+
+  /* The phone's Strong's numbers are asked for here because this window is
+     where the tagging table lives. Answering from anywhere else would be a
+     second opinion about which word carries which number. */
+  useEffect(() => {
+    const bridge = window.BSP?.lexicon;
+    if (!bridge?.onRemoteRequest || !bridge.replyRemoteRequest) return;
+    return bridge.onRemoteRequest((request) => {
+      if (!request || !request.id) return;
+      if (request.kind === 'annotate') {
+        const verses = Array.isArray(request.payload?.verses) ? request.payload.verses : [];
+        bridge.replyRemoteRequest?.(request.id, verses.map((verse: { text?: string; book?: string }) => (
+          annotateTextWithStrongsSync(String(verse?.text || ''), String(verse?.book || '')).map((token) => ({
+            word: token.word,
+            code: token.strongs?.strongs ?? null,
+            entry: token.strongs ?? null,
+          }))
+        )));
+        return;
+      }
+      if (request.kind === 'lookup') {
+        bridge.replyRemoteRequest?.(request.id, lookupStrongsEntry(String(request.payload?.code || '')));
+      }
+    });
   }, []);
 
   useBroadcastSync();

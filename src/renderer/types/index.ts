@@ -812,6 +812,9 @@ declare global {
         lookup: (query: string) => Promise<WordStudyEntry | null>;
         detect: (text: string) => Promise<WordStudyEntry | null>;
         annotate: (text: string, book?: string) => Promise<Array<{ word: string; strongs?: WordStudyEntry }>>;
+        /** The phone's Strong's questions, answered from this window's word table. */
+        onRemoteRequest?: (cb: (request: { id: number; kind: 'annotate' | 'lookup'; payload: any }) => void) => () => void;
+        replyRemoteRequest?: (id: number, value: unknown) => void;
       };
       /** Cmd+Shift+B and POST /api/display/blackout arrive here. Returns an unsubscribe. */
       onBlackoutToggle?: (cb: () => void) => (() => void);
@@ -837,6 +840,13 @@ declare global {
         isOpen: () => Promise<boolean>;
         getStatus: () => Promise<{ isOpen: boolean; url: string; browserUrl?: string; remoteUrl?: string; clients: number; updatedAt: number }>;
         onMessage: (cb: (message: any) => void) => () => void;
+        /** FS/LT for the audience screen, from the phone remote. Returns an unsubscribe. */
+        onOutputMode?: (cb: (mode: 'fullscreen' | 'lowerThird') => void) => () => void;
+        /** FX from the phone remote, folded into this window's fxSettings. */
+        onFxSettings?: (cb: (patch: Record<string, unknown>) => void) => () => void;
+        /** Fires when the phone remote projects, so this window can adopt the
+            scene it did not create. */
+        onRemoteProject: (cb: (scene: any) => void) => () => void;
       };
       /** The stage display's feed — the operator message vocabulary in
           src/stage/stage-state.ts, carried the same way display state is. */
@@ -892,6 +902,10 @@ declare global {
       };
       session: {
         start: (payload?: { name?: string }) => Promise<any>;
+        rename: (payload: { name: string }) => Promise<{ ok: boolean; session?: any; error?: string }>;
+        armEnd: (payload: { armed: boolean }) => Promise<{ ok: boolean; armed: boolean; expiresAt: number | null }>;
+        /** Arming is decided in main, so the desk and the phone always agree. */
+        onEndArm: (cb: (payload: { armed: boolean; expiresAt: number | null }) => void) => () => void;
         end: () => Promise<any>;
         addEntry: (payload: { type: string; reference: string; book?: string; chapter?: number; verse?: number; text: string; version?: string; mode?: string; source?: string; confidence?: number }) => Promise<any>;
         list: () => Promise<{ ok: boolean; sessions: Array<{ id: string; name: string; startedAt: string; endedAt: string | null; entries: number }> }>;
@@ -970,7 +984,6 @@ declare global {
         baseUrl: () => Promise<string>;
         pathForFile: (file: File) => string;
       };
-      openSlideEditor: () => Promise<boolean>;
       openStageDisplay: (target?: { displayId?: string } | string | number) => Promise<boolean>;
       closeStageDisplay: () => Promise<{ ok: boolean; open: boolean }>;
       isStageDisplayOpen: () => Promise<boolean>;

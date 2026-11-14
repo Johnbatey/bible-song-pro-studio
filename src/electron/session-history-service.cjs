@@ -11,12 +11,19 @@ function createSessionHistoryService({ app }) {
     if (!fs.existsSync(historyDir)) fs.mkdirSync(historyDir, { recursive: true });
   }
 
+  /* "Sunday AM" reads in a history list; "Session 11/13/2026" does not, and a
+     timestamp is already stamped on the record. */
+  function defaultSessionName(now = new Date()) {
+    const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()];
+    return day + (now.getHours() < 12 ? ' AM' : ' PM');
+  }
+
   function startSession(name) {
     ensureDir();
     if (currentSession) endSession();
     currentSession = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      name: name || 'Session ' + new Date().toLocaleDateString(),
+      name: name || defaultSessionName(),
       startedAt: new Date().toISOString(),
       endedAt: null,
       entries: [],
@@ -43,6 +50,21 @@ function createSessionHistoryService({ app }) {
     entries.push(e);
     autoSave();
     return { ok: true, entry: e };
+  }
+
+  /* The phone starts a service with an auto-generated name, which is a poor
+     thing to find in the history a month later — so the name stays editable
+     for as long as the service is running. */
+  function renameSession(name) {
+    if (!currentSession) return { ok: false, error: 'No active session' };
+    const trimmed = String(name || '').trim().slice(0, 80);
+    if (!trimmed) return { ok: false, error: 'A name is required' };
+    currentSession.name = trimmed;
+    autoSave(true);
+    return {
+      ok: true,
+      session: { id: currentSession.id, name: currentSession.name, startedAt: currentSession.startedAt, entries: entries.length },
+    };
   }
 
   function endSession() {
@@ -122,7 +144,7 @@ function createSessionHistoryService({ app }) {
     return { ok: true };
   }
 
-  return { startSession, endSession, addEntry, listSessions, getSession, exportSession, getStatus, clearAll };
+  return { startSession, endSession, renameSession, addEntry, listSessions, getSession, exportSession, getStatus, clearAll };
 }
 
 module.exports = { createSessionHistoryService };

@@ -38,6 +38,29 @@ contextBridge.exposeInMainWorld('BSP', {
       ipcRenderer.on('display:message', handler);
       return () => ipcRenderer.removeListener('display:message', handler);
     },
+    /* A verse the phone remote projected. Separate from onMessage because it
+       is not display state: it tells the operator window what is now on
+       screen, so its own copy of the program does not drift. */
+    onRemoteProject: (cb) => {
+      const handler = (_, scene) => cb(scene);
+      ipcRenderer.on('display:remote-project', handler);
+      return () => ipcRenderer.removeListener('display:remote-project', handler);
+    },
+    /* The phone's FS/LT buttons. The renderer owns the audience screen's mode
+       and pushes it outward, so the request arrives as a message here rather
+       than as a write to the main process's copy. */
+    onOutputMode: (cb) => {
+      const handler = (_, mode) => cb(mode);
+      ipcRenderer.on('display:set-output-mode', handler);
+      return () => ipcRenderer.removeListener('display:set-output-mode', handler);
+    },
+    /* FX from the phone: the store owns fxSettings, so this arrives as a patch
+       for it rather than as a write to the main process. */
+    onFxSettings: (cb) => {
+      const handler = (_, patch) => cb(patch);
+      ipcRenderer.on('display:set-fx-settings', handler);
+      return () => ipcRenderer.removeListener('display:set-fx-settings', handler);
+    },
   },
 
   /* The stage display's own feed. Deliberately the same shape as `display`
@@ -110,6 +133,13 @@ contextBridge.exposeInMainWorld('BSP', {
 
   session: {
     start: (payload) => ipcRenderer.invoke('session:start', payload),
+    rename: (payload) => ipcRenderer.invoke('session:rename', payload),
+    armEnd: (payload) => ipcRenderer.invoke('session:armEnd', payload),
+    onEndArm: (cb) => {
+      const handler = (_event, payload) => cb(payload);
+      ipcRenderer.on('session:end-arm', handler);
+      return () => ipcRenderer.removeListener('session:end-arm', handler);
+    },
     end: () => ipcRenderer.invoke('session:end'),
     addEntry: (payload) => ipcRenderer.invoke('session:addEntry', payload),
     list: () => ipcRenderer.invoke('session:list'),
@@ -277,7 +307,6 @@ contextBridge.exposeInMainWorld('BSP', {
     importFile: () => ipcRenderer.invoke('workspace:import'),
   },
 
-  openSlideEditor: () => ipcRenderer.invoke('slide-editor:open'),
   openStageDisplay: (target) => ipcRenderer.invoke('stage-display:open', target),
   closeStageDisplay: () => ipcRenderer.invoke('stage-display:close'),
   openStageDesigner: () => ipcRenderer.invoke('stage-designer:open'),
@@ -319,6 +348,14 @@ contextBridge.exposeInMainWorld('BSP', {
     lookup: (query) => ipcRenderer.invoke('lexicon:lookup', query),
     detect: (text) => ipcRenderer.invoke('lexicon:detect', text),
     annotate: (text, book) => ipcRenderer.invoke('lexicon:annotate', { text, book }),
+    /* The phone's Strong's questions arrive here because the word table this
+       window tags with is the only one that should be answering them. */
+    onRemoteRequest: (cb) => {
+      const handler = (_, request) => cb(request);
+      ipcRenderer.on('lexicon:remote-request', handler);
+      return () => ipcRenderer.removeListener('lexicon:remote-request', handler);
+    },
+    replyRemoteRequest: (id, value) => ipcRenderer.send('lexicon:remote-reply', { id, value }),
   },
   feedback: {
     send: (payload) => ipcRenderer.invoke('feedback:send', payload),

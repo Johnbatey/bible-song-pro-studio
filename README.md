@@ -121,6 +121,7 @@ npm run verify:all
 | `npm run verify:media` | Validates media library indexing & Range requests |
 | `npm run verify:slide-parity` | Validates 27 editable slide properties against reference engine |
 | `npm run test:live-scripture` | Validates spoken & written scripture parsing fixtures |
+| `npm run verify:remote-auth` | Boots the local server and proves the phone remote, browser output and REST API refuse a client without the session token |
 | `npm run verify:display-all` | Full display pipeline & window architecture check |
 
 ---

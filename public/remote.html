@@ -3,173 +3,2097 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://localhost:* http://127.0.0.1:*; media-src 'self' blob: http://localhost:* http://127.0.0.1:*; connect-src 'self' ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*; font-src 'self' data: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'self';">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#111010">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>BSP Remote</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0a0c12;--surface:#141820;--surface2:#1c2130;--accent:#C9A96E;--text:#e8e8ed;--dim:#7a7a8a;--radius:12px}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;overflow:hidden}
-body{padding:16px;display:flex;flex-direction:column}
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-h1{font-size:18px;font-weight:700;color:var(--accent)}
-.conn{font-size:11px;padding:4px 10px;border-radius:999px;background:rgba(76,175,80,.15);color:#4caf50}
-.conn.disconnected{background:rgba(244,67,54,.15);color:#f44336}
-input,select,button{font-family:inherit;font-size:14px;border:none;outline:none;border-radius:var(--radius)}
-.search-row{display:flex;gap:8px;margin-bottom:12px}
-.search-row input{flex:1;padding:10px 14px;background:var(--surface2);color:var(--text);border:1px solid transparent}
-.search-row input:focus{border-color:var(--accent)}
-.search-row button{padding:10px 16px;background:var(--accent);color:#000;font-weight:600;cursor:pointer}
-.quick-refs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-.quick-refs button{padding:6px 12px;background:var(--surface);color:var(--dim);font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,.06)}
-.quick-refs button:active{background:var(--surface2);color:var(--text)}
-.result-card{padding:12px;background:var(--surface);border-radius:var(--radius);margin-bottom:10px;cursor:pointer;border:1px solid transparent}
-.result-card:active{border-color:var(--accent);background:var(--surface2)}
-.result-card .ref{color:var(--accent);font-weight:600;font-size:13px;margin-bottom:4px}
-.result-card .text{color:var(--dim);font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.result-card .text.expanded{-webkit-line-clamp:unset}
-.mode-bar{display:flex;gap:8px;margin-bottom:14px}
-.mode-bar button{flex:1;padding:8px;text-align:center;font-size:12px;background:var(--surface);color:var(--dim);cursor:pointer}
-.mode-bar button.active{background:var(--accent);color:#000;font-weight:600}
-.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px}
-.scroll-area::-webkit-scrollbar{width:3px}
-.scroll-area::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:999px}
-.actions{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:var(--bg);display:flex;gap:8px;border-top:1px solid rgba(255,255,255,.04);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
-.actions button{flex:1;padding:12px;font-size:13px;font-weight:600;cursor:pointer}
-.btn-blackout{background:#f44336;color:#fff}
-.btn-clear{background:var(--surface2);color:var(--dim)}
-.btn-project{background:var(--accent);color:#000}
-@media(prefers-color-scheme:light){:root{--bg:#f5f5f7;--surface:#fff;--surface2:#e8e8ed;--text:#1d1d1f;--dim:#86868b}}
+/* Same two faces the console uses, served from the same origin. */
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url('/fonts/InterVariable.woff2') format('woff2')}
+@font-face{font-family:'Geist Mono';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/GeistMono-latin-400.woff2') format('woff2')}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+
+/* ── Palette ───────────────────────────────────────────────────────────────
+   Verbatim from src/renderer/styles/tokens.css: warm-shifted blacks, signal
+   orange for whatever is on screen, green only for cued, blue for the
+   networked link, red for a fault. Radius never exceeds 6px. */
+:root{
+  --booth:#0C0B0B; --ground:#111010; --surface:#161414; --raised:#1D1B1C;
+  --active:#232221; --edge:#262628;
+  --screen:#FFFFFF; --soft:#D9D4D2; --dim:#A8A2A0; --mute:#6E6968;
+
+  --signal:#FF5500; --signal-lift:#FF7728;
+  --signal-wash:rgba(255,85,0,.12); --signal-glow:rgba(255,85,0,.28);
+  --preview:#22C55E; --fault:#EF4444; --link:#3B82F6; --hold:var(--mute);
+  --ink:#160905;
+
+  --r:4px; --r-max:6px; --dot:999px;
+  --ease:cubic-bezier(.16,1,.30,1); --d-state:120ms;
+  --pad:16px;
+  --mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
+}
+
+html,body{height:100%}
+body{
+  background:var(--ground); color:var(--screen);
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  font-size:13px; line-height:1.45;
+  display:flex; flex-direction:column; overflow:hidden; overflow-x:hidden;
+  padding-top:calc(10px + env(safe-area-inset-top));
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;font-size:13px;color:var(--screen);background:var(--raised);border:1px solid transparent;border-radius:var(--r);cursor:pointer;transition:background var(--d-state) var(--ease),border-color var(--d-state) var(--ease),color var(--d-state) var(--ease)}
+button:active{background:var(--active)}
+button:disabled{opacity:.38;cursor:default}
+input{font-family:inherit;font-size:16px;border:none;outline:none;border-radius:var(--r)}
+
+/* ── 1. screens: a swipeable strip of what each output is doing ─────────── */
+.meta{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 var(--pad) 8px}
+.eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+  padding:4px 8px;border-radius:var(--r);background:var(--raised);border:1px solid var(--edge);color:var(--dim);
+}
+.pill .dot{width:5px;height:5px;border-radius:var(--dot);background:var(--hold)}
+.pill.live{color:var(--soft);border-color:rgba(59,130,246,.45);background:rgba(59,130,246,.12)}
+.pill.live .dot{background:var(--link);box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+.pill.down{color:#FFB4B4;border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.12)}
+.pill.down .dot{background:var(--fault)}
+
+/* The audience screen's mode. FS and LT are the desk's own words for it, and
+   this switches the same setting — NDI feeds keep their per-feed render mode
+   and are not touched from here. It sits at the top of the chrome bar because
+   it is reached for mid-service, so it gets a real tap target. */
+.screenmode{display:flex;align-items:center;gap:9px}
+.modes{display:flex;gap:3px;padding:3px;background:var(--raised);border:1px solid var(--edge);border-radius:var(--r)}
+.modes button{min-width:58px;padding:7px 14px;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;background:transparent;border:none;border-radius:2px;color:var(--mute)}
+.modes button.on{background:var(--active);color:var(--screen);box-shadow:inset 0 -2px 0 var(--signal)}
+/* Pressed, on either state: the switch answers the finger before the app does. */
+.modes button:active{background:var(--active);color:var(--screen)}
+
+.screens{
+  display:flex;gap:9px;overflow-x:auto;scroll-snap-type:x mandatory;
+  padding:0 var(--pad) 9px;scrollbar-width:none;scroll-padding-left:var(--pad);
+}
+.screens::-webkit-scrollbar{display:none}
+.scr{
+  flex:0 0 82%;max-width:340px;scroll-snap-align:center;
+  padding:10px 12px;border-radius:var(--r-max);background:var(--surface);
+  border:1px solid var(--edge);min-height:74px;display:flex;flex-direction:column;justify-content:center;gap:3px;
+}
+.scr.program{border-color:var(--edge)}
+.scr.on-air{background:var(--signal-wash);border-color:rgba(255,85,0,.34)}
+.scr.blackout{background:var(--surface);border-color:rgba(110,105,104,.6)}
+/* The stage is a confidence monitor, not the audience screen, so it carries the
+   link tally rather than the program orange. */
+.scr.stage.open{border-color:rgba(59,130,246,.38)}
+.scr.stage.open .tally{background:var(--link);box-shadow:0 0 0 3px rgba(59,130,246,.16)}
+.scr .top{display:flex;align-items:center;gap:6px}
+.scr .top .tally{width:5px;height:5px;border-radius:var(--dot);background:var(--hold)}
+.scr.on-air .top .tally{background:var(--signal);box-shadow:0 0 0 3px var(--signal-wash)}
+.scr .title{font-size:13.5px;font-weight:600;color:var(--screen);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scr .sub{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scr .clock{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--soft);letter-spacing:.02em}
+/* Which translation is on the screen, because "Psalms 23:2" does not say. */
+.scr .ver{margin-left:auto;padding:1px 4px;border:1px solid var(--edge);border-radius:2px;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+/* The stage card carries both a translation and a running clock; the badge
+   takes the free space and the clock sits just after it. */
+.scr .ver + .clock{margin-left:6px}
+.scr .timerbtns{display:flex;gap:6px;margin-top:8px}
+.scr .timerbtns button{flex:1;padding:6px 8px;font-size:11.5px;font-weight:600;background:var(--raised);border:1px solid var(--edge);color:var(--soft)}
+
+/* Narrow phones: the strip is the one row that can grow, so the cards trim
+   their chrome — padding, label tracking, control height — rather than the
+   words the operator has to read at a glance. */
+@media (max-width:390px){
+  .scr{flex-basis:88%;padding:9px 11px}
+  .scr .eyebrow{font-size:9px;letter-spacing:.1em}
+  .scr .title{font-size:13px}
+  .scr .timerbtns{margin-top:7px}
+  .scr .timerbtns button{padding:6px 6px;font-size:11px}
+}
+
+.dots{display:flex;justify-content:center;gap:5px;padding-bottom:10px}
+.dots i{width:5px;height:3px;border-radius:2px;background:var(--edge);transition:width var(--d-state) var(--ease),background var(--d-state) var(--ease)}
+.dots i.on{width:13px;background:var(--dim)}
+
+/* ── 2. tabs ────────────────────────────────────────────────────────────── */
+.tabs{display:flex;gap:4px;margin:0 var(--pad) 10px;padding:3px;background:var(--raised);border:1px solid var(--edge);border-radius:var(--r-max)}
+.tabs button{flex:1;padding:8px 4px;font-size:12px;font-weight:500;color:var(--dim);background:transparent;border:none;border-radius:var(--r)}
+.tabs button.on{background:var(--active);color:var(--screen);box-shadow:inset 0 -2px 0 var(--signal)}
+
+/* ── 3. panels ──────────────────────────────────────────────────────────── */
+/* min-width:0 all the way down: a flex item defaults to its content's
+   intrinsic width, which let the search row push the whole panel wider than
+   the phone and clip the button off the right edge. */
+.panels{flex:1;min-height:0;min-width:0;display:flex}
+.panel{flex:1;min-height:0;min-width:0;display:none;flex-direction:column;padding:0 var(--pad)}
+.panel.on{display:flex}
+
+/* bible tools: the desk's four bible controls, condensed to one row of chips
+   with each control's options directly beneath it. */
+.tools{display:flex;gap:6px;align-items:center;margin-bottom:9px;overflow-x:auto;scrollbar-width:none;min-width:0}
+.tools::-webkit-scrollbar{display:none}
+.tools > button{flex:0 0 auto;padding:6px 10px;font-size:11.5px;font-weight:500;color:var(--dim);background:var(--raised);border:1px solid var(--edge)}
+.tools > button.on{color:var(--screen);background:var(--active);border-color:rgba(255,85,0,.42)}
+.tools .modes{flex:0 0 auto}
+.toolopts{display:flex;gap:7px;align-items:center;margin-bottom:9px;min-width:0}
+.toolopts[hidden]{display:none}
+.toolopts select{flex:1;min-width:0;padding:8px 9px;background:var(--raised);border:1px solid var(--edge);border-radius:var(--r);color:var(--soft);font-family:var(--mono);font-size:16px;appearance:none;-webkit-appearance:none}
+.toolopts select:focus{outline:none;border-color:var(--signal);box-shadow:0 0 0 3px var(--signal-wash)}
+.toolopts option{background:var(--surface);color:var(--screen)}
+
+/* Book navigator: the shelf, then the chapters, then the chapter itself, with
+   one Back that walks up the same ladder. */
+.browsebar{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.browsebar[hidden]{display:none}
+.browsebar button{padding:5px 9px;font-size:11.5px;font-weight:600;color:var(--soft);background:var(--raised);border:1px solid var(--edge)}
+.browsebar button[hidden]{display:none}
+.bookgrid,.chaptergrid{display:grid;gap:6px;padding-bottom:8px}
+.bookgrid{grid-template-columns:repeat(auto-fill,minmax(98px,1fr))}
+.chaptergrid{grid-template-columns:repeat(auto-fill,minmax(54px,1fr))}
+.bookgrid button,.chaptergrid button{padding:9px 10px;background:var(--surface);border:1px solid var(--edge);border-radius:var(--r);color:var(--soft);text-align:left}
+.bookgrid button{display:flex;flex-direction:column;gap:2px;font-size:12px}
+.bookgrid button .sub{font-family:var(--mono);font-size:9.5px;color:var(--mute)}
+.chaptergrid button{font-family:var(--mono);font-size:13px;text-align:center;padding:11px 4px}
+/* A Strong's number is a control: tapping it puts the desk's word study on the
+   screen, tapping it again restores the verse. Orange is the number's untapped
+   colour and a solid orange pill is the tapped one — the same on/off the desk
+   uses. */
+.strongs{font-family:var(--mono);font-size:9px;line-height:1;letter-spacing:.02em;color:var(--signal);background:transparent;border:1px solid transparent;border-radius:2px;padding:2px 3px;margin-left:2px;vertical-align:super;cursor:pointer;touch-action:manipulation}
+.strongs:active{background:var(--signal-wash)}
+.strongs.on{color:var(--ink);background:var(--signal);border-color:var(--signal)}
+.switches{display:flex;gap:6px;width:100%}
+.switches button{flex:1;padding:7px 8px;font-size:11.5px;font-weight:500;color:var(--dim);background:var(--raised);border:1px solid var(--edge)}
+.switches button.on{color:var(--screen);background:var(--active);border-color:rgba(255,85,0,.42)}
+.toolopts.fx{flex-wrap:wrap}
+/* What a word study says, in the operator's own hand: the audience has the card,
+   and reading a definition off a phone beats leaning into the desk monitor. */
+.study{margin:0 var(--pad) 10px;padding:11px 12px;background:var(--surface);border:1px solid var(--edge);border-left:2px solid var(--signal);border-radius:var(--r)}
+.study-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.study-head button{padding:4px 9px;font-size:11px;color:var(--dim);background:var(--raised);border:1px solid var(--edge)}
+.study-word{display:block;margin-top:6px;font-size:17px;line-height:1.25;color:var(--screen)}
+.study-word .lemma{font-size:20px}
+.study-word .say{font-family:var(--mono);font-size:10.5px;color:var(--mute);margin-left:6px}
+.study-gloss{margin-top:2px;font-size:12.5px;color:var(--signal-lift)}
+.study-def{margin-top:6px;font-size:12.5px;line-height:1.55;color:var(--soft);max-height:28vh;overflow:auto}
+.study-use{margin-top:6px;font-family:var(--mono);font-size:10.5px;line-height:1.5;color:var(--mute)}
+
+/* bible: what this phone projected last, at the top of the panel now that the
+   search field lives in the chrome bar. */
+.recent{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;min-width:0}
+.recent[hidden]{display:none}
+
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:0;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:0 0 auto;padding:6px 10px;font-size:11.5px;color:var(--dim);background:var(--raised);border:1px solid var(--edge)}
+.chips button:active{color:var(--soft);background:var(--active)}
+/* A history row's label and its Clear, on one line, so the control reads as
+   belonging to the list beside it. */
+.rowhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rowhead .eyebrow{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rename{display:flex;gap:8px;margin-top:9px}
+.rename[hidden]{display:none}
+.rename input{flex:1;min-width:0;padding:10px 12px;background:var(--raised);border:1px solid var(--edge);border-radius:var(--r);color:var(--screen)}
+.rename button{flex:0 0 auto;padding:0 14px;background:var(--raised);border:1px solid var(--edge);border-radius:var(--r);color:var(--soft);font-weight:600}
+.rowhead button{padding:3px 8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);background:transparent;border:1px solid var(--edge);border-radius:var(--r);cursor:pointer}
+.rowhead button[data-armed="1"]{color:var(--signal);border-color:var(--signal)}
+/* The number being studied is lit in the history too, so a second tap on it
+   reads as "close this" rather than "open it again". */
+#studiedChips button.on{color:var(--screen);background:var(--signal-wash);border-color:rgba(255,85,0,.42)}
+
+#results{flex:1;min-width:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(178px + env(safe-area-inset-bottom))}
+#results::-webkit-scrollbar{width:3px}
+#results::-webkit-scrollbar-thumb{background:var(--edge);border-radius:var(--dot)}
+
+.card{padding:11px 12px;margin-bottom:8px;border-radius:var(--r);background:var(--surface);border:1px solid var(--edge);cursor:pointer;transition:border-color var(--d-state) var(--ease),background var(--d-state) var(--ease)}
+/* Cued and on air are different facts: green for what Project would send,
+   orange for what the screen already shows. */
+.card.on-air{border-color:rgba(255,85,0,.5);background:var(--raised)}
+/* The verse that was asked for, while its chapter reads around it. Subtle on
+   purpose: orange is reserved for what is on the screen. */
+.card.focus{background:var(--raised);border-color:rgba(217,212,210,.24)}
+.card .ref{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;font-weight:600;color:var(--soft);margin-bottom:4px}
+.card .ref .tag{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;padding:2px 5px;border-radius:2px}
+.card .ref .tag.onair{color:var(--signal);background:var(--signal-wash)}
+.card .text{color:var(--dim);font-size:12.5px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card.on-air .text{-webkit-line-clamp:unset;color:var(--soft)}
+
+/* Paging for chapters longer than a window. Dashed, because it is a seam in a
+   list rather than a control with an outcome. */
+.more{display:block;width:100%;margin:0 0 8px;padding:9px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);background:var(--surface);border:1px dashed var(--edge);border-radius:var(--r)}
+.more:active{background:var(--active);color:var(--soft)}
+
+.hint{padding:30px 16px;text-align:center;color:var(--dim);font-size:12.5px;line-height:1.7}
+.hint .big{font-size:13.5px;font-weight:600;color:var(--soft);margin-bottom:4px}
+
+/* session + ndi panels */
+.scroller{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(178px + env(safe-area-inset-bottom))}
+.block{background:var(--surface);border:1px solid var(--edge);border-radius:var(--r-max);padding:12px 13px;margin-bottom:9px}
+.block .head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.block .label{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.block .value{font-size:13px;font-weight:600;color:var(--screen)}
+.block .note{font-size:11.5px;color:var(--dim);line-height:1.5;margin-top:2px}
+.rows{display:flex;flex-direction:column;gap:7px;margin-top:9px}
+.row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:12px;color:var(--dim)}
+.row b{font-weight:600;color:var(--soft)}
+.row .mono{font-family:var(--mono);font-size:11.5px;color:var(--soft)}
+.buttons{display:flex;gap:7px;margin-top:11px}
+.buttons button{flex:1;padding:11px;font-size:12.5px;font-weight:600}
+.buttons .go{background:var(--signal);color:var(--ink);border:none}
+.buttons .go:active{background:var(--signal-lift)}
+.buttons .stop{background:var(--raised);color:var(--soft);border:1px solid var(--edge)}
+.empty{padding:22px 16px;text-align:center;color:var(--mute);font-size:12px;line-height:1.6}
+
+/* ── 4. actions ─────────────────────────────────────────────────────────── */
+/* Search sits at the top of the bar: a reference is the one thing an operator
+   types mid-service. The transport under it is what they press. */
+.actions{
+  position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:8px;align-items:stretch;
+  padding:11px var(--pad) calc(11px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,rgba(17,16,16,.55),var(--ground) 44%);
+  border-top:1px solid var(--edge);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+}
+.seek{display:flex;gap:8px;min-width:0}
+/* The translation the phone is reading in. Native, because iOS gives it the
+   picker the operator already knows; only the chrome around it is ours. */
+.version{position:relative;display:flex;flex:0 0 auto}
+.version select{
+  appearance:none;-webkit-appearance:none;
+  max-width:98px;padding:10px 24px 10px 10px;background:var(--raised);border:1px solid var(--edge);
+  border-radius:var(--r);color:var(--soft);font-family:var(--mono);font-size:16px;
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.version select:focus{outline:none;border-color:var(--signal);box-shadow:0 0 0 3px var(--signal-wash)}
+.version option{background:var(--surface);color:var(--screen);text-transform:none}
+.version::after{
+  content:'';position:absolute;right:9px;top:50%;width:5px;height:5px;pointer-events:none;
+  border-right:1px solid var(--mute);border-bottom:1px solid var(--mute);
+  transform:translateY(-70%) rotate(45deg);
+}
+.seek input{flex:1;min-width:0;padding:10px 12px;background:var(--raised);border:1px solid var(--edge);color:var(--screen);transition:border-color var(--d-state) var(--ease),box-shadow var(--d-state) var(--ease)}
+.seek input:focus{border-color:var(--signal);box-shadow:0 0 0 3px var(--signal-wash)}
+.seek input::placeholder{color:var(--mute)}
+.seek button{padding:0 15px;background:var(--signal);color:var(--ink);font-weight:600;border:none;border-radius:var(--r)}
+.seek button:active{background:var(--signal-lift)}
+.transport{display:flex;gap:7px}
+.transport button{flex:1;padding:11px 6px;font-size:12px;font-weight:600}
+.transport .step{background:var(--raised);color:var(--soft);border:1px solid var(--edge)}
+.transport .ghost{background:var(--raised);color:var(--dim);border:1px solid var(--edge)}
+.transport .ghost.warn{color:var(--soft);border-color:rgba(110,105,104,.75);background:var(--active)}
+
+/* ── toast + banner ─────────────────────────────────────────────────────── */
+#toast{
+  position:fixed;left:50%;bottom:calc(168px + env(safe-area-inset-bottom));transform:translate(-50%,12px);
+  padding:9px 14px;border-radius:var(--r);font-size:12px;font-weight:500;
+  background:var(--raised);color:var(--soft);border:1px solid var(--edge);
+  opacity:0;pointer-events:none;transition:opacity 180ms var(--ease),transform 180ms var(--ease);
+  white-space:nowrap;max-width:88vw;overflow:hidden;text-overflow:ellipsis;
+}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#toast.err{color:#FFC5C5;border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.12)}
+
+#banner{display:none;margin:0 var(--pad) 9px;padding:9px 11px;border-radius:var(--r);font-size:11.5px;line-height:1.5;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.38);color:#FFC5C5}
+#banner.show{display:block}
+#banner b{display:block;margin-bottom:2px;font-weight:600;color:#FFD9D9}
 </style>
 </head>
 <body>
-<header>
-<h1>BSP Remote</h1>
-<span class="conn" id="connStatus">Connecting...</span>
-</header>
 
-<div class="search-row">
-<input id="searchInput" type="text" placeholder="John 3:16 or search verses..." autocomplete="off" enterkeyhint="search">
-<button id="searchBtn">Search</button>
+<!-- 1. what the outputs are doing, swipe for the rest -->
+<div class="meta">
+  <span class="eyebrow">Screens</span>
+  <span class="pill" id="conn"><span class="dot"></span><span id="connText">Connecting</span></span>
 </div>
 
-<div class="quick-refs" id="quickRefs"></div>
-
-<div class="mode-bar">
-<button data-mode="bible" class="active">Bible</button>
-<button data-mode="song">Song</button>
-<button data-mode="media">Media</button>
+<div id="banner">
+  <b id="bannerTitle"></b>
+  <span id="bannerText"></span>
 </div>
 
-<div class="scroll-area" id="results"></div>
+<div class="screens" id="screens"></div>
+<div class="dots" id="dots"></div>
+
+<!-- the study that is on screen, readable here and dismissable here -->
+<div class="study" id="study" hidden>
+  <div class="study-head">
+    <span class="eyebrow" id="studyCode">Word study</span>
+    <button type="button" id="studyClose">Close</button>
+  </div>
+  <div class="study-word" id="studyWord"></div>
+  <div class="study-gloss" id="studyGloss"></div>
+  <div class="study-def" id="studyDef"></div>
+  <div class="study-use" id="studyUse"></div>
+</div>
+
+<!-- 2. controls, by area -->
+<nav class="tabs" id="tabs">
+  <button data-tab="bible" class="on">Bible</button>
+  <button data-tab="session">Session</button>
+  <button data-tab="ndi">NDI</button>
+</nav>
+
+<div class="panels">
+  <!-- 3a. bible -->
+  <section class="panel on" id="panel-bible">
+    <div class="tools">
+      <button type="button" id="toolBooks">Books</button>
+      <button type="button" id="toolStrongs" aria-pressed="false">Strong’s</button>
+      <div class="modes" id="dualToggle" role="group" aria-label="Bible mode">
+        <button type="button" data-dual="single" aria-pressed="true">Single</button>
+        <button type="button" data-dual="dual" aria-pressed="false">Dual</button>
+      </div>
+      <button type="button" id="toolFx" aria-pressed="false">FX</button>
+    </div>
+
+    <!-- options for whichever tool is on, directly under it -->
+    <div class="toolopts" id="dualOpts" hidden>
+      <select id="dualVersion" aria-label="Second translation"></select>
+      <div class="modes" id="dualLayouts" role="group" aria-label="Dual layout">
+        <button type="button" data-layout="vertical" aria-pressed="true">Side</button>
+        <button type="button" data-layout="horizontal" aria-pressed="false">Stacked</button>
+      </div>
+    </div>
+    <div class="toolopts fx" id="fxOpts" hidden>
+      <select id="fxType" aria-label="Transition"></select>
+      <select id="fxDuration" aria-label="Transition time"></select>
+      <div class="switches">
+        <button type="button" id="fxBackground" aria-pressed="false">Background</button>
+        <button type="button" id="fxStage" aria-pressed="true">Stage FX</button>
+      </div>
+    </div>
+
+    <div class="browsebar" id="browseBar" hidden>
+      <button type="button" id="browseBack">‹ Back</button>
+      <span class="eyebrow" id="browseCrumb"></span>
+    </div>
+
+    <div class="recent" id="recent" hidden>
+      <div class="rowhead">
+        <span class="eyebrow" id="recentLabel">Recent</span>
+        <button type="button" id="clearRecents">Clear</button>
+      </div>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="recent" id="studied" hidden>
+      <div class="rowhead">
+        <span class="eyebrow" id="studiedLabel">Studied</span>
+        <button type="button" id="clearStudied">Clear</button>
+      </div>
+      <div class="chips" id="studiedChips"></div>
+    </div>
+    <div id="results">
+      <div class="hint">
+        <div class="big">Search a reference or a phrase</div>
+        Tap a result and it goes straight to air.
+      </div>
+    </div>
+  </section>
+
+  <!-- 3b. session -->
+  <section class="panel" id="panel-session">
+    <div class="scroller">
+      <div class="block">
+        <div class="head">
+          <span class="label" id="sessionLabel">Service Session</span>
+          <span class="value" id="sessionState">—</span>
+        </div>
+        <div class="note" id="sessionNote">Sessions record every verse that goes to air.</div>
+        <form class="rename" id="renameForm" hidden>
+          <input id="sessionNameInput" type="text" maxlength="80" placeholder="Name this service" autocomplete="off" autocapitalize="words" enterkeyhint="done" />
+          <button type="submit">Rename</button>
+        </form>
+        <div class="buttons">
+          <button class="go" id="sessionStart">Start service</button>
+          <button class="stop" id="sessionEnd">End</button>
+        </div>
+      </div>
+      <div class="block">
+        <div class="head">
+          <span class="label">Recent</span>
+          <span class="value" id="sessionCount">0</span>
+        </div>
+        <div id="sessionList"><div class="empty">No saved sessions yet.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3c. ndi -->
+  <section class="panel" id="panel-ndi">
+    <div class="scroller">
+      <div class="block">
+        <div class="head">
+          <span class="label">NDI Output</span>
+          <span class="value" id="ndiState">—</span>
+        </div>
+        <div class="note" id="ndiNote">Streams this console to OBS, vMix or another machine.</div>
+        <div class="rows" id="ndiRows"></div>
+        <div class="buttons">
+          <button class="go" id="ndiStart">Start</button>
+          <button class="stop" id="ndiStop">Stop</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
 
 <div class="actions">
-<button class="btn-blackout" id="blackoutBtn">Blackout</button>
-<button class="btn-clear" id="clearBtn">Clear</button>
-<button class="btn-project" id="projectBtn">Project</button>
+  <div class="screenmode">
+    <span class="eyebrow">Screen</span>
+    <div class="modes" id="modes" role="group" aria-label="Audience screen mode">
+      <button type="button" data-mode="fullscreen" aria-pressed="true" title="Full screen">FS</button>
+      <button type="button" data-mode="lowerThird" aria-pressed="false" title="Lower third">LT</button>
+    </div>
+  </div>
+  <div class="seek">
+    <label class="version">
+      <select id="version" aria-label="Bible translation"></select>
+    </label>
+    <input id="q" type="search" placeholder="John 3:16 or a phrase…" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+    <button id="go">Search</button>
+  </div>
+  <div class="transport">
+    <button class="step" id="prev">Prev</button>
+    <button class="step" id="next">Next</button>
+    <button class="ghost" id="blackout">Blackout</button>
+    <button class="ghost" id="clear">Clear</button>
+  </div>
 </div>
 
+<div id="toast"></div>
+
 <script>
-(function() {
+(function () {
+  'use strict';
+
+  /* The app hands over its session key in the link it shows the operator (the
+     QR code in Settings → Output). The page was authorized to be served at
+     all, so this is for what follows: a header on REST, the query string on
+     the WebSocket, which cannot carry a custom header. The HttpOnly cookie
+     the server set covers both if this is ever absent. */
+  const TOKEN = new URLSearchParams(location.search).get('token') || '';
   const API_BASE = window.location.origin;
-  let ws = null;
-  let currentMode = 'bible';
-  let selectedVerse = null;
-  let currentState = {};
 
   const $ = (id) => document.getElementById(id);
-  const searchInput = $('searchInput');
-  const searchBtn = $('searchBtn');
-  const results = $('results');
-  const connStatus = $('connStatus');
-  const blackoutBtn = $('blackoutBtn');
-  const clearBtn = $('clearBtn');
-  const projectBtn = $('projectBtn');
-  const quickRefs = $('quickRefs');
+  const screensEl = $('screens');
+  const dotsEl = $('dots');
+  const resultsEl = $('results');
+  const qEl = $('q');
+  const prevBtn = $('prev');
+  const nextBtn = $('next');
+  const blackoutBtn = $('blackout');
+  const clearBtn = $('clear');
+  const connEl = $('conn');
+  const connText = $('connText');
+  const toastEl = $('toast');
 
-  const QUICK_REFS = ['John 3:16', 'Psalm 23', 'Romans 8:28', '1 Cor 13:4', 'Phil 4:13', 'Jer 29:11', 'Prov 3:5', 'Isa 40:31', 'Eph 2:8', 'Gen 1:1'];
+  /* What this phone put on screen, newest first. Kept on the phone rather than
+     asked of the app: it is what this operator looked at, not a property of
+     the service. */
+  const RECENT_KEY = 'bsp.remote.recent';
+  const RECENT_MAX = 8;
+  const VERSION_KEY = 'bsp.remote.version';
+  const STUDY_KEY = 'bsp.remote.studied';
+  const STUDY_MAX = 8;
 
-  function connectWS() {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(proto + '//' + location.host);
-    ws.onopen = () => { connStatus.textContent = 'Connected'; connStatus.className = 'conn'; };
-    ws.onmessage = (e) => {
-      try { currentState = JSON.parse(e.data); } catch {}
-    };
-    ws.onclose = () => {
-      connStatus.textContent = 'Disconnected'; connStatus.className = 'conn disconnected';
-      setTimeout(connectWS, 2000);
-    };
+  let versions = [];        // translations the app can read, for the picker
+  let lastQuery = '';       // so a translation change can re-run the search
+  let searchFocus = null;   // the verse the last search asked for, by reference
+  let paintedVerses = [];   // the result set currently in the list
+  let windowFrom = 0;       // first and last painted verse of a long chapter
+  let windowTo = 0;
+
+  /* Psalm 119 is 176 verses. A phone does not need every card mounted to read
+     one, and the asked-for verse only has to be a page away at most. */
+  const LIST_WINDOW = 40;
+  let stepping = false;     // a previous/next request is in flight
+  let projecting = false;   // a tap is already putting a verse on screen
+  let live = null;          // program state, from the socket / REST
+  let lastVerse = null;     // what the phone last put up, so a study can clear back to it
+  let status = null;        // ndi + session summary, from /api/status
+  let stage = null;         // stage summary, pushed on the socket
+  let stageAt = 0;          // when that summary arrived, for the running clock
+  let tab = 'bible';
+  let searching = false;
+  let toastTimer = 0;
+  let screensSignature = '';
+
+  /* ── small UI helpers ─────────────────────────────────── */
+
+  function toast(message, isError) {
+    toastEl.textContent = message;
+    toastEl.className = 'show' + (isError ? ' err' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = isError ? 'err' : ''; }, 2200);
   }
+
+  function banner(title, text) {
+    if (!title) { $('banner').className = ''; return; }
+    $('bannerTitle').textContent = title;
+    $('bannerText').textContent = text || '';
+    $('banner').className = 'show';
+  }
+
+  /** The stage clock, counted locally from the last summary so it keeps
+   *  running between pushes — a live socket should not need a poll to tick. */
+  function stageSeconds() {
+    if (!stage) return 0;
+    const base = Number(stage.timerSeconds) || 0;
+    return stage.timerRunning ? base + (Date.now() - stageAt) / 1000 : base;
+  }
+
+  /* Only what changes during a service. The stage's mode is set on the desk and
+     rarely touched here, and naming "Confidence" on the phone costs a whole
+     line above the title — so the line appears only when something is saying
+     something, and the card stays short the rest of the time. */
+  function stageSubline() {
+    if (!stage) return 'Unavailable';
+    if (!stage.open) return 'Not opened in the app';
+    if (!stage.messageCount) return '';
+    return stage.messageCount + (stage.messageCount === 1 ? ' message' : ' messages');
+  }
+
+  function clock(totalSeconds) {
+    const total = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const pad = (n) => String(n).padStart(2, '0');
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return h ? h + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
+  }
+
+  function setConnected(ok) {
+    connEl.className = 'pill ' + (ok ? 'live' : 'down');
+    connText.textContent = ok ? 'Connected' : 'Disconnected';
+  }
+
+  /* ── 1. the screens strip ─────────────────────────────── */
+
+  /**
+   * One card per output the app can report: the program screen, then each NDI
+   * feed. Rebuilt only when the reported content changes, because rebuilding
+   * resets the swipe position mid-gesture.
+   */
+  /** A reference without the translation the desktop console writes into it
+   *  ("John 3:16 (KJV)"). The badge carries the translation here, and the tag
+   *  has to match a reference the phone itself searched for. */
+  function bareReference(reference) {
+    return String(reference || '').replace(/\s*\(([A-Za-z0-9-]{2,12})\)$/, '');
+  }
+
+  function renderScreens() {
+    const ndi = (status && status.ndi) || null;
+    const feeds = ndi && Array.isArray(ndi.feeds) ? ndi.feeds : [];
+    const scene = live && live.scene;
+    const content = (scene && scene.content) || null;
+    const blackout = Boolean(live && live.blackout);
+
+    const cards = [];
+    /* FS or LT is part of what the program output is doing, so it belongs in the
+       same label the desk uses for it — "PROGRAM · LT" — rather than in a
+       second chip next to the translation. Blank until the app has said. */
+    const programMode = live ? (live.outputMode === 'lowerThird' ? 'LT' : 'FS') : '';
+    cards.push({
+      kind: 'program',
+      label: 'Program' + (programMode ? ' · ' + programMode : ''),
+      title: blackout ? 'Blackout' : (content ? (bareReference(content.reference) || 'Custom') : 'Nothing on screen'),
+      sub: blackout ? 'Screen is dark' : (content && content.text) || 'Cue a verse to begin',
+      onAir: Boolean(content) && !blackout,
+      blackout,
+      version: blackout ? '' : liveVersion(),
+    });
+    const stageOpen = Boolean(stage && stage.open);
+    const stageTitle = !stageOpen
+      ? 'Stage closed'
+      : ((stage.current && (stage.current.title || stage.current.body)) || 'Stage open');
+    cards.push({
+      kind: 'stage',
+      label: 'Stage',
+      title: stageTitle,
+      sub: stageSubline(),
+      open: stageOpen,
+      clock: stageOpen ? clock(stageSeconds()) : '',
+      /* The same translation the program card carries. A confidence monitor is
+         there to say what the room is hearing, and the reference alone does not
+         name the wording. */
+      version: stageOpen ? liveVersion() : '',
+      /* The timer only means anything once the stage is up, and this card is
+         the one place on the phone that is about the stage — so its controls
+         live here rather than in a tab of their own. */
+      timer: stageOpen ? Boolean(stage.timerRunning) : null,
+    });
+
+    feeds.forEach((feed, index) => {
+      const size = feed.width && feed.height ? feed.width + '×' + feed.height : '1920×1080';
+      cards.push({
+        kind: 'ndi',
+        label: 'NDI' + (feeds.length > 1 ? ' ' + (index + 1) : ''),
+        title: feed.name || 'NDI stream',
+        sub: size + ' · ' + (feed.connections || 0) + ' consumer' + (feed.connections === 1 ? '' : 's'),
+        onAir: true,
+      });
+    });
+    if (!feeds.length) {
+      cards.push({
+        kind: 'ndi',
+        label: 'NDI',
+        title: 'Not streaming',
+        sub: ndi && ndi.available ? 'Start it in the NDI tab' : 'NDI library not available',
+        onAir: false,
+      });
+    }
+
+    const signature = JSON.stringify(cards);
+    if (signature === screensSignature) return;
+    screensSignature = signature;
+
+    /* Replacing the cards resets the scroll offset, which would yank the strip
+       back to the program card every time a verse went live. Put the reader
+       back where they were. */
+    const previousScroll = screensEl.scrollLeft;
+    screensEl.innerHTML = '';
+    cards.forEach((card) => {
+      const el = document.createElement('div');
+      el.className = 'scr ' + card.kind + (card.onAir ? ' on-air' : '') + (card.blackout ? ' blackout' : '') + (card.open ? ' open' : '');
+
+      const top = document.createElement('div');
+      top.className = 'top';
+      const tally = document.createElement('span');
+      tally.className = 'tally';
+      const label = document.createElement('span');
+      label.className = 'eyebrow';
+      label.textContent = card.label;
+      top.appendChild(tally);
+      top.appendChild(label);
+
+      const title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = card.title;
+      const sub = document.createElement('div');
+      sub.className = 'sub';
+      sub.textContent = card.sub;
+
+      /* Translation first, then the clock: the badge is about the text, the
+         clock is about the service. */
+      if (card.version) {
+        const versionEl = document.createElement('span');
+        versionEl.className = 'ver';
+        versionEl.textContent = card.version;
+        top.appendChild(versionEl);
+      }
+
+      if (card.clock) {
+        const clockEl = document.createElement('span');
+        clockEl.className = 'clock';
+        clockEl.textContent = card.clock;
+        top.appendChild(clockEl);
+      }
+
+      el.appendChild(top);
+      el.appendChild(title);
+      /* Skipped rather than left blank: an empty div would still cost the card
+         a row, which on a narrow phone is the title's room. */
+      if (card.sub) el.appendChild(sub);
+
+      if (card.timer !== null && card.timer !== undefined) {
+        el.appendChild(stageTimerRow(card.timer));
+      }
+      screensEl.appendChild(el);
+    });
+
+    screensEl.scrollLeft = previousScroll;
+
+    dotsEl.innerHTML = '';
+    cards.forEach(() => dotsEl.appendChild(document.createElement('i')));
+    updateDots();
+  }
+
+  /* Derived from the current scroll offset, so a rebuild of the strip does not
+     snap the indicator back to the first card while you are looking at the
+     second one. */
+  /** Start/Pause and Reset for the stage clock, on the stage card itself. */
+  function stageTimerRow(running) {
+    const row = document.createElement('div');
+    row.className = 'timerbtns';
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.textContent = running ? 'Pause' : 'Start';
+    toggle.addEventListener('click', () => stageTimer(running ? 'stop' : 'start'));
+
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.textContent = 'Reset';
+    reset.addEventListener('click', () => stageTimer('reset'));
+
+    row.appendChild(toggle);
+    row.appendChild(reset);
+    return row;
+  }
+
+  function updateDots() {
+    const dots = dotsEl.querySelectorAll('i');
+    if (!dots.length) return;
+    const card = screensEl.firstElementChild;
+    const step = card ? card.getBoundingClientRect().width + 9 : 1;
+    const index = Math.min(dots.length - 1, Math.round(screensEl.scrollLeft / step));
+    dots.forEach((dot, i) => dot.classList.toggle('on', i === index));
+  }
+
+  function trackScroll() {
+    screensEl.addEventListener('scroll', updateDots, { passive: true });
+  }
+
+  /* ── 2. tabs ──────────────────────────────────────────── */
+
+  function setTab(name) {
+    tab = name;
+    Array.prototype.forEach.call($('tabs').children, (btn) => {
+      btn.classList.toggle('on', btn.dataset.tab === name);
+    });
+    ['bible', 'session', 'ndi'].forEach((key) => {
+      $('panel-' + key).classList.toggle('on', key === name);
+    });
+    if (name === 'session') { loadSessions(); loadStatus(); }
+    if (name === 'ndi') loadStatus();
+  }
+
+  /* ── server calls ─────────────────────────────────────── */
+
+  let unauthorized = false;
 
   async function api(method, path, body) {
     try {
       const opts = { method, headers: {} };
-      if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+      if (TOKEN) opts.headers['x-bsp-token'] = TOKEN;
+      if (body) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      }
       const res = await fetch(API_BASE + path, opts);
+      if (res.status === 401 || res.status === 403) {
+        unauthorized = true;
+        banner('This link has expired', 'The app restarted since this page was opened, so its key no longer works. Rescan the QR code in Settings → Output.');
+        return { ok: false };
+      }
+      if (unauthorized) { unauthorized = false; banner(null); }
       return await res.json();
-    } catch { return { ok: false }; }
+    } catch {
+      banner('Not connected to the app', 'Check that Bible Song Pro Studio is open and that this phone is on the same network.');
+      return { ok: false };
+    }
   }
 
-  function showResults(data) {
-    results.innerHTML = '';
-    if (!data || !data.length) {
-      results.innerHTML = '<div style="color:var(--dim);text-align:center;padding:40px;font-size:13px">No results. Search or tap a quick reference.</div>';
+  /* ── translation ──────────────────────────────────────── */
+
+  function storedVersion() {
+    try { return localStorage.getItem(VERSION_KEY) || 'KJV'; } catch { return 'KJV'; }
+  }
+
+  /** The translation this phone is reading in — search and Prev/Next both use
+   *  it, so the two never disagree about which text is on screen. */
+  function currentVersion() {
+    return $('version').value || storedVersion() || 'KJV';
+  }
+
+  async function loadVersions() {
+    const data = await api('GET', '/api/bible/versions');
+    const list = data && data.ok && Array.isArray(data.versions) ? data.versions : [];
+    if (!list.length) return;
+    versions = list;
+    const select = $('version');
+    const wanted = select.value || storedVersion();
+    select.innerHTML = '';
+    versions.forEach((version) => {
+      const option = document.createElement('option');
+      option.value = version.id;
+      option.textContent = version.abbreviation || version.id;
+      select.appendChild(option);
+    });
+    select.value = versions.some((version) => version.id === wanted) ? wanted : (versions[0].id || 'KJV');
+    describeVersion();
+    /* The dual reading's second pane is chosen from the same list. */
+    paintToolOptions();
+  }
+
+  /* The box shows the abbreviation to stay narrow; the full name is the
+   tooltip and what the toast says, because "DBY" alone tells nobody anything. */
+  function describeVersion() {
+    const chosen = versions.find((version) => version.id === $('version').value);
+    $('version').title = chosen ? (chosen.name || chosen.id) : '';
+    return chosen;
+  }
+
+  function versionChanged() {
+    const chosen = describeVersion();
+    try { localStorage.setItem(VERSION_KEY, currentVersion()); } catch { /* storage off */ }
+    toast('Translation: ' + (chosen ? (chosen.abbreviation || chosen.id) : currentVersion()));
+    /* Strong's numbers are worded per translation and the book names change
+       with it, so nothing cached from the old one can be reused. */
+    strongsCache.clear();
+    if (opts.dual && opts.dualVersion === currentVersion()) {
+      const other = versions.find((version) => version.id !== currentVersion());
+      if (other) opts.dualVersion = other.id;
+      saveBibleOptions();
+      paintToolOptions();
+    }
+    if (booksOpen) {
+      /* Book names are localised, so the shelf starts again in the new one. */
+      browser.level = 'books';
+      browser.verses = [];
+      loadBooks();
       return;
     }
-    data.forEach((verse) => {
-      const card = document.createElement('div');
-      card.className = 'result-card';
-      card.innerHTML = `<div class="ref">${verse.reference}</div><div class="text">${verse.text}</div>`;
-      card.onclick = () => {
-        selectedVerse = verse;
-        document.querySelectorAll('.result-card').forEach((c) => c.style.borderColor = 'transparent');
-        card.style.borderColor = 'var(--accent)';
-        const textEl = card.querySelector('.text');
-        textEl.classList.toggle('expanded');
-      };
-      results.appendChild(card);
+    /* What is listed was read in the old translation. Re-run the same search
+       rather than leave its text under a new label. */
+    if (lastQuery) search(lastQuery);
+  }
+
+  /* ── recent references ────────────────────────────────── */
+
+  function readRecents() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+      return Array.isArray(raw) ? raw.filter((ref) => typeof ref === 'string' && ref) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function remember(reference) {
+    const ref = String(reference || '').trim();
+    if (!ref) return;
+    const next = [ref].concat(readRecents().filter((item) => item !== ref)).slice(0, RECENT_MAX);
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* storage off */ }
+    paintRecents(next);
+  }
+
+  /** The service a history row belongs to. Both lists are cleared when a
+   *  service ends, so everything in one belongs to a single group — naming that
+   *  group is what makes a Clear (or the automatic one at End) checkable while
+   *  the service is still running. */
+  /** The name this service goes by, or '' when nothing is being recorded.
+   *  One derivation, so the Session header and the history rows cannot name it
+   *  differently. */
+  function serviceName() {
+    const session = status && status.session;
+    if (!session || !session.active) return '';
+    const name = String((session.session && session.session.name) || '').trim();
+    return name || 'This service';
+  }
+
+  function sessionGroupLabel(base) {
+    const name = serviceName();
+    return name ? base + ' · ' + name : base;
+  }
+
+  /* One writer for both rows, so Recent and Studied can never end up naming
+     different services. Comparing the text keeps a status poll from touching
+     the DOM every second. */
+  function paintGroupLabels() {
+    [['recentLabel', 'Recent'], ['studiedLabel', 'Studied']].forEach(([id, base]) => {
+      const el = $(id);
+      if (!el) return;
+      const label = sessionGroupLabel(base);
+      if (el.textContent !== label) el.textContent = label;
     });
   }
 
-  async function search(query) {
-    if (!query.trim()) return;
-    const data = await api('POST', '/api/verse/search', { query: query.trim(), versionId: 'KJV', limit: 20 });
-    showResults(data.results || []);
+  /* A chip fills the search field rather than going straight to air: a
+     reference is worth one look before it is in front of the room. */
+  function paintRecents(refs) {
+    const list = refs || readRecents();
+    paintGroupLabels();
+    $('recent').hidden = booksOpen || list.length === 0;
+    const chips = $('chips');
+    chips.innerHTML = '';
+    list.forEach((ref) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = ref;
+      btn.addEventListener('click', () => { setTab('bible'); qEl.value = ref; search(ref); });
+      chips.appendChild(btn);
+    });
   }
 
-  async function projectVerse() {
-    if (!selectedVerse) return;
-    await api('POST', '/api/display/project', { verse: selectedVerse });
+  /* ── the numbers this phone has studied ──────────────── */
+
+  /** Kept per device, like the recents: the numbers one operator looks up in a
+   *  service are rarely the numbers another does. */
+  function readStudied() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(STUDY_KEY) || '[]');
+      return Array.isArray(raw) ? raw.filter((code) => typeof code === 'string' && code) : [];
+    } catch {
+      return [];
+    }
   }
 
-  // Quick refs
-  QUICK_REFS.forEach((ref) => {
-    const btn = document.createElement('button');
-    btn.textContent = ref;
-    btn.onclick = () => { searchInput.value = ref; search(ref); };
-    quickRefs.appendChild(btn);
-  });
+  function rememberStudy(code) {
+    const value = String(code || '').trim();
+    if (!value) return;
+    const next = [value].concat(readStudied().filter((item) => item !== value)).slice(0, STUDY_MAX);
+    try { localStorage.setItem(STUDY_KEY, JSON.stringify(next)); } catch { /* storage off */ }
+  }
 
-  // Events
-  searchBtn.onclick = () => search(searchInput.value);
-  searchInput.onkeydown = (e) => { if (e.key === 'Enter') search(searchInput.value); };
+  /* One chip per number, newest first. A tap opens that study; a tap on the one
+     already open closes it, because the chip and the number on the verse are
+     two ways to the same toggle. */
+  function paintStudied() {
+    const list = readStudied();
+    const active = liveStudyCode();
+    paintGroupLabels();
+    $('studied').hidden = booksOpen || list.length === 0;
+    const chips = $('studiedChips');
+    chips.innerHTML = '';
+    list.forEach((code) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = code;
+      btn.setAttribute('aria-pressed', code === active ? 'true' : 'false');
+      btn.classList.toggle('on', code === active);
+      btn.addEventListener('click', () => toggleStudy(code));
+      chips.appendChild(btn);
+    });
+  }
 
-  projectBtn.onclick = projectVerse;
-  clearBtn.onclick = () => api('POST', '/api/display/clear');
-  blackoutBtn.onclick = () => api('POST', '/api/display/blackout');
+  /* ── bible tools: books, Strong's, single/dual, FX ────── */
 
-  document.querySelectorAll('.mode-bar button').forEach((btn) => {
-    btn.onclick = () => {
-      document.querySelectorAll('.mode-bar button').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentMode = btn.dataset.mode;
+  const BIBLE_OPTIONS_KEY = 'bsp.remote.bible';
+  /* The same names the desk's FX panel shows — no parentheticals, because
+     none of them was ever a choice. */
+  const FX_TYPES = [
+    ['cut', 'Cut'],
+    ['fade', 'Fade'],
+    ['zoom', 'Zoom'],
+    ['slide-up', 'Slide up'],
+    ['slide-down', 'Slide down'],
+    ['slide-left', 'Slide left'],
+    ['slide-right', 'Slide right'],
+    ['type', 'Type on'],
+    ['type-words', 'Type words'],
+    ['zoom-type', 'Zoom + Type on'],
+    ['zoom-type-words', 'Zoom + Type words'],
+  ];
+  const FX_TIMES = [0.2, 0.4, 0.6, 0.8, 1, 1.5, 2];
+
+  function readBibleOptions() {
+    const defaults = { strongs: false, dual: false, dualVersion: '', dualLayout: 'vertical', fxType: 'fade', fxDuration: 0.4 };
+    try {
+      const raw = JSON.parse(localStorage.getItem(BIBLE_OPTIONS_KEY) || '{}');
+      return {
+        strongs: Boolean(raw.strongs),
+        dual: Boolean(raw.dual),
+        dualVersion: typeof raw.dualVersion === 'string' ? raw.dualVersion : '',
+        dualLayout: raw.dualLayout === 'horizontal' ? 'horizontal' : 'vertical',
+        fxType: typeof raw.fxType === 'string' && raw.fxType ? raw.fxType : 'fade',
+        fxDuration: Number(raw.fxDuration) || defaults.fxDuration,
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  let opts = readBibleOptions();
+  let booksOpen = false;
+  let fxOpen = false;
+  let strongsBusy = false;
+  const strongsCache = new Map();
+  const browser = { level: 'books', books: [], book: null, chapter: 0, verses: [] };
+
+  function saveBibleOptions() {
+    try { localStorage.setItem(BIBLE_OPTIONS_KEY, JSON.stringify(opts)); } catch { /* storage off */ }
+  }
+
+  /** What every projection from this phone carries: the second translation in
+   *  a dual reading, and the transition the operator picked here. Neither
+   *  touches the desk's own settings — they travel on the scene. */
+  function projectionExtras() {
+    const extras = {};
+    if (opts.dual && opts.dualVersion) {
+      extras.secondaryVersionId = opts.dualVersion;
+      extras.dualLayout = opts.dualLayout;
+    }
+    /* FX is not here on purpose: it is the app's setting now, so it is changed
+       for everyone rather than attached to one verse. */
+    return extras;
+  }
+
+  function buildSelect(el, items, value) {
+    el.innerHTML = '';
+    items.forEach(([optionValue, label]) => {
+      const option = document.createElement('option');
+      option.value = String(optionValue);
+      option.textContent = label;
+      el.appendChild(option);
+    });
+    el.value = items.some(([optionValue]) => String(optionValue) === String(value))
+      ? String(value)
+      : (items[0] ? String(items[0][0]) : '');
+  }
+
+  function paintTools() {
+    $('toolBooks').classList.toggle('on', booksOpen);
+    $('toolStrongs').classList.toggle('on', opts.strongs);
+    $('toolStrongs').setAttribute('aria-pressed', opts.strongs ? 'true' : 'false');
+    $('toolFx').classList.toggle('on', fxOpen);
+    $('toolFx').setAttribute('aria-pressed', fxOpen ? 'true' : 'false');
+    Array.prototype.forEach.call($('dualToggle').children, (btn) => {
+      const on = (btn.dataset.dual === 'dual') === opts.dual;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    Array.prototype.forEach.call($('dualLayouts').children, (btn) => {
+      const on = btn.dataset.layout === opts.dualLayout;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    $('dualOpts').hidden = !opts.dual;
+    $('fxOpts').hidden = !fxOpen;
+    $('browseBar').hidden = !booksOpen;
+    /* The shelf is a place of its own, so the recents are not stacked above it. */
+    $('recent').hidden = booksOpen || $('chips').children.length === 0;
+  }
+
+  function paintToolOptions() {
+    if (versions.length) {
+      buildSelect($('dualVersion'), versions.map((version) => [version.id, version.name || version.id]), opts.dualVersion);
+      opts.dualVersion = $('dualVersion').value || opts.dualVersion;
+    }
+    if (!$('fxType').options.length) buildSelect($('fxType'), FX_TYPES, opts.fxType);
+    if (!$('fxDuration').options.length) {
+      buildSelect($('fxDuration'), FX_TIMES.map((time) => [String(time), time + 's']), String(opts.fxDuration));
+    }
+    paintFx();
+  }
+
+  /* ── FX, which is the desk's own setting ─────────────── */
+
+  /** What the app reports, falling back to this phone's last choice while the
+   *  socket is still connecting. */
+  function appFx() {
+    const fx = live && live.fxAnimation;
+    return {
+      transitionType: (fx && fx.transitionType) || opts.fxType || 'fade',
+      duration: Number(fx && fx.duration) || opts.fxDuration || 0.4,
+      animateBackground: Boolean(fx && fx.animateBackground),
+      stageDisplayFxEnabled: !fx || fx.stageDisplayFxEnabled !== false,
     };
+  }
+
+  function setToggle(el, on) {
+    el.classList.toggle('on', Boolean(on));
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function paintFx() {
+    const fx = appFx();
+    if ($('fxType').value !== fx.transitionType) $('fxType').value = fx.transitionType;
+    /* A duration set on the desk need not be one of this list's steps — the FX
+       panel allows its own — so a value that is missing is added rather than
+       rounded to the nearest step and shown as something it is not. */
+    const duration = String(fx.duration);
+    if (!Array.prototype.some.call($('fxDuration').options, (option) => option.value === duration)) {
+      const extra = document.createElement('option');
+      extra.value = duration;
+      extra.textContent = duration + 's';
+      $('fxDuration').appendChild(extra);
+    }
+    if ($('fxDuration').value !== duration) $('fxDuration').value = duration;
+    setToggle($('fxBackground'), fx.animateBackground);
+    setToggle($('fxStage'), fx.stageDisplayFxEnabled);
+  }
+
+  /* The app applies it and pushes the result, so the controls here always show
+     what the desk is actually set to rather than what was tapped. */
+  async function sendFx(patch) {
+    const data = await api('POST', '/api/fx', patch);
+    if (!data || !data.ok) { toast((data && data.error) || 'Could not change the FX', true); return; }
+    live = Object.assign({}, live || {}, {
+      fxAnimation: Object.assign({}, (live && live.fxAnimation) || {}, patch),
+    });
+    paintFx();
+  }
+
+  function setDual(dual) {
+    opts.dual = dual;
+    /* The same translation twice is not a comparison — move the second pane to
+       another version rather than showing a verse against itself. */
+    if (dual && (!opts.dualVersion || opts.dualVersion === currentVersion())) {
+      const other = versions.find((version) => version.id !== currentVersion());
+      if (other) opts.dualVersion = other.id;
+    }
+    saveBibleOptions();
+    paintTools();
+    paintToolOptions();
+    if (dual && !opts.dualVersion) toast('No second translation is installed', true);
+  }
+
+  function setDualLayout(layout) {
+    opts.dualLayout = layout === 'horizontal' ? 'horizontal' : 'vertical';
+    saveBibleOptions();
+    paintTools();
+  }
+
+  function toggleFx() {
+    fxOpen = !fxOpen;
+    paintTools();
+  }
+
+  async function toggleStrongs() {
+    opts.strongs = !opts.strongs;
+    saveBibleOptions();
+    paintTools();
+    if (!opts.strongs) {
+      if (!booksOpen || browser.level === 'verses') renderWindow();
+      return;
+    }
+    const matched = await loadStrongs();
+    /* The app tags a curated set of original-language terms, not every word, so
+       a passage with none is normal. Say so rather than leave a lit button
+       over a list that shows no numbers. */
+    if (matched === 0) toast('No Strong’s terms in this passage');
+  }
+
+  /* Strong's numbers for what is painted, one request for the whole window
+     rather than one per card. Cached by reference, since a chapter is often
+     read twice in a service. */
+  async function loadStrongs() {
+    if (!opts.strongs || strongsBusy) return -1;
+    const visible = paintedVerses.slice(windowFrom, windowTo);
+    const annotated = () => visible
+      .filter((verse) => verse && (strongsCache.get(verse.reference) || []).some((token) => token.code))
+      .length;
+    const pending = visible.filter((verse) => verse && verse.reference && !strongsCache.has(verse.reference));
+    if (!pending.length) { paintStrongs(); return annotated(); }
+
+    strongsBusy = true;
+    const data = await api('POST', '/api/verse/strongs', {
+      verses: pending.map((verse) => ({ text: verse.text, book: verse.book })),
+    });
+    strongsBusy = false;
+    if (!opts.strongs) return -1;
+    if (data && data.ok && Array.isArray(data.annotations)) {
+      pending.forEach((verse, index) => strongsCache.set(verse.reference, data.annotations[index] || []));
+    } else if (data && data.ok === false) {
+      toast(data.error || 'Strong’s numbers are not available', true);
+      opts.strongs = false;
+      saveBibleOptions();
+      paintTools();
+      renderWindow();
+      return -1;
+    }
+    paintStrongs();
+    return annotated();
+  }
+
+  function paintStrongs() {
+    if (!opts.strongs) return;
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('.card'), (card) => {
+      const tokens = strongsCache.get(card.dataset.ref);
+      const textEl = card.querySelector('.text');
+      if (!tokens || !tokens.length || !textEl) return;
+      textEl.textContent = '';
+      tokens.forEach((token) => {
+        textEl.appendChild(document.createTextNode(token.word));
+        if (!token.code) return;
+        /* A number the desk can study is a button, exactly as it is there. */
+        const code = document.createElement('button');
+        code.type = 'button';
+        code.className = 'strongs';
+        code.dataset.code = token.code;
+        code.textContent = token.code;
+        code.setAttribute('aria-pressed', 'false');
+        code.setAttribute('aria-label', 'Word study for ' + token.code);
+        code.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const verse = paintedVerses.find((item) => item.reference === card.dataset.ref);
+          toggleStudy(token.code, verse);
+        });
+        textEl.appendChild(code);
+      });
+    });
+    markStudy();
+  }
+
+  /* ── word study: tap a number to show it, tap it again to clear ── */
+
+  /** The number the desk is studying right now, or null. */
+  function liveStudyCode() {
+    const content = live && live.scene && live.scene.content;
+    const study = content && content.wordStudy;
+    return study && study.strongs ? String(study.strongs) : null;
+  }
+
+  /** The definition itself, so a number tapped on a verse can be read out here
+   *  rather than only on the audience screen. */
+  function paintStudy() {
+    const content = live && live.scene && live.scene.content;
+    const entry = (content && content.wordStudy) || null;
+    $('study').hidden = !entry;
+    if (!entry) return;
+    $('studyCode').textContent = [entry.strongs, entry.language].filter(Boolean).join(' · ');
+    $('studyWord').textContent = '';
+    const lemma = document.createElement('span');
+    lemma.className = 'lemma';
+    lemma.textContent = entry.lemma || entry.transliteration || entry.strongs || '';
+    $('studyWord').appendChild(lemma);
+    const say = [entry.transliteration, entry.pronunciation ? '/ ' + entry.pronunciation + ' /' : ''].filter(Boolean).join('  ');
+    if (say) {
+      const said = document.createElement('span');
+      said.className = 'say';
+      said.textContent = say;
+      $('studyWord').appendChild(said);
+    }
+    $('studyGloss').textContent = entry.gloss || '';
+    $('studyGloss').hidden = !entry.gloss;
+    $('studyDef').textContent = entry.definition || '';
+    $('studyDef').hidden = !entry.definition;
+    $('studyUse').textContent = entry.kjvUsage ? 'KJV: ' + entry.kjvUsage : '';
+    $('studyUse').hidden = !entry.kjvUsage;
+  }
+
+  function markStudy() {
+    const active = liveStudyCode();
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('.strongs'), (button) => {
+      const on = Boolean(active) && button.dataset.code === active;
+      button.classList.toggle('on', on);
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  /* The desk shows a word study by putting one on the screen and clears it by
+     putting the verse back, so a second tap reprojects the verse the number
+     came from rather than blanking the screen. */
+  async function toggleStudy(code, verse) {
+    if (liveStudyCode() === code) {
+      const back = verse || lastVerse;
+      if (back) { project(back); return; }
+      clearScreen();
+      return;
+    }
+    const data = await api('POST', '/api/display/wordstudy', { code });
+    if (data && data.ok) {
+      toast('Word study: ' + code);
+      rememberStudy(code);
+      if (data.state) live = data.state;
+      afterProgramChange();
+    } else {
+      toast((data && data.error) || 'Could not open that word study', true);
+    }
+  }
+
+  /* ── book navigator ───────────────────────────────────── */
+
+  async function openBrowser() {
+    booksOpen = true;
+    browser.level = 'books';
+    browser.book = null;
+    browser.chapter = 0;
+    browser.verses = [];
+    paintTools();
+    await loadBooks();
+  }
+
+  async function loadBooks() {
+    hint('<div class="big">Loading books…</div>');
+    const data = await api('GET', '/api/bible/books?versionId=' + encodeURIComponent(currentVersion()));
+    if (!data || !data.ok) {
+      hint('<div class="big">Could not load the books</div>Check the connection and try again.');
+      return;
+    }
+    browser.books = data.books || [];
+    paintBrowser();
+  }
+
+  function paintBrowser() {
+    if (browser.level === 'verses') {
+      /* The chapter is an ordinary result list: same cards, same paging, same
+         tap-to-air — so a verse found by browsing behaves like one found by
+         searching. */
+      paintResults(browser.verses, browser.verses[0] ? browser.verses[0].reference : null);
+    } else if (browser.level === 'chapters') {
+      const count = Number(browser.book && browser.book.chapters) || 0;
+      paintGrid('chaptergrid', Array.from({ length: count }, (_, index) => ({
+        label: String(index + 1),
+        onClick: () => openChapter(index + 1),
+      })));
+    } else {
+      paintGrid('bookgrid', browser.books.map((book) => ({
+        label: book.name,
+        sub: book.chapters + (book.chapters === 1 ? ' chapter' : ' chapters'),
+        onClick: () => { browser.book = book; browser.level = 'chapters'; paintBrowser(); },
+      })));
+    }
+    paintCrumb();
+  }
+
+  function paintCrumb() {
+    $('browseBack').hidden = browser.level === 'books';
+    $('browseCrumb').textContent = !booksOpen ? ''
+      : browser.level === 'books' ? 'Books'
+        : browser.level === 'chapters' ? browser.book.name
+          : browser.book.name + ' ' + browser.chapter;
+  }
+
+  function paintGrid(className, items) {
+    resultsEl.innerHTML = '';
+    paintedVerses = [];
+    windowFrom = 0;
+    windowTo = 0;
+    searchFocus = null;
+    const grid = document.createElement('div');
+    grid.className = className;
+    items.forEach((item) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      const name = document.createElement('span');
+      name.textContent = item.label;
+      button.appendChild(name);
+      if (item.sub) {
+        const sub = document.createElement('span');
+        sub.className = 'sub';
+        sub.textContent = item.sub;
+        button.appendChild(sub);
+      }
+      button.addEventListener('click', item.onClick);
+      grid.appendChild(button);
+    });
+    resultsEl.appendChild(grid);
+  }
+
+  async function openChapter(chapter) {
+    browser.chapter = chapter;
+    hint('<div class="big">Loading…</div>');
+    const data = await api('POST', '/api/verse/chapter', { versionId: currentVersion(), book: browser.book.name, chapter });
+    if (!data || !data.ok) {
+      hint('<div class="big">Could not load that chapter</div>Check the connection and try again.');
+      return;
+    }
+    browser.verses = data.verses || [];
+    browser.level = 'verses';
+    paintBrowser();
+  }
+
+  function browserBack() {
+    if (browser.level === 'verses') { browser.level = 'chapters'; paintBrowser(); return; }
+    if (browser.level === 'chapters') { browser.level = 'books'; paintBrowser(); return; }
+    closeBrowser();
+  }
+
+  function closeBrowser() {
+    booksOpen = false;
+    browser.level = 'books';
+    browser.verses = [];
+    paintTools();
+    paintCrumb();
+    /* Back to whatever the list was before the shelf was opened. */
+    if (lastQuery) search(lastQuery);
+    else hint('<div class="big">Search a reference or a phrase</div>Tap a result and it goes straight to air.');
+  }
+
+  /* ── 3a. bible ────────────────────────────────────────── */
+
+  function hint(html) {
+    resultsEl.innerHTML = '<div class="hint">' + html + '</div>';
+  }
+
+  /** The slice a long chapter opens on: the asked-for verse a third of the way
+   *  down, so most of what follows can be read and tapped without paging. */
+  function initialWindow(verses) {
+    if (verses.length <= LIST_WINDOW) return { from: 0, to: verses.length };
+    const focusIndex = searchFocus ? verses.findIndex((verse) => verse.reference === searchFocus) : -1;
+    const centre = focusIndex >= 0 ? focusIndex : 0;
+    const from = Math.max(0, Math.min(verses.length - LIST_WINDOW, centre - Math.floor(LIST_WINDOW / 3)));
+    return { from, to: from + LIST_WINDOW };
+  }
+
+  function paintResults(verses, focus) {
+    searchFocus = focus || null;
+    paintedVerses = verses;
+    const range = initialWindow(verses);
+    windowFrom = range.from;
+    windowTo = range.to;
+    renderWindow();
+    if (!verses.length) return;
+
+    /* A chapter is a long list, and the verse that was asked for is where the
+       reading starts — bring it into view rather than dropping the operator at
+       the top of the chapter. Only on a fresh search: scrolling on every tag
+       refresh would fight the finger doing the scrolling. */
+    const anchor = resultsEl.querySelector('.card.focus');
+    if (anchor) {
+      /* Already on screen means leave it: asked for verse 1 of a chapter that
+         opens with verse 1, there is nothing to scroll, and scrolling anyway
+         would push the start of the chapter up out of view. */
+      const box = resultsEl.getBoundingClientRect();
+      const rect = anchor.getBoundingClientRect();
+      if (rect.top < box.top || rect.bottom > box.bottom) anchor.scrollIntoView({ block: 'center' });
+    }
+  }
+
+  /** Paint the current slice, with a seam on either side where the rest of a
+   *  long chapter is waiting. */
+  function renderWindow() {
+    resultsEl.innerHTML = '';
+    if (!paintedVerses.length) {
+      hint('<div class="big">Nothing found</div>Try a reference like John 3:16, or a shorter phrase.');
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    if (windowFrom > 0) {
+      fragment.appendChild(pager('Earlier verses · ' + windowFrom, () => extendWindow(-1)));
+    }
+
+    paintedVerses.slice(windowFrom, windowTo).forEach((verse) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.ref = verse.reference || '';
+
+      const ref = document.createElement('div');
+      ref.className = 'ref';
+      ref.textContent = verse.reference;
+
+      /* textContent, not innerHTML: the verse text is data from the app and
+         must not be able to introduce markup into this page. */
+      const text = document.createElement('div');
+      text.className = 'text';
+      text.textContent = verse.text;
+
+      card.appendChild(ref);
+      card.appendChild(text);
+      /* A tap is the cue and the go in one — see project(). */
+      card.addEventListener('click', () => project(verse));
+      fragment.appendChild(card);
+    });
+
+    resultsEl.appendChild(fragment);
+
+    if (windowTo < paintedVerses.length) {
+      resultsEl.appendChild(pager('Later verses · ' + (paintedVerses.length - windowTo), () => extendWindow(1)));
+    }
+
+    syncTagged();
+    /* Annotating is a request of its own, so it happens after the list is
+       readable rather than holding the paint. */
+    if (opts.strongs) void loadStrongs();
+  }
+
+  function pager(label, onClick) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'more';
+    button.textContent = label;
+    button.addEventListener('click', onClick);
+    return button;
+  }
+
+  function extendWindow(direction) {
+    const before = resultsEl.scrollTop;
+    const height = resultsEl.scrollHeight;
+    if (direction < 0) {
+      windowFrom = Math.max(0, windowFrom - LIST_WINDOW);
+      renderWindow();
+      /* Verses landed above the reader. Keep the same one under the finger
+         rather than leaving them at a top they have already read past. */
+      resultsEl.scrollTop = before + (resultsEl.scrollHeight - height);
+    } else {
+      windowTo = Math.min(paintedVerses.length, windowTo + LIST_WINDOW);
+      renderWindow();
+      resultsEl.scrollTop = before;
+    }
+  }
+
+  /* Mark whichever result is on air, and clear the mark from the rest — so the
+     list agrees with the strip straight after a tap, without another search. */
+  /** The translation of what is actually on screen, upper-cased for a label.
+   *  Read from the live scene rather than from the picker: after a translation
+   *  change the old text is still up until the next verse goes out. */
+  function liveVersion() {
+    const content = live && live.scene && live.scene.content;
+    return content && content.version ? String(content.version).toUpperCase() : '';
+  }
+
+  function syncTagged() {
+    const liveContent = live && live.scene && live.scene.content;
+    const liveRef = liveContent && liveContent.reference ? bareReference(liveContent.reference) : null;
+    const version = liveVersion();
+    /* Labelled, not just tagged: the same reference reads differently in two
+       translations, and the tag is the only place the phone says which. */
+    const label = version ? 'On air · ' + version : 'On air';
+    const cards = resultsEl.querySelectorAll('.card');
+    const onAirInList = Boolean(liveRef) && Array.prototype.some.call(cards, (card) => card.dataset.ref === liveRef);
+    /* What is on screen is where the operator's eye belongs once it is up;
+       before that, it is the verse they asked for. */
+    const anchorRef = onAirInList ? liveRef : searchFocus;
+    Array.prototype.forEach.call(cards, (card) => {
+      const isOnAir = Boolean(liveRef) && card.dataset.ref === liveRef;
+      card.classList.toggle('on-air', isOnAir);
+      card.classList.toggle('focus', Boolean(anchorRef) && card.dataset.ref === anchorRef);
+      setTag(card, 'onair', isOnAir, label);
+    });
+  }
+
+  function setTag(card, kind, present, label) {
+    const existing = card.querySelector('.ref .tag.' + kind);
+    if (present && !existing) {
+      const tag = document.createElement('span');
+      tag.className = 'tag ' + kind;
+      tag.textContent = label;
+      card.querySelector('.ref').appendChild(tag);
+    } else if (!present && existing) {
+      existing.remove();
+    } else if (present) {
+      /* Rewritten in place: the label carries the translation, and that can
+         change while the same reference stays on air. */
+      if (existing.textContent !== label) existing.textContent = label;
+    }
+  }
+
+  async function search(query) {
+    const term = String(query || '').trim();
+    if (!term || searching) return;
+    /* A search is a fresh start; leave the book shelf if it was open. */
+    if (booksOpen) {
+      booksOpen = false;
+      browser.level = 'books';
+      browser.verses = [];
+      paintTools();
+      paintCrumb();
+    }
+    searching = true;
+    lastQuery = term;
+    hint('<div class="big">Searching…</div>');
+    const data = await api('POST', '/api/verse/search', { query: term, versionId: currentVersion(), limit: 40 });
+    searching = false;
+    if (!data || !data.ok) { hint('<div class="big">Search failed</div>Check the connection and try again.'); return; }
+    paintResults(data.results || [], data.focus);
+  }
+
+  /* A tap is a cue and a go in one. The phone is in the operator's hand during
+     a service rather than on a desk, so there is no second moment in which
+     they would confirm a cue — the strip above is the confirmation. */
+  async function project(verse) {
+    if (!verse || projecting) return;
+    projecting = true;
+    const data = await api('POST', '/api/display/project', Object.assign({ verse }, projectionExtras()));
+    projecting = false;
+    if (data && data.ok) {
+      lastVerse = verse;
+      toast('Live: ' + (verse.reference || 'verse'));
+      remember(verse.reference);
+      if (data.state) live = data.state;
+      afterProgramChange();
+    } else {
+      toast('Could not put that verse on screen', true);
+    }
+  }
+
+  /* One verse on from what is on screen. The app walks the canon from the
+     projected reference, so a reading crosses chapter and book breaks without
+     the phone having to know where the reading has got to. */
+  async function step(direction) {
+    if (stepping) return;
+    stepping = true;
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+    const data = await api('POST', '/api/display/step', Object.assign(
+      { direction, versionId: currentVersion() },
+      projectionExtras(),
+    ));
+    stepping = false;
+    prevBtn.disabled = false;
+    nextBtn.disabled = false;
+    if (data && data.ok) {
+      const reference = data.verse && data.verse.reference;
+      toast((direction === 'next' ? 'Next: ' : 'Back: ') + (reference || 'verse'));
+      if (reference) remember(reference);
+      if (data.state) live = data.state;
+      afterProgramChange();
+    } else {
+      toast((data && data.error) || 'Nothing to step to', true);
+    }
+  }
+
+  /* Start, pause and reset the stage clock. The app keeps the time — this only
+     sends the instruction — so the phone and the stage screen cannot disagree
+     about how long the service has been running. */
+  async function stageTimer(command) {
+    const data = await api('POST', '/api/stage/timer', { command });
+    if (data && data.ok) {
+      if (data.state) { stage = data.state; stageAt = Date.now(); }
+      toast(command === 'start' ? 'Stage timer running' : command === 'stop' ? 'Stage timer paused' : 'Stage timer reset');
+      renderScreens();
+    } else {
+      toast((data && data.error) || 'Could not change the stage timer', true);
+    }
+  }
+
+  async function toggleBlackout() {
+    const data = await api('POST', '/api/display/blackout');
+    if (data && data.ok) {
+      toast(data.blackout ? 'Blackout on' : 'Blackout off');
+      live = Object.assign({}, live || {}, { blackout: Boolean(data.blackout) });
+      afterProgramChange();
+    } else {
+      toast('Could not toggle blackout', true);
+    }
+  }
+
+  async function clearScreen() {
+    const data = await api('POST', '/api/display/clear');
+    if (data && data.ok) {
+      toast('Screen cleared');
+      live = Object.assign({}, live || {}, { scene: null });
+      afterProgramChange();
+    } else {
+      toast('Could not clear the screen', true);
+    }
+  }
+
+  function afterProgramChange() {
+    renderScreens();
+    syncTagged();
+    paintModes();
+    markStudy();
+    paintStudy();
+    paintStudied();
+    paintFx();
+    blackoutBtn.classList.toggle('warn', Boolean(live && live.blackout));
+  }
+
+  /* ── audience screen mode ─────────────────────────────── */
+
+  function outputMode() {
+    return live && live.outputMode === 'lowerThird' ? 'lowerThird' : 'fullscreen';
+  }
+
+  /* The buttons show what the app says the screen is doing, never what was
+     last pressed — the push that follows a change is the answer. */
+  function paintModes() {
+    const mode = outputMode();
+    Array.prototype.forEach.call($('modes').children, (btn) => {
+      const on = btn.dataset.mode === mode;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  async function setMode(mode) {
+    if (mode === outputMode()) return;
+    const scene = live && live.scene;
+    /* Slides and media always play full frame: the app resolves those to
+       fullscreen whatever the lower-third setting says, so say so rather than
+       light a button that cannot take effect. */
+    if (mode === 'lowerThird' && scene && (scene.type === 'presentation' || scene.type === 'media')) {
+      toast('Slides and media play full screen only', true);
+      return;
+    }
+    const data = await api('POST', '/api/display/mode', { mode });
+    if (data && data.ok) {
+      toast(mode === 'lowerThird' ? 'Lower third' : 'Full screen');
+      live = Object.assign({}, live || {}, { outputMode: mode });
+      afterProgramChange();
+    } else {
+      /* A 404 from this endpoint means the app is running a build from before
+         the switch existed: no amount of tapping will help until it restarts. */
+      if (data && data.error === 'Not found') toast('Restart Bible Song Pro to enable the screen switch', true);
+      else toast((data && data.error) || 'Could not change the screen mode', true);
+    }
+  }
+
+  /* ── 3b. session ──────────────────────────────────────── */
+
+  async function loadSessions() {
+    const data = await api('GET', '/api/session/list');
+    const sessions = (data && data.sessions) || [];
+    $('sessionCount').textContent = String(sessions.length);
+    const list = $('sessionList');
+    if (!sessions.length) {
+      list.innerHTML = '<div class="empty">No saved sessions yet.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    sessions.slice(0, 5).forEach((session) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const name = document.createElement('b');
+      name.textContent = session.name || 'Session';
+      const meta = document.createElement('span');
+      meta.className = 'mono';
+      const when = session.startedAt ? new Date(session.startedAt) : null;
+      const count = Array.isArray(session.entries) ? session.entries.length : 0;
+      meta.textContent = (when ? when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '') + ' · ' + count;
+      row.appendChild(name);
+      row.appendChild(meta);
+      list.appendChild(row);
+    });
+  }
+
+  let lastSessionActive = null; // null until the phone has seen a session state
+
+  function renderSessionStatus() {
+    const session = status && status.session;
+    const active = Boolean(session && session.active);
+    /* The desk can end a service without the phone being touched, and a shared
+       phone should still be clean next week — so the end is taken from the
+       reported state, not only from this screen's End button. Edges only: a
+       page opened mid-service must not wipe the history it just found. */
+    if (lastSessionActive === true && !active) clearHistoryLists();
+    lastSessionActive = active;
+    /* The console owns the armed window; a status poll is the fallback when the
+       socket is down, so an armed button cannot outlive its three seconds. */
+    paintEndArm(active && Boolean(status && status.endArm && status.endArm.armed));
+    /* The header carries the service name the history rows use, so "what will
+       End clear" reads the same from either tab; the state is still the value
+       beside it. */
+    $('sessionLabel').textContent = serviceName() || 'Service Session';
+    $('sessionState').textContent = active ? 'Recording' : 'Idle';
+    $('sessionNote').textContent = active
+      ? ((session.session && session.session.entries) || 0) + ' verses so far'
+      : 'Sessions record every verse that goes to air.';
+    /* Renaming is only meaningful while a service is running, so the field
+       appears with it and the name it carries is the one on screen. A poll must
+       not overwrite a half-typed name, hence the focus guard. */
+    const nameInput = $('sessionNameInput');
+    $('renameForm').hidden = !active;
+    if (!active) { nameInput.value = ''; delete nameInput.dataset.dirty; }
+    else if (document.activeElement !== nameInput && !nameInput.dataset.dirty) {
+      nameInput.value = serviceName() === 'This service' ? '' : serviceName();
+    }
+    $('sessionStart').disabled = active;
+    $('sessionEnd').disabled = !active;
+    /* Start or End renames both groups, because the group is the service. */
+    paintGroupLabels();
+  }
+
+  async function renameSession(event) {
+    event.preventDefault();
+    const input = $('sessionNameInput');
+    const name = input.value.trim();
+    if (!name) { toast('Type a name first', true); return; }
+    const data = await api('POST', '/api/session/rename', { name });
+    if (data && data.ok !== false) {
+      toast('Service renamed');
+      delete input.dataset.dirty;
+      input.blur();
+      await loadStatus();
+    }
+    else toast('Could not rename the service', true);
+  }
+
+  async function startSession() {
+    /* No name: the console names it, using the desk's clock and the one rule the
+       desktop uses, so a service started here is filed like one started there. */
+    const data = await api('POST', '/api/session/start', {});
+    if (data && data.ok !== false) {
+      /* The name comes back from the console, so the operator sees what the
+         service will be filed as rather than a bare "started". */
+      const name = String((data.session && data.session.name) || '');
+      await loadStatus();
+      toast(name ? name + ' started' : 'Session started');
+    }
+    else toast('Could not start a session', true);
+  }
+
+  /* A shared phone should open next week's service with nothing on it from this
+     one. Both lists are per device, so this is cleared here rather than asked
+     of the desk — and only after the session is safely saved, so a failure to
+     end it leaves the history where the operator can still use it. */
+  function clearHistoryLists() {
+    try {
+      localStorage.removeItem(RECENT_KEY);
+      localStorage.removeItem(STUDY_KEY);
+    } catch { /* storage off */ }
+    ['clearRecents', 'clearStudied'].forEach((id) => {
+      const button = $(id);
+      if (!button) return;
+      button.dataset.armed = '';
+      button.textContent = 'Clear';
+    });
+    paintRecents([]);
+    paintStudied();
+  }
+
+  /* Ending also discards both history lists, so it takes two taps like the Clear
+     buttons. The armed window is kept by the console, not by this page: a tap on
+     the desk's End button disarms this one before the second tap could land, and
+     an armed button left in a pocket expires on the console's clock. */
+  function paintEndArm(armed) {
+    const button = $('sessionEnd');
+    button.dataset.armed = armed ? '1' : '';
+    button.textContent = armed ? 'Sure? End' : 'End';
+  }
+
+  function endSession() {
+    const button = $('sessionEnd');
+    if (button.dataset.armed !== '1') {
+      paintEndArm(true); // optimistic; the console's echo is authoritative
+      api('POST', '/api/session/end/arm', { armed: true });
+      return;
+    }
+    paintEndArm(false);
+    api('POST', '/api/session/end/arm', { armed: false });
+    /* Disabled rather than just ignored, so a third tap during the request
+       cannot fire a second end. loadStatus decides the real state. */
+    button.disabled = true;
+    finishSession();
+  }
+
+  async function finishSession() {
+    /* Read the name before ending: afterwards there is no service to name, and
+       the toast is the last chance to say which one was filed. */
+    const ending = serviceName();
+    const name = ending === 'This service' ? '' : ending;
+    const data = await api('POST', '/api/session/end');
+    if (data && data.ok) {
+      clearHistoryLists();
+      toast((name ? name + ' saved' : 'Session saved') + ' · history cleared');
+      await loadStatus();
+      loadSessions();
+    } else toast('Could not end the session', true);
+  }
+
+  /* ── 3c. ndi ──────────────────────────────────────────── */
+
+  function renderNdi() {
+    const ndi = (status && status.ndi) || {};
+    const running = Boolean(ndi.running);
+    $('ndiState').textContent = running ? 'Streaming' : (ndi.available ? 'Idle' : 'Unavailable');
+    $('ndiNote').textContent = ndi.lastError
+      ? ndi.lastError
+      : 'Streams this console to OBS, vMix or another machine.';
+
+    const rows = [
+      ['Source', ndi.source || '—'],
+      ['Resolution', ndi.width && ndi.height ? ndi.width + '×' + ndi.height : '—'],
+      ['Consumers', String(ndi.connections || 0)],
+      ['Feeds', String(ndi.activeFeedCount || 0)],
+    ];
+    $('ndiRows').innerHTML = '';
+    rows.forEach(([label, value]) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const key = document.createElement('span');
+      key.textContent = label;
+      const val = document.createElement('span');
+      val.className = 'mono';
+      val.textContent = value;
+      row.appendChild(key);
+      row.appendChild(val);
+      $('ndiRows').appendChild(row);
+    });
+    $('ndiStart').disabled = running || !ndi.available;
+    $('ndiStop').disabled = !running;
+  }
+
+  async function startNdi() {
+    const data = await api('POST', '/api/ndi/start');
+    if (data && data.ok) { toast('NDI started'); await loadStatus(); }
+    else toast((data && data.error) || 'Could not start NDI', true);
+  }
+
+  async function stopNdi() {
+    const data = await api('POST', '/api/ndi/stop');
+    if (data && data.ok) { toast('NDI stopped'); await loadStatus(); }
+    else toast('Could not stop NDI', true);
+  }
+
+  /* ── status + live state ──────────────────────────────── */
+
+  async function loadStatus() {
+    const data = await api('GET', '/api/status');
+    if (!data || !data.ok) { renderScreens(); return; }
+    status = data;
+    if (data.displayState) live = data.displayState;
+    renderScreens();
+    renderSessionStatus();
+    renderNdi();
+    afterProgramChange();
+  }
+
+  /* One fetch when the socket opens — and again after a reconnect — is all the
+     stage needs now; every later change is pushed as `stage:update`. */
+  async function loadStage() {
+    const data = await api('GET', '/api/stage/state');
+    if (data && data.ok) { stage = data; stageAt = Date.now(); renderScreens(); }
+  }
+
+  let ws = null;
+  let retry = 0;
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(proto + '//' + location.host + (TOKEN ? '/?token=' + encodeURIComponent(TOKEN) : '/'));
+
+    /* Versions are re-read on every open, not only at load: a translation
+       imported in the app while this page sat in a pocket should appear. */
+    ws.onopen = () => { retry = 0; setConnected(true); loadStatus(); loadStage(); loadVersions(); };
+
+    ws.onmessage = (event) => {
+      let msg;
+      try { msg = JSON.parse(event.data); } catch { return; }
+      /* Stage has its own message type. It must be handled before the display
+         branch, whose "looks like state" test a stage summary would fail. */
+      /* The armed End window is shared with the desk, so both buttons agree. */
+      if (msg && msg.type === 'endArm') { paintEndArm(Boolean(msg.armed)); return; }
+      if (msg && msg.type === 'stage:update') {
+        if (msg.state) { stage = msg.state; stageAt = Date.now(); renderScreens(); }
+        return;
+      }
+      const state = msg && msg.type === 'display:update' ? msg.state : (msg && msg.state ? msg.state : msg);
+      if (!state || typeof state !== 'object') return;
+      if (state.scene !== undefined || state.blackout !== undefined) {
+        live = state;
+        afterProgramChange();
+      }
+    };
+
+    ws.onclose = () => {
+      setConnected(false);
+      retry = Math.min(retry + 1, 6);
+      setTimeout(connect, 600 * retry);
+    };
+    ws.onerror = () => { try { ws.close(); } catch { /* already closing */ } };
+  }
+
+  /* ── wiring ───────────────────────────────────────────── */
+
+  $('go').addEventListener('click', () => { setTab('bible'); search(qEl.value); });
+  qEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    qEl.blur();
+    setTab('bible');
+    search(qEl.value);
+  });
+  prevBtn.addEventListener('click', () => step('previous'));
+  nextBtn.addEventListener('click', () => step('next'));
+  $('version').addEventListener('change', versionChanged);
+  Array.prototype.forEach.call($('modes').children, (btn) => {
+    btn.addEventListener('click', () => setMode(btn.dataset.mode));
   });
 
-  // Load initial
-  api('POST', '/api/verse/search', { query: 'John 3:16', versionId: 'KJV', limit: 5 }).then(showResults);
+  $('toolBooks').addEventListener('click', () => { if (booksOpen) closeBrowser(); else void openBrowser(); });
+  $('toolStrongs').addEventListener('click', toggleStrongs);
+  $('toolFx').addEventListener('click', toggleFx);
+  $('browseBack').addEventListener('click', browserBack);
+  Array.prototype.forEach.call($('dualToggle').children, (btn) => {
+    btn.addEventListener('click', () => setDual(btn.dataset.dual === 'dual'));
+  });
+  Array.prototype.forEach.call($('dualLayouts').children, (btn) => {
+    btn.addEventListener('click', () => setDualLayout(btn.dataset.layout));
+  });
+  $('dualVersion').addEventListener('change', () => { opts.dualVersion = $('dualVersion').value; saveBibleOptions(); });
+  $('fxType').addEventListener('change', () => {
+    opts.fxType = $('fxType').value;
+    saveBibleOptions();
+    paintFx();
+    sendFx({ transitionType: opts.fxType });
+  });
+  $('fxDuration').addEventListener('change', () => {
+    opts.fxDuration = Number($('fxDuration').value) || 0.4;
+    saveBibleOptions();
+    paintFx();
+    sendFx({ duration: opts.fxDuration });
+  });
+  $('fxBackground').addEventListener('click', () => sendFx({ animateBackground: !appFx().animateBackground }));
+  $('fxStage').addEventListener('click', () => sendFx({ stageDisplayFxEnabled: !appFx().stageDisplayFxEnabled }));
+  /* Two taps, because this is a phone and a thumb brushing a Clear would cost
+     the next operator the service's references. The second tap has to come
+     within three seconds, which is long enough to be deliberate and short
+     enough that a stale "Sure?" is never sitting armed on a shared device. */
+  function clearHistory(key, button, after) {
+    clearTimeout(Number(button.dataset.timer) || 0);
+    if (button.dataset.armed !== '1') {
+      button.dataset.armed = '1';
+      button.textContent = 'Sure?';
+      const timer = setTimeout(() => {
+        button.dataset.armed = '';
+        button.textContent = 'Clear';
+      }, 3000);
+      button.dataset.timer = String(timer);
+      return;
+    }
+    button.dataset.armed = '';
+    button.textContent = 'Clear';
+    try { localStorage.removeItem(key); } catch { /* storage off */ }
+    after();
+  }
 
-  connectWS();
+  $('clearRecents').addEventListener('click', () => clearHistory(RECENT_KEY, $('clearRecents'), () => {
+    paintRecents([]);
+    toast('Recent references cleared');
+  }));
+  $('clearStudied').addEventListener('click', () => clearHistory(STUDY_KEY, $('clearStudied'), () => {
+    paintStudied();
+    toast('Studied numbers cleared');
+  }));
+
+  /* Closing the study puts back the verse the number came from — the same
+     gesture as tapping the lit number, so there is one way to clear it. */
+  $('studyClose').addEventListener('click', () => {
+    const code = liveStudyCode();
+    if (code) toggleStudy(code, lastVerse);
+  });
+  blackoutBtn.addEventListener('click', toggleBlackout);
+  clearBtn.addEventListener('click', clearScreen);
+  $('renameForm').addEventListener('submit', renameSession);
+  /* A name typed but not yet submitted survives a status poll. */
+  $('sessionNameInput').addEventListener('input', (event) => { event.target.dataset.dirty = '1'; });
+  $('sessionStart').addEventListener('click', startSession);
+  $('sessionEnd').addEventListener('click', endSession);
+  $('ndiStart').addEventListener('click', startNdi);
+  $('ndiStop').addEventListener('click', stopNdi);
+
+  Array.prototype.forEach.call($('tabs').children, (btn) => {
+    btn.addEventListener('click', () => setTab(btn.dataset.tab));
+  });
+
+  paintRecents();
+  paintStudied();
+  loadVersions();
+
+  if (!TOKEN) {
+    banner('This link is missing its key', 'Open the QR code in Settings → Output and scan it again.');
+  }
+
+  trackScroll();
+  renderScreens();
+  paintModes();
+  paintTools();
+  paintToolOptions();
+  setConnected(false);
+  connect();
+
+  /* NDI consumers and session state change without a display update, so poll
+     while the page is on screen — never in the background. Stage is not polled:
+     it is pushed. */
+  setInterval(() => {
+    if (document.visibilityState === 'visible') loadStatus();
+  }, 5000);
+
+  /* The stage clock between pushes: rewrite just that line of text, so the
+     strip is not rebuilt once a second. */
+  function refreshStageClock() {
+    if (!stage || !stage.open) return;
+    const el = document.querySelector('.scr.stage .clock');
+    const next = clock(stageSeconds());
+    if (el && el.textContent !== next) el.textContent = next;
+  }
+
+  setInterval(() => {
+    if (document.visibilityState === 'visible') refreshStageClock();
+  }, 1000);
+
+  /* A backgrounded page has its timers throttled, so a phone that comes back
+     to the foreground would otherwise show a stale clock until the next push.
+     The value is derived from the receipt time, so recomputing is enough. */
+  document.addEventListener('visibilitychange', refreshStageClock);
 })();
 </script>
 </body>
