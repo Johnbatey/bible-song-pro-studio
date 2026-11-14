@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Bible Song Pro Studio — YouTube Thumbnail</title>
+<style>
+/* ============================================================
+   BIBLE SONG PRO — YOUTUBE THUMBNAIL · "Animation in BSP Studio"
+   1280 × 720. Brand tokens from tokens.css, same system as the
+   carousel: booth black, one signal orange, three faces.
+   ============================================================ */
+
+@font-face{font-family:'Source Serif 4';src:url('../carousel/fonts/SourceSerif4-latin-var.woff2') format('woff2');font-weight:200 900;font-display:block;}
+@font-face{font-family:'Inter';src:url('../carousel/fonts/InterVariable.woff2') format('woff2');font-weight:100 900;font-display:block;}
+@font-face{font-family:'Geist Mono';src:url('../carousel/fonts/GeistMono-latin-400.woff2') format('woff2');font-weight:400;font-display:block;}
+
+:root{
+  --booth:#0C0B0B; --ground:#111010; --surface:#161414; --raised:#1D1B1C;
+  --edge:#262628; --mute:#6E6968; --dim:#A8A2A0; --soft:#D9D4D2; --screen:#fff;
+  --signal:#FF5500;
+  --voice:'Source Serif 4',Georgia,serif;
+  --ui:'Inter',-apple-system,system-ui,sans-serif;
+  --sig:'Geist Mono',ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{-webkit-font-smoothing:antialiased;}
+body{background:#151313;}
+
+.thumb{
+  position:relative;width:1280px;height:720px;overflow:hidden;
+  background:var(--booth);color:var(--screen);font-family:var(--ui);
+}
+.thumb *{position:relative;}
+
+/* one warm light, from behind the presenter */
+.glow{
+  position:absolute;top:-260px;right:-140px;width:940px;height:940px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,85,0,.13) 0%,rgba(255,85,0,.035) 44%,transparent 68%);
+}
+
+/* ---------------- header row ---------------- */
+.kicker{position:absolute;left:56px;top:54px;display:flex;align-items:center;gap:9px;}
+.tally{width:8px;height:8px;border-radius:999px;background:var(--signal);
+  box-shadow:0 0 12px 2px rgba(255,85,0,.6);}
+.kicker .t{font-family:var(--sig);font-size:13px;letter-spacing:.18em;color:var(--signal);text-transform:uppercase;}
+
+.brand{position:absolute;right:52px;top:46px;display:flex;align-items:center;gap:10px;}
+.brand img{width:36px;height:36px;border-radius:9px;}
+.brand .n{font-size:17px;font-weight:600;letter-spacing:-.025em;}
+.brand .n sup{font-family:var(--sig);font-size:7px;font-weight:400;letter-spacing:.14em;
+  text-transform:uppercase;margin-left:.34em;vertical-align:.9em;line-height:0;color:var(--dim);}
+
+/* ---------------- the hook ---------------- */
+.h1{position:absolute;left:52px;top:96px;font-size:119px;font-weight:700;
+  line-height:.94;letter-spacing:-.05em;}
+.h1 .dot{color:var(--signal);}
+
+.chips{position:absolute;left:58px;top:352px;display:flex;gap:8px;}
+.chip{
+  font-family:var(--sig);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  padding:8px 10px;border:1px solid var(--edge);border-radius:2px;color:var(--dim);
+}
+.chip.on{color:var(--signal);border-color:#4A2A18;background:rgba(255,85,0,.08);}
+
+/* ---------------- the live surface (carousel treatment) ---------------- */
+.card{
+  position:absolute;left:56px;top:414px;width:600px;height:272px;
+  background:var(--surface);border:1px solid var(--edge);border-radius:4px;
+  padding:22px 28px;display:flex;flex-direction:column;
+  box-shadow:0 30px 70px rgba(0,0,0,.55);
+}
+.card .top{display:flex;align-items:center;gap:9px;}
+.card .top .lbl{font-family:var(--sig);font-size:11px;letter-spacing:.18em;
+  color:var(--signal);text-transform:uppercase;}
+.card .verse{
+  margin-top:16px;font-family:var(--voice);font-weight:300;font-size:31px;line-height:1.26;
+  letter-spacing:-.012em;color:var(--screen);
+}
+.card .caret{display:inline-block;width:2px;height:.76em;background:var(--signal);
+  margin-left:4px;vertical-align:-.03em;}
+.card .foot{margin-top:auto;display:flex;align-items:baseline;justify-content:space-between;}
+.card .ref{font-family:var(--sig);font-size:10px;letter-spacing:.16em;color:var(--signal);}
+.card .tc{font-family:var(--sig);font-size:10px;letter-spacing:.1em;color:var(--mute);}
+
+/* ---------------- presenter, cut out, no frame ---------------- */
+.presenter{
+  position:absolute;right:34px;bottom:0;height:644px;
+  filter:drop-shadow(0 22px 44px rgba(0,0,0,.7));
+}
+
+/* preview chrome (not exported) */
+body.deck{display:flex;flex-direction:column;align-items:center;gap:22px;padding:40px 0 60px;}
+body.deck .cap{font-family:var(--sig);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#6E6968;}
+</style>
+</head>
+<body class="deck">
+
+<div class="thumb">
+  <div class="glow"></div>
+
+  <div class="kicker"><span class="tally"></span><span class="t">Animation FX</span></div>
+
+  <div class="brand">
+    <img src="./assets/bsp-icon.png" alt="Bible Song Pro Studio" />
+    <span class="n">Bible Song Pro<sup>Studio</sup></span>
+  </div>
+
+  <h1 class="h1">Animate<br>Any Verse<span class="dot">.</span></h1>
+
+  <div class="chips">
+    <span class="chip on">Zoom + Type-On</span>
+    <span class="chip">Word by Word</span>
+    <span class="chip">0.8 s</span>
+  </div>
+
+  <div class="card">
+    <div class="top"><span class="tally"></span><span class="lbl">Program · Live</span></div>
+    <div class="verse">And God said, Let there be light: and there was light.<span class="caret"></span></div>
+    <div class="foot">
+      <span class="ref">GENESIS 1:3 · KJV</span>
+      <span class="tc">00:04:12</span>
+    </div>
+  </div>
+
+  <img class="presenter" src="./assets/presenter-clean.png" alt="Tutorial presenter" />
+</div>
+
+<div class="cap">1280 × 720 · YouTube thumbnail</div>
+</body>
+</html>

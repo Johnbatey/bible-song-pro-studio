@@ -22,12 +22,6 @@ export default defineConfig({
             console.warn(`Could not copy ${f}:`, e.message);
           }
         });
-        const slideEditorDir = path.resolve(__dirname, 'public/slide-editor');
-        const distSlideEditor = path.join(distDir, 'slide-editor');
-        if (existsSync(slideEditorDir)) {
-          cpSync(slideEditorDir, distSlideEditor, { recursive: true });
-          console.log('Copied slide-editor/ to dist/');
-        }
         // Copy assets/bibles for bible service access at runtime
         const biblesSrc = path.resolve(__dirname, 'assets/bibles');
         const biblesDest = path.join(distDir, 'assets/bibles');

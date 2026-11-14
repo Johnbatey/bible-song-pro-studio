@@ -23,7 +23,7 @@
 
 This work adds a full operator-facing internationalization system for Bible Song Pro Studio and completes localization across Settings, docks, Pro Slides creation, the React Slide Editor, backup/restore, and related chrome. It also replaces emoji-as-icons with stroke SVG icons in Settings / word-study / slide editor surfaces, and improves live output UX: re-clicking a live presentation slide or queue item takes Program down; queue play becomes pause while live; the same scripture/song passage cannot be queued twice.
 
-**Out of scope (intentionally):** projected congregation content (verse text, lyrics), brand/jargon tokens (NDI, Deepgram, Pro Slides, Preview, Program, TAKE, LIVE), and the legacy HTML slide editor at `public/slide-editor/` (the in-app React `SlideEditorModal` is the primary path).
+**Out of scope (intentionally):** projected congregation content (verse text, lyrics), brand/jargon tokens (NDI, Deepgram, Pro Slides, Preview, Program, TAKE, LIVE), and the retired legacy HTML slide editor (the in-app React `SlideEditorModal` is now the only editor; the old bundle survives only as the dev parity oracle at `scripts/slide-engine-oracle/`, which no user ever sees).
 
 ---
 
@@ -157,7 +157,7 @@ Approx. scale vs pre-i18n baseline (`ed30187..HEAD`): **~50 files**, **~6.6k ins
 ## Follow-ups (not in this PR)
 
 - Localize remaining SongPacks internals / other empty states (Media grid, Session History) if still English.
-- Migrate or retire legacy `public/slide-editor/index.html` (still English if opened as Electron window content).
+- ~~Migrate or retire legacy `public/slide-editor/index.html`~~ — retired. The standalone window and its `slide-editor:open` IPC are gone; the in-app React editor is the only editor, and the bundle now lives outside `public/` as a dev-only fixture.
 - Optional: toast when queue add is ignored as duplicate.
 - Performance plan items (NDI poll unification, `useStoreSync` debounce, `requestSingleInstanceLock`) remain separate.
 

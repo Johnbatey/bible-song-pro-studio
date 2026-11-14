@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { AppleToggle } from './AppleToggle';
+import { RemoteQrCode } from './RemoteQrCode';
 import type { AppSettings, AppSettingsPatch, DisplayTarget, AudioInputDevice, LocalModelStatus, NdiStatus, SermonLanguage, BibleDisplayOptions, NdiOutputFeed, NdiContentFilter, NdiRenderMode, NdiFeedStatus } from '../types';
 import { BackupSystem } from './settings/BackupSystem';
 import { createDefaultTheme } from '../utils/defaultTheme';
@@ -260,6 +261,9 @@ export function SettingsModal() {
   const platform = useAppStore((s) => s.platform);
   const showSongCredits = useAppStore((s) => s.showSongCredits);
   const setShowSongCredits = useAppStore((s) => s.setShowSongCredits);
+  /* The output links are built by the main process (port, LAN address, this
+     session's key) and arrive with the display status. */
+  const outputStatus = useAppStore((s) => s.display.outputStatus);
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(activeCategoryValue || 'scripture');
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -1308,6 +1312,53 @@ export function SettingsModal() {
                       {t('settings.output.openStage')}
                     </button>
                   </div>
+                </div>
+
+                {/* Browser and phone output. Both links carry this session's
+                    key, so they are shown here rather than documented: the
+                    operator pastes one into OBS and scans the other. */}
+                <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+                  <div>
+                    <div style={modalStyles.rowTitle}>Browser &amp; Phone Output</div>
+                    <div style={modalStyles.rowSub}>
+                      Paste the browser link into OBS as a Browser Source, or scan the code to open the
+                      remote on a phone on the same network. Both carry a key for this session, so they
+                      change every time the app starts.
+                    </div>
+                  </div>
+                  {outputStatus.browserUrl ? (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        readOnly
+                        value={outputStatus.browserUrl}
+                        onFocus={(e) => e.currentTarget.select()}
+                        style={{ ...modalStyles.textInput, flex: 1, minWidth: 0 }}
+                      />
+                      <SettingsCopyButton textToCopy={outputStatus.browserUrl} label="Copy" style={modalStyles.actionBtn} />
+                    </div>
+                  ) : (
+                    <div style={modalStyles.rowSub}>
+                      The output server is not running, so there is no link to show. Check the port, then reopen Settings.
+                    </div>
+                  )}
+                  {outputStatus.remoteUrl && (
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <RemoteQrCode url={outputStatus.remoteUrl} size={132} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 0 }}>
+                        <input
+                          type="text"
+                          readOnly
+                          value={outputStatus.remoteUrl}
+                          onFocus={(e) => e.currentTarget.select()}
+                          style={{ ...modalStyles.textInput, width: '100%' }}
+                        />
+                        <div>
+                          <SettingsCopyButton textToCopy={outputStatus.remoteUrl} label="Copy remote link" style={modalStyles.actionBtn} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ ...modalStyles.formRow, flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>

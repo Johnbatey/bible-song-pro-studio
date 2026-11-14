@@ -52,7 +52,7 @@ product. Overall completion: **~50%**. Legend: `[x]` done · `[~]` partial · `[
       them — the mobile remote could never drive the display. Relay now re-sends as text
 
 ## Phase 4: Presentation Engine — ~80%
-- [x] Slide system (`SlideEditor.tsx` + `public/slide-editor` bundle, localStorage-backed)
+- [x] Slide system (`SlideEditorModal` over `src/renderer/components/slide-editor` and the `slide-engine` parser — **one** editor; the old `public/slide-editor` bundle and the window that opened it are retired, and the bundle is kept only as the parity oracle in `scripts/slide-engine-oracle/`)
 - [x] **Media import** — real image/video library (`media-service.cjs`): native picker + drag-and-drop
       (`webUtils.getPathForFile`), files copied into `userData/media`, served from `/media/` with HTTP
       Range support so video seeks and loops, path traversal refused, orphaned entries self-prune
@@ -186,7 +186,7 @@ top of these candidates later.
 | Live STT | Deepgram streaming (reconnect/backoff/stall detection) + offline whisper.cpp large-v3-turbo w/ CoreML + silero VAD | Web Speech API (non-functional) |
 | Display | Dual translation (`secondaryVerse`), lyric mode w/ author + copyright + key, autofit | ✅ both now supported |
 | Assets | MP4 motion backgrounds, JPG themes, PNG lower thirds | HTML/SVG equivalents |
-| Remote | Token-authed (`/api/ws-token`) | No auth |
+| Remote | Token-authed (`/api/ws-token`) | Token-authed per launch: `?token=` on the link the app shows, traded for an HttpOnly cookie, checked on the API, the projector pages and the WebSocket handshake |
 
 **Where we are ahead:** slide editor with PPTX/PDF import, stage display, a real theme *designer*
 (it ships fixed themes), scene list, session history with export.

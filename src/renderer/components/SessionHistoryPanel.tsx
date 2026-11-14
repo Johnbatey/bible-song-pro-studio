@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { type, fontWeight } from '../styles/type';
 import { Block, BlockButton } from './Block';
@@ -10,12 +10,59 @@ export function SessionHistoryPanel() {
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
   const [sessionData, setSessionData] = useState<any>(null);
   const [status, setStatus] = useState<any>(null);
+  /* A service started from the phone is named by date; the desk can fix that
+     while it runs. The draft only re-syncs from the live name when the operator
+     is not in the middle of editing it. */
+  const [nameDraft, setNameDraft] = useState('');
+  const nameDirty = useRef(false);
+  /* Ending clears the phone's history lists too, so a stray click should not do
+     it: the first click arms, the second ends. */
+  const [endArmed, setEndArmed] = useState(false);
+
+  /* The armed window lives in main, so arming here disarms the phone immediately
+     and arming there updates this button before a second click could land. */
+  useEffect(() => {
+    const off = window.BSP?.session?.onEndArm?.((payload) => setEndArmed(Boolean(payload?.armed)));
+    return () => { if (typeof off === 'function') off(); };
+  }, []);
 
   useEffect(() => { refresh(); }, []);
+
+  useEffect(() => {
+    const live = status?.session?.name;
+    if (live && !nameDirty.current) setNameDraft(live);
+  }, [status?.session?.name]);
+
+  useEffect(() => {
+    if (!status?.active) setEndArmed(false);
+  }, [status?.active]);
+
+  async function endService() {
+    if (!endArmed) {
+      await window.BSP?.session?.armEnd({ armed: true });
+      return;
+    }
+    await window.BSP?.session?.armEnd({ armed: false });
+    await window.BSP?.session?.end();
+    refresh();
+  }
+
+  async function renameActive() {
+    const name = nameDraft.trim();
+    if (!name) return;
+    const res = await window.BSP?.session?.rename({ name }).catch(() => null);
+    if (!res?.ok) return;
+    nameDirty.current = false;
+    await refresh();
+  }
 
   async function refresh() {
     const s = await window.BSP?.session?.status().catch(() => null);
     setStatus(s);
+    /* A finished service is not renameable, so the next one starts from its own
+       name rather than a leftover draft. */
+    if (!s?.active) nameDirty.current = false;
+    setEndArmed(Boolean(s?.endArm?.armed));
     const list = await window.BSP?.session?.list().catch(() => ({ sessions: [] }));
     const allSessions = list?.sessions || [];
     setSessions(allSessions);
@@ -54,21 +101,33 @@ export function SessionHistoryPanel() {
     <Block
       className="blk-fill"
       title="History"
-      subtitle={status?.active ? '● Recording' : undefined}
+      /* The name is the one thing worth seeing without opening the panel: it is
+         what the saved history will be filed under. Capped and ellipsised here,
+         because .blk__subtitle is nowrap and unsrinkable and a long name would
+         otherwise push the tools out of a narrow dock's chrome bar. */
+      subtitle={status?.active ? (
+        <span
+          title={status?.session?.name || 'Recording'}
+          style={{ display: 'inline-block', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'bottom' }}
+        >
+          {'● ' + (status?.session?.name || 'Recording')}
+        </span>
+      ) : undefined}
       tools={(
         <>
           <BlockButton
-            onClick={async () => { await window.BSP?.session?.start({ name: 'Session ' + new Date().toLocaleTimeString() }); refresh(); }}
+            onClick={async () => { await window.BSP?.session?.start(); refresh(); }}
             title="Start a new session"
           >
             + New
           </BlockButton>
           {status?.active && (
             <BlockButton
-              onClick={async () => { await window.BSP?.session?.end(); refresh(); }}
-              title="End active session"
+              onClick={endService}
+              title={endArmed ? 'Click again to end the service' : 'End active session'}
+              style={endArmed ? { color: '#FF5500' } : undefined}
             >
-              End
+              {endArmed ? 'Sure? End' : 'End'}
             </BlockButton>
           )}
           <BlockButton onClick={refresh} title="Refresh history">⟳</BlockButton>
@@ -106,6 +165,39 @@ export function SessionHistoryPanel() {
           </div>
         )}
       </div>
+
+      {status?.active && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+          <input
+            value={nameDraft}
+            onChange={(e) => { nameDirty.current = true; setNameDraft(e.target.value); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') renameActive(); }}
+            placeholder="Name this service"
+            maxLength={80}
+            aria-label="Service name"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              height: 28,
+              padding: '0 8px',
+              background: 'var(--chrome-control)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 6,
+              color: 'var(--text-primary)',
+              fontSize: 12,
+              fontFamily: 'inherit',
+              outline: 'none',
+            }}
+          />
+          <BlockButton
+            onClick={renameActive}
+            title="Rename the running service"
+            style={{ height: 28, fontSize: 11 }}
+          >
+            Rename
+          </BlockButton>
+        </div>
+      )}
 
       {sessionData && sessionData.entries && sessionData.entries.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '2px 0' }}>

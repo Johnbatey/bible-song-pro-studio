@@ -1193,6 +1193,19 @@ const OT_BOOKS = new Set([
   'Obadiah', 'Jonah', 'Micah', 'Nahum', 'Habakkuk', 'Zephaniah', 'Haggai', 'Zechariah', 'Malachi'
 ]);
 
+/** The entry a Strong's number names, for the phone's tap-to-project. Built
+    from the same two tables the tagging uses, so a number shown on a verse can
+    always be answered — which a separate lookup table could not promise. */
+const STRONGS_BY_CODE: Record<string, WordStudyEntry> = {};
+for (const entry of [...Object.values(GREEK_WORDS), ...Object.values(HEBREW_WORDS)]) {
+  if (entry.strongs && !STRONGS_BY_CODE[entry.strongs]) STRONGS_BY_CODE[entry.strongs] = entry;
+}
+
+export function lookupStrongsEntry(code: string): WordStudyEntry | null {
+  if (!code) return null;
+  return STRONGS_BY_CODE[String(code).trim().toUpperCase()] || null;
+}
+
 export function annotateTextWithStrongsSync(text: string, bookName?: string): Array<{ word: string; strongs?: WordStudyEntry }> {
   if (!text) return [];
   const isOT = bookName ? OT_BOOKS.has(bookName) : true;

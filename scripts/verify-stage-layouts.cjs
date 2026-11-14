@@ -93,8 +93,14 @@ assert.match(designerHtml, /frame-src 'none'/, "the designer's CSP must set fram
 assert.match(canvas, /<StageSurface/, 'the designer canvas must render StageSurface, not a facsimile of it');
 assert.doesNotMatch(canvas, /<iframe|createElement\(['"`]iframe/i, 'the designer must not embed anything');
 
-// The window.
-const designerWindow = main.match(/function createStageDesignerWindow\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+// The window, and the close path that guards it. Both, because the guard moved
+// into setupStageDesignerEvents when the window grew a prewarmed copy — matching
+// only createStageDesignerWindow() is how this assertion went quiet while the
+// behaviour it names stayed put.
+const designerWindow = [
+  main.match(/function setupStageDesignerEvents\(win\) \{[\s\S]*?\n\}/)?.[0] || '',
+  main.match(/function createStageDesignerWindow\(\) \{[\s\S]*?\n\}/)?.[0] || '',
+].join('\n');
 assert.ok(designerWindow, 'createStageDesignerWindow must exist in main.cjs');
 assert.match(designerWindow, /webSecurity:\s*true/, 'the designer window must run with webSecurity on');
 assert.match(designerWindow, /contextIsolation:\s*true/, 'the designer window must run with context isolation');
@@ -147,10 +153,19 @@ assert.match(panel, /useLayoutLibrary\(\)/, 'the operator panel must read the sa
 assert.match(panel, /\.\.\.PRESET_OPTIONS,[\s\S]{0,200}library\.layouts\.map/, 'the layout picker must list presets and saved layouts together');
 assert.match(panel, /openStageDesigner/, 'the operator panel must be able to open the designer');
 
-// A preset travels as an id the stage can look up; an operator's layout has to
-// travel whole, because nothing on the stage side has heard of it.
-assert.match(panel, /isPresetId\(id\)[\s\S]{0,120}publishStage\(\{ layout: id \}\)/, 'a preset must be applied by id');
-assert.match(panel, /publishStage\(\{[\s\S]{0,120}customLayout:/, 'a saved layout must be published in full');
+// A preset travels as an id *and* its effective configuration. The id lets a
+// stage look the preset up; the materialized customLayout carries the zone
+// tweaks and colours someone has applied on top of it, so a window opened
+// mid-service reproduces what is on the wall rather than the stock preset.
+// Both keys together are deliberate — main.cjs retains them as a pair.
+assert.match(
+  panel,
+  /publishStage\(\{\s*layout: id,\s*customLayout:/,
+  'a preset must publish its id together with its effective configuration',
+);
+// A saved layout has no id the stage side has ever heard of, so it can only
+// travel whole.
+assert.match(panel, /publishStage\(\{[\s\S]{0,160}customLayout:/, 'a saved layout must be published in full');
 assert.match(panel, /library\.setActive\(id\)/, 'choosing a layout must record it so the next launch comes back to it');
 
 // The bus receives as well as publishes, or a change made in the designer

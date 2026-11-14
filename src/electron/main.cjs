@@ -93,6 +93,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const http = require('http');
+const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const bibleService = require('./bible-service.cjs');
 const { createTranscriptionService } = require('./transcription-service.cjs');
@@ -142,11 +143,65 @@ let httpServer = null;
 const HTTP_PORT_BASE = 8942;
 const HTTP_PORT_ATTEMPTS = 8;
 let displayPort = HTTP_PORT_BASE;
+
+/* ── The key that gates everything the network can reach ────────────────────
+ *
+ * The asset server binds 0.0.0.0, because a phone remote and an OBS Browser
+ * Source on another machine are the point of it. That used to mean anyone on
+ * the church network — a volunteer's laptop, a guest on a flat VLAN — could
+ * POST /api/display/project and put text on the projector, or open the
+ * WebSocket and relay whatever it liked to every other client.
+ *
+ * So: one random token per launch, required by the REST API, by the page that
+ * drives the projector, and by the WebSocket handshake. The operator never
+ * types it — it travels in the URL the app shows them, and the display/remote
+ * pages trade it for an HttpOnly cookie on first load so the page's own
+ * fetches and its socket are covered without the token appearing in page
+ * source. A link from last week's service stops working when the app restarts,
+ * which is what you want for a credential that sits in a chat log.
+ * ────────────────────────────────────────────────────────────────────────── */
+const AUTH_COOKIE = 'bsp_token';
+const remoteToken = crypto.randomBytes(18).toString('hex');
 /** Set when the server could not bind at all, so the UI can say why. */
 let httpServerError = null;
 let activeDisplayId = null;
 let ndiService = null;
 let sessionHistory = null;
+
+/* ── the End button's armed window ───────────────────────
+   Ending a service clears the phone's history, so both surfaces ask for a
+   second tap. Main owns the three-second window, so arming on the desk disarms
+   the phone (and the other way round) at once, rather than two independent
+   timers drifting apart. */
+const END_ARM_MS = 3000;
+let endArmExpiresAt = 0;
+let endArmTimer = null;
+
+function endArmState() {
+  const armed = endArmExpiresAt > Date.now();
+  return { armed, expiresAt: armed ? endArmExpiresAt : null };
+}
+
+function broadcastEndArm() {
+  const payload = { type: 'endArm', ...endArmState() };
+  if (wss) wss.clients.forEach((c) => { if (c.readyState === 1) c.send(JSON.stringify(payload)); });
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('session:end-arm', payload);
+}
+
+function setEndArm(armed) {
+  clearTimeout(endArmTimer);
+  endArmTimer = null;
+  endArmExpiresAt = armed ? Date.now() + END_ARM_MS : 0;
+  if (armed) {
+    endArmTimer = setTimeout(() => {
+      endArmExpiresAt = 0;
+      endArmTimer = null;
+      broadcastEndArm();
+    }, END_ARM_MS);
+  }
+  broadcastEndArm();
+  return endArmState();
+}
 let songImportService = null;
 let appStoreService = null;
 let stageLayoutsService = null;
@@ -653,10 +708,80 @@ function broadcastStageState(message, senderId) {
 }
 
 /* Kinds that are events rather than state, and so are passed on but never
-   retained. Replaying "start the timer" to a window opened twenty minutes
-   later would start it twenty minutes late, and a broadcast message the
-   operator has long since taken down would reappear on a fresh screen. */
-const STAGE_TRANSIENT_KINDS = new Set(['timer-command', 'program-output', 'message']);
+   retained: a message the operator has long since taken down must not reappear
+   on a fresh screen. Timer commands are no longer among them — the timer they
+   produce is retained, and only that travels. See setStageTimer. */
+const STAGE_TRANSIENT_KINDS = new Set(['program-output', 'message']);
+
+/* ── Asking the renderer a question ────────────────────────────────────────
+ * One request, one reply, a timeout so an unresponsive window costs a second
+ * rather than hanging the phone's request forever.
+ * ────────────────────────────────────────────────────────────────────────── */
+const lexiconRequests = new Map();
+let lexiconRequestSeq = 0;
+
+function askRenderer(kind, payload, timeoutMs = 2500) {
+  return new Promise((resolve) => {
+    if (!mainWindow || mainWindow.isDestroyed()) { resolve(null); return; }
+    const id = ++lexiconRequestSeq;
+    const timer = setTimeout(() => {
+      lexiconRequests.delete(id);
+      resolve(null);
+    }, timeoutMs);
+    lexiconRequests.set(id, (value) => {
+      clearTimeout(timer);
+      lexiconRequests.delete(id);
+      resolve(value);
+    });
+    mainWindow.webContents.send('lexicon:remote-request', { id, kind, payload });
+  });
+}
+
+/**
+ * The timer a command leaves behind, or null for a command we do not know.
+ *
+ * The clock lives here rather than in the menu that pressed the button, because
+ * there are now several of them — the operator panel, and a phone in someone's
+ * pocket — and elapsed time is only elapsed time if one process counts it.
+ */
+function applyStageTimerCommand(command, atMs) {
+  const timer = stageState.timer || {};
+  const accumulated = Number(timer.accumulatedSeconds) || 0;
+  const running = Boolean(timer.running);
+  const startedAt = Number.isFinite(timer.startedAtMs) ? timer.startedAtMs : null;
+  const elapsed = accumulated + (running && startedAt != null ? Math.max(0, atMs - startedAt) / 1000 : 0);
+
+  if (command === 'start') {
+    /* Re-starting a running timer is not a restart: it must not throw away the
+       time already banked, only repair a start that was never stamped. */
+    return running && startedAt != null
+      ? { running: true, startedAtMs: startedAt, accumulatedSeconds: accumulated }
+      : { running: true, startedAtMs: atMs, accumulatedSeconds: Math.floor(elapsed) };
+  }
+  /* Floored, not rounded: the running readout floors too, and a pause that
+     jumped the clock a second forward would look like the timer gaining time. */
+  if (command === 'stop') return { running: false, startedAtMs: null, accumulatedSeconds: Math.floor(elapsed) };
+  if (command === 'reset') return { running: false, startedAtMs: null, accumulatedSeconds: 0 };
+  return null;
+}
+
+/**
+ * Apply a timer command and tell everyone the timer that came out of it.
+ *
+ * The command itself is not forwarded: "start" is an instruction with a moment
+ * attached, and a screen that applied it again would restart a clock already
+ * running. The timer is state — applying it twice is harmless — which is also
+ * why a stage window opened an hour later catches the right reading from the
+ * retained snapshot.
+ */
+function setStageTimer(command, senderId, atMs) {
+  const timer = applyStageTimerCommand(command, Number(atMs) || Date.now());
+  if (!timer) return null;
+  stageState = { ...stageState, timer, updatedAt: Date.now() };
+  broadcastStageState({ kind: 'timer', timer }, senderId);
+  broadcastStageSummary();
+  return timer;
+}
 
 /**
  * Pass an operator message to the stage windows, retaining what a window
@@ -670,20 +795,70 @@ const STAGE_TRANSIENT_KINDS = new Set(['timer-command', 'program-output', 'messa
  */
 function setStageState(message, senderId) {
   if (!message || typeof message !== 'object') return stageState;
+  /* A timer instruction folds into the one clock the phone reads, then travels
+     as the timer it produced rather than as the instruction. */
+  if (message.kind === 'timer-command') {
+    setStageTimer(message.command, senderId, message.atMs);
+    return stageState;
+  }
   if (!STAGE_TRANSIENT_KINDS.has(message.kind)) {
     const value = message.kind === 'config' ? (message.config || {}) : message;
     const { kind, ...rest } = value;
     void kind;
     stageState = { ...stageState, ...rest, updatedAt: Date.now() };
-    /* A layout and a custom layout are two answers to the same question, and
-       the snapshot must not carry both: a window catching up would apply the
-       preset and then have the stale custom layout drawn over it. Whichever
-       one this message set wins, and the other is dropped. */
+    /* A layout and a custom layout are two answers to the same question, so the
+       snapshot keeps exactly one — with one deliberate exception. When a
+       message carries both, they are a pair the renderer built together: a
+       preset id plus that preset's effective configuration, which is how
+       per-preset zone tweaks reach a window that opens later. Both are
+       retained, and `customLayout` is authoritative when the stage applies
+       them. A message with only one drops the other. */
     if ('layout' in rest && !('customLayout' in rest)) delete stageState.customLayout;
     if ('customLayout' in rest && rest.customLayout && !('layout' in rest)) delete stageState.layout;
   }
   broadcastStageState(message, senderId);
+  broadcastStageSummary();
   return stageState;
+}
+
+/**
+ * What the phone needs to draw the stage card, and nothing else.
+ *
+ * `stageState` carries a whole theme, a layout with zones and sometimes a
+ * packed projection — none of which a phone needs, and all of which would be
+ * handed to anything holding the session key. This is the same summary the
+ * REST endpoint returns, so the socket and the endpoint cannot disagree.
+ */
+function stageSummary() {
+  const state = stageState || {};
+  const timer = state.timer || {};
+  const elapsed = (Number(timer.accumulatedSeconds) || 0)
+    + (timer.running && Number.isFinite(timer.startedAtMs)
+      ? Math.max(0, Date.now() - timer.startedAtMs) / 1000
+      : 0);
+  const summary = (content) => (content
+    ? { title: content.title || '', body: content.body || '' }
+    : null);
+  const windows = liveStageWindows().size;
+  return {
+    ok: true,
+    open: Boolean((stageDisplayWindow && !stageDisplayWindow.isDestroyed()) || windows > 0),
+    windows,
+    mode: state.mode || 'confidence',
+    current: summary(state.current),
+    next: summary(state.next),
+    timerRunning: Boolean(timer.running),
+    timerSeconds: Math.floor(elapsed),
+    messageCount: Array.isArray(state.messages) ? state.messages.length : 0,
+    layoutId: state.layout && state.layout.id ? state.layout.id : null,
+  };
+}
+
+/** Stage changes reach the operator windows over IPC; this is the phone's copy. */
+function broadcastStageSummary() {
+  if (!wss) return;
+  const message = JSON.stringify({ type: 'stage:update', state: stageSummary() });
+  wss.clients.forEach((client) => { if (client.readyState === 1) client.send(message); });
 }
 
 function serveStatic(dirName) {
@@ -703,18 +878,137 @@ function serveStatic(dirName) {
   };
 }
 
-function serveHtmlFile(filename) {
+function serveHtmlFile(filename, extraHeaders = {}) {
   return (req, res) => {
-    if (isDev) { res.writeHead(302, { Location: `http://localhost:5173/${filename}` }); res.end(); return; }
+    if (isDev) {
+      res.writeHead(302, { Location: `http://localhost:5173/${filename}`, ...extraHeaders });
+      res.end();
+      return;
+    }
     const fp = path.join(__dirname, '../../dist', filename);
-    if (!fs.existsSync(fp)) { res.writeHead(404); res.end('Not Found'); return; }
+    if (!fs.existsSync(fp)) { res.writeHead(404, { ...extraHeaders }); res.end('Not Found'); return; }
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store, no-cache, must-revalidate',
       'Access-Control-Allow-Origin': '*',
+      ...extraHeaders,
     });
     res.end(fs.readFileSync(fp, 'utf8'));
   };
+}
+
+/* ── Authorization for the network surfaces ────────────────────────────────
+ * Shared by the REST API, the gated pages and the WebSocket handshake so all
+ * three answer the same question the same way. Compared with a constant-time
+ * equality: the token is short-lived, but an attacker who can measure the
+ * response is still an attacker.
+ * ────────────────────────────────────────────────────────────────────────── */
+function tokensMatch(presented, expected) {
+  const a = Buffer.from(String(presented || ''), 'utf8');
+  const b = Buffer.from(String(expected || ''), 'utf8');
+  return a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/** Every place a token can legitimately arrive from: header, query, cookie. */
+function requestToken(req, url) {
+  const header = req.headers['x-bsp-token'];
+  if (typeof header === 'string' && header) return header;
+  const query = url?.searchParams?.get('token');
+  if (query) return query;
+  const cookies = String(req.headers.cookie || '');
+  const match = new RegExp('(?:^|;\\s*)' + AUTH_COOKIE + '=([^;]+)').exec(cookies);
+  if (!match) return '';
+  try { return decodeURIComponent(match[1]); } catch { return match[1]; }
+}
+
+function isAuthorized(req, url) {
+  return tokensMatch(requestToken(req, url), remoteToken);
+}
+
+/**
+ * A page loaded with the token trades it for a cookie, so its own fetches and
+ * its WebSocket handshake are authorized without the token being readable by
+ * the page's script or by anything injected into it.
+ */
+function authorizedPageHeaders(url) {
+  const fromQuery = url?.searchParams?.get('token');
+  if (!fromQuery || !tokensMatch(fromQuery, remoteToken)) return {};
+  return { 'Set-Cookie': `${AUTH_COOKIE}=${remoteToken}; Path=/; HttpOnly; SameSite=Strict` };
+}
+
+/**
+ * What someone gets when they open an old bookmark or guess the port. Says
+ * where the real link is rather than pretending the page does not exist, so an
+ * operator whose OBS source stopped working can fix it without reading a log.
+ */
+function sendAuthRequired(res) {
+  res.writeHead(403, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+  });
+  res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Bible Song Pro — locked</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0c0e14;color:#e8eaf0;font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}main{max-width:40rem;padding:2rem}h1{font-size:1.25rem;margin:0 0 .75rem}p{margin:.5rem 0;color:#9aa3b2}strong{color:#e8eaf0}</style>
+</head><body><main><h1>This screen needs a link from Bible Song Pro Studio</h1>
+<p>Remote control and browser output are locked so nobody else on this network can drive the projector.</p>
+<p>In the app, open <strong>Settings &rarr; Output</strong> and copy the Remote or Browser URL shown there. It carries a key for this session.</p>
+<p>The key changes every time the app starts, so a bookmark or an OBS source saved at an earlier service has to be updated once.</p></main></body></html>`);
+}
+
+/** The address a phone on the same network should use — 127.0.0.1 is this machine only. */
+function lanAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const entry of interfaces[name] || []) {
+      if (entry.family === 'IPv4' && !entry.internal) return entry.address;
+    }
+  }
+  return '127.0.0.1';
+}
+
+/* ── What a renderer is allowed to become ──────────────────────────────────
+ *
+ * Every window here loads preload.cjs, and a contextBridge survives a
+ * navigation. So a window that navigates anywhere else — a dropped link, a
+ * target=_blank, a remote page that frames itself into us — hands the whole
+ * `window.BSP` bridge (file dialogs, deck reads, factory reset) to whatever it
+ * landed on. Nothing in the app needs to leave its own pages, so nothing is
+ * allowed to.
+ * ────────────────────────────────────────────────────────────────────────── */
+function isAppUrl(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(rawUrl || ''));
+  } catch {
+    return false;
+  }
+  if (parsed.protocol === 'file:') {
+    /* Packaged and built runs: dist/ next to src/electron. */
+    return parsed.pathname.includes('/dist/');
+  }
+  if (isDev) return parsed.hostname === 'localhost' && parsed.port === '5173';
+  return false;
+}
+
+/** Permissions a presentation app actually asks for. Everything else is refused. */
+const ALLOWED_PERMISSIONS = new Set([
+  'media',                    // microphone and camera, via getUserMedia
+  'audioCapture',
+  'videoCapture',
+  /* Audio output routing. Settings → Audio picks a device and utils/audio-output
+     calls setSinkId with it; Chromium gates that behind this permission, so a
+     tighter allowlist would silently send every cue to the default device. */
+  'speaker-selection',
+  'clipboard-read',           // pasting lyrics and references into the console
+  'clipboard-sanitized-write',
+  'fullscreen',
+  'pointerLock',
+]);
+
+/** Origin form of the same question, for the check handler. */
+function permissionOriginAllowed(origin) {
+  if (!origin || origin === 'null') return true; // opaque file:// main frame
+  if (origin.startsWith('file://')) return true;
+  return isDev && /^http:\/\/localhost:5173$/.test(origin);
 }
 
 const MEDIA_CONTENT_TYPES = {
@@ -762,26 +1056,233 @@ function serveMedia(req, res, fileName) {
   fs.createReadStream(filePath).pipe(res);
 }
 
+/**
+ * Put a verse on the program screen, from wherever the instruction came — a tap
+ * on the phone, or one step of Previous/Next. Returns the state that went out.
+ */
+function projectVerse(v) {
+  /* A whole Scene, not just a content bag. The display chooses its theme by
+     `scene.type` and keys its transition off `scene.id`, so a scene without
+     them projects in the wrong theme and never animates in. */
+  const content = { text: v.text, reference: v.reference, version: v.version || 'KJV' };
+  /* Dual reading travels inside the scene, where the display already knows how
+     to set a second translation beside or under the first. */
+  if (v.secondary && v.secondary.text) {
+    content.secondaryVerse = {
+      text: v.secondary.text,
+      reference: v.secondary.reference,
+      version: v.secondary.version,
+    };
+    content.dualLayout = v.dualLayout === 'horizontal' ? 'horizontal' : 'vertical';
+  }
+  /* No transition of its own: the phone's FX are the app's FX now, and a scene
+     carrying its own transition would quietly override the setting the phone
+     had just changed. */
+  const scene = {
+    id: `remote-${Date.now()}`,
+    name: v.reference || 'Verse',
+    type: 'bible',
+    content,
+  };
+  sessionHistory?.addEntry({ type: 'verse', reference: v.reference, book: v.book, chapter: v.chapter, verse: v.verse, text: v.text, source: 'remote' });
+  return showScene(scene);
+}
+
+/**
+ * Put a scene on the program screen and tell the operator window about it.
+ *
+ * The operator window owns the next full state push, so it has to learn what
+ * the phone put on screen. Without this it would push the scene it still
+ * believed was live and quietly take the verse down again.
+ */
+function showScene(scene) {
+  setDisplayState({ scene, type: scene.type || 'bible' });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('display:remote-project', scene);
+  }
+  return displayState;
+}
+
+/**
+ * The word-study card the desk projects when a Strong's number is clicked.
+ * Same scene id and same text, so the two surfaces cannot show different
+ * definitions of the same number.
+ */
+function wordStudyScene(entry) {
+  const transliteration = entry.transliteration || entry.strongs;
+  return {
+    id: `wordstudy-${entry.strongs}`,
+    name: `Word Study: ${transliteration}`,
+    type: 'bible',
+    content: {
+      text: `${entry.lemma || ''} (${transliteration} • ${entry.strongs}) — ${entry.gloss || ''}: ${entry.definition || ''}`,
+      reference: `Word Study: ${transliteration} (${entry.strongs})`,
+      wordStudy: entry,
+    },
+  };
+}
+
+/**
+ * The verse one step before or after what is on screen, walking past chapter
+ * and book boundaries but not off the ends of the canon.
+ *
+ * Derived from the projected reference rather than from a list the phone keeps:
+ * the screen is the truth about what is live, and the phone may have been
+ * asleep through the last three changes.
+ */
+function neighborVerse(direction, requestedVersion) {
+  const content = displayState.scene && displayState.scene.content;
+  const reference = content && content.reference;
+  if (!reference) return null;
+  /* The phone's own pick wins, so a reading does not change translation
+     halfway through because the projector was last given a different one — but
+     only if it names a translation this app can actually open. */
+  const known = bibleService.getVersions().some((version) => version.id === requestedVersion);
+  const version = known ? requestedVersion : (content.version || 'KJV');
+  const parsed = bibleService.parseReference(reference, version);
+  if (!parsed || !parsed.book) return null;
+
+  const step = direction === 'previous' ? -1 : 1;
+  const verses = bibleService.getChapter(version, parsed.book, parsed.chapter) || [];
+  const index = verses.findIndex((verse) => verse.verse === parsed.verseStart);
+  if (index !== -1 && verses[index + step]) return verses[index + step];
+
+  /* Later chapters of the same book first, in the direction of travel. The
+     chapter count is the book's own, so the walk cannot run off the end. */
+  const books = bibleService.getBooks(version) || [];
+  const at = books.findIndex((book) => book.name === parsed.book);
+  const lastChapter = at === -1 ? parsed.chapter : (Number(books[at].chapters) || parsed.chapter);
+  for (let chapter = parsed.chapter + step; chapter > 0 && chapter <= lastChapter; chapter += step) {
+    const chapterVerses = bibleService.getChapter(version, parsed.book, chapter) || [];
+    if (chapterVerses.length) return step > 0 ? chapterVerses[0] : chapterVerses[chapterVerses.length - 1];
+  }
+
+  /* Then the neighbouring book. Numbered books are entries of their own, so
+     the order is simply the canon's. */
+  if (at === -1) return null;
+  for (let offset = at + step; offset >= 0 && offset < books.length; offset += step) {
+    const book = books[offset];
+    if (!book || !book.chapters) continue;
+    const chapterVerses = bibleService.getChapter(version, book.name, step > 0 ? 1 : book.chapters) || [];
+    if (chapterVerses.length) return step > 0 ? chapterVerses[0] : chapterVerses[chapterVerses.length - 1];
+  }
+  return null;
+}
+
+/**
+ * The verse plus whatever the phone asked to travel with it: a second
+ * translation for a dual reading, and a transition of its own.
+ *
+ * Resolved here rather than on the phone because the second translation's text
+ * has to come from the app's bible, and because a missing verse in that
+ * translation should quietly leave a single-verse projection rather than half
+ * of a comparison.
+ */
+function remoteProjection(verse, body) {
+  const projection = { ...verse };
+
+  const secondaryVersion = body?.secondaryVersionId;
+  if (secondaryVersion) {
+    const chapter = bibleService.getChapter(secondaryVersion, verse.book, verse.chapter) || [];
+    const match = chapter.find((entry) => entry.verse === Number(verse.verse));
+    if (match) {
+      projection.secondary = { text: match.text, reference: match.reference, version: match.version };
+      projection.dualLayout = body?.dualLayout === 'horizontal' ? 'horizontal' : 'vertical';
+    }
+  }
+
+  return projection;
+}
+
 // ── API Handlers for REST / Mobile Remote ──
 const apiHandlers = {
+  /* Just enough for the phone's translation picker: no book lists, which is
+     most of what getVersions() carries and none of what a picker needs. */
+  'GET /api/bible/versions': () => ({
+    ok: true,
+    versions: (bibleService.getVersions() || []).map(({ id, name, abbreviation, language, isUser }) => ({
+      id, name, abbreviation, language, isUser: Boolean(isUser),
+    })),
+  }),
+  /* A reference is a place in a chapter, not a single result. Asking for
+     "John 1:1" answers with all of John 1 and names the verse that was asked
+     for, which is what the desktop console does — the phone should read the
+     same way, and `focus` is how it knows where to start reading. A phrase is
+     still a search and still comes back as matches. */
   'POST /api/verse/search': ({ body }) => {
-    const results = bibleService.search(body?.versionId || 'KJV', body?.query || '', body?.limit || 20, { book: body?.book || '' });
-    return { ok: true, results };
+    const version = body?.versionId || 'KJV';
+    const query = body?.query || '';
+    const ref = bibleService.parseReference(query, version);
+    if (ref && ref.book) {
+      const chapter = bibleService.getChapter(version, ref.book, ref.chapter) || [];
+      if (chapter.length) {
+        const focused = chapter.find((verse) => verse.verse === ref.verseStart) || chapter[0];
+        return { ok: true, results: chapter, focus: focused.reference };
+      }
+    }
+    const results = bibleService.search(version, query, body?.limit || 20, { book: body?.book || '' });
+    return { ok: true, results, focus: null };
   },
   'POST /api/verse/chapter': ({ body }) => {
     const verses = bibleService.getChapter(body?.versionId || 'KJV', body?.book, body?.chapter);
     return { ok: true, verses };
   },
+  /* The book shelf for the phone's own navigator: names and chapter counts
+     only, so the picker does not carry the text of the whole bible. */
+  'GET /api/bible/books': ({ query }) => ({
+    ok: true,
+    books: (bibleService.getBooks(query?.versionId || 'KJV') || [])
+      .map(({ name, chapters }) => ({ name, chapters })),
+  }),
+  /* Strong's numbers for the verses on screen, in one request rather than one
+     per card. Tokenised by the same lexicon the desk uses, so the phone never
+     invents its own idea of which word carries which number. */
+  'POST /api/verse/strongs': async ({ body }) => {
+    const verses = (Array.isArray(body?.verses) ? body.verses : []).slice(0, 60)
+      .map((verse) => ({ text: String(verse?.text || ''), book: String(verse?.book || '') }));
+    const annotations = await askRenderer('annotate', { verses });
+    /* Null means the desk did not answer. Answering anyway with a second
+       lexicon is how the phone ended up with numbers the desk disagreed
+       with. */
+    if (!Array.isArray(annotations)) return { ok: false, error: 'The app is not answering for Strong’s numbers' };
+    return { ok: true, annotations };
+  },
+  /* A Strong's number tapped on the phone puts the desk's word-study card on
+     the screen; tapping it again restores the verse from the phone's side. */
+  'POST /api/display/wordstudy': async ({ body }) => {
+    const code = String(body?.code || '').trim();
+    if (!code) return { ok: false, error: 'No Strong’s number in the request' };
+    const entry = await askRenderer('lookup', { code });
+    if (!entry || !entry.strongs) return { ok: false, error: 'That number is not in the lexicon' };
+    const scene = wordStudyScene(entry);
+    return { ok: true, scene, state: showScene(scene) };
+  },
+  /* FX for the programme. The renderer owns fxSettings and pushes them outward
+     with every state update, so this asks rather than writes. */
+  'POST /api/fx': ({ body }) => {
+    const patch = {};
+    if (typeof body?.transitionType === 'string' && body.transitionType) patch.transitionType = body.transitionType;
+    if (Number.isFinite(Number(body?.duration))) patch.duration = Math.min(5, Math.max(0.1, Number(body.duration)));
+    if (typeof body?.animateBackground === 'boolean') patch.animateBackground = body.animateBackground;
+    if (typeof body?.stageDisplayFxEnabled === 'boolean') patch.stageDisplayFxEnabled = body.stageDisplayFxEnabled;
+    if (!Object.keys(patch).length) return { ok: false, error: 'No FX setting in the request' };
+    if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, error: 'The app window is not open' };
+    mainWindow.webContents.send('display:set-fx-settings', patch);
+    return { ok: true, settings: patch };
+  },
   'POST /api/display/project': ({ body }) => {
-    if (body?.verse) {
-      const v = body.verse;
-      setDisplayState({
-        scene: { content: { text: v.text, reference: v.reference, version: v.version || 'KJV' } },
-        type: 'verse',
-      });
-      sessionHistory?.addEntry({ type: 'verse', reference: v.reference, book: v.book, chapter: v.chapter, verse: v.verse, text: v.text, source: 'remote' });
-    }
-    return { ok: true, state: displayState };
+    const v = body?.verse;
+    if (!v || !v.text) return { ok: false, error: 'No verse in the request' };
+    return { ok: true, state: projectVerse(remoteProjection(v, body)) };
+  },
+  /* One step through the reading. Previous/Next on the phone is this endpoint
+     with a direction, not a list the phone walks by itself. */
+  'POST /api/display/step': ({ body }) => {
+    const live = displayState.scene && displayState.scene.content;
+    if (!live || !live.reference) return { ok: false, error: 'Nothing on screen to step from' };
+    const verse = neighborVerse(body?.direction === 'previous' ? 'previous' : 'next', body?.versionId);
+    if (!verse) return { ok: false, error: 'Nothing beyond that verse' };
+    return { ok: true, verse, state: projectVerse(remoteProjection(verse, body)) };
   },
   'POST /api/display/clear': () => {
     setDisplayState({ scene: null, type: null });
@@ -796,14 +1297,49 @@ const apiHandlers = {
     setDisplayState({ blackout: !displayState.blackout });
     return { ok: true, blackout: displayState.blackout };
   },
+  /* FS/LT for the audience screen. Same reason as blackout: the renderer owns
+     the mode and pushes it outward, so writing only this process's copy would
+     be undone by the next state push. NDI feeds have render modes of their own
+     per feed and are deliberately not reachable from here. */
+  'POST /api/display/mode': ({ body }) => {
+    const mode = body?.mode === 'lowerThird' ? 'lowerThird' : body?.mode === 'fullscreen' ? 'fullscreen' : null;
+    if (!mode) return { ok: false, error: 'Unknown screen mode' };
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('display:set-output-mode', mode);
+      return { ok: true, mode };
+    }
+    setDisplayState({ outputMode: mode });
+    return { ok: true, mode };
+  },
   'GET /api/display/state': () => ({ ok: true, state: displayState }),
+  /* The stage's feed, as a summary rather than the state object itself.
+     `stageState` carries a whole theme, a layout with zones, and sometimes a
+     packed projection — none of which a phone needs, and all of which would
+     then be handed to anything holding the session key. Enough to say what
+     the stage is showing, and whether it is open at all. */
+  'GET /api/stage/state': () => stageSummary(),
+  /* The stage clock, from the phone. Answers with the summary so the card can
+     redraw from the result instead of waiting for the broadcast it caused. */
+  'POST /api/stage/timer': ({ body }) => {
+    const timer = setStageTimer(body?.command);
+    if (!timer) return { ok: false, error: 'Unknown timer command' };
+    return { ok: true, timer, state: stageSummary() };
+  },
   'GET /api/status': () => ({
     ok: true, displayState, ndi: ndiService?.status() || { available: false },
     session: sessionHistory?.getStatus() || { active: false },
+    endArm: endArmState(),
     ai: transcriptionService?.status() || { ok: false },
   }),
-  'POST /api/session/start': ({ body }) => sessionHistory?.startSession(body?.name),
-  'POST /api/session/end': () => sessionHistory?.endSession(),
+  'POST /api/session/start': ({ body }) => {
+    setEndArm(false);
+    return sessionHistory?.startSession(body?.name);
+  },
+  'POST /api/session/end': () => { setEndArm(false); return sessionHistory?.endSession(); },
+  /* Arming is kept in main, not in either page, so one surface's first tap is
+     visible on the other before the second tap lands. */
+  'POST /api/session/end/arm': ({ body }) => ({ ok: true, ...setEndArm(body?.armed !== false) }),
+  'POST /api/session/rename': ({ body }) => sessionHistory?.renameSession(body?.name),
   'GET /api/session/list': () => ({ ok: true, sessions: sessionHistory?.listSessions() || [] }),
   'GET /api/session/export': ({ query }) => sessionHistory?.exportSession(query?.id, query?.format || 'json'),
   'POST /api/ndi/start': () => {
@@ -830,12 +1366,18 @@ function startHttpServer() {
     // Static files
     // ProgramSurface browser output (slides + verses). Legacy flat display.html
     // stays available at /legacy-display.html for debugging.
-    if (pn === '/display.html' || pn === '/' || pn === '/browser-display.html') {
-      serveHtmlFile('browser-display.html')(req, res);
+    /* Every page that can paint the projector or drive it is gated. The static
+       asset routes below stay open: they are media and fonts, which carry no
+       authority of their own. */
+    if (pn === '/display.html' || pn === '/' || pn === '/browser-display.html'
+      || pn === '/legacy-display.html' || pn === '/remote.html') {
+      if (!isAuthorized(req, url)) { sendAuthRequired(res); return; }
+      const page = pn === '/remote.html' ? 'remote.html'
+        : pn === '/legacy-display.html' ? 'display.html'
+          : 'browser-display.html';
+      serveHtmlFile(page, authorizedPageHeaders(url))(req, res);
       return;
     }
-    if (pn === '/legacy-display.html') { serveHtmlFile('display.html')(req, res); return; }
-    if (pn === '/remote.html') { serveHtmlFile('remote.html')(req, res); return; }
     if (pn.startsWith('/fonts/')) { serveStatic('fonts')(req, res, url); return; }
     if (pn.startsWith('/themes/')) { serveStatic('themes')(req, res, url); return; }
     if (pn.startsWith('/lowerthirds/')) { serveStatic('lowerthirds')(req, res, url); return; }
@@ -847,6 +1389,16 @@ function startHttpServer() {
 
     // REST API
     if (pn.startsWith('/api/')) {
+      /* Checked before the body is read, so an unauthorized caller costs us
+         nothing and cannot use the endpoint as a parser oracle. */
+      if (!isAuthorized(req, url)) {
+        res.writeHead(401, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        });
+        res.end(JSON.stringify({ ok: false, error: 'Unauthorized' }));
+        return;
+      }
       const method = req.method;
       let body = '';
       req.on('data', (chunk) => body += chunk);
@@ -859,13 +1411,19 @@ function startHttpServer() {
           const params = new URLSearchParams(url.search);
           const query = {};
           params.forEach((v, k) => query[k] = v);
-          const result = handler({ body: parsed, query });
-          res.writeHead(200, {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-store, no-cache, must-revalidate',
-            'Access-Control-Allow-Origin': '*',
+          /* Awaited: some handlers answer through the renderer (the lexicon),
+             and writing the response before the promise settles would send an
+             empty body. */
+          Promise.resolve(handler({ body: parsed, query })).then((result) => {
+            res.writeHead(200, {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store, no-cache, must-revalidate',
+            });
+            res.end(JSON.stringify(result));
+          }).catch((error) => {
+            res.writeHead(400);
+            res.end(JSON.stringify({ ok: false, error: error && error.message ? error.message : String(error) }));
           });
-          res.end(JSON.stringify(result));
         } catch (e) {
           res.writeHead(400); res.end(JSON.stringify({ ok: false, error: e.message }));
         }
@@ -894,7 +1452,26 @@ function startHttpServer() {
   });
 
   httpServer = server;
-  wss = new WebSocketServer({ server, perMessageDeflate: false });
+  wss = new WebSocketServer({
+    server,
+    perMessageDeflate: false,
+    /* The socket carries program state and relays operator commands between
+       clients, so it is exactly as sensitive as the REST API and is gated the
+       same way. A handshake from a page that was never handed the token — or
+       from a script that found the port — is refused here rather than after
+       it has already been sent the current display state. */
+    verifyClient: (info, done) => {
+      let reqUrl;
+      try {
+        reqUrl = new URL(info.req.url || '/', 'http://localhost');
+      } catch {
+        done(false, 400, 'Bad Request');
+        return;
+      }
+      if (isAuthorized(info.req, reqUrl)) { done(true); return; }
+      done(false, 401, 'Unauthorized');
+    },
+  });
   wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ type: 'display:update', state: displayState }));
     // Relay must re-send as text: forwarding the raw Buffer produces a binary frame,
@@ -1014,6 +1591,9 @@ function broadcastStageWindows() {
     const isOpen = Boolean((stageDisplayWindow && !stageDisplayWindow.isDestroyed() && stageDisplayWindow.isVisible()) || [...liveStageWindows()].some((w) => w.isVisible()));
     mainWindow.webContents.send('stage-display:state', { open: isOpen });
   }
+  /* Opening or closing a stage screen changes `open` in the summary, and the
+     phone has no other way to hear about it. */
+  broadcastStageSummary();
 }
 
 function resizableOutputBounds(bounds) {
@@ -1508,20 +2088,28 @@ function createDockPopoutWindow(dockId) {
   return { ok: true };
 }
 
-function createSlideEditorWindow() {
-  const win = new BrowserWindow({ width: 1600, height: 1000, minWidth: 640, minHeight: 480, resizable: true, maximizable: true, fullscreenable: true, thickFrame: true, backgroundColor: '#0b0d12', title: 'BSP Slide Editor', webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, webSecurity: false } });
-  win.loadURL(isDev ? 'http://localhost:5173/slide-editor/index.html' : `file://${path.join(__dirname, '../../dist/slide-editor/index.html')}`);
-  if (isDev) win.webContents.openDevTools({ mode: 'detach' });
-  return win;
-}
+/* There is one slide editor: the in-app React one (SlideEditorModal, over
+   src/renderer/components/slide-editor and the slide-engine parser). The
+   legacy HTML editor that used to open in its own window — public/slide-editor,
+   a prebuilt bundle — is retired. Its parser still earns its keep as the
+   reference the port was verified against, so it lives on at
+   scripts/slide-engine-oracle/ and is loaded only by the parity harness in dev.
+   It is deliberately not in public/, because everything there is copied into
+   the shipped build. */
 
 app.whenReady().then(async () => {
   // Session permission request handler
   if (session && session.defaultSession) {
+    /* Was `callback(true)` for everything. That handed camera, microphone,
+       geolocation and clipboard to any frame in any window — including remote
+       pages the operator embedded as a background. The allowlist is what this
+       app actually uses; the origin check is what keeps it ours. */
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-      callback(true);
+      const pageUrl = webContents?.getURL?.() || '';
+      callback(ALLOWED_PERMISSIONS.has(permission) && isAppUrl(pageUrl));
     });
-    session.defaultSession.setPermissionCheckHandler(() => true);
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin) =>
+      ALLOWED_PERMISSIONS.has(permission) && permissionOriginAllowed(requestingOrigin));
 
     // OBS Studio Browser Source Parity: Strip X-Frame-Options and frame-ancestors CSP
     // so any external web page, dashboard, timer, church stream, or overlay can be framed cleanly
@@ -1677,8 +2265,8 @@ app.whenReady().then(async () => {
     else setDisplayState({ blackout: !displayState.blackout });
   });
   globalShortcut.register('CommandOrControl+Shift+N', () => { ndiService?.start(DEFAULT_NDI_NAME); });
-  globalShortcut.register('CommandOrControl+Shift+E', () => sessionHistory?.endSession());
-  globalShortcut.register('CommandOrControl+Shift+P', () => { sessionHistory?.startSession('Session ' + new Date().toLocaleString()); });
+  globalShortcut.register('CommandOrControl+Shift+E', () => { setEndArm(false); sessionHistory?.endSession(); });
+  globalShortcut.register('CommandOrControl+Shift+P', () => { sessionHistory?.startSession(); });
   globalShortcut.register('F5', () => { if (displayWindow && !displayWindow.isDestroyed()) displayWindow.reload(); });
 
   // ── IPC ──
@@ -1723,8 +2311,12 @@ app.whenReady().then(async () => {
     // Null rather than a plausible-looking URL when nothing is listening —
     // the projector is unaffected by this, but the remote genuinely is not
     // reachable and an address that refuses the connection is worse than none.
-    browserUrl: httpServerError ? null : `http://127.0.0.1:${displayPort}/display.html`,
-    remoteUrl: httpServerError ? null : `http://127.0.0.1:${displayPort}/remote.html`,
+    /* Tokenized, because these are the links the operator copies into OBS and
+       into their phone. browserUrl stays loopback — it is for a browser on
+       this machine. remoteUrl is the network address, which is the whole point
+       of a remote: 127.0.0.1 on a phone is the phone. */
+    browserUrl: httpServerError ? null : `http://127.0.0.1:${displayPort}/display.html?token=${remoteToken}`,
+    remoteUrl: httpServerError ? null : `http://${lanAddress()}:${displayPort}/remote.html?token=${remoteToken}`,
     port: httpServerError ? null : displayPort,
     serverError: httpServerError,
     clients: wss ? wss.clients.size : 0,
@@ -1750,7 +2342,6 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.handle('slide-editor:open', () => { createSlideEditorWindow(); return true; });
   ipcMain.handle('stage-display:open', (_, arg) => {
     const displayId = (arg && typeof arg === 'object') ? arg.displayId : arg;
     const target = chooseDisplay(displayId);
@@ -1835,7 +2426,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('get:platform', () => process.platform);
   ipcMain.handle('get:userDataPath', () => app.getPath('userData'));
   ipcMain.handle('get:version', () => app.getVersion());
-  ipcMain.handle('get:displayUrl', () => `http://127.0.0.1:${displayPort}/display.html`);
+  ipcMain.handle('get:displayUrl', () => `http://127.0.0.1:${displayPort}/display.html?token=${remoteToken}`);
 
   let cachedSystemFonts = null;
   ipcMain.handle('fonts:getSystemFonts', async () => {
@@ -1941,6 +2532,14 @@ app.whenReady().then(async () => {
   ipcMain.handle('verse:detect', (_, p) => verseDetectionService.detect(p?.text, p?.options || {}));
   ipcMain.handle('verse:warmIndex', (_, p) => verseDetectionService.warmIndex(p?.versionId || 'KJV'));
   ipcMain.handle('verse:indexStatus', () => verseDetectionService.indexStatus());
+
+  /* The renderer's own Strong's tagging, asked over IPC. The word table the
+     desk tags with lives in the renderer, and a second copy up here is exactly
+     how the phone came to show numbers the desk disagreed with. */
+  ipcMain.on('lexicon:remote-reply', (_event, reply) => {
+    const done = reply && lexiconRequests.get(reply.id);
+    if (done) done(reply.value);
+  });
 
   ipcMain.handle('lexicon:lookup', (_, query) => lexiconService.lookup(query));
   ipcMain.handle('lexicon:detect', (_, text) => lexiconService.detectWordStudyTerms(text));
@@ -2052,7 +2651,9 @@ app.whenReady().then(async () => {
 
   // Session history IPC
   ipcMain.handle('session:start', (_, p) => sessionHistory?.startSession(p?.name));
-  ipcMain.handle('session:end', () => sessionHistory?.endSession());
+  ipcMain.handle('session:rename', (_, p) => sessionHistory?.renameSession(p?.name));
+  ipcMain.handle('session:armEnd', (_, p) => ({ ok: true, ...setEndArm(p?.armed !== false) }));
+  ipcMain.handle('session:end', () => { setEndArm(false); return sessionHistory?.endSession(); });
   ipcMain.handle('session:addEntry', (_, p) => {
     const r = sessionHistory?.addEntry(p);
     if (p?.reference) setDisplayState({ scene: { content: { text: p.text, reference: p.reference, version: p.version || 'KJV' } }, type: 'verse' });
@@ -2061,7 +2662,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('session:list', () => ({ ok: true, sessions: sessionHistory?.listSessions() || [] }));
   ipcMain.handle('session:get', (_, id) => ({ ok: true, session: sessionHistory?.getSession(id) }));
   ipcMain.handle('session:export', (_, p) => sessionHistory?.exportSession(p?.id, p?.format || 'json'));
-  ipcMain.handle('session:status', () => sessionHistory?.getStatus() || { ok: false });
+  ipcMain.handle('session:status', () => ({ ...(sessionHistory?.getStatus() || { ok: false }), endArm: endArmState() }));
 
   // Song import IPC
   ipcMain.handle('song:importFile', (_, p) => songImportService?.importFile(p?.filePath));
@@ -2629,7 +3230,11 @@ app.whenReady().then(async () => {
     // If the output screen was unplugged, tear the window down rather than leaving it
     // stranded on coordinates that no longer exist.
     if (activeDisplayId && String(removed?.id) === activeDisplayId) {
-      if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
+      /* destroy(), not close(): the window's own close handler calls
+         preventDefault() and hides itself while the app is still running, so
+         close() here left a live, hidden, IPC-connected renderer that nothing
+         could reach — one per unplugged monitor. */
+      if (displayWindow && !displayWindow.isDestroyed()) displayWindow.destroy();
       displayWindow = null;
       activeDisplayId = null;
     }
@@ -2741,6 +3346,21 @@ app.on('web-contents-created', (_evt, contents) => {
   try {
     contents.setVisualZoomLevelLimits(1, 1);
   } catch (err) { }
+  /* Rendering the app is the only thing these windows do. Anything else is
+     either a mistake or an attack, and both are answered the same way: stay
+     put. External links go through shell:openExternal, which has an https
+     allowlist, so a denied window.open costs the operator nothing. */
+  contents.on('will-navigate', (event, url) => {
+    if (!isAppUrl(url)) {
+      console.warn('[Security] Blocked navigation to', String(url).slice(0, 200));
+      event.preventDefault();
+    }
+  });
+  contents.setWindowOpenHandler(({ url }) => {
+    console.warn('[Security] Blocked window.open to', String(url).slice(0, 200));
+    return { action: 'deny' };
+  });
+  contents.on('will-attach-webview', (event) => event.preventDefault());
   contents.on('before-input-event', (event, input) => {
     if ((input.control || input.meta) && (input.key === '=' || input.key === '+' || input.key === '-' || input.key === '_' || input.key === '0')) {
       event.preventDefault();
@@ -2750,6 +3370,13 @@ app.on('web-contents-created', (_evt, contents) => {
 
 app.on('window-all-closed', () => {
   appStoreService?.flush();
+  /* macOS keeps the process alive with no windows, and the dock icon is how the
+     operator gets back in. Tearing the servers and the speech/NDI services
+     down here left that reopen with a console whose phone remote, browser
+     output and transcription were gone until a full restart. Everything below
+     the early return is the "actually quitting" path, which on macOS is
+     will-quit. */
+  if (process.platform === 'darwin') return;
   deepgramService?.destroy();
   ndiService?.destroy();
   for (const win of ndiFeedWindows.values()) {
@@ -2761,12 +3388,10 @@ app.on('window-all-closed', () => {
     wss?.close();
     httpServer?.close();
   } catch (_) {}
-  if (process.platform !== 'darwin') {
-    app.quit();
-    setTimeout(() => {
-      try { process.exit(0); } catch (_) {}
-    }, 350).unref();
-  }
+  app.quit();
+  setTimeout(() => {
+    try { process.exit(0); } catch (_) {}
+  }, 350).unref();
 });
 app.on('will-quit', () => {
   appStoreService?.flush();
@@ -2788,4 +3413,10 @@ app.on('will-quit', () => {
     }, 350).unref();
   }
 });
-app.on('activate', () => { if (!mainWindow) mainWindow = createMainWindow(); });
+app.on('activate', () => {
+  if (!mainWindow) mainWindow = createMainWindow();
+  /* Belt and braces: if anything did close the server (a port conflict that
+     was later resolved, a failed bind), reopening the app is the moment to
+     retry rather than leave the remote silently dead. */
+  if (!httpServer || !httpServer.listening) startHttpServer();
+});

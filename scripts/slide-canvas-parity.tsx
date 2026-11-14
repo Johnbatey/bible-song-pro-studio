@@ -146,7 +146,7 @@ function compare(label: string, a: any, b: any, out: ParityDiff[], path = '') {
 
 export async function run(deckName: string, slideIndex = 0, opts: { keepOpen?: boolean } = {}) {
   const O = window.BSPSlideEditor;
-  if (!O) throw new Error('Load /slide-editor/slide-editor.bundle.js first.');
+  if (!O) throw new Error('Load /scripts/slide-engine-oracle/slide-editor.bundle.js first.');
 
   ensureHost();
   const boardA = document.getElementById('__parity-a')!;

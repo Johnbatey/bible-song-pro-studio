@@ -116,7 +116,37 @@ for (const file of [CANVAS, AIR]) {
   );
 }
 
+/* One editor, not two.
+
+   There used to be a second, standalone HTML editor in public/slide-editor/,
+   opened in its own window. Two editors over one slide format is how the two
+   renderers above drifted apart in the first place, so the retirement is
+   pinned here rather than left to memory: nothing may reintroduce a second
+   entry point, and public/ — which is copied wholesale into every build —
+   must not carry it. The reference bundle stays available to the differential
+   harness in scripts/parity-slide-engine.md, outside the shipped tree. */
+assert.doesNotMatch(
+  read('src/electron/main.cjs'),
+  /createSlideEditorWindow/,
+  'the standalone HTML slide editor window must stay retired — the in-app React editor is the only one',
+);
+assert.doesNotMatch(
+  read('src/electron/preload.cjs'),
+  /openSlideEditor/,
+  'the renderer must not be offered a second editor entry point',
+);
+assert.equal(
+  fs.existsSync(path.join(root, 'public/slide-editor')),
+  false,
+  'public/ is copied into every build, so the retired editor must not live there',
+);
+assert.equal(
+  fs.existsSync(path.join(root, 'scripts/slide-engine-oracle/slide-editor.bundle.js')),
+  true,
+  'the parity oracle must stay available for the differential harness in scripts/parity-slide-engine.md',
+);
+
 console.log(
   `Slide element parity verified: ${written.size} editable properties drawn by both the editor canvas and the air board, `
-  + `shape vocabulary matched (${[...canvasShapes].sort().join(', ')}), zero-width borders preserved.`,
+  + `shape vocabulary matched (${[...canvasShapes].sort().join(', ')}), zero-width borders preserved, one editor only.`,
 );
