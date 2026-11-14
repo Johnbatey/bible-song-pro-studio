@@ -322,6 +322,11 @@ export function BiblePanel() {
   const setCurrentScene = useAppStore((s) => s.setCurrentScene);
   const setPreviewScene = useAppStore((s) => s.setPreviewScene);
   const addVerseToHistory = useAppStore((s) => s.addVerseToHistory);
+  /* Translation management answers in the shared notice bar rather than a silent
+     console line: a refused import or delete has to be visible to be fixable. */
+  const pushNotice = useAppStore((s) => s.notify);
+  const notify = (text: string, type: 'info' | 'warning' = 'info') =>
+    pushNotice({ id: `bible-translations-${Date.now()}`, text, type, duration: 5, animation: 'slideDown' });
   const addToQueue = useAppStore((s) => s.addToQueue);
   const outputMode = useAppStore((s) => s.display.outputMode);
   const bibleOutputMode = useAppStore((s) => s.display.bibleOutputMode || 'fullscreen');
@@ -412,6 +417,10 @@ export function BiblePanel() {
 
       for (const filePath of paths) {
         const res = await window.BSP?.bible?.importFile({ filePath });
+        if (res && res.ok === false) {
+          notify(res.error || 'Could not import that Bible file.', 'warning');
+          continue;
+        }
         if (res && res.exists) {
           setPendingOverwrite({
             versionId: res.versionId || 'BIBLE',
@@ -441,6 +450,8 @@ export function BiblePanel() {
       });
       if (res && res.ok && res.versionId) {
         await reloadVersions(res.versionId);
+      } else if (res && res.ok === false) {
+        notify(res.error || 'Could not replace that translation.', 'warning');
       }
     } catch (err) {
       console.error('Bible overwrite failed:', err);
@@ -455,9 +466,17 @@ export function BiblePanel() {
       const res = await window.BSP?.bible?.deleteVersion(versionId);
       if (res && res.ok) {
         await reloadVersions('KJV');
+        if (res.removedUserCopyOnly) {
+          notify(`Removed your imported copy of ${versionId}; the built-in text stays.`);
+        }
+        return;
       }
+      /* A refused delete used to look like a dead button: the reason was
+         discarded and nothing on screen changed. */
+      notify(res?.error || 'Could not remove that translation.', 'warning');
     } catch (err) {
       console.error('Failed to remove Bible translation:', err);
+      notify('Could not remove that translation.', 'warning');
     }
   };
   /* Keyed by reference, not verse number: search results span books, so verse
@@ -2359,6 +2378,13 @@ export function BiblePanel() {
                         <span style={{ fontSize: 10, color: '#3b82f6', background: 'rgba(59, 130, 246, 0.15)', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
                           Imported
                         </span>
+                      ) : ver.hasUserCopy ? (
+                        <span
+                          title="Your imported file shares this built-in translation's id, so the built-in text is the one in use."
+                          style={{ fontSize: 10, color: '#d97706', background: 'rgba(217, 119, 6, 0.15)', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}
+                        >
+                          Imported copy hidden
+                        </span>
                       ) : (
                         <span style={{ fontSize: 10, color: 'var(--text-dim)', background: 'rgba(255, 255, 255, 0.04)', padding: '1px 6px', borderRadius: 4 }}>
                           Standard
@@ -2372,11 +2398,12 @@ export function BiblePanel() {
                     )}
                   </div>
 
-                  {ver.isUser ? (
+                  {ver.isUser || ver.hasUserCopy ? (
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm(`Are you sure you want to delete the imported translation "${ver.name}" (${ver.id})?`)) {
+                        const verb = ver.isUser ? 'delete' : "remove your imported copy of";
+                        if (window.confirm(`Are you sure you want to ${verb} the translation "${ver.name}" (${ver.id})?`)) {
                           void handleDeleteVersion(ver.id);
                         }
                       }}
@@ -2393,7 +2420,7 @@ export function BiblePanel() {
                         transition: 'all 0.15s ease',
                       }}
                     >
-                      Delete
+                      {ver.isUser ? 'Delete' : 'Remove copy'}
                     </button>
                   ) : (
                     <span style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', paddingRight: 4 }}>
