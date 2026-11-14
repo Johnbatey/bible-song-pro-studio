@@ -249,7 +249,10 @@ function getUserBibleDir() {
 }
 
 function getAllVersionMeta() {
-  const metaList = [...VERSION_META];
+  /* Copies, not the VERSION_META objects themselves: a user file that collides
+     with a bundled id marks its meta below, and that mark must not stick to the
+     bundled list for the rest of the process. */
+  const metaList = VERSION_META.map((meta) => ({ ...meta }));
   const userDir = getUserBibleDir();
   if (fs.existsSync(userDir)) {
     try {
@@ -277,6 +280,13 @@ function getAllVersionMeta() {
             isUser: true,
             userPath: filePath,
           });
+        } else if (!existing.isUser) {
+          /* A user file whose name collides with a bundled id used to be skipped
+             silently. The bundled id wins in loadVersion, so the file was never
+             listed and never deletable — a permanent orphan. Mark the bundled
+             entry with the copy so the UI can offer to remove it. */
+          existing.hasUserCopy = true;
+          existing.userCopyPath = path.join(userDir, file);
         }
       });
     } catch (_) {}
@@ -321,7 +331,142 @@ function getData() {
   return cache;
 }
 
-function importBibleFile({ filePath, overwrite = false }) {
+/* ── SQLite bibles ────────────────────────────────────────
+ * OpenLP and EasyWorship keep scripture in SQLite, which is why the picker has
+ * always listed *.sqlite and *.db. sql.js is the engine the song importer
+ * already uses; it is loaded on the first database import, not at startup. */
+let sqlEnginePromise = null;
+
+function loadSqlEngine() {
+  if (!sqlEnginePromise) {
+    sqlEnginePromise = require('sql.js')().catch((err) => {
+      sqlEnginePromise = null;
+      throw err;
+    });
+  }
+  return sqlEnginePromise;
+}
+
+function isSqliteDatabase(buffer) {
+  return Boolean(buffer) && buffer.length >= 16
+    && buffer.subarray(0, 15).toString('latin1') === 'SQLite format 3';
+}
+
+function sqliteIdent(name) {
+  return '"' + String(name).replace(/"/g, '""') + '"';
+}
+
+/* sql.js answers with column names as the file spells them, so every row is
+   folded to lower case before anything looks a column up. */
+function sqliteRows(db, sql) {
+  const stmt = db.prepare(sql);
+  const rows = [];
+  try {
+    while (stmt.step()) {
+      const raw = stmt.getAsObject();
+      const row = {};
+      Object.keys(raw).forEach((key) => { row[String(key).toLowerCase()] = raw[key]; });
+      rows.push(row);
+    }
+  } finally {
+    stmt.free();
+  }
+  return rows;
+}
+
+function sqliteColumns(db, table) {
+  try {
+    return sqliteRows(db, `PRAGMA table_info(${sqliteIdent(table)})`).map((row) => String(row.name || ''));
+  } catch (_) {
+    return [];
+  }
+}
+
+const SQLITE_BOOK_COLUMNS = ['book_name', 'bookname', 'book', 'book_number', 'booknumber'];
+const SQLITE_TEXT_COLUMNS = ['text', 'scripture', 'verse_text', 'content'];
+
+/** Canonical order, for the files that store a `book_number` and no names. */
+function bookNameForNumber(value) {
+  const canonical = CANONICAL_BOOKS.find((book) => book.number === Number(value));
+  return canonical ? canonical.name : '';
+}
+
+async function parseSqliteBibleFile(buffer, fallbackName) {
+  const SQL = await loadSqlEngine();
+  const db = new SQL.Database(buffer);
+  try {
+    const tables = sqliteRows(db, "SELECT name FROM sqlite_master WHERE type='table'")
+      .map((row) => String(row.name || ''))
+      .filter(Boolean);
+    const verseTable = tables.find((table) => {
+      const cols = sqliteColumns(db, table);
+      return cols.includes('chapter') && cols.includes('verse')
+        && cols.some((column) => SQLITE_BOOK_COLUMNS.includes(column))
+        && cols.some((column) => SQLITE_TEXT_COLUMNS.includes(column));
+    });
+    if (!verseTable) throw new Error('no verse table (expected book, chapter, verse and text columns)');
+
+    /* A names table inside the file beats our canon order: it is the file's own. */
+    const bookNames = new Map();
+    for (const table of tables) {
+      if (table === verseTable) continue;
+      const cols = sqliteColumns(db, table);
+      const numberCol = ['book_number', 'booknumber', 'number'].find((column) => cols.includes(column));
+      const nameCol = ['book_name', 'bookname', 'name'].find((column) => cols.includes(column));
+      if (!numberCol || !nameCol) continue;
+      try {
+        sqliteRows(db, `SELECT * FROM ${sqliteIdent(table)}`).forEach((row) => {
+          const number = Number(row[numberCol]);
+          const name = String(row[nameCol] || '').trim();
+          if (Number.isFinite(number) && name) bookNames.set(number, name);
+        });
+      } catch (_) { /* a table we cannot read is not a reason to fail the import */ }
+    }
+
+    const cols = sqliteColumns(db, verseTable);
+    const bookCol = SQLITE_BOOK_COLUMNS.find((column) => cols.includes(column));
+    const textCol = SQLITE_TEXT_COLUMNS.find((column) => cols.includes(column));
+    const bibleData = {};
+    const localizedBookNames = [];
+    sqliteRows(db, `SELECT * FROM ${sqliteIdent(verseTable)}`).forEach((row) => {
+      const bookValue = String(row[bookCol] ?? '').trim();
+      const numbered = /^\d+$/.test(bookValue);
+      const book = numbered
+        ? (bookNames.get(Number(bookValue)) || bookNameForNumber(bookValue) || bookValue)
+        : bookValue;
+      const chapter = String(row.chapter ?? '').trim().replace(/\.0+$/, '');
+      const verse = String(row.verse ?? '').trim().replace(/\.0+$/, '');
+      const text = String(row[textCol] ?? '').replace(/\s+/g, ' ').trim();
+      if (!book || !chapter || !verse || !text) return;
+      if (!bibleData[book]) bibleData[book] = {};
+      if (!bibleData[book][chapter]) bibleData[book][chapter] = {};
+      bibleData[book][chapter][verse] = text;
+      if (numbered && bookNames.has(Number(bookValue)) && !localizedBookNames.some((b) => b.name === book)) {
+        const canonical = CANONICAL_BOOKS.find((b) => b.number === Number(bookValue));
+        localizedBookNames.push({ code: canonical ? canonical.code : '', name: book });
+      }
+    });
+
+    /* The translation's own name, when a metadata table carries one. */
+    let name = '';
+    for (const table of tables) {
+      const tableCols = sqliteColumns(db, table);
+      if (!tableCols.includes('name') || tableCols.includes('verse')) continue;
+      try {
+        const hit = sqliteRows(db, `SELECT * FROM ${sqliteIdent(table)} LIMIT 5`)
+          .map((row) => String(row.name || '').trim())
+          .find((value) => value.length > 1);
+        if (hit) { name = hit; break; }
+      } catch (_) {}
+    }
+
+    return { name: name || fallbackName, bibleData, localizedBookNames };
+  } finally {
+    try { db.close(); } catch (_) {}
+  }
+}
+
+async function importBibleFile({ filePath, overwrite = false }) {
   if (!filePath || !fs.existsSync(filePath)) return { ok: false, error: 'File not found: ' + filePath };
   const ext = path.extname(filePath).toLowerCase();
   let baseId = path.basename(filePath, ext).replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase() || 'CUSTOM';
@@ -330,23 +475,35 @@ function importBibleFile({ filePath, overwrite = false }) {
   let localizedBookNames = [];
 
   try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    if (ext === '.xml' || ext === '.osis' || ext === '.usfx' || ext === '.xmm' || content.trim().startsWith('<?xml') || content.includes('<bible')) {
-      const res = parseXmlBible(content, baseId);
+    const buffer = fs.readFileSync(filePath);
+    if (isSqliteDatabase(buffer)) {
+      const res = await parseSqliteBibleFile(buffer, baseId);
       versionName = res.name || baseId;
       booksData = res.bibleData;
       localizedBookNames = res.localizedBookNames;
-    } else if (ext === '.usfm' || ext === '.sfm' || content.trim().startsWith('\\id')) {
-      const res = parseUsfmText(content, baseId);
-      booksData = res.bibleData;
-      localizedBookNames = res.localizedBookNames;
+    } else if (ext === '.db' || ext === '.sqlite' || ext === '.sqlite3') {
+      /* The picker offers these extensions, so a database that is not SQLite has
+         to say so rather than be handed to a JSON parser. */
+      return { ok: false, error: 'That database is not a SQLite file. Export it as SQLite, XML or JSON and import it again.' };
     } else {
-      const parsed = JSON.parse(content);
-      if (parsed.id) baseId = String(parsed.id).trim().toUpperCase();
-      if (parsed.name) versionName = String(parsed.name).trim();
-      const res = parseJsonBible(parsed, baseId);
-      booksData = res.bibleData;
-      localizedBookNames = res.localizedBookNames;
+      const content = buffer.toString('utf8');
+      if (ext === '.xml' || ext === '.osis' || ext === '.usfx' || ext === '.xmm' || content.trim().startsWith('<?xml') || content.includes('<bible')) {
+        const res = parseXmlBible(content, baseId);
+        versionName = res.name || baseId;
+        booksData = res.bibleData;
+        localizedBookNames = res.localizedBookNames;
+      } else if (ext === '.usfm' || ext === '.sfm' || content.trim().startsWith('\\id')) {
+        const res = parseUsfmText(content, baseId);
+        booksData = res.bibleData;
+        localizedBookNames = res.localizedBookNames;
+      } else {
+        const parsed = JSON.parse(content);
+        if (parsed.id) baseId = String(parsed.id).trim().toUpperCase();
+        if (parsed.name) versionName = String(parsed.name).trim();
+        const res = parseJsonBible(parsed, baseId);
+        booksData = res.bibleData;
+        localizedBookNames = res.localizedBookNames;
+      }
     }
   } catch (err) {
     return { ok: false, error: 'Failed to parse Bible file: ' + (err.message || String(err)) };
@@ -357,6 +514,16 @@ function importBibleFile({ filePath, overwrite = false }) {
   }
 
   const allMeta = getAllVersionMeta();
+  /* Importing KJV.xml used to write userDir/KJV.json, which the loader never
+     saw (the bundled KJV wins), leaving a file the operator could not use or
+     delete. Refuse it and say what to do instead. */
+  const idCollision = allMeta.find((m) => m.id.toLowerCase() === baseId.toLowerCase());
+  if (idCollision && !idCollision.isUser) {
+    return {
+      ok: false,
+      error: `"${idCollision.name}" is a built-in translation, so a file cannot be added under the id ${baseId}. Save it as ${baseId}_Custom (or any other name) and import it again.`,
+    };
+  }
   const existing = allMeta.find((m) => m.id.toLowerCase() === baseId.toLowerCase() || m.name.toLowerCase() === versionName.toLowerCase());
 
   if (existing && !overwrite) {
@@ -460,7 +627,17 @@ function getVersions() {
       name,
       chapters: Object.keys(chapters || {}).length,
     }));
-    return { id: meta.id, name: meta.name, abbreviation: meta.abbreviation, language: meta.language, books };
+    /* isUser has to travel: the panel decides whether to offer Delete from it,
+       and dropping it here is why imported translations had no Delete button. */
+    return {
+      id: meta.id,
+      name: meta.name,
+      abbreviation: meta.abbreviation,
+      language: meta.language,
+      books,
+      isUser: Boolean(meta.isUser),
+      hasUserCopy: Boolean(meta.hasUserCopy),
+    };
   });
 }
 
@@ -571,28 +748,29 @@ function clearUserBibles() {
 function deleteVersion(versionId) {
   if (!versionId) return { ok: false, error: 'No version specified' };
   const userDir = getUserBibleDir();
-  const versions = getAllVersionMeta();
-  const target = versions.find((v) => v.id.toLowerCase() === String(versionId).toLowerCase() && v.isUser);
-  if (!target) {
+  const wanted = String(versionId).toLowerCase();
+  const target = getAllVersionMeta().find((v) => v.id.toLowerCase() === wanted);
+  /* A bundled id can still have the operator's file behind it, imported before
+     that import was refused. The bundled text itself is not ours to delete, but
+     the stranded copy is theirs, so removing it is allowed. */
+  const userFiles = [];
+  if (target && target.isUser) {
+    userFiles.push(target.userPath || path.join(userDir, target.file || `${target.id}.json`));
+  } else if (target && target.hasUserCopy && target.userCopyPath) {
+    userFiles.push(target.userCopyPath);
+  }
+  if (!userFiles.length) {
     return { ok: false, error: 'Cannot delete bundled translation or version not found' };
   }
   try {
-    if (target.userPath && fs.existsSync(target.userPath)) {
-      fs.unlinkSync(target.userPath);
-    } else {
-      const candidates = [
-        path.join(userDir, `${versionId}.json`),
-        path.join(userDir, `${versionId}.xml`),
-        path.join(userDir, `${target.id}.json`),
-        path.join(userDir, `${target.id}.xml`),
-      ];
-      for (const p of candidates) {
-        if (fs.existsSync(p)) fs.unlinkSync(p);
-      }
+    for (const filePath of userFiles) {
+      if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
+    /* Clear the whole index: a bundled id whose user copy is gone has different
+       contents than it did a moment ago. */
     cache = null;
-    bibleSearchCache.delete(versionId);
-    return { ok: true, versionId };
+    bibleSearchCache.clear();
+    return { ok: true, versionId, removedUserCopyOnly: Boolean(target && !target.isUser) };
   } catch (err) {
     return { ok: false, error: err.message };
   }

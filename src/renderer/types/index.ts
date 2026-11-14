@@ -610,6 +610,8 @@ export interface BibleVersion {
   language: string;
   books: BibleBook[];
   isUser?: boolean;
+  /** A user file shares this built-in id, so it is not the text in use. */
+  hasUserCopy?: boolean;
   userPath?: string;
 }
 
@@ -871,7 +873,7 @@ declare global {
         search: (payload: { versionId: string; query: string; limit?: number; book?: string }) => Promise<BibleSearchResult[]>;
         pick: (payload?: any) => Promise<{ ok: boolean; filePaths?: string[]; canceled?: boolean }>;
         importFile: (payload: { filePath: string; overwrite?: boolean }) => Promise<{ ok: boolean; exists?: boolean; imported?: boolean; versionId?: string; versionName?: string; filePath?: string; error?: string }>;
-        deleteVersion: (payload: { versionId: string } | string) => Promise<{ ok: boolean; error?: string }>;
+        deleteVersion: (payload: { versionId: string } | string) => Promise<{ ok: boolean; error?: string; versionId?: string; removedUserCopyOnly?: boolean }>;
       };
 
       verse: {
