@@ -3299,27 +3299,48 @@ app.whenReady().then(async () => {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-    ndiService?.stop();
-    for (const win of ndiFeedWindows.values()) {
-      if (win && !win.isDestroyed()) win.close();
-    }
-    ndiFeedWindows.clear();
-    for (const win of stageWindows) {
-      if (win && !win.isDestroyed()) win.close();
-    }
-    stageWindows.clear();
-    for (const win of dockPopoutWindows.values()) {
-      if (win && !win.isDestroyed()) win.close();
-    }
-    dockPopoutWindows.clear();
-    for (const win of stageDesignerWindows) {
-      if (win && !win.isDestroyed()) win.close();
-    }
-    stageDesignerWindows.clear();
-    if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
-    displayWindow = null;
-    if (process.platform !== 'darwin') {
-      app.quit();
+    /* Tearing the child windows down must never be able to stop the quit: any
+       throw in here used to skip app.quit(), leaving a process in Task Manager
+       with no window to close. */
+    try {
+      /* Every child window answers close() with hide() while app.isQuitting is
+         false (see the display and stage windows' close handlers), and
+         before-quit only runs after this handler — so the flag is set here,
+         before the chain, or each close() just hides the window and the
+         reference is dropped. macOS keeps the hide-to-reopen behaviour, where
+         the flag is set in before-quit instead. */
+      if (process.platform !== 'darwin') app.isQuitting = true;
+      ndiService?.stop();
+      for (const win of ndiFeedWindows.values()) {
+        if (win && !win.isDestroyed()) win.close();
+      }
+      ndiFeedWindows.clear();
+      for (const win of stageWindows) {
+        if (win && !win.isDestroyed()) win.close();
+      }
+      stageWindows.clear();
+      for (const win of dockPopoutWindows.values()) {
+        if (win && !win.isDestroyed()) win.close();
+      }
+      dockPopoutWindows.clear();
+      for (const win of stageDesignerWindows) {
+        if (win && !win.isDestroyed()) win.close();
+      }
+      stageDesignerWindows.clear();
+      if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
+      displayWindow = null;
+      /* A prewarmed designer is hidden and deliberately not in
+         stageDesignerWindows until it is shown, so nothing above closes it —
+         and while it lives, window-all-closed never fires and the single
+         instance lock stays held, which is why a relaunch exited silently. */
+      if (app.isQuitting && prewarmedStageDesignerWindow && !prewarmedStageDesignerWindow.isDestroyed()) {
+        prewarmedStageDesignerWindow.close();
+        prewarmedStageDesignerWindow = null;
+      }
+    } catch (err) {
+      console.error('[Shutdown] Window teardown failed:', err);
+    } finally {
+      if (process.platform !== 'darwin') app.quit();
     }
   });
 
