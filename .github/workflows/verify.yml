@@ -71,5 +71,11 @@ jobs:
       - name: Remote auth gate
         run: npm run verify:remote-auth
 
+      # Also stubs `electron` and boots main.cjs: it closes the main window after
+      # opening and hiding a stage designer, and asserts that the app quits, that
+      # the hidden prewarmed designer is closed, and that no window survives.
+      - name: Shutdown closes every window (#24)
+        run: npm run verify:shutdown
+
       - name: Renderer build
         run: npm run build:renderer
