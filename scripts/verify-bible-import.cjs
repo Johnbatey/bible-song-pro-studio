@@ -2,10 +2,10 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const initSqlJs = require('sql.js');
-const { importBibleFile, getVersions, getChapter, deleteVersion } = require('../src/electron/bible-service.cjs');
+const { importBibleFile, getVersions, getChapter, deleteVersion, repairStoredBookNumbers } = require('../src/electron/bible-service.cjs');
 
 const userDir = path.join(__dirname, '../userData/bibles');
-const TESTS = ['NIV_TEST', 'SQLITE_TEST'];
+const TESTS = ['NIV_TEST', 'SQLITE_TEST', 'JP_TEST', 'LEGACY_TEST'];
 
 function cleanUserDataBibles() {
   if (!fs.existsSync(userDir)) return;
@@ -103,9 +103,46 @@ async function run() {
   assert.strictEqual(fs.existsSync(orphan), false, 'The stranded file should be gone');
   assert.strictEqual(getVersions().find((v) => v.id === 'KJV').hasUserCopy, false, 'The mark should clear with the file');
 
+  // Test 7: a Zefania n attribute holding a book name ("1 Samuel") is a name, not a number
+  const jpFile = path.join(tmpDir, 'JP_TEST.xml');
+  fs.writeFileSync(jpFile, `<bible translation="Japanese CO1955 Test">
+  <BIBLEBOOK n="1 Samuel"><CHAPTER cnumber="1"><VERS vnumber="1">サムエル記上の一節</VERS></CHAPTER></BIBLEBOOK>
+  <BIBLEBOOK n="2 Samuel"><CHAPTER cnumber="1"><VERS vnumber="1">サムエル記下の一節</VERS></CHAPTER></BIBLEBOOK>
+</bible>`, 'utf8');
+  const res7 = await importBibleFile({ filePath: jpFile });
+  assert.strictEqual(res7.ok, true, 'Named-book XML import should succeed: ' + (res7.error || ''));
+  const jpSaved = JSON.parse(fs.readFileSync(path.join(userDir, 'JP_TEST.json'), 'utf8'));
+  const jpFirst = jpSaved.localizedBookNames.find((b) => b.name === 'サムエル記上');
+  const jpSecond = jpSaved.localizedBookNames.find((b) => b.name === 'サムエル記下');
+  assert.ok(jpFirst && jpSecond, 'Japanese book names should be recorded');
+  assert.strictEqual(jpFirst.number, 9, 'n="1 Samuel" must map to 1 Samuel, not Genesis');
+  assert.strictEqual(jpFirst.code, '1SA');
+  assert.strictEqual(jpSecond.number, 10, 'n="2 Samuel" must map to 2 Samuel, not Exodus');
+  assert.strictEqual(jpSecond.code, '2SA');
+
+  // The bilingual view hands the localized book name to the English translation.
+  const crossMapped = getChapter('KJV', 'サムエル記上', 1);
+  assert.ok(crossMapped.length > 0, 'A localized book name should resolve in another translation');
+  assert.strictEqual(crossMapped[0].book, '1 Samuel', 'Localized 1 Samuel must pair with English 1 Samuel');
+
+  // Test 8: translations imported before the book-name fix get their stored numbers corrected
+  fs.writeFileSync(path.join(userDir, 'LEGACY_TEST.json'), JSON.stringify({
+    id: 'LEGACY_TEST',
+    name: 'Legacy import',
+    books: { '1 Samuel': { '1': { '1': 'legacy verse' } } },
+    localizedBookNames: [
+      { number: 1, code: 'GEN', name: '1 Samuel' },
+      { number: 1, code: 'GEN', name: 'サムエル記上' },
+    ],
+  }, null, 2), 'utf8');
+  repairStoredBookNumbers();
+  const legacy = JSON.parse(fs.readFileSync(path.join(userDir, 'LEGACY_TEST.json'), 'utf8'));
+  assert.deepStrictEqual(legacy.localizedBookNames[0], { number: 9, code: '1SA', name: '1 Samuel' }, 'A stored English book name should recover its number');
+  assert.deepStrictEqual(legacy.localizedBookNames[1], { number: 9, code: '1SA', name: 'サムエル記上' }, 'A stored local book name should recover its number from the language tables');
+
   fs.rmSync(tmpDir, { recursive: true, force: true });
   cleanUserDataBibles();
-  console.log('✓ Custom Bible import, SQLite import, bundled-id refusal, and orphan recovery confirmed 100%.');
+  console.log('✓ Custom Bible import, SQLite import, bundled-id refusal, orphan recovery, named-book XML mapping, and stored book-number repair confirmed 100%.');
 }
 
 run().catch((err) => {
