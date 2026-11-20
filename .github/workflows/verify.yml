@@ -27,15 +27,11 @@ jobs:
   headless:
     runs-on: ubuntu-latest
     env:
-      # None of the checks below require Electron — verified by their imports.
-      # Skipping the binary saves the largest download in the install.
+      # onnxruntime-node's CUDA EP fetch is skipped from the project .npmrc, so
+      # the plain `npm ci` below is exactly the install a developer does. Do not
+      # add a job-level override for it here: CI is the proof that a fresh Linux
+      # clone installs cleanly.
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      # onnxruntime-node's postinstall installs only the CUDA EP binaries, and it
-      # auto-runs on Linux/x64. For 1.21.0 it asks for
-      # onnxruntime-linux-x64-gpu-1.21.0.tgz, which is not published, so `npm ci`
-      # failed with a 404 before any check ran. The checks below use only the CPU
-      # runtime that ships inside the package.
-      ONNXRUNTIME_NODE_INSTALL_CUDA: 'skip'
 
     steps:
       - uses: actions/checkout@v5
