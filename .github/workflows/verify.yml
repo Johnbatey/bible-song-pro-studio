@@ -30,6 +30,12 @@ jobs:
       # None of the checks below require Electron — verified by their imports.
       # Skipping the binary saves the largest download in the install.
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      # onnxruntime-node's postinstall installs only the CUDA EP binaries, and it
+      # auto-runs on Linux/x64. For 1.21.0 it asks for
+      # onnxruntime-linux-x64-gpu-1.21.0.tgz, which is not published, so `npm ci`
+      # failed with a 404 before any check ran. The checks below use only the CPU
+      # runtime that ships inside the package.
+      ONNXRUNTIME_NODE_INSTALL_CUDA: 'skip'
 
     steps:
       - uses: actions/checkout@v5
@@ -46,6 +52,11 @@ jobs:
 
       - name: Bible canon and licensing
         run: npm run verify:bibles
+
+      # The XML, JSON and SQLite importers and the book numbers they store,
+      # including the Zefania n="1 Samuel" case that used to become book 1.
+      - name: Bible import and book mapping
+        run: npm run verify:bible-import
 
       # Byte-level only. Whether the faces actually render is verify:fonts-render,
       # which needs a window and stays local.

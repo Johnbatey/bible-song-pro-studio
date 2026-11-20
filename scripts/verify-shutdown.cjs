@@ -204,13 +204,26 @@ async function waitFor(predicate, { timeout = 12000, step = 150 } = {}) {
 async function run() {
   console.log('Testing that closing the main window closes every window and quits...');
 
+  /* Bring-up creates its windows on either side of an await, so the list is
+     polled rather than read once. The console also has two shapes: a built tree
+     opens dist/index.html, while a clone without a build still opens the Vite
+     dev URL (http://localhost:5173). Both are the main window; the splash and
+     the stage designer are not. */
+  const isConsole = (win) => {
+    const url = String(win.url);
+    if (!url || url.includes('splash.html')) return false;
+    return /index\.html/.test(url) || !/\.html(?:[?#]|$)/.test(url);
+  };
+  const consoleWindow = () => windows.find((win) => !win.isDestroyed() && isConsole(win));
+  await waitFor(() => Boolean(consoleWindow()));
+
   /* Hand-over destroys the splash after its floor; waiting for that rather than
      a fixed sleep keeps the check quick and stops the splash looking like a
      survivor. */
   const handedOver = await waitFor(() => !windows.some((win) => String(win.url).includes('splash.html') && !win.isDestroyed()));
   assert.ok(handedOver, 'the splash never handed over to the main window');
 
-  const main = windows.find((win) => String(win.url).includes('index.html'));
+  const main = consoleWindow();
   assert.ok(main, 'main window was not created');
 
   const openDesigner = ipcHandlers.get('stage-designer:open');
