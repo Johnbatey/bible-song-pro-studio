@@ -5,16 +5,24 @@
  * built app the way a user does, so the window, the servers, the NDI service and
  * the single-instance lock are all real.
  *
- * main.cjs carries the matching probe behind BSP_CI_SHUTDOWN_PROBE, armed only
- * for this script: it opens a stage designer, hides it (leaving the prewarmed
- * window that used to survive), closes the main window, and then does nothing —
- * the app has to exit by itself. The script fails if the process is still alive
- * at the timeout, and insists the probe's own log lines appeared so a crash
- * during startup cannot be mistaken for a clean shutdown.
+ * scripts/verify-app-exit-probe.cjs is the entry it launches: it boots the real
+ * main process, opens a stage designer through the panel's bridge, hides it
+ * (leaving the prewarmed window that used to survive), closes the main window,
+ * and then does nothing — the app has to exit by itself. That script is the only
+ * test code involved; src/electron carries none. The harness fails if the
+ * process is still alive at the timeout, and insists the probe's own log lines
+ * appeared so a crash during startup cannot be mistaken for a clean shutdown.
+ *
+ * A runner with no interactive desktop is reported as such: Electron starts, its
+ * main window never comes up, and the check says the runner was headless instead
+ * of dressing that up as the leak #24 reported. BSP_CI_REQUIRE_DESKTOP=1 turns
+ * it back into a failure for a runner that is supposed to have a desktop.
  *
  * Windows is where this went wrong, but the mechanism is the same everywhere:
  * run it locally with BSP_CI_SHUTDOWN_EXPECT_QUIT=1 to exercise the pass path on
  * macOS, which keeps the app alive by design when its last window closes.
+ * BSP_CI_SIMULATE_WIN32=1 takes the app's own Windows teardown on the host
+ * instead, which is where the survivor assertion below can fire.
  * ────────────────────────────────────────────────────────────────────────── */
 'use strict';
 
@@ -25,6 +33,7 @@ const { spawn } = require('node:child_process');
 
 const electronBinary = require('electron'); // a path to the binary under plain Node
 const projectRoot = path.join(__dirname, '..');
+const probeEntry = path.join('scripts', 'verify-app-exit-probe.cjs');
 /* The app writes settings and session history under userData; a launch from
    this script must not land in the operator's real profile. */
 const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'bsp-app-exit-'));
@@ -46,14 +55,44 @@ function fail(message, output) {
   process.exit(1);
 }
 
+/* Windows is the only platform here whose session can be non-interactive, and a
+   service session has no desktop to put a window on. Positively identified, so a
+   crash during startup on a machine that does have a desktop stays a failure. */
+function headlessEvidence() {
+  if (process.platform !== 'win32') return null;
+  const session = String(process.env.SESSIONNAME || '').trim();
+  if (!session) return 'SESSIONNAME is not set, so this process has no interactive desktop';
+  if (/^services?$/i.test(session)) return `SESSIONNAME is "${session}", the non-interactive service session`;
+  return null;
+}
+
+function reportHeadless(reason, output) {
+  console.warn('::warning::Headless runner: the Windows shutdown check needs an interactive desktop, and this machine has none.');
+  console.warn('Headless runner: this check needs an interactive desktop, and this machine has none.');
+  console.warn('  evidence: ' + reason);
+  console.warn('  the app never reached its main window, so no shutdown behaviour was tested here.');
+  console.warn('  run this on a runner with a desktop session, or set BSP_CI_REQUIRE_DESKTOP=1 to fail instead.');
+  if (output) console.warn('--- app output ---\n' + output.trim().slice(-2000));
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    try {
+      fs.appendFileSync(
+        process.env.GITHUB_STEP_SUMMARY,
+        '### Windows shutdown (#24)\n\n'
+        + '**Skipped: headless runner.** ' + reason + '. The app never reached its main window, '
+        + 'so no shutdown behaviour was tested here.\n',
+      );
+    } catch (_) {}
+  }
+  process.exit(0);
+}
+
 (async () => {
   console.log('Launching the app and closing its main window; the process must exit on its own...');
 
-  const child = spawn(electronBinary, ['--disable-gpu', `--user-data-dir=${userData}`, '.'], {
+  const child = spawn(electronBinary, ['--disable-gpu', `--user-data-dir=${userData}`, probeEntry], {
     cwd: projectRoot,
     env: {
       ...process.env,
-      BSP_CI_SHUTDOWN_PROBE: '1',
       BSP_CI_SHUTDOWN_DELAY_MS: String(probeDelayMs),
       ELECTRON_ENABLE_LOGGING: '1',
       /* Never inherit a harness value from the shell: CI must test the app's own
@@ -81,14 +120,27 @@ function fail(message, output) {
 
   if (exit.timedOut) {
     try { child.kill('SIGKILL'); } catch (_) {}
-    fail(`the process was still running ${Math.round(timeoutMs / 1000)}s after the main window closed`, output);
   }
   if (exit.error) fail('could not launch the app: ' + exit.error.message, output);
+
+  /* The probe arms once the main window is up, so its absence means the app
+     never got a window at all — the headless case, or a real startup failure. */
+  if (!output.includes('[CI] shutdown probe armed')) {
+    const headless = headlessEvidence();
+    if (headless && process.env.BSP_CI_REQUIRE_DESKTOP !== '1') reportHeadless(headless, output);
+    if (exit.timedOut) fail(`the process was still running ${Math.round(timeoutMs / 1000)}s and never opened its main window`, output);
+    fail(`the app never opened its main window (exit code ${exit.code}, signal ${exit.signal || 'none'})`, output);
+  }
+
+  if (exit.timedOut) {
+    fail(`the process was still running ${Math.round(timeoutMs / 1000)}s after the main window closed`, output);
+  }
 
   const missing = EXPECTED_LINES.filter((line) => !output.includes(line));
   if (missing.length) fail('the app never reached: ' + missing.join(' | '), output);
 
-  if (output.includes('[CI] shutdown probe failed')) fail('the probe itself failed', output);
+  const probeFailure = output.split('\n').find((line) => line.includes('[CI] shutdown probe failed'));
+  if (probeFailure) fail(probeFailure.trim(), output);
   if (output.includes('[Shutdown] Window teardown failed')) fail('window teardown logged an error', output);
   if (exit.code !== 0) fail(`the app exited with code ${exit.code} (signal ${exit.signal || 'none'})`, output);
 
