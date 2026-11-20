@@ -39,6 +39,7 @@
     "verify:remote-architecture": "node scripts/verify-remote-architecture.cjs",
     "verify:remote-auth": "node scripts/verify-remote-auth.cjs",
     "verify:shutdown": "node scripts/verify-shutdown.cjs",
+    "verify:app-exit": "node scripts/verify-app-exit.cjs",
     "verify:program-surface": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-program-surface.cjs",
     "verify:audience-display": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-audience-display.cjs",
     "verify:display-parity": "unset ELECTRON_RUN_AS_NODE; electron scripts/verify-display-parity.cjs",

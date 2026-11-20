@@ -32,3 +32,35 @@ jobs:
 
       - name: Run Display Fields Parity Verification
         run: npm run verify:display-fields
+
+  shutdown-windows:
+    name: Windows shutdown (#24)
+    # The reported leak was a process still in Task Manager on Windows 11 after
+    # every window was closed, so the check that matters has to run a real
+    # Electron process on a real Windows desktop — not the stubbed harness that
+    # verify.yml already runs.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      # The app decides dev-vs-built by whether dist/index.html exists, and the
+      # probe opens the stage designer, so the renderer has to be built first.
+      - name: Build renderer
+        run: npm run build:renderer
+
+      # Launches `electron .`, opens and hides a stage designer, closes the main
+      # window, and fails if the process is still alive at the timeout — which is
+      # exactly the symptom #24 reported.
+      - name: Closing the main window ends the process
+        run: npm run verify:app-exit
