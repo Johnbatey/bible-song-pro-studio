@@ -3344,6 +3344,37 @@ app.whenReady().then(async () => {
     }
   });
 
+  /* ── CI probe for the shutdown path (#24) ───────────────
+   * Armed by an env var, so a normal launch never takes this branch. It opens a
+   * stage designer, hides it the way the UI does (which keeps it as the
+   * prewarmed window) and then closes the main window — the same close a click
+   * sends — leaving the app to exit on its own. scripts/verify-app-exit.cjs runs
+   * this on Windows CI and fails if the process is still alive afterwards. */
+  if (process.env.BSP_CI_SHUTDOWN_PROBE === '1') {
+    const probeDelay = Number(process.env.BSP_CI_SHUTDOWN_DELAY_MS) || 4000;
+    console.log('[CI] shutdown probe armed');
+    setTimeout(() => {
+      try {
+        const designer = createStageDesignerWindow();
+        if (designer) {
+          designer.close();
+          console.log('[CI] stage designer opened and hidden (prewarmed)');
+        }
+        console.log('[CI] closing main window');
+        mainWindow?.close();
+        /* macOS deliberately keeps the app alive with no windows, so a local
+           run off Windows asks for the quit the Windows handler sends itself.
+           CI never sets this: the handler's own quit is what is being tested. */
+        if (process.env.BSP_CI_SHUTDOWN_EXPECT_QUIT === '1') {
+          setTimeout(() => app.quit(), 500);
+        }
+      } catch (err) {
+        console.error('[CI] shutdown probe failed:', err);
+        process.exit(2);
+      }
+    }, probeDelay);
+  }
+
   // Fullscreen events
   mainWindow.on('enter-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', true));
   mainWindow.on('leave-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', false));
