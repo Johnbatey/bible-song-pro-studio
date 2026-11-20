@@ -108,6 +108,17 @@ async function run() {
   if (designer.isVisible()) throw new Error('the designer is still visible after closing it');
   console.log('[CI] stage designer opened and hidden (prewarmed)');
 
+  /* One designer, not two. The prewarm timer used to fire after an open that
+     beat it to the window and build a second, hidden one; the visible window's
+     close then took the prewarmed slot and the other survived shutdown with
+     nothing naming it. Long enough here for a late prewarm to land. */
+  await wait(2500);
+  const designers = BrowserWindow.getAllWindows()
+    .filter((win) => !win.isDestroyed() && urlOf(win).includes('stage-designer.html'));
+  if (designers.length > 1) {
+    throw new Error(`a second stage designer window is open: ${designers.length} designer windows`);
+  }
+
   if (simulateWindows) {
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
     console.log('[CI] reporting as win32 for the main window close');
