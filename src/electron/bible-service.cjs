@@ -11,6 +11,7 @@ const {
   parseUsfmText,
   parseJsonBible,
 } = require('./bible-parsing.cjs');
+const { BIBLE_BOOK_TRANSLATIONS } = require('./bible-translations.cjs');
 
 // Bundled scripture is public domain and 66-book Protestant canon only — see
 // BIBLES.md. Copyrighted translations (NIV, NKJV, NLT, NASB, ESV) are not shipped;
@@ -249,6 +250,7 @@ function getUserBibleDir() {
 }
 
 function getAllVersionMeta() {
+  runBookNumberRepairOnce();
   /* Copies, not the VERSION_META objects themselves: a user file that collides
      with a bundled id marks its meta below, and that mark must not stick to the
      bundled list for the rest of the process. */
@@ -292,6 +294,58 @@ function getAllVersionMeta() {
     } catch (_) {}
   }
   return metaList;
+}
+
+/* ── stored book-number repair ────────────────────────────
+ * The XML importer used to read a book name in the n attribute as a number, so
+ * an import made before that fix kept `1 Samuel` as canonical 1 with code GEN.
+ * The bilingual view pairs translations on that stored number and code, so the
+ * pairing stayed wrong until the file was imported again. The stored book name
+ * is the trustworthy part, so the number and code are recomputed from it once,
+ * in place, and earlier imports keep working without a re-import. */
+
+function localizedBookNumberForName(name) {
+  const key = fold(name);
+  if (!key) return null;
+  for (const table of Object.values(BIBLE_BOOK_TRANSLATIONS)) {
+    const hit = Object.entries(table || {}).find(([, localized]) => fold(localized) === key);
+    if (hit) return Number(hit[0]);
+  }
+  return null;
+}
+
+function repairedBookEntry(entry) {
+  const name = String(entry?.name || '').trim();
+  if (!name) return entry;
+  const reversed = matchCanonicalBook(name) ? null : localizedBookNumberForName(name);
+  const canonical = matchCanonicalBook(name) || CANONICAL_BOOKS[reversed - 1];
+  if (!canonical) return entry;
+  if (Number(entry.number) === canonical.number && entry.code === canonical.code) return entry;
+  return { ...entry, number: canonical.number, code: canonical.code };
+}
+
+function repairStoredBookNumbers() {
+  let files = [];
+  try { files = fs.readdirSync(getUserBibleDir()); } catch (_) { return; }
+  files.filter((file) => file.endsWith('.json')).forEach((file) => {
+    const filePath = path.join(getUserBibleDir(), file);
+    try {
+      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      if (!parsed || !Array.isArray(parsed.localizedBookNames)) return;
+      const repaired = parsed.localizedBookNames.map(repairedBookEntry);
+      if (repaired.every((entry, index) => entry === parsed.localizedBookNames[index])) return;
+      parsed.localizedBookNames = repaired;
+      fs.writeFileSync(filePath, JSON.stringify(parsed, null, 2), 'utf8');
+    } catch (_) { /* a file we cannot read is not a reason to fail the listing */ }
+  });
+}
+
+let bookNumberRepairRan = false;
+
+function runBookNumberRepairOnce() {
+  if (bookNumberRepairRan) return;
+  bookNumberRepairRan = true;
+  repairStoredBookNumbers();
 }
 
 function loadVersion(meta) {
@@ -789,4 +843,5 @@ module.exports = {
   importBibleFile,
   deleteVersion,
   clearUserBibles,
+  repairStoredBookNumbers,
 };
