@@ -18,6 +18,10 @@
  * of dressing that up as the leak #24 reported. BSP_CI_REQUIRE_DESKTOP=1 turns
  * it back into a failure for a runner that is supposed to have a desktop.
  *
+ * A probe that cannot arrange the ordering it tests — the prewarm callback it
+ * holds by name has been renamed, say — is reported as a broken test setup, not
+ * as the leak, because a change inside main.cjs must not read as a shutdown bug.
+ *
  * Windows is where this went wrong, but the mechanism is the same everywhere:
  * run it locally with BSP_CI_SHUTDOWN_EXPECT_QUIT=1 to exercise the pass path on
  * macOS, which keeps the app alive by design when its last window closes.
@@ -136,11 +140,22 @@ function reportHeadless(reason, output) {
     fail(`the process was still running ${Math.round(timeoutMs / 1000)}s after the main window closed`, output);
   }
 
+  /* The probe says what failed before anything is inferred from missing lines:
+     a probe that could not arrange its own ordering has tested nothing about
+     shutdown, and must not be reported as the app failing to close. */
+  const probeLine = (needle) => output.split('\n').find((line) => line.includes(needle)) || null;
+  const setupFailure = probeLine('[CI] shutdown probe setup failed');
+  if (setupFailure) {
+    console.error('::error::The shutdown check could not be set up, so this run says nothing about shutdown.');
+    fail('the check could not be set up, so nothing about shutdown was tested: '
+      + setupFailure.replace(/^.*\[CI\] shutdown probe setup failed:\s*/, ''), output);
+  }
+
+  const probeFailure = probeLine('[CI] shutdown probe failed');
+  if (probeFailure) fail(probeFailure.trim(), output);
+
   const missing = EXPECTED_LINES.filter((line) => !output.includes(line));
   if (missing.length) fail('the app never reached: ' + missing.join(' | '), output);
-
-  const probeFailure = output.split('\n').find((line) => line.includes('[CI] shutdown probe failed'));
-  if (probeFailure) fail(probeFailure.trim(), output);
   if (output.includes('[Shutdown] Window teardown failed')) fail('window teardown logged an error', output);
   if (exit.code !== 0) fail(`the app exited with code ${exit.code} (signal ${exit.signal || 'none'})`, output);
 

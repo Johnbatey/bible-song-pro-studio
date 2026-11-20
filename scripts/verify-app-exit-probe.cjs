@@ -25,11 +25,22 @@ const { app, BrowserWindow, screen } = require('electron');
  * callback as main.cjs schedules it and hands it to the run below, which fires
  * it at the one moment the race needs it: with a designer open. Every other
  * timer passes through untouched. */
+/* A failure of this harness's own arrangement — the prewarm it meant to hold
+   never arrived, or a designer was already there — is not evidence about the
+   app. It is reported on its own line with its own exit code, so a rename
+   inside main.cjs cannot read as the shutdown leak #24 reported. */
+class ProbeSetupError extends Error {}
+
 const realSetTimeout = global.setTimeout;
 let firePrewarm = null;
 global.setTimeout = function (fn, delay, ...args) {
   if (typeof fn === 'function' && fn.name === 'prewarmStageDesignerWindow') {
-    firePrewarm = () => fn(...args);
+    firePrewarm = () => {
+      /* The hold ends with the one call it was holding: from here the process
+         runs on the timers it started with, for the shutdown under test. */
+      global.setTimeout = realSetTimeout;
+      fn(...args);
+    };
     console.log('[CI] prewarm timer held until a designer is already open');
     return 0;
   }
@@ -120,7 +131,7 @@ async function run() {
      really does come first; a designer already present means the hold missed
      and the run would not be testing the race at all. */
   if (designerWindows().length) {
-    throw new Error('a designer window existed before the probe opened one, so the prewarm was not held and the race never happened');
+    throw new ProbeSetupError('a designer window existed before the probe opened one, so the prewarm was not held and the race never happened; the hold matches the callback by name (prewarmStageDesignerWindow), has it been renamed?');
   }
 
   /* The panel's own path, so the window that ends up prewarmed is the one the
@@ -139,10 +150,15 @@ async function run() {
      close then took the prewarmed slot and left the other with no name. */
   const armedAt = Date.now();
   while (!firePrewarm) {
-    if (Date.now() - armedAt > 30000) throw new Error('main.cjs never scheduled the prewarm timer');
+    if (Date.now() - armedAt > 30000) {
+      throw new ProbeSetupError('main.cjs never scheduled a prewarm the probe could hold; the hold matches the callback by name (prewarmStageDesignerWindow), so it may have been renamed');
+    }
     await wait(100);
   }
   firePrewarm();
+  if (global.setTimeout !== realSetTimeout) {
+    throw new ProbeSetupError('the setTimeout hold was not restored after firing the prewarm');
+  }
   await wait(500);
   const afterPrewarm = designerWindows();
   if (afterPrewarm.length !== 1) {
@@ -184,6 +200,13 @@ async function run() {
 }
 
 run().catch((err) => {
-  console.error('[CI] shutdown probe failed:', err && err.message ? err.message : err);
-  process.exit(2);
+  const message = err && err.message ? err.message : err;
+  /* A distinct line and exit code: verify-app-exit.cjs reports a setup failure
+     as a broken check, not as the shutdown leak this check exists to catch.
+     app.exit() rather than process.exit(): in the main process the latter can
+     return and let this function carry on to the line below, which would print
+     the setup error a second time as an app failure and undo the distinction. */
+  const setup = err instanceof ProbeSetupError;
+  console.error(`[CI] shutdown probe ${setup ? 'setup failed' : 'failed'}:`, message);
+  app.exit(setup ? 3 : 2);
 });
