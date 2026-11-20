@@ -104,9 +104,11 @@ function parseXmlAttributes(attrString = '') {
 function matchCanonicalBook(identifier = '') {
   if (!identifier) return null;
   const str = String(identifier).trim();
-  const num = parseInt(str, 10);
-  if (!isNaN(num) && num >= 1 && num <= 66) {
-    return CANONICAL_BOOKS[num - 1];
+  /* Only an all-digit value is a book number. parseInt("1 Samuel") is 1, which
+     used to map the books of Samuel to Genesis and Exodus. */
+  if (/^\d+$/.test(str)) {
+    const num = parseInt(str, 10);
+    if (num >= 1 && num <= 66) return CANONICAL_BOOKS[num - 1];
   }
   const clean = str.toUpperCase().replace(/[^A-Z0-9]/g, '');
   const matchCode = CANONICAL_BOOKS.find((b) => b.code === clean || b.code === clean.slice(0, 3));
@@ -195,12 +197,20 @@ function parseXmlBible(xmlText, fallbackId) {
     }
 
     const attrs = parseXmlAttributes(attrString);
-    const bNumber = parseInt(attrs.bnumber || attrs.number || attrs.n || attrs.bno || String(bookIndex), 10);
+    /* Files spell the n attribute as a book name as often as a number ("1 Samuel").
+       A value is a book number only when the whole value is digits, and a name in
+       that attribute has to resolve as a name before the positional guess is used. */
+    const numericAttr = [attrs.bnumber, attrs.number, attrs.bno, attrs.n]
+      .find((value) => /^\d+$/.test(String(value ?? '').trim()));
+    const bNumber = numericAttr === undefined ? null : parseInt(String(numericAttr).trim(), 10);
     const rawIdentifier = attrs.bname || attrs.name || attrs.n || attrs.osisid || attrs.id || '';
-    const canonical = CANONICAL_BOOKS[bNumber - 1] || matchCanonicalBook(rawIdentifier) || CANONICAL_BOOKS[bookIndex - 1] || { name: `Book ${bNumber}`, code: `B${bNumber}` };
+    const canonical = (bNumber ? CANONICAL_BOOKS[bNumber - 1] : null)
+      || matchCanonicalBook(rawIdentifier)
+      || CANONICAL_BOOKS[bookIndex - 1]
+      || { name: `Book ${bookIndex}`, code: `B${bookIndex}` };
 
-    const localizedName = resolveLocalizedBookName(rawIdentifier, canonical.number || bNumber, detectedLang);
-    localizedBookNames.push({ number: canonical.number || bNumber, code: canonical.code || `B${bNumber}`, name: localizedName });
+    const localizedName = resolveLocalizedBookName(rawIdentifier, canonical.number || bookIndex, detectedLang);
+    localizedBookNames.push({ number: canonical.number || bookIndex, code: canonical.code || `B${bookIndex}`, name: localizedName });
 
     if (!bibleData[localizedName]) bibleData[localizedName] = {};
 
