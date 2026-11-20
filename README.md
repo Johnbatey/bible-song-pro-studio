@@ -74,6 +74,13 @@ cd bible-song-pro-studio
 # Install dependencies
 npm install
 
+# Linux + NVIDIA GPU only, optional: also install the CUDA execution provider
+# for on-device speech models. It is skipped by default (.npmrc) so a plain
+# install works everywhere; the CPU provider is used when it is absent. An env
+# var outranks .npmrc, so this is the opt-in. That URL upstream requests 404s
+# today, so this command reaches the same error the default avoided until fixed.
+ONNXRUNTIME_NODE_INSTALL_CUDA=v12 npm install
+
 # Install pre-commit verification hooks
 node scripts/install-hooks.cjs
 
