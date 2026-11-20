@@ -1861,7 +1861,29 @@ function createStageDisplayWindow(targetDisplay, options = {}) {
  * second call focuses the one already open rather than opening a rival editor
  * onto the same layouts.
  */
-let prewarmedStageDesignerWindow = null;
+/* Every designer window, shown or hidden. stageDesignerWindows above is the
+   subset the stage bus sends to, and a hidden designer is deliberately out of
+   it, so that set cannot answer the one question both the prewarm timer and the
+   open handler must ask before building a window: is a designer already here?
+   It used to be a single `prewarmedStageDesignerWindow` slot instead, and the
+   race was in the slot — a designer opened before the prewarm timer fired was
+   not in it, so the timer built a second, hidden window, and the visible one's
+   close then took the slot and orphaned the first. A registry has no such blind
+   spot, and the prewarmed window is simply its hidden member. */
+const allDesignerWindows = new Set();
+
+function liveAllDesignerWindows() {
+  for (const win of allDesignerWindows) if (win.isDestroyed()) allDesignerWindows.delete(win);
+  return allDesignerWindows;
+}
+
+/** The designer that is up but hidden — what "prewarmed" means now. */
+function hiddenDesignerWindow() {
+  for (const win of liveAllDesignerWindows()) {
+    if (!win.isVisible()) return win;
+  }
+  return null;
+}
 
 function setupStageDesignerEvents(win) {
   const contentsId = win.webContents.id;
@@ -1869,9 +1891,7 @@ function setupStageDesignerEvents(win) {
   win.on('closed', () => {
     stageDesignerWindows.delete(win);
     dirtyDesigners.delete(contentsId);
-    if (prewarmedStageDesignerWindow === win) {
-      prewarmedStageDesignerWindow = null;
-    }
+    allDesignerWindows.delete(win);
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
@@ -1886,7 +1906,6 @@ function setupStageDesignerEvents(win) {
         stageDesignerWindows.delete(win);
         dirtyDesigners.delete(contentsId);
         win.hide();
-        prewarmedStageDesignerWindow = win;
         if (mainWindow && !mainWindow.isDestroyed()) {
           if (mainWindow.isMinimized()) mainWindow.restore();
           mainWindow.focus();
@@ -1918,7 +1937,6 @@ function setupStageDesignerEvents(win) {
       if (!app.isQuitting) {
         win.hide();
         stageDesignerWindows.delete(win);
-        prewarmedStageDesignerWindow = win;
         if (mainWindow && !mainWindow.isDestroyed()) {
           if (mainWindow.isMinimized()) mainWindow.restore();
           mainWindow.focus();
@@ -1938,7 +1956,11 @@ function setupStageDesignerEvents(win) {
 }
 
 function prewarmStageDesignerWindow() {
-  if (prewarmedStageDesignerWindow && !prewarmedStageDesignerWindow.isDestroyed()) return;
+  /* A designer that is already here is what this timer exists to have ready, so
+     there is nothing to build. Building one anyway is the second hidden window
+     #24 exposed: a designer opened ahead of the timer is not in the old slot, so
+     this prewarm added another, and only one of the two could ever be named. */
+  if (liveAllDesignerWindows().size > 0) return;
   try {
     const win = new BrowserWindow({
       width: 1440,
@@ -1963,7 +1985,7 @@ function prewarmStageDesignerWindow() {
     win.loadURL(isDev ? 'http://localhost:5173/stage-designer.html' : `file://${path.join(__dirname, '../../dist/stage-designer.html')}`);
     win.setMenuBarVisibility(false);
     setupStageDesignerEvents(win);
-    prewarmedStageDesignerWindow = win;
+    allDesignerWindows.add(win);
   } catch (e) {
     console.warn('[StageDesigner] Prewarm failed:', e);
   }
@@ -1978,8 +2000,11 @@ function createStageDesignerWindow() {
     }
   }
 
-  if (prewarmedStageDesignerWindow && !prewarmedStageDesignerWindow.isDestroyed()) {
-    const win = prewarmedStageDesignerWindow;
+  /* Hidden from the registry, not from the old slot: a designer that is already
+     up but out of sight is the one to show, whichever way it got here. */
+  const prewarmed = hiddenDesignerWindow();
+  if (prewarmed) {
+    const win = prewarmed;
     stageDesignerWindows.add(win);
     if (win.isMinimized()) win.restore();
     win.show();
@@ -1999,6 +2024,7 @@ function createStageDesignerWindow() {
   win.loadURL(isDev ? 'http://localhost:5173/stage-designer.html' : `file://${path.join(__dirname, '../../dist/stage-designer.html')}`);
   win.setMenuBarVisibility(false);
   setupStageDesignerEvents(win);
+  allDesignerWindows.add(win);
   stageDesignerWindows.add(win);
   win.show();
   win.focus();
@@ -3330,11 +3356,10 @@ app.whenReady().then(async () => {
       if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
       displayWindow = null;
       /* Everything still here, by asking Electron rather than by walking a
-         handle. A hidden window belongs to no list — the prewarmed designer is
-         the one #24 was filed about, and a prewarm that lands after an early
-         open leaves a second one that not even prewarmedStageDesignerWindow
-         points at — so "close the prewarmed one" is one leak short of the
-         invariant. While any window lives, window-all-closed never fires and
+         handle. A hidden window can belong to no list — the prewarmed designer
+         is the one #24 was filed about, and the prewarm/open race once left a
+         second one that nothing named — so "close the prewarmed one" is a leak
+         short of the invariant. While any window lives, window-all-closed never fires and
          the single instance lock stays held, which is why a relaunch used to
          exit silently.
 
@@ -3346,7 +3371,7 @@ app.whenReady().then(async () => {
           if (!win || win.isDestroyed()) continue;
           try { win.destroy(); } catch (_) {}
         }
-        prewarmedStageDesignerWindow = null;
+        allDesignerWindows.clear();
       }
     } catch (err) {
       console.error('[Shutdown] Window teardown failed:', err);
