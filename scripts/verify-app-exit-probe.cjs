@@ -15,6 +15,27 @@
 
 const { app, BrowserWindow, screen } = require('electron');
 
+/* ── The race, held open ────────────────────────────────────────────────
+ * #24's second designer came from the prewarm timer firing while a designer was
+ * already open: it read the old single slot, found it empty, and built another
+ * window behind the visible one. Nothing makes that ordering happen in a given
+ * run — a fast machine can get from the open to the close before the 1500 ms
+ * timer lands, and a check that waits for it then passes without ever visiting
+ * the bug. So the timer is not left to timing. This wrapper catches the prewarm
+ * callback as main.cjs schedules it and hands it to the run below, which fires
+ * it at the one moment the race needs it: with a designer open. Every other
+ * timer passes through untouched. */
+const realSetTimeout = global.setTimeout;
+let firePrewarm = null;
+global.setTimeout = function (fn, delay, ...args) {
+  if (typeof fn === 'function' && fn.name === 'prewarmStageDesignerWindow') {
+    firePrewarm = () => fn(...args);
+    console.log('[CI] prewarm timer held until a designer is already open');
+    return 0;
+  }
+  return realSetTimeout(fn, delay, ...args);
+};
+
 /* Required once this module is loaded, so the windows main.cjs opens arrive as
    ordinary events rather than needing a hook inside it. */
 require('../src/electron/main.cjs');
@@ -54,6 +75,11 @@ function findWindow(needle) {
   return BrowserWindow.getAllWindows().find((win) => !win.isDestroyed() && urlOf(win).includes(needle)) || null;
 }
 
+function designerWindows() {
+  return BrowserWindow.getAllWindows()
+    .filter((win) => !win.isDestroyed() && urlOf(win).includes('stage-designer.html'));
+}
+
 async function waitForWindow(needle, timeout = 60000) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeout) {
@@ -85,9 +111,17 @@ async function run() {
   if (!mainWindow) throw new Error('the main window never opened');
   console.log('[CI] shutdown probe armed');
 
-  /* Let startup settle: the splash hand-over, the prewarmed designer and the
-     first display-state push all land in this window. */
+  /* Let startup settle: the splash hand-over and the first display-state push
+     both land in this window. The prewarm does not, by design — it is held. */
   await wait(delayMs);
+
+  /* Prove the ordering before relying on it. With the timer held, main.cjs
+     cannot have built a designer, so an empty list here says the open below
+     really does come first; a designer already present means the hold missed
+     and the run would not be testing the race at all. */
+  if (designerWindows().length) {
+    throw new Error('a designer window existed before the probe opened one, so the prewarm was not held and the race never happened');
+  }
 
   /* The panel's own path, so the window that ends up prewarmed is the one the
      UI would have made. A missing bridge shows up below, on visibility. */
@@ -100,24 +134,32 @@ async function run() {
   await wait(1000);
   if (!designer.isVisible()) throw new Error('the stage designer did not become visible');
 
+  /* The ordering #24 broke, on demand: a designer is open and the prewarm
+     fires. It used to build a second, hidden window here, and the open one's
+     close then took the prewarmed slot and left the other with no name. */
+  const armedAt = Date.now();
+  while (!firePrewarm) {
+    if (Date.now() - armedAt > 30000) throw new Error('main.cjs never scheduled the prewarm timer');
+    await wait(100);
+  }
+  firePrewarm();
+  await wait(500);
+  const afterPrewarm = designerWindows();
+  if (afterPrewarm.length !== 1) {
+    throw new Error(`the prewarm added a designer window while one was open: ${afterPrewarm.length} designer windows now`);
+  }
+  console.log('[CI] prewarm fired with a designer open, and only that designer exists');
+
   /* Closing it hides it and leaves it as the prewarmed window — the one that
      used to survive shutdown, because no list held it. */
   designer.close();
   await wait(500);
   if (designer.isDestroyed()) throw new Error('closing the designer should hide it, not destroy it');
   if (designer.isVisible()) throw new Error('the designer is still visible after closing it');
-  console.log('[CI] stage designer opened and hidden (prewarmed)');
-
-  /* One designer, not two. The prewarm timer used to fire after an open that
-     beat it to the window and build a second, hidden one; the visible window's
-     close then took the prewarmed slot and the other survived shutdown with
-     nothing naming it. Long enough here for a late prewarm to land. */
-  await wait(2500);
-  const designers = BrowserWindow.getAllWindows()
-    .filter((win) => !win.isDestroyed() && urlOf(win).includes('stage-designer.html'));
-  if (designers.length > 1) {
-    throw new Error(`a second stage designer window is open: ${designers.length} designer windows`);
+  if (designerWindows().length !== 1) {
+    throw new Error(`the hidden designer is not the only one: ${designerWindows().length} designer windows`);
   }
+  console.log('[CI] stage designer opened and hidden (prewarmed)');
 
   if (simulateWindows) {
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
