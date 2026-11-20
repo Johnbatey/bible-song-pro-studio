@@ -59,8 +59,13 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
-      # Launches `electron .`, opens and hides a stage designer, closes the main
-      # window, and fails if the process is still alive at the timeout — which is
-      # exactly the symptom #24 reported.
+      # Launches the app through scripts/verify-app-exit-probe.cjs, opens and
+      # hides a stage designer, closes the main window, and fails if the process
+      # is still alive at the timeout — exactly the symptom #24 reported.
+      #
+      # A runner without an interactive desktop cannot put a window on screen. It
+      # is then reported as a headless runner (a warning annotation plus a job
+      # summary line) and the step stays green, rather than failing as a shutdown
+      # leak; set BSP_CI_REQUIRE_DESKTOP=1 to demand a desktop instead.
       - name: Closing the main window ends the process
         run: npm run verify:app-exit

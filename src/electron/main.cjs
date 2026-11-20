@@ -3329,12 +3329,23 @@ app.whenReady().then(async () => {
       stageDesignerWindows.clear();
       if (displayWindow && !displayWindow.isDestroyed()) displayWindow.close();
       displayWindow = null;
-      /* A prewarmed designer is hidden and deliberately not in
-         stageDesignerWindows until it is shown, so nothing above closes it —
-         and while it lives, window-all-closed never fires and the single
-         instance lock stays held, which is why a relaunch exited silently. */
-      if (app.isQuitting && prewarmedStageDesignerWindow && !prewarmedStageDesignerWindow.isDestroyed()) {
-        prewarmedStageDesignerWindow.close();
+      /* Everything still here, by asking Electron rather than by walking a
+         handle. A hidden window belongs to no list — the prewarmed designer is
+         the one #24 was filed about, and a prewarm that lands after an early
+         open leaves a second one that not even prewarmedStageDesignerWindow
+         points at — so "close the prewarmed one" is one leak short of the
+         invariant. While any window lives, window-all-closed never fires and
+         the single instance lock stays held, which is why a relaunch used to
+         exit silently.
+
+         destroy(), not close(): a remaining window must not be able to answer
+         with hide(), and an unsaved-changes dialog must not be raised in front
+         of a quit that is already underway. */
+      if (app.isQuitting) {
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (!win || win.isDestroyed()) continue;
+          try { win.destroy(); } catch (_) {}
+        }
         prewarmedStageDesignerWindow = null;
       }
     } catch (err) {
@@ -3343,38 +3354,6 @@ app.whenReady().then(async () => {
       if (process.platform !== 'darwin') app.quit();
     }
   });
-
-  /* ── CI probe for the shutdown path (#24) ───────────────
-   * Armed by an env var, so a normal launch never takes this branch. It opens a
-   * stage designer, hides it the way the UI does (which keeps it as the
-   * prewarmed window) and then closes the main window — the same close a click
-   * sends — leaving the app to exit on its own. scripts/verify-app-exit.cjs runs
-   * this on Windows CI and fails if the process is still alive afterwards. */
-  if (process.env.BSP_CI_SHUTDOWN_PROBE === '1') {
-    const probeDelay = Number(process.env.BSP_CI_SHUTDOWN_DELAY_MS) || 4000;
-    console.log('[CI] shutdown probe armed');
-    setTimeout(() => {
-      try {
-        const designer = createStageDesignerWindow();
-        if (designer) {
-          designer.close();
-          console.log('[CI] stage designer opened and hidden (prewarmed)');
-        }
-        console.log('[CI] closing main window');
-        mainWindow?.close();
-        /* macOS deliberately keeps the app alive with no windows, so a local
-           run off Windows asks for the quit the Windows handler sends itself.
-           CI never sets this: the handler's own quit is what is being tested. */
-        if (process.env.BSP_CI_SHUTDOWN_EXPECT_QUIT === '1') {
-          setTimeout(() => app.quit(), 500);
-        }
-      } catch (err) {
-        console.error('[CI] shutdown probe failed:', err);
-        process.exit(2);
-      }
-    }, probeDelay);
-  }
-
   // Fullscreen events
   mainWindow.on('enter-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', true));
   mainWindow.on('leave-full-screen', () => mainWindow?.webContents.send('fullscreen:changed', false));
