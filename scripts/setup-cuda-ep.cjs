@@ -218,6 +218,15 @@ function copyLibraries(targetDirectory, libsDirectory, version) {
   }
 }
 
+/** The first smoke-test dataset this wheel actually carries, or null. */
+function smokeModel(libsDirectory) {
+  return (
+    SMOKE_MODELS.map((entry) => path.join(libsDirectory, path.basename(entry))).find((file) =>
+      fs.existsSync(file),
+    ) ?? null
+  );
+}
+
 function verify(targetDirectory, version) {
   const missing = requiredFiles(version).filter((name) => {
     const file = path.join(targetDirectory, name);
@@ -288,7 +297,7 @@ async function smokeTest(ortDirectory, modelPath) {
   log(`smoke test passed: session created (providers: ${reported})`);
 }
 
-(async () => {
+async function main() {
   if (process.platform !== 'linux' || process.arch !== 'x64') {
     log(`skipping: CUDA binaries are only published for linux/x64 (this is ${process.platform}/${process.arch})`);
     return;
@@ -345,9 +354,7 @@ async function smokeTest(ortDirectory, modelPath) {
       log(`installed into ${path.relative(ROOT, directory)}`);
     }
 
-    const modelPath = SMOKE_MODELS.map((entry) =>
-      path.join(libsDirectory, path.basename(entry)),
-    ).find((file) => fs.existsSync(file));
+    const modelPath = smokeModel(libsDirectory);
     if (!modelPath) {
       fail(
         `onnxruntime-gpu ${version} ships none of ${SMOKE_MODELS.join(', ')}, so the CUDA EP cannot be smoke-tested`,
@@ -358,4 +365,21 @@ async function smokeTest(ortDirectory, modelPath) {
 
   log('done. Launch with BSP_WHISPER_DEVICE=cuda to use the provider; `npm run verify:local-models` checks the models.');
   log('note: `npm ci` recreates node_modules — re-run `npm run setup:cuda` after every install.');
-})().catch((error) => fail(error.message || String(error)));
+}
+
+if (require.main === module) {
+  main().catch((error) => fail(error.message || String(error)));
+}
+
+/* Exported so a test can drive extraction and copying with a fake wheel and a
+   fake node_modules. Nothing here loads onnxruntime-node. */
+module.exports = {
+  extractWheel,
+  copyLibraries,
+  smokeModel,
+  findOrtPackages,
+  binDirectory,
+  selectWheel,
+  requiredFiles,
+  SMOKE_MODELS,
+};
