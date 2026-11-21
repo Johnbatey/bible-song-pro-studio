@@ -22,8 +22,6 @@
 const fs = require('fs');
 const path = require('path');
 
-let transformers = null;
-
 /**
  * What an operator can pick from.
  *
@@ -136,7 +134,16 @@ function findModel(value) {
   return MODELS.find((m) => m.key === value || m.id === value) || null;
 }
 
-function createOnnxWhisperService({ app }) {
+function createOnnxWhisperService({
+  app,
+  /* Injected by the device test, so the CUDA request and the CPU retry can be
+     observed without onnxruntime-node or a GPU. */
+  importTransformers = () => import('@huggingface/transformers'),
+}) {
+  /* Per instance, not per module: the import used to be cached in a module
+     global, which is one recogniser's module handed to every service in the
+     process. There is one service in the app, so this is the same work. */
+  let transformers = null;
   const userData = app ? app.getPath('userData') : process.cwd();
   const cacheDir = path.join(userData, 'huggingface-cache');
   let pipe = null;
@@ -208,7 +215,7 @@ function createOnnxWhisperService({ app }) {
     } catch (e) {
       console.warn('Failed to create huggingface-cache directory:', e);
     }
-    if (!transformers) transformers = await import('@huggingface/transformers');
+    if (!transformers) transformers = await importTransformers();
     /* v3 reads the cache location off `env` rather than the TRANSFORMERS_CACHE
        environment variable v2 used, so setting it has to happen after import
        and before the first pipeline call. */
