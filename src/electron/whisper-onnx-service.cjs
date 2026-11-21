@@ -136,13 +136,9 @@ function findModel(value) {
 
 function createOnnxWhisperService({
   app,
-  /* Injected by the device test, so the CUDA request and the CPU retry can be
-     observed without onnxruntime-node or a GPU. */
+  /* The device test supplies a stand-in; the app always takes the default. */
   importTransformers = () => import('@huggingface/transformers'),
 }) {
-  /* Per instance, not per module: the import used to be cached in a module
-     global, which is one recogniser's module handed to every service in the
-     process. There is one service in the app, so this is the same work. */
   let transformers = null;
   const userData = app ? app.getPath('userData') : process.cwd();
   const cacheDir = path.join(userData, 'huggingface-cache');

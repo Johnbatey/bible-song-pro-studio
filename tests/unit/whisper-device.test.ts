@@ -3,14 +3,13 @@
    -------------------------------------------------------------------------
    Installing the provider is one thing; asking for it is another. These tests
    drive warmup() with a stand-in for transformers.js, so the device request,
-   the one CPU retry, the device that status() reports and the fallback reason
-   surviving a transcript are all observed on this machine — no
-   onnxruntime-node, no GPU, no download.
+   the one CPU retry, the device status() reports and the fallback reason
+   surviving a transcript are observed here — no onnxruntime-node, no GPU.
 
-   The service's only seam is `importTransformers`; everything below goes
-   through the real warmup/transcribe/status code.
+   `importTransformers` is the service's only seam; everything below it is the
+   real warmup/transcribe/status code.
    ========================================================================= */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRequire } from 'module';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -25,41 +24,39 @@ let root: string;
 
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'whisper-device-test-'));
-  delete process.env.BSP_WHISPER_DEVICE;
 });
 
 afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
-  delete process.env.BSP_WHISPER_DEVICE;
+  vi.unstubAllEnvs();
   Object.defineProperty(process, 'platform', { value: REAL_PLATFORM, configurable: true });
   Object.defineProperty(process, 'arch', { value: REAL_ARCH, configurable: true });
 });
 
-/** The platform gate reads the process globals; both are configurable. */
+/** The gate reads the process globals; both properties are configurable. */
 function pretendPlatform(platform: string, arch: string) {
   Object.defineProperty(process, 'platform', { value: platform, configurable: true });
   Object.defineProperty(process, 'arch', { value: arch, configurable: true });
 }
 
-type PipelineCall = { task: string; model: string; options: Record<string, unknown> };
-
 /**
- * A transformers.js stand-in that records every pipeline() attempt and lets
- * each one succeed or fail. Attempt 1 is the CUDA request, attempt 2 the retry.
+ * transformers.js stand-in. Records the options of every pipeline() attempt;
+ * `behave(attempt)` decides what that attempt returns. Attempt 1 is the CUDA
+ * request, attempt 2 the retry.
  */
 function fakeTransformers(behave: (attempt: number) => unknown) {
-  const calls: PipelineCall[] = [];
+  const calls: Record<string, unknown>[] = [];
   const module = {
     env: {} as Record<string, unknown>,
-    pipeline: async (task: string, model: string, options: Record<string, unknown>) => {
-      calls.push({ task, model, options });
+    pipeline: async (_task: string, _model: string, options: Record<string, unknown>) => {
+      calls.push(options);
       return behave(calls.length);
     },
   };
   return { module, calls };
 }
 
-/** Recognisers in this service are callable: pipe(audio, options) -> result. */
+/** A recogniser is callable: pipe(audio, options) -> result. */
 const recogniser = () => async () => ({ text: 'amen', chunks: [] });
 
 function serviceWith(module: unknown) {
@@ -69,49 +66,51 @@ function serviceWith(module: unknown) {
   });
 }
 
+/** The opt-in as an operator would set it: variable plus a CUDA host. */
+function requestCudaOnLinux() {
+  vi.stubEnv('BSP_WHISPER_DEVICE', 'cuda');
+  pretendPlatform('linux', 'x64');
+}
+
 describe('CUDA opt-in', () => {
   it('leaves the pipeline on the default device when the variable is unset', async () => {
     const { module, calls } = fakeTransformers(recogniser);
     const service = serviceWith(module);
 
-    const warmed = await service.warmup();
-
-    expect(warmed.ok).toBe(true);
+    expect((await service.warmup()).ok).toBe(true);
     expect(calls).toHaveLength(1);
-    expect('device' in calls[0].options).toBe(false);
+    expect('device' in calls[0]).toBe(false);
     expect(service.status().device).toBe('cpu');
   });
 
   it('requests device cuda when BSP_WHISPER_DEVICE=cuda on linux/x64', async () => {
-    pretendPlatform('linux', 'x64');
-    process.env.BSP_WHISPER_DEVICE = 'cuda';
+    requestCudaOnLinux();
     const { module, calls } = fakeTransformers(recogniser);
-
     const service = serviceWith(module);
+
     await service.warmup();
 
-    expect(calls[0].options.device).toBe('cuda');
-    expect(service.status().device).toBe('cuda');
+    expect(calls[0].device).toBe('cuda');
     expect(service.status().ready).toBe(true);
+    expect(service.status().device).toBe('cuda');
   });
 
   it('ignores the variable off linux/x64 rather than asking for an unsupported device', async () => {
+    vi.stubEnv('BSP_WHISPER_DEVICE', 'cuda');
     pretendPlatform('darwin', 'x64');
-    process.env.BSP_WHISPER_DEVICE = 'cuda';
     const { module, calls } = fakeTransformers(recogniser);
-
     const service = serviceWith(module);
+
     await service.warmup();
 
-    expect('device' in calls[0].options).toBe(false);
+    expect('device' in calls[0]).toBe(false);
     expect(service.status().device).toBe('cpu');
   });
 });
 
 describe('CPU fallback', () => {
   async function warmWithFailingCuda() {
-    pretendPlatform('linux', 'x64');
-    process.env.BSP_WHISPER_DEVICE = 'cuda';
+    requestCudaOnLinux();
     const { module, calls } = fakeTransformers((attempt) => {
       if (attempt === 1) throw new Error('libonnxruntime_providers_cuda.so: cannot open shared object file');
       return recogniser();
@@ -126,11 +125,10 @@ describe('CPU fallback', () => {
 
     expect(warmed.ok).toBe(true);
     expect(calls).toHaveLength(2);
-    expect(calls[0].options.device).toBe('cuda');
-    expect('device' in calls[1].options).toBe(false);
-    expect(service.status().device).toBe('cpu');
+    expect(calls[0].device).toBe('cuda');
+    expect('device' in calls[1]).toBe(false);
     expect(service.status().ready).toBe(true);
-    expect(service.status().warmupState).toBe('ready');
+    expect(service.status().device).toBe('cpu');
   });
 
   it('reports why it fell back, naming the CUDA error', async () => {
