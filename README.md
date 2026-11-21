@@ -105,6 +105,13 @@ Runtime's own error if the provider does not load instead of silently running on
 Requirements: CUDA 12.8+ and cuDNN 9.x on `LD_LIBRARY_PATH`, or a PyTorch installation built for the same
 CUDA major version. `npm ci` recreates `node_modules`, so re-run `npm run setup:cuda` after any install.
 
+Installing the provider does not make the app use it. Launch with the variable set, or the runtime stays on
+CPU; if the provider then fails to load, transcription still starts on CPU and says so in Settings → Audio.
+
+```bash
+BSP_WHISPER_DEVICE=cuda npm start
+```
+
 Verify an existing installation without downloading anything:
 
 ```bash

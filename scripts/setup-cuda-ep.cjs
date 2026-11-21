@@ -192,21 +192,23 @@ function extractWheel(wheelPath, outputDirectory) {
   }
 
   // The test models are optional as a group — the smoke test uses whichever one
-  // this wheel ships — so a miss is a note, not a failure. The library
-  // extraction above has already proved that unzip works and the wheel opens.
-  for (const entry of SMOKE_MODELS) {
-    try {
-      execFileSync('unzip', ['-o', '-j', wheelPath, entry, '-d', outputDirectory], {
-        stdio: 'ignore',
-      });
-    } catch {
-      warn(`${path.basename(wheelPath)} does not contain ${entry}`);
-    }
+  // this wheel ships. The library extraction above already proved that unzip
+  // works, so a miss here is silent and named by the caller if none landed.
+  try {
+    execFileSync('unzip', ['-o', '-j', wheelPath, ...SMOKE_MODELS, '-d', outputDirectory], {
+      stdio: 'ignore',
+    });
+  } catch {
+    /* this wheel layout has no dataset; the model lookup below reports it */
   }
 }
 
+function requiredFiles(version) {
+  return [`libonnxruntime.so.${version}`, ...PROVIDER_FILES];
+}
+
 function copyLibraries(targetDirectory, libsDirectory, version) {
-  const names = [`libonnxruntime.so.${version}`, ...PROVIDER_FILES];
+  const names = requiredFiles(version);
   const missing = names.filter((name) => !fs.existsSync(path.join(libsDirectory, name)));
   if (missing.length > 0) fail(`wheel is missing ${missing.join(', ')}`);
 
@@ -217,8 +219,7 @@ function copyLibraries(targetDirectory, libsDirectory, version) {
 }
 
 function verify(targetDirectory, version) {
-  const required = [`libonnxruntime.so.${version}`, ...PROVIDER_FILES];
-  const missing = required.filter((name) => {
+  const missing = requiredFiles(version).filter((name) => {
     const file = path.join(targetDirectory, name);
     return !fs.existsSync(file) || fs.statSync(file).size === 0;
   });
@@ -355,6 +356,6 @@ async function smokeTest(ortDirectory, modelPath) {
     await smokeTest(directories[0], modelPath);
   }
 
-  log('done. Restart the app, then run the model check (e.g. `npm run verify:local-models`).');
+  log('done. Launch with BSP_WHISPER_DEVICE=cuda to use the provider; `npm run verify:local-models` checks the models.');
   log('note: `npm ci` recreates node_modules — re-run `npm run setup:cuda` after every install.');
 })().catch((error) => fail(error.message || String(error)));
