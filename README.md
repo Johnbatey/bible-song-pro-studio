@@ -74,19 +74,44 @@ cd bible-song-pro-studio
 # Install dependencies
 npm install
 
-# Linux + NVIDIA GPU only, optional: also install the CUDA execution provider
-# for on-device speech models. It is skipped by default (.npmrc) so a plain
-# install works everywhere; the CPU provider is used when it is absent. An env
-# var outranks .npmrc, so this is the opt-in. That URL upstream requests 404s
-# today, so this command reaches the same error the default avoided until fixed.
-ONNXRUNTIME_NODE_INSTALL_CUDA=v12 npm install
-
 # Install pre-commit verification hooks
 node scripts/install-hooks.cjs
 
 # Start the application
 npm start
 ```
+
+### CUDA execution provider (optional, Linux x64 only)
+
+`onnxruntime-node` 1.21.0 — the version `@huggingface/transformers` 3.8.1 depends on — fetches its CUDA
+libraries from a GitHub release asset that is currently returning 404, and its installer has no alternative
+source or URL override. `ONNXRUNTIME_NODE_INSTALL_CUDA=v12` only turns off CUDA-version detection, so it
+fails in exactly the same way.
+
+Install the same libraries from Microsoft's PyPI wheel instead:
+
+```bash
+npm ci
+npm run setup:cuda
+```
+
+The script resolves `onnxruntime-gpu` at the exact installed `onnxruntime-node` version, verifies the
+download against PyPI's SHA-256, and copies the CUDA execution provider libraries into every local
+`onnxruntime-node` copy (the top-level one and the one nested under `@huggingface/transformers`).
+
+It then creates an `InferenceSession` with `executionProviders: ['cuda']`, so the command fails with ONNX
+Runtime's own error if the provider does not load instead of silently running on CPU.
+
+Requirements: CUDA 12.8+ and cuDNN 9.x on `LD_LIBRARY_PATH`, or a PyTorch installation built for the same
+CUDA major version. `npm ci` recreates `node_modules`, so re-run `npm run setup:cuda` after any install.
+
+Verify an existing installation without downloading anything:
+
+```bash
+npm run setup:cuda -- --check
+```
+
+The default install stays CPU-only and unchanged: no CUDA library is downloaded unless you run the script.
 
 ---
 
