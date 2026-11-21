@@ -1093,8 +1093,13 @@ export interface LocalModelStatus {
   warmupState: string;
   /** 0–100 while the weights are coming down. */
   downloadProgress: number;
+  /** Which execution provider the loaded session actually got: 'cuda' only when
+      the CUDA provider really came up, otherwise 'cpu'. */
+  device: string;
   cacheDir: string;
   lastError: string;
+  /** A successful-but-adjusted run, or why a CUDA request fell back to CPU. */
+  lastNotice: string;
   /** Whether the running model can be told a language at all. */
   multilingual: boolean;
   /** Language codes a multilingual model may be locked to. */

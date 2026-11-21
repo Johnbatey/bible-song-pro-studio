@@ -145,6 +145,10 @@ function createOnnxWhisperService({ app }) {
   let lastError = '';
   /** A note about a successful-but-adjusted run. Never an error. */
   let lastNotice = '';
+  /** Why a CUDA request ended on CPU. Kept apart from lastNotice because
+      transcribe() clears that one after every successful call, and this is a
+      property of the loaded session rather than of one utterance. */
+  let deviceNotice = '';
   let model = DEFAULT_MODEL;
   let downloadProgress = 0;
   /** Which execution provider the loaded pipeline actually got. cpu unless
@@ -176,7 +180,7 @@ function createOnnxWhisperService({ app }) {
       device: activeDevice,
       cacheDir,
       lastError,
-      lastNotice,
+      lastNotice: lastNotice || deviceNotice,
       backends: ['onnxruntime-node'],
       /* Whether the running model can be told a language at all. The Language
          settings row reads this: offering French to an English-only recogniser
@@ -229,6 +233,7 @@ function createOnnxWhisperService({ app }) {
     downloadProgress = 0;
     lastError = '';
     lastNotice = '';
+    deviceNotice = '';
     return { ok: true, status: status() };
   }
 
@@ -250,6 +255,7 @@ function createOnnxWhisperService({ app }) {
         warmupState = 'loading';
         downloadProgress = 0;
         activeDevice = 'cpu';
+        deviceNotice = '';
         const { pipeline } = await loadTransformers();
         const options = {
           dtype: model.dtype,
@@ -285,7 +291,7 @@ function createOnnxWhisperService({ app }) {
              still leave the operator a recogniser rather than an error that
              reads as a dead microphone. The weights are already on disk. */
           pipe = await pipeline('automatic-speech-recognition', model.id, options);
-          lastNotice = `CUDA was requested but did not load, so this session runs on CPU: ${cudaError.message}`;
+          deviceNotice = `CUDA was requested but did not load, so this session runs on CPU: ${cudaError.message}`;
         }
         warmupState = 'ready';
         downloadProgress = 100;
@@ -386,6 +392,7 @@ function createOnnxWhisperService({ app }) {
       pipe = null;
       warmupState = 'idle';
       activeDevice = 'cpu';
+      deviceNotice = '';
       downloadProgress = 0;
       return { ok: true, status: status() };
     } catch (err) {
