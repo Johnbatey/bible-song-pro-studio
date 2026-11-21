@@ -147,6 +147,9 @@ function createOnnxWhisperService({ app }) {
   let lastNotice = '';
   let model = DEFAULT_MODEL;
   let downloadProgress = 0;
+  /** Which execution provider the loaded pipeline actually got. cpu unless
+      BSP_WHISPER_DEVICE asked for CUDA and the session really came up on it. */
+  let activeDevice = 'cpu';
 
   /** A model is on disk when its cache folder exists — that is what makes the
       difference between "will start instantly" and "needs the internet". */
@@ -170,6 +173,7 @@ function createOnnxWhisperService({ app }) {
       ready: warmupState === 'ready' && Boolean(pipe),
       warmupState,
       downloadProgress,
+      device: activeDevice,
       cacheDir,
       lastError,
       lastNotice,
@@ -220,6 +224,7 @@ function createOnnxWhisperService({ app }) {
        from. */
     pipe = null;
     warmupState = 'idle';
+    activeDevice = 'cpu';
     activeWarmupPromise = null;
     downloadProgress = 0;
     lastError = '';
@@ -244,8 +249,9 @@ function createOnnxWhisperService({ app }) {
 
         warmupState = 'loading';
         downloadProgress = 0;
+        activeDevice = 'cpu';
         const { pipeline } = await loadTransformers();
-        pipe = await pipeline('automatic-speech-recognition', model.id, {
+        const options = {
           dtype: model.dtype,
           progress_callback: (progress) => {
             if (progress.status === 'progress') {
@@ -255,7 +261,32 @@ function createOnnxWhisperService({ app }) {
               downloadProgress = 100;
             }
           },
-        });
+        };
+
+        /* The execution provider is picked here and nowhere else: transformers.js
+           derives it from `device`, and its default in Node is ['cpu'], so an
+           installed CUDA provider would otherwise sit unused. */
+        const wantsCuda =
+          process.env.BSP_WHISPER_DEVICE === 'cuda' &&
+          process.platform === 'linux' &&
+          process.arch === 'x64';
+
+        try {
+          pipe = await pipeline(
+            'automatic-speech-recognition',
+            model.id,
+            wantsCuda ? { ...options, device: 'cuda' } : options,
+          );
+          if (wantsCuda) activeDevice = 'cuda';
+        } catch (cudaError) {
+          if (!wantsCuda) throw cudaError;
+          /* CUDA is a request, never a requirement: the CPU provider ships with
+             onnxruntime-node and always loads. A CUDA session that fails must
+             still leave the operator a recogniser rather than an error that
+             reads as a dead microphone. The weights are already on disk. */
+          pipe = await pipeline('automatic-speech-recognition', model.id, options);
+          lastNotice = `CUDA was requested but did not load, so this session runs on CPU: ${cudaError.message}`;
+        }
         warmupState = 'ready';
         downloadProgress = 100;
         lastError = '';
@@ -354,6 +385,7 @@ function createOnnxWhisperService({ app }) {
     try {
       pipe = null;
       warmupState = 'idle';
+      activeDevice = 'cpu';
       downloadProgress = 0;
       return { ok: true, status: status() };
     } catch (err) {
