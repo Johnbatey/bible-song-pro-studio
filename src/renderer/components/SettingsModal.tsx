@@ -998,7 +998,7 @@ export function SettingsModal() {
                         {aiStatus?.warmupState === 'error'
                           ? aiStatus?.lastError || t('settings.audio.modelLoadError')
                           : aiStatus?.ready
-                          ? `${t('settings.audio.modelReady')}${aiStatus.device ? ` · ${aiStatus.device.toUpperCase()}` : ''}`
+                          ? `${t('settings.audio.modelReady')} · ${aiStatus.device.toUpperCase()}`
                           : t('settings.audio.downloadSizeHint', { size: localModel?.approxSize || '~145 MB' })}
                       </span>
                     </div>
