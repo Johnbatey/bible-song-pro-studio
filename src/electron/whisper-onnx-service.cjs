@@ -22,8 +22,6 @@
 const fs = require('fs');
 const path = require('path');
 
-let transformers = null;
-
 /**
  * What an operator can pick from.
  *
@@ -136,7 +134,12 @@ function findModel(value) {
   return MODELS.find((m) => m.key === value || m.id === value) || null;
 }
 
-function createOnnxWhisperService({ app }) {
+function createOnnxWhisperService({
+  app,
+  /* The device test supplies a stand-in; the app always takes the default. */
+  importTransformers = () => import('@huggingface/transformers'),
+}) {
+  let transformers = null;
   const userData = app ? app.getPath('userData') : process.cwd();
   const cacheDir = path.join(userData, 'huggingface-cache');
   let pipe = null;
@@ -145,8 +148,15 @@ function createOnnxWhisperService({ app }) {
   let lastError = '';
   /** A note about a successful-but-adjusted run. Never an error. */
   let lastNotice = '';
+  /** Why a CUDA request ended on CPU. Kept apart from lastNotice because
+      transcribe() clears that one after every successful call, and this is a
+      property of the loaded session rather than of one utterance. */
+  let deviceNotice = '';
   let model = DEFAULT_MODEL;
   let downloadProgress = 0;
+  /** Which execution provider the loaded pipeline actually got. cpu unless
+      BSP_WHISPER_DEVICE asked for CUDA and the session really came up on it. */
+  let activeDevice = 'cpu';
 
   /** A model is on disk when its cache folder exists — that is what makes the
       difference between "will start instantly" and "needs the internet". */
@@ -170,9 +180,10 @@ function createOnnxWhisperService({ app }) {
       ready: warmupState === 'ready' && Boolean(pipe),
       warmupState,
       downloadProgress,
+      device: activeDevice,
       cacheDir,
       lastError,
-      lastNotice,
+      lastNotice: lastNotice || deviceNotice,
       backends: ['onnxruntime-node'],
       /* Whether the running model can be told a language at all. The Language
          settings row reads this: offering French to an English-only recogniser
@@ -200,7 +211,7 @@ function createOnnxWhisperService({ app }) {
     } catch (e) {
       console.warn('Failed to create huggingface-cache directory:', e);
     }
-    if (!transformers) transformers = await import('@huggingface/transformers');
+    if (!transformers) transformers = await importTransformers();
     /* v3 reads the cache location off `env` rather than the TRANSFORMERS_CACHE
        environment variable v2 used, so setting it has to happen after import
        and before the first pipeline call. */
@@ -220,10 +231,12 @@ function createOnnxWhisperService({ app }) {
        from. */
     pipe = null;
     warmupState = 'idle';
+    activeDevice = 'cpu';
     activeWarmupPromise = null;
     downloadProgress = 0;
     lastError = '';
     lastNotice = '';
+    deviceNotice = '';
     return { ok: true, status: status() };
   }
 
@@ -244,8 +257,10 @@ function createOnnxWhisperService({ app }) {
 
         warmupState = 'loading';
         downloadProgress = 0;
+        activeDevice = 'cpu';
+        deviceNotice = '';
         const { pipeline } = await loadTransformers();
-        pipe = await pipeline('automatic-speech-recognition', model.id, {
+        const options = {
           dtype: model.dtype,
           progress_callback: (progress) => {
             if (progress.status === 'progress') {
@@ -255,7 +270,32 @@ function createOnnxWhisperService({ app }) {
               downloadProgress = 100;
             }
           },
-        });
+        };
+
+        /* The execution provider is picked here and nowhere else: transformers.js
+           derives it from `device`, and its default in Node is ['cpu'], so an
+           installed CUDA provider would otherwise sit unused. */
+        const wantsCuda =
+          process.env.BSP_WHISPER_DEVICE === 'cuda' &&
+          process.platform === 'linux' &&
+          process.arch === 'x64';
+
+        try {
+          pipe = await pipeline(
+            'automatic-speech-recognition',
+            model.id,
+            wantsCuda ? { ...options, device: 'cuda' } : options,
+          );
+          if (wantsCuda) activeDevice = 'cuda';
+        } catch (cudaError) {
+          if (!wantsCuda) throw cudaError;
+          /* CUDA is a request, never a requirement: the CPU provider ships with
+             onnxruntime-node and always loads. A CUDA session that fails must
+             still leave the operator a recogniser rather than an error that
+             reads as a dead microphone. The weights are already on disk. */
+          pipe = await pipeline('automatic-speech-recognition', model.id, options);
+          deviceNotice = `CUDA was requested but did not load, so this session runs on CPU: ${cudaError.message}`;
+        }
         warmupState = 'ready';
         downloadProgress = 100;
         lastError = '';
@@ -354,6 +394,8 @@ function createOnnxWhisperService({ app }) {
     try {
       pipe = null;
       warmupState = 'idle';
+      activeDevice = 'cpu';
+      deviceNotice = '';
       downloadProgress = 0;
       return { ok: true, status: status() };
     } catch (err) {

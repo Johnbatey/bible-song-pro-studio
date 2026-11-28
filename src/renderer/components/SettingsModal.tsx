@@ -989,6 +989,7 @@ export function SettingsModal() {
                             })}
                       </button>
                       <span
+                        title={aiStatus?.lastNotice || undefined}
                         style={{
                           fontSize: 11,
                           color: aiStatus?.warmupState === 'error' ? 'var(--tally-fault)' : 'var(--text-dim)',
@@ -997,7 +998,7 @@ export function SettingsModal() {
                         {aiStatus?.warmupState === 'error'
                           ? aiStatus?.lastError || t('settings.audio.modelLoadError')
                           : aiStatus?.ready
-                          ? t('settings.audio.modelReady')
+                          ? `${t('settings.audio.modelReady')} · ${aiStatus.device.toUpperCase()}`
                           : t('settings.audio.downloadSizeHint', { size: localModel?.approxSize || '~145 MB' })}
                       </span>
                     </div>

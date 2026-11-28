@@ -30,6 +30,7 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "setup:cuda": "node scripts/setup-cuda-ep.cjs",
     "test:live-scripture": "node scripts/test-live-scripture-parser.cjs",
     "verify:local-models": "node scripts/verify-local-models.cjs",
     "verify:ndi": "node scripts/verify-ndi-bundling.cjs",
