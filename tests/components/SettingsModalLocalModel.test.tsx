@@ -10,12 +10,25 @@ import type { LocalModelStatus } from '../../src/renderer/types';
 const FALLBACK_NOTICE =
   'CUDA requested but onnxruntime could not create a CUDA session; running on CPU.';
 
+/* What a wheel that copied but cannot resolve its libraries reports. */
+const LOAD_ERROR = 'libcudnn.so.9: cannot open shared object file: No such file or directory';
+
 /** Only the fields the row paints, so the status cannot carry values the
     engine would never report. */
-type OnnxStatus = Pick<LocalModelStatus, 'ready' | 'warmupState' | 'device' | 'lastNotice'>;
+type OnnxStatus = Pick<
+  LocalModelStatus,
+  'ready' | 'warmupState' | 'device' | 'lastNotice' | 'lastError'
+>;
 
 function onnxStatus(overrides: Partial<OnnxStatus> = {}): OnnxStatus {
-  return { ready: true, warmupState: 'ready', device: 'cpu', lastNotice: '', ...overrides };
+  return {
+    ready: true,
+    warmupState: 'ready',
+    device: 'cpu',
+    lastNotice: '',
+    lastError: '',
+    ...overrides,
+  };
 }
 
 function mockBsp(onnx: OnnxStatus) {
@@ -49,5 +62,16 @@ describe('SettingsModal local model row', () => {
        not the one is one hover away — without a Linux GPU. */
     expect(line.textContent).toBe('Loaded and ready to transcribe. · CPU');
     expect(line).toHaveAttribute('title', FALLBACK_NOTICE);
+  });
+
+  it('shows lastError in place of the provider when warmup failed', async () => {
+    mockBsp(onnxStatus({ ready: false, warmupState: 'error', lastError: LOAD_ERROR }));
+    render(<SettingsModal />);
+
+    const line = await screen.findByText(LOAD_ERROR);
+    expect(line.textContent).toBe(LOAD_ERROR);
+    // The provider suffix gives way to the failure, so the row never claims a
+    // device it did not manage to load.
+    expect(screen.queryByText(/Loaded and ready to transcribe\./)).toBeNull();
   });
 });
